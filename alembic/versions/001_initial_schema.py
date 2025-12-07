@@ -16,11 +16,14 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Enable extensions
-    op.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"')
+    # Create extensions schema first
+    op.execute('CREATE SCHEMA IF NOT EXISTS extensions')
+    
+    # Enable extensions in extensions schema
+    op.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp" SCHEMA extensions')
     # pgvector extension - handle gracefully if not available
     try:
-        op.execute('CREATE EXTENSION IF NOT EXISTS vector')
+        op.execute('CREATE EXTENSION IF NOT EXISTS vector SCHEMA extensions')
     except Exception:
         # Extension may already exist or not be available
         # This is handled by the init script

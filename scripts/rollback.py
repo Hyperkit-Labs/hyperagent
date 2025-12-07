@@ -125,12 +125,68 @@ class RollbackManager:
         print("[*] Running pre-rollback checks...")
         
         # Check if rollback is safe
-        # In production, this could check:
-        # - Active workflows
-        # - Critical operations in progress
-        # - Data consistency
+        try:
+            # Check for active workflows
+            from hyperagent.db.session import get_db
+            from hyperagent.models.workflow import Workflow
+            from sqlalchemy import select
+            from sqlalchemy.ext.asyncio import AsyncSession
+            
+            async for db in get_db():
+                result = await db.execute(
+                    select(Workflow).where(
+                        Workflow.status.in_(["running", "pending"])
+                    )
+                )
+                active_workflows = result.scalars().all()
+                
+                if active_workflows:
+                    print(f"[!] Warning: {len(active_workflows)} active workflows found")
+                    print("[!] Consider waiting for workflows to complete before rollback")
+                    response = input("Continue anyway? (yes/no): ")
+                    if response.lower() != "yes":
+                        return False
+                break
+            
+            # Check database connectivity
+            from hyperagent.core.config import settings
+            import asyncpg
+            
+            conn = await asyncpg.connect(settings.database_url)
+            await conn.close()
+            print("[+] Database connectivity verified")
+            
+            # Check service health
+            if not await self._check_service_health():
+                print("[!] Warning: Service health check failed")
+                response = input("Continue with rollback anyway? (yes/no): ")
+                if response.lower() != "yes":
+                    return False
+            
+            print("[+] Pre-rollback checks passed")
+            return True
+            
+        except Exception as e:
+            print(f"[-] Pre-rollback check error: {e}")
+            print("[!] Continuing with rollback (use --force to skip checks)")
+            return False
+    
+    async def _check_service_health(self) -> bool:
+        """Check if service is healthy before rollback"""
+        import aiohttp
         
-        return True
+        health_url = os.getenv("HEALTH_CHECK_URL", "http://localhost:8000/api/v1/health")
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(health_url, timeout=5) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        return data.get("status") == "healthy"
+                    return False
+        except Exception:
+            # Service might not be running, which is okay for rollback
+            return True
     
     async def _restore_database(self, backup_file: str) -> bool:
         """Restore database from backup"""

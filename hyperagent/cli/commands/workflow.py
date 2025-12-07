@@ -38,7 +38,9 @@ def register_workflow_commands(workflow_group: click.Group) -> None:
     @click.option(
         "--network",
         "-n",
-        type=click.Choice(["hyperion_testnet", "hyperion_mainnet", "mantle_testnet", "mantle_mainnet"]),
+        type=click.Choice(
+            ["hyperion_testnet", "hyperion_mainnet", "mantle_testnet", "mantle_mainnet"]
+        ),
         default="hyperion_testnet",
         help="Target blockchain",
     )
@@ -204,7 +206,9 @@ def register_workflow_commands(workflow_group: click.Group) -> None:
                             yaml.dump(status_data, default_flow_style=False, allow_unicode=True)
                         )
                     except ImportError:
-                        format_error("YAML format requires PyYAML", "Install with: pip install pyyaml")
+                        format_error(
+                            "YAML format requires PyYAML", "Install with: pip install pyyaml"
+                        )
                 elif format == "compact":
                     console.print(
                         f"{status_data.get('workflow_id', 'N/A')} | {status_data.get('status', 'N/A')} | {status_data.get('progress_percentage', 0)}%"
@@ -399,4 +403,3 @@ def register_workflow_commands(workflow_group: click.Group) -> None:
             handle_api_error(e, f"workflow {workflow_id}")
         except Exception as e:
             format_error("Failed to export workflow", str(e))
-

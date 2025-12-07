@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: hyperagent-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn hyperagent.api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: THIRDWEB_CLIENT_ID
+        sync: false
+      - key: THIRDWEB_SECRET_KEY
+        sync: false
+      - key: THIRDWEB_SERVER_WALLET_ADDRESS
+        sync: false
+      - key: MERCHANT_WALLET_ADDRESS
+        sync: false
+      - key: USDC_ADDRESS_FUJI
+        sync: false
+      - key: USDC_ADDRESS_AVALANCHE
+        sync: false
+      - key: X402_ENABLED
+        value: "true"
+      - key: X402_ENABLED_NETWORKS
+        value: "avalanche_fuji,avalanche_mainnet"
+      - key: X402_SERVICE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: NODE_ENV
+        value: "production"
+      - key: LOG_LEVEL
+        value: "INFO"
+      - key: ENABLE_METRICS
+        value: "true"
+      - key: ENABLE_WEBSOCKET
+        value: "true"
+      - key: CORS_ORIGINS
+        sync: false
+

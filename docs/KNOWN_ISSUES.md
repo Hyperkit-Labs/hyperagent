@@ -1,6 +1,6 @@
 # Known Issues & Limitations
 
-**Last Updated**: 2025-01-27  
+**Last Updated**: 2025-12-07  
 **Version**: 1.0.0
 
 ## Current Known Issues

@@ -2,6 +2,14 @@
 """
 Production Deployment Script
 
+⚠️  DEVELOPMENT ONLY - NOT FOR PRODUCTION USE ⚠️
+
+This script is a development/testing tool for local deployment scenarios.
+For production deployments, use:
+- Render.com: See render.yaml and GUIDE/SIMPLIFIED_SETUP.md
+- VPS: See scripts/start_production.sh
+- Direct Python: uvicorn hyperagent.api.main:app
+
 Concept: Automated deployment to production environment
 Logic: Validate environment, run migrations, deploy services, verify health
 Security: Checks for required secrets, validates configuration
@@ -124,9 +132,31 @@ class ProductionDeployment:
     
     async def _check_service_health(self, service: str) -> bool:
         """Check if service is healthy"""
-        # Simplified health check
-        # In production, use actual health check endpoints
-        return True
+        import aiohttp
+        
+        # Service-specific health check URLs
+        health_checks = {
+            "postgres": None,  # Checked via connection test
+            "redis": None,     # Checked via connection test
+            "hyperagent": os.getenv("HEALTH_CHECK_URL", "http://localhost:8000/api/v1/health"),
+            "x402-verifier": "http://localhost:3002/health",
+        }
+        
+        health_url = health_checks.get(service)
+        if not health_url:
+            # Database/Redis are checked via connection tests
+            return True
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(health_url, timeout=5) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        return data.get("status") in ["healthy", "ok"]
+                    return False
+        except Exception as e:
+            print(f"[-] Health check for {service} failed: {e}")
+            return False
     
     async def _run_migrations(self) -> bool:
         """Run Alembic database migrations"""
@@ -197,8 +227,9 @@ class ProductionDeployment:
     async def _deploy_direct(self) -> bool:
         """Deploy directly (systemd, supervisor, etc.)"""
         print("[*] Direct deployment (systemd/supervisor)")
-        # Implementation would depend on deployment target
-        return True
+        print("[!] Direct deployment not implemented - use start_production.sh instead")
+        print("[!] For production, see GUIDE/SIMPLIFIED_SETUP.md")
+        return False
     
     async def _verify_deployment(self) -> bool:
         """Verify deployment is healthy"""

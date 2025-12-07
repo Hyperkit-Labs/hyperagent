@@ -337,5 +337,5 @@ SELECT id, contract_name, constructor_args FROM contracts ORDER BY created_at DE
 
 ---
 
-**Last Updated**: 2025-11-18
+**Last Updated**: 2025-12-07
 

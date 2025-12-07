@@ -312,7 +312,9 @@ def register_contract_commands(contract_group: click.Group) -> None:
                 if explorer in explorer_urls:
                     console.print(f"  Explorer: {explorer_urls[explorer]}")
                 else:
-                    console.print(f"  {CLIStyle.WARNING} Explorer URL not configured for {explorer}")
+                    console.print(
+                        f"  {CLIStyle.WARNING} Explorer URL not configured for {explorer}"
+                    )
 
             console.print(
                 f"\n{CLIStyle.INFO} Note: Automatic verification submission not yet implemented"
@@ -331,4 +333,3 @@ def register_contract_commands(contract_group: click.Group) -> None:
             handle_api_error(e, f"contract verification")
         except Exception as e:
             format_error("Failed to get verification info", str(e))
-

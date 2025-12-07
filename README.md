@@ -58,6 +58,46 @@
 - PostgreSQL 15+ (or [Supabase](https://supabase.com) - recommended)
 - [Google Gemini API Key](https://aistudio.google.com/app/apikey)
 
+## Hardware
+For development:
+- Minimum: 8 GB RAM, 2 cores (works but slow)
+- Recommended: 16 GB RAM, 4 cores (smooth)
+- Optimal: 32 GB RAM, 6+ cores (best experience)
+For production deployment:
+- Use cloud services (Supabase, Redis Cloud) to reduce local requirements
+See [GUIDE/SIMPLIFIED_SETUP.md](./GUIDE/SIMPLIFIED_SETUP.md) for cloud-based setup
+
+Minimum Local Storage
+- Fresh Install: ~10-12 GB
+- After 1 Month: ~15-18 GB
+- After 3 Months: ~22-28 GB
+
+Recommended Free Space
+- Minimum: 30 GB free
+- Recommended: 50 GB free
+- Optimal: 100 GB free (SSD)
+
+Largest Components
+- Docker Images: ~5-8 GB (can be cleaned)
+- Docker Volumes: ~5-15 GB (grows with usage)
+- Python venv: ~1 GB
+- Frontend node_modules: ~500 MB
+
+Quick Savings
+- Use Supabase (saves ~5-15 GB database volume)
+- Clean Docker regularly (saves ~2-5 GB)
+- Limit Prometheus retention (saves ~1-2 GB)
+- Rotate logs (saves ~500 MB - 1 GB)
+- Total potential savings: ~8-23 GB
+For development, 30-50 GB free space is recommended.
+
+## Performance
+- First build: ~25-45 minutes
+- Rebuild (with cache): ~5-15 minutes
+- Frontend only: ~3-5 minutes
+- Backend only: ~20-35 minutes
+The multi-stage build and layer caching help reduce rebuild times. Most time is spent installing Python dependencies and Solidity compilers.
+
 ### Quick Install
 
 ```bash

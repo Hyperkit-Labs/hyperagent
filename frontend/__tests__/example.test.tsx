@@ -4,7 +4,7 @@
  * This demonstrates the test setup. Replace with actual component tests.
  */
 
-import { render, screen } from '@testing-library/react';
+// import { render, screen } from '@testing-library/react';
 
 describe('Example Test', () => {
   it('should pass', () => {

@@ -19,6 +19,8 @@ python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
 asyncio_mode = "auto"
+# Disable web3.tools.pytest_ethereum plugin to avoid import errors
+addopts = "-p no:web3.tools.pytest_ethereum"
 
 [tool.black]
 line-length = 100

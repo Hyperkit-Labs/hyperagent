@@ -6,7 +6,6 @@ import { useActiveWallet, useActiveAccount } from 'thirdweb/react';
 import { WorkflowForm } from '@/components/workflows/WorkflowForm';
 import { createWorkflow, handleApiError } from '@/lib/api';
 import { createFetchWithPayment, isThirdwebConfigured } from '@/lib/thirdwebClient';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Card } from '@/components/ui/Card';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
@@ -130,7 +129,7 @@ export default function CreateWorkflowPage() {
           Describe the smart contract you want to create and we'll generate it for you
         </p>
         <p className="mt-2 text-sm text-blue-600">
-          Note: Avalanche networks require x402 payment. You'll be prompted to approve payments in your wallet.
+          Note: Avalanche networks require x402 payment. You&apos;ll be prompted to approve payments in your wallet.
         </p>
       </div>
 

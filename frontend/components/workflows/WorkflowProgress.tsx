@@ -18,7 +18,6 @@ const stages = [
 ];
 
 export function WorkflowProgress({ workflow }: WorkflowProgressProps) {
-  const currentStage = stages.find((s) => workflow.status === s.key) || stages[0];
   const currentStageIndex = stages.findIndex((s) => workflow.status === s.key);
 
   return (
@@ -35,7 +34,6 @@ export function WorkflowProgress({ workflow }: WorkflowProgressProps) {
           {stages.map((stage, index) => {
             const isCompleted = index < currentStageIndex;
             const isCurrent = index === currentStageIndex;
-            const isPending = index > currentStageIndex;
 
             return (
               <div

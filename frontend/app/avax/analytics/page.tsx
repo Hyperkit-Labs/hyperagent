@@ -6,7 +6,6 @@ import { motion } from "framer-motion";
 import { SpendingTrends } from "@/components/analytics/SpendingTrends";
 import { PaymentHistoryTable } from "@/components/analytics/PaymentHistoryTable";
 import { PaymentSummary as PaymentSummaryComponent } from "@/components/analytics/PaymentSummary";
-import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { RefreshCw, TrendingUp } from "lucide-react";

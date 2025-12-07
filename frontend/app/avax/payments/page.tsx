@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useActiveAccount } from 'thirdweb/react';
 import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { BudgetDisplay } from '@/components/x402/BudgetDisplay';
 import { PaymentHistoryTable } from '@/components/analytics/PaymentHistoryTable';

@@ -114,6 +114,7 @@ export default function MonitoringPage() {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const getServiceStatus = (service: ServiceStatus | undefined) => {
     if (!service) return { status: 'unknown', color: 'gray' };
     const status = service.status || 'unknown';

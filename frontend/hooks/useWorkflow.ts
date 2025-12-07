@@ -57,6 +57,7 @@ export function useWorkflow(workflowId: string | null, pollInterval = 2000) {
         clearInterval(intervalId);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workflowId, pollInterval]);
 
   return { workflow, loading, error };

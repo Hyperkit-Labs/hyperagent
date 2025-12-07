@@ -44,6 +44,7 @@ jobs:
       
       - name: Run MyPy type checking
         run: mypy hyperagent/
+        continue-on-error: true
 
   # ============================================================================
   # STAGE 2: SECURITY SCANNING

@@ -2,7 +2,6 @@
 
 import { useState, useMemo, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Card } from '@/components/ui/Card';
 import { 
   Network, 
   Database, 
@@ -28,7 +27,6 @@ import {
   ChevronRight,
   Sparkles
 } from 'lucide-react';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // Lazy load heavy components
 const MindMapCanvas = lazy(() => import('@/components/architecture/MindMapCanvas'));
@@ -694,7 +692,7 @@ export default function ArchitecturePage() {
                             className="overflow-hidden border-t border-white/5"
                           >
                             <div className="p-2 space-y-1 bg-slate-900/20">
-                              {nodes.map((node, nodeIndex) => {
+                              {nodes.map((node) => {
                                 const NodeIcon = node.icon;
                                 const isSelected = selectedNode === node.id;
                                 const isHovered = hoveredNodeId === node.id;
@@ -886,7 +884,7 @@ export default function ArchitecturePage() {
                         <div>
                           <h3 className="text-sm font-medium text-slate-200 mb-2">Implementation</h3>
                           <div className="p-3 bg-slate-950 rounded-lg border border-white/5 font-mono text-xs text-slate-400 overflow-x-auto">
-                            <span className="text-pink-400">import</span> {`{ ${selectedNodeData.label.replace(/\s/g, '')} }`} <span className="text-pink-400">from</span> <span className="text-green-400">'{selectedNodeData.details.implementation}'</span>;
+                            <span className="text-pink-400">import</span> {`{ ${selectedNodeData.label.replace(/\s/g, '')} }`} <span className="text-pink-400">from</span> <span className="text-green-400">&apos;{selectedNodeData.details.implementation}&apos;</span>;
                           </div>
                         </div>
                       )}

@@ -41,7 +41,7 @@ export function PaymentChart({ history }: PaymentChartProps) {
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <div className="flex items-end justify-between h-64 gap-2">
-        {chartData.map((item, index) => (
+        {chartData.map((item) => (
           <div key={item.date} className="flex-1 flex flex-col items-center">
             <div
               className="w-full bg-blue-500 rounded-t hover:bg-blue-600 transition-colors cursor-pointer"

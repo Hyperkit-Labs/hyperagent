@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
-import { Rocket, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Rocket, ArrowRight } from 'lucide-react';
 
 export default function DeploymentsPage() {
   return (

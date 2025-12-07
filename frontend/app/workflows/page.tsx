@@ -6,7 +6,6 @@ import { WorkflowCard } from '@/components/workflows/WorkflowCard';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
 import Link from 'next/link';
 import { getWorkflows } from '@/lib/api';
 import type { Workflow } from '@/lib/types';
@@ -38,6 +37,7 @@ export default function WorkflowsPage() {
 
   useEffect(() => {
     fetchWorkflows();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
   const fetchWorkflows = async () => {

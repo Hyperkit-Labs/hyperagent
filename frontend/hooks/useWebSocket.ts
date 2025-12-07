@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { WorkflowWebSocket } from '@/lib/websocket';
-import type { WebSocketMessage, Workflow } from '@/lib/types';
+import type { Workflow } from '@/lib/types';
 
 export function useWebSocket(workflowId: string | null) {
   const [workflow, setWorkflow] = useState<Workflow | null>(null);

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import type { PaymentInfo } from '@/lib/x402Client';
-import { createPaymentWallet, createFetchWithPayment, getAvalancheChain } from '@/lib/thirdwebClient';
+import { createPaymentWallet, createFetchWithPayment } from '@/lib/thirdwebClient';
 
 interface PaymentModalProps {
   paymentInfo: PaymentInfo;
@@ -68,7 +68,7 @@ export function PaymentModal({
 
       if (response.ok) {
         // Payment successful - the payment data is automatically handled
-        const responseData = await response.json();
+        await response.json();
         
         setStatus('success');
         setTimeout(() => {

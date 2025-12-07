@@ -3,12 +3,10 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { getHealth, getNetworks } from '@/lib/api';
-import { useHealth } from '@/hooks/useHealth';
+import { getNetworks } from '@/lib/api';
 import Link from 'next/link';
-import type { HealthStatus, Network } from '@/lib/types';
+import type { Network } from '@/lib/types';
 import {
   Sparkles,
   Zap,

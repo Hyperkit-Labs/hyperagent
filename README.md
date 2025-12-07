@@ -12,7 +12,6 @@
 
 
 <div align="center">
-  <h1>HyperAgent</h1>
   <p><strong>AI-powered smart contract development platform</strong></p>
   <p>From natural language to production-ready, audited contracts in minutes</p>
   

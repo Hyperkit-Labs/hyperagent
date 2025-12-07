@@ -1,20 +1,6 @@
 # HyperAgent Getting Started Guide
 
-**Document Type**: Tutorial (Learning-Oriented)  
-**Category**: User Documentation  
-**Audience**: New Users, First-Time Users  
-**Location**: `GUIDE/GETTING_STARTED.md`
-
-This tutorial guides you through setting up HyperAgent and creating your first smart contract. By the end, you'll have HyperAgent running and will have generated and deployed a contract.
-
-## What You'll Accomplish
-
-By completing this tutorial, you will:
-- Install and configure HyperAgent
-- Set up the required services (PostgreSQL, Redis)
-- Generate your first smart contract from natural language
-- Deploy a contract to a testnet
-- Understand the basic workflow
+Quick setup guide to get HyperAgent running and generate your first smart contract.
 
 ## Table of Contents
 

@@ -9,7 +9,7 @@ Next.js frontend application for HyperAgent - AI Agent Platform for On-Chain Sma
 - **Contract Viewer**: Syntax-highlighted Solidity code display with ABI viewer
 - **Deployment Tracking**: View deployment details with explorer links
 - **Template Browser**: Browse and search contract templates
-- **System Monitoring**: Integration with Grafana for metrics visualization
+- **System Monitoring**: Integration with Prometheus for metrics collection
 
 ## Getting Started
 
@@ -34,7 +34,6 @@ cp .env.local.example .env.local
 ```
 NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws
-NEXT_PUBLIC_GRAFANA_URL=http://localhost:3001
 ```
 
 ### Development

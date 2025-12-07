@@ -1,6 +1,6 @@
 # HyperAgent Troubleshooting Guide
 
-## Common Issues and Solutions
+Common issues and solutions.
 
 ### 1. Constructor Argument Errors
 

@@ -6,7 +6,6 @@ import { thirdwebClient, createFetchWithPayment, isThirdwebConfigured } from '@/
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { SpendingControls } from '@/components/spending/SpendingControls';
-import type { Workflow } from '@/lib/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -76,8 +75,8 @@ export default function AvalancheStudioPage() {
   const [loading, setLoading] = useState(false);
   const [workflowLoading, setWorkflowLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<Record<string, unknown> | null>(null);
-  const [workflow, setWorkflow] = useState<Workflow | null>(null);
+  const [result, setResult] = useState<any>(null);
+  const [workflow, setWorkflow] = useState<any>(null);
   const [thirdwebConfigured, setThirdwebConfigured] = useState(false);
 
   useEffect(() => {

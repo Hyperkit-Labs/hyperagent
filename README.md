@@ -2,16 +2,12 @@
   <img src="/public/ascii-art-doh-HyperAgent.png" alt="HyperAgent ASCII Art" width="800">
 </div>
 
-<div align="center">
-  
 <!-- Badges: start -->
 ![Version](https://img.shields.io/badge/version-1.0.0-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Status](https://img.shields.io/badge/status-production%20ready-success)
 <!-- Badges: end -->
-
-</div>
 
 ## Overview
 
@@ -167,21 +163,6 @@ HyperAgent is an AI-powered platform that streamlines smart contract development
    # For production, use direct Python deployment (see render.yaml)
    docker-compose up -d
    ```
-   
-   **Option C: Hybrid Setup (Recommended for Windows/WSL2)**
-   ```bash
-   # Start only backend services in Docker (3-5x faster frontend development)
-   # Unix/Linux/Mac:
-   ./scripts/start-backend.sh
-   
-   # Windows:
-   scripts\start-backend.bat
-   
-   # Then run frontend locally in a separate terminal:
-   cd frontend && npm run dev
-   ```
-   
-   > **Why Hybrid?** On Windows/WSL2, Docker volume mounts are slow. Running frontend locally provides **3-5x faster** builds and **10x faster** hot reload. See [Docker Guide](./GUIDE/DOCKER.md#hybrid-development-setup) for details.
 
 7. **Verify x402 setup** (if using x402 payments)
    ```bash
@@ -203,32 +184,24 @@ For detailed setup instructions, see [Getting Started Guide](./GUIDE/GETTING_STA
 
 HyperAgent includes a Next.js web frontend for non-developers:
 
-**If using Hybrid Setup** (backend in Docker, frontend local - recommended for Windows):
-```bash
-# Backend services should already be running from Option C above
-cd frontend
-npm install  # First time only
-npm run dev
-```
+1. **Navigate to frontend directory**
+   ```bash
+   cd frontend
+   ```
 
-**If using Full Docker Setup** (all services in Docker):
-```bash
-# Frontend is included in docker-compose, no separate setup needed
-# Access at http://localhost:3000
-```
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-**If using Simplified Setup** (no Docker):
-```bash
-cd frontend
-npm install
-npm run dev
-```
+3. **Start development server**
+   ```bash
+   npm run dev
+   ```
 
-**Access the frontend:**
-- Open [http://localhost:3000](http://localhost:3000) in your browser
-- Create workflows, view contracts, and monitor deployments through the web interface
-
-> **Performance Tip**: On Windows/WSL2, use the Hybrid Setup for **3-5x faster** frontend development. See [Docker Guide](./GUIDE/DOCKER.md#hybrid-development-setup) for details.
+4. **Access the frontend**
+   - Open [http://localhost:3000](http://localhost:3000) in your browser
+   - Create workflows, view contracts, and monitor deployments through the web interface
 
 See [Frontend README](./frontend/README.md) for detailed frontend documentation.
 
@@ -523,26 +496,12 @@ For more details, see:
 
 ## Architecture
 
-HyperAgent follows a **Service-Oriented Architecture (SOA)** with modern project structure conventions:
+HyperAgent follows a **Service-Oriented Architecture (SOA)** with:
 
-- **Project Structure**: Aligned with 12-Factor App principles and modern JavaScript/React conventions
-  - Clear separation of concerns (application code, config, tooling, documentation)
-  - Root-level tooling config (Docker, Make, linting, formatting)
-  - Monorepo-style organization with minimal root directory
-  - See [Architecture Structure Guide](./docs/ARCHITECTURE_STRUCTURE.md) for details
-
-- **Technology Stack**: Comprehensive modern stack
-  - Backend: Python 3.10+ with FastAPI, SQLAlchemy, Redis
-  - Frontend: Next.js 16 with React 19, TypeScript, Tailwind CSS
-  - Blockchain: Web3.py, Alith SDK, Thirdweb, multi-chain support
-  - AI/LLM: Google Gemini, OpenAI, LangChain
-  - See [Technology Stack Documentation](./docs/TECH_STACK.md) for complete details
-
-- **Architecture Patterns**:
-  - **Agent-to-Agent (A2A) Protocol**: Decoupled agent communication via event bus
-  - **Event-Driven Architecture**: Redis Streams for event persistence and real-time updates
-  - **Service Orchestration**: Sequential and parallel service execution patterns
-  - **RAG System**: Template retrieval and similarity matching for enhanced generation
+- **Agent-to-Agent (A2A) Protocol**: Decoupled agent communication via event bus
+- **Event-Driven Architecture**: Redis Streams for event persistence and real-time updates
+- **Service Orchestration**: Sequential and parallel service execution patterns
+- **RAG System**: Template retrieval and similarity matching for enhanced generation
 
 ### Core Components
 

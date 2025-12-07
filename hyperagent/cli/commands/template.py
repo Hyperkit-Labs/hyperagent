@@ -175,4 +175,3 @@ def register_template_commands(template_group: click.Group) -> None:
             handle_api_error(e, "template search")
         except Exception as e:
             format_error("Failed to search templates", str(e))
-

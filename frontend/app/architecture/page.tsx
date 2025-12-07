@@ -886,7 +886,7 @@ export default function ArchitecturePage() {
                         <div>
                           <h3 className="text-sm font-medium text-slate-200 mb-2">Implementation</h3>
                           <div className="p-3 bg-slate-950 rounded-lg border border-white/5 font-mono text-xs text-slate-400 overflow-x-auto">
-                            <span className="text-pink-400">import</span> {`{ ${selectedNodeData.label.replace(/\s/g, '')} }`} <span className="text-pink-400">from</span> <span className="text-green-400">&apos;{selectedNodeData.details.implementation}&apos;</span>;
+                            <span className="text-pink-400">import</span> {`{ ${selectedNodeData.label.replace(/\s/g, '')} }`} <span className="text-pink-400">from</span> <span className="text-green-400">'{selectedNodeData.details.implementation}'</span>;
                           </div>
                         </div>
                       )}

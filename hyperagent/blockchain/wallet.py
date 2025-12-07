@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 class WalletError(Exception):
     """Wallet management error"""
+
     pass
 
 

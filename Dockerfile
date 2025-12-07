@@ -1,11 +1,14 @@
 # Dockerfile - Multi-stage build for HyperAgent
+# Security: Updated to Python 3.12-slim for latest security patches
+# Best Practice: Use specific tags (e.g., python:3.12-slim) instead of 'latest' for reproducibility
 # Stage 1: Builder
-FROM python:3.10-slim as builder
+FROM python:3.12-slim as builder
 
 WORKDIR /build
 
 # Install build dependencies including Node.js for solc
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Run apt-get upgrade to apply security patches
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     build-essential \
     gcc \
     g++ \
@@ -64,7 +67,8 @@ RUN npm install -g solc@latest && \
           dotenv
 
 # Stage 2: Runtime
-FROM python:3.10-slim
+# Updated to Python 3.12-slim for latest security patches
+FROM python:3.12-slim
 
 # Create non-root user for security
 RUN groupadd -r hyperagent && useradd -r -g hyperagent hyperagent
@@ -72,7 +76,8 @@ RUN groupadd -r hyperagent && useradd -r -g hyperagent hyperagent
 WORKDIR /app
 
 # Install runtime dependencies including Node.js
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Run apt-get upgrade to apply security patches
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     curl \
     postgresql-client \
     redis-tools \
@@ -128,7 +133,7 @@ RUN mkdir -p /app/logs && chown -R hyperagent:hyperagent /app/logs
 ENV PATH=/home/hyperagent/.local/bin:/usr/local/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH=/home/hyperagent/.local/lib/python3.10/site-packages:/app \
+    PYTHONPATH=/home/hyperagent/.local/lib/python3.12/site-packages:/app \
     PYTHONHASHSEED=random \
     SOLC_VERSION=0.8.30 \
     NODE_PATH=/app/node_modules

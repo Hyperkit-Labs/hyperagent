@@ -1,0 +1,37 @@
+{
+  "name": "hyperagent",
+  "version": "1.0.0",
+  "description": "AI Agent Platform for On-Chain Smart Contract Generation",
+  "private": true,
+  "scripts": {
+    "commit": "node scripts/version/parallel-commit.js",
+    "commit:dry": "node scripts/version/parallel-commit.js --dry-run",
+    "commit:sh": "bash scripts/version/parallel-commit.sh",
+    "commit:sh:dry": "bash scripts/version/parallel-commit.sh --dry-run",
+    "commit:all": "git add -A && git commit -m 'chore: update all changes'",
+    "commit:auto": "bash scripts/version/parallel-commit.sh --max 3",
+    "status": "git status",
+    "changes": "git status --porcelain",
+    "staged": "git diff --cached --name-only"
+  },
+  "keywords": [
+    "smart-contracts",
+    "blockchain",
+    "ai",
+    "llm",
+    "solidity",
+    "hyperion",
+    "mantle",
+    "web3"
+  ],
+  "author": "HyperAgent Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JustineDevs/HyperAgent.git"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+

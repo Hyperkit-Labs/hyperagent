@@ -4,10 +4,12 @@ Concept: Define tools that Alith agents can call autonomously
 Logic: Bridge between Alith tool calls and HyperAgent services
 Usage: Tools are registered with Alith agents for autonomous execution
 """
+
 import logging
-from typing import Dict, Any, Optional, List
-from web3 import Web3
+from typing import Any, Dict, List, Optional
+
 from eth_account import Account
+from web3 import Web3
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +18,7 @@ logger = logging.getLogger(__name__)
 def get_deployment_tools() -> List[Dict[str, Any]]:
     """
     Get standard deployment tools for Alith agents
-    
+
     Returns:
         List of tool definitions compatible with Alith SDK
     """
@@ -29,25 +31,25 @@ def get_deployment_tools() -> List[Dict[str, Any]]:
                 "properties": {
                     "bytecode": {
                         "type": "string",
-                        "description": "Contract bytecode (hex string with 0x prefix)"
+                        "description": "Contract bytecode (hex string with 0x prefix)",
                     },
                     "abi": {
                         "type": "array",
                         "description": "Contract ABI (Application Binary Interface)",
-                        "items": {"type": "object"}
+                        "items": {"type": "object"},
                     },
                     "network": {
                         "type": "string",
                         "description": "Target network (hyperion_testnet, mantle_testnet)",
-                        "enum": ["hyperion_testnet", "mantle_testnet"]
+                        "enum": ["hyperion_testnet", "mantle_testnet"],
                     },
                     "gas_limit": {
                         "type": "number",
-                        "description": "Optional gas limit (will be estimated if not provided)"
-                    }
+                        "description": "Optional gas limit (will be estimated if not provided)",
+                    },
                 },
-                "required": ["bytecode", "network"]
-            }
+                "required": ["bytecode", "network"],
+            },
         },
         {
             "name": "check_balance",
@@ -57,16 +59,16 @@ def get_deployment_tools() -> List[Dict[str, Any]]:
                 "properties": {
                     "address": {
                         "type": "string",
-                        "description": "Wallet address to check (0x format)"
+                        "description": "Wallet address to check (0x format)",
                     },
                     "network": {
                         "type": "string",
                         "description": "Network to check balance on",
-                        "enum": ["hyperion_testnet", "mantle_testnet"]
-                    }
+                        "enum": ["hyperion_testnet", "mantle_testnet"],
+                    },
                 },
-                "required": ["address", "network"]
-            }
+                "required": ["address", "network"],
+            },
         },
         {
             "name": "estimate_gas",
@@ -76,20 +78,20 @@ def get_deployment_tools() -> List[Dict[str, Any]]:
                 "properties": {
                     "bytecode": {
                         "type": "string",
-                        "description": "Contract bytecode for deployment estimation"
+                        "description": "Contract bytecode for deployment estimation",
                     },
                     "network": {
                         "type": "string",
                         "description": "Target network",
-                        "enum": ["hyperion_testnet", "mantle_testnet"]
+                        "enum": ["hyperion_testnet", "mantle_testnet"],
                     },
                     "from_address": {
                         "type": "string",
-                        "description": "Address deploying the contract"
-                    }
+                        "description": "Address deploying the contract",
+                    },
                 },
-                "required": ["bytecode", "network"]
-            }
+                "required": ["bytecode", "network"],
+            },
         },
         {
             "name": "get_transaction_status",
@@ -97,18 +99,15 @@ def get_deployment_tools() -> List[Dict[str, Any]]:
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "tx_hash": {
-                        "type": "string",
-                        "description": "Transaction hash (0x format)"
-                    },
+                    "tx_hash": {"type": "string", "description": "Transaction hash (0x format)"},
                     "network": {
                         "type": "string",
                         "description": "Network where transaction was sent",
-                        "enum": ["hyperion_testnet", "mantle_testnet"]
-                    }
+                        "enum": ["hyperion_testnet", "mantle_testnet"],
+                    },
                 },
-                "required": ["tx_hash", "network"]
-            }
+                "required": ["tx_hash", "network"],
+            },
         },
         {
             "name": "verify_contract",
@@ -118,17 +117,17 @@ def get_deployment_tools() -> List[Dict[str, Any]]:
                 "properties": {
                     "contract_address": {
                         "type": "string",
-                        "description": "Deployed contract address"
+                        "description": "Deployed contract address",
                     },
                     "network": {
                         "type": "string",
                         "description": "Network where contract is deployed",
-                        "enum": ["hyperion_testnet", "mantle_testnet"]
-                    }
+                        "enum": ["hyperion_testnet", "mantle_testnet"],
+                    },
                 },
-                "required": ["contract_address", "network"]
-            }
-        }
+                "required": ["contract_address", "network"],
+            },
+        },
     ]
 
 
@@ -136,15 +135,15 @@ def get_deployment_tools() -> List[Dict[str, Any]]:
 class AlithToolHandler:
     """
     Handler for executing Alith tool calls
-    
+
     Concept: Execute tools called by Alith agents
     Logic: Bridge between Alith tool calls and HyperAgent services
     """
-    
+
     def __init__(self, network_manager, eigenda_client=None, private_key: Optional[str] = None):
         """
         Initialize tool handler
-        
+
         Args:
             network_manager: NetworkManager instance for Web3 operations
             eigenda_client: Optional EigenDAClient for Mantle deployments
@@ -153,15 +152,15 @@ class AlithToolHandler:
         self.network_manager = network_manager
         self.eigenda_client = eigenda_client
         self.private_key = private_key
-    
+
     async def execute_tool(self, tool_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """
         Execute a tool called by an Alith agent
-        
+
         Args:
             tool_name: Name of the tool to execute
             parameters: Tool parameters from agent
-        
+
         Returns:
             Tool execution result
         """
@@ -177,44 +176,38 @@ class AlithToolHandler:
             elif tool_name == "verify_contract":
                 return await self._verify_contract(parameters)
             else:
-                return {
-                    "success": False,
-                    "error": f"Unknown tool: {tool_name}"
-                }
+                return {"success": False, "error": f"Unknown tool: {tool_name}"}
         except Exception as e:
             logger.error(f"Tool execution error for {tool_name}: {e}", exc_info=True)
-            return {
-                "success": False,
-                "error": str(e)
-            }
-    
+            return {"success": False, "error": str(e)}
+
     async def _deploy_contract(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Execute contract deployment"""
         from hyperagent.core.config import settings
-        
+
         bytecode = params.get("bytecode", "")
         network = params.get("network")
         abi = params.get("abi", [])
         gas_limit = params.get("gas_limit")
-        
+
         if not bytecode or not network:
             return {"success": False, "error": "bytecode and network are required"}
-        
+
         private_key = self.private_key or settings.private_key
         if not private_key:
             return {"success": False, "error": "Private key required for deployment"}
-        
+
         try:
             w3 = self.network_manager.get_web3(network)
             account = Account.from_key(private_key)
-            
+
             # Build contract
             contract = w3.eth.contract(abi=abi, bytecode=bytecode)
-            
+
             # Estimate gas if not provided
             if not gas_limit:
                 gas_limit = contract.constructor().estimate_gas({"from": account.address})
-            
+
             # Get gas price
             try:
                 fee_data = w3.eth.fee_history(1, "latest")
@@ -223,22 +216,24 @@ class AlithToolHandler:
                 gas_price = base_fee + max_priority_fee
             except Exception:
                 gas_price = w3.eth.gas_price
-            
+
             # Build and send transaction
-            tx = contract.constructor().build_transaction({
-                "from": account.address,
-                "nonce": w3.eth.get_transaction_count(account.address),
-                "gas": int(gas_limit * 1.2),
-                "gasPrice": gas_price,
-                "chainId": self.network_manager.get_network_config(network).get("chain_id")
-            })
-            
+            tx = contract.constructor().build_transaction(
+                {
+                    "from": account.address,
+                    "nonce": w3.eth.get_transaction_count(account.address),
+                    "gas": int(gas_limit * 1.2),
+                    "gasPrice": gas_price,
+                    "chainId": self.network_manager.get_network_config(network).get("chain_id"),
+                }
+            )
+
             signed_tx = account.sign_transaction(tx)
             tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
-            
+
             # Wait for confirmation
             receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=300, poll_latency=2)
-            
+
             # EigenDA integration for Mantle
             eigenda_commitment = None
             if network.startswith("mantle") and self.eigenda_client:
@@ -249,67 +244,68 @@ class AlithToolHandler:
                         eigenda_commitment = eigenda_result.get("commitment")
                 except Exception as e:
                     logger.warning(f"EigenDA submission failed: {e}")
-            
+
             return {
                 "success": True,
                 "contract_address": receipt["contractAddress"],
                 "transaction_hash": tx_hash.hex(),
                 "block_number": receipt["blockNumber"],
                 "gas_used": receipt["gasUsed"],
-                "eigenda_commitment": eigenda_commitment
+                "eigenda_commitment": eigenda_commitment,
             }
         except Exception as e:
             logger.error(f"Deployment failed: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
-    
+
     async def _check_balance(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Check wallet balance"""
         address = params.get("address")
         network = params.get("network")
-        
+
         if not address or not network:
             return {"success": False, "error": "address and network are required"}
-        
+
         try:
             w3 = self.network_manager.get_web3(network)
             balance_wei = w3.eth.get_balance(address)
             balance_eth = w3.from_wei(balance_wei, "ether")
-            
+
             return {
                 "success": True,
                 "address": address,
                 "balance_wei": str(balance_wei),
                 "balance_eth": float(balance_eth),
-                "network": network
+                "network": network,
             }
         except Exception as e:
             logger.error(f"Balance check failed: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
-    
+
     async def _estimate_gas(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Estimate gas for deployment"""
         bytecode = params.get("bytecode", "")
         network = params.get("network")
         from_address = params.get("from_address")
-        
+
         if not bytecode or not network:
             return {"success": False, "error": "bytecode and network are required"}
-        
+
         try:
             w3 = self.network_manager.get_web3(network)
-            
+
             if not from_address:
                 # Use default account if available
                 from hyperagent.core.config import settings
+
                 if settings.private_key:
                     account = Account.from_key(settings.private_key)
                     from_address = account.address
                 else:
                     return {"success": False, "error": "from_address or private_key required"}
-            
+
             contract = w3.eth.contract(bytecode=bytecode)
             gas_estimate = contract.constructor().estimate_gas({"from": from_address})
-            
+
             # Get current gas price
             try:
                 fee_data = w3.eth.fee_history(1, "latest")
@@ -318,34 +314,34 @@ class AlithToolHandler:
                 gas_price = base_fee + max_priority_fee
             except Exception:
                 gas_price = w3.eth.gas_price
-            
+
             estimated_cost_wei = gas_estimate * gas_price
             estimated_cost_eth = w3.from_wei(estimated_cost_wei, "ether")
-            
+
             return {
                 "success": True,
                 "gas_estimate": int(gas_estimate),
                 "gas_price": str(gas_price),
                 "estimated_cost_wei": str(estimated_cost_wei),
                 "estimated_cost_eth": float(estimated_cost_eth),
-                "network": network
+                "network": network,
             }
         except Exception as e:
             logger.error(f"Gas estimation failed: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
-    
+
     async def _get_transaction_status(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Get transaction status"""
         tx_hash = params.get("tx_hash")
         network = params.get("network")
-        
+
         if not tx_hash or not network:
             return {"success": False, "error": "tx_hash and network are required"}
-        
+
         try:
             w3 = self.network_manager.get_web3(network)
             receipt = w3.eth.get_transaction_receipt(tx_hash)
-            
+
             return {
                 "success": True,
                 "transaction_hash": tx_hash,
@@ -353,33 +349,32 @@ class AlithToolHandler:
                 "block_number": receipt.get("blockNumber"),
                 "gas_used": receipt.get("gasUsed"),
                 "contract_address": receipt.get("contractAddress"),
-                "network": network
+                "network": network,
             }
         except Exception as e:
             logger.error(f"Transaction status check failed: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
-    
+
     async def _verify_contract(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Verify contract (placeholder - would integrate with explorer API)"""
         contract_address = params.get("contract_address")
         network = params.get("network")
-        
+
         if not contract_address or not network:
             return {"success": False, "error": "contract_address and network are required"}
-        
+
         try:
             w3 = self.network_manager.get_web3(network)
             code = w3.eth.get_code(contract_address)
-            
+
             return {
                 "success": True,
                 "contract_address": contract_address,
                 "has_code": len(code) > 0,
                 "code_length": len(code),
                 "network": network,
-                "note": "Full verification requires explorer API integration"
+                "note": "Full verification requires explorer API integration",
             }
         except Exception as e:
             logger.error(f"Contract verification failed: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
-

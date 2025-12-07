@@ -1,9 +1,13 @@
 # Troubleshooting Guide
 
+<<<<<<< HEAD
 **Document Type**: How-To Guide (Goal-Oriented)  
 **Category**: Support  
 **Audience**: All Users  
 **Location**: `docs/TROUBLESHOOTING.md`
+=======
+Common issues and solutions.
+>>>>>>> development
 
 Common issues and solutions for HyperAgent.
 

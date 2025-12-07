@@ -1,0 +1,31 @@
+# Dockerfile for Frontend Development
+# This runs Next.js dev server with hot reload
+
+FROM node:20-alpine
+
+# Install wget for healthcheck
+RUN apk add --no-cache wget
+
+WORKDIR /app
+
+# Install dependencies first (for better caching)
+# Note: Using npm install instead of npm ci to support --legacy-peer-deps if needed
+# This ensures compatibility with React 19 and testing library versions
+COPY package.json package-lock.json* ./
+RUN npm install --legacy-peer-deps
+
+# Copy frontend source code (will be overridden by volume mount in dev)
+COPY . .
+
+# Expose Next.js dev server port
+EXPOSE 3000
+
+# Set environment variables for Next.js
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV HOSTNAME=0.0.0.0
+
+# Run dev server with hot reload
+# Use --hostname 0.0.0.0 to allow external connections
+CMD ["npm", "run", "dev:docker"]
+

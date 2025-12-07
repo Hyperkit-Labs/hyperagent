@@ -1,12 +1,85 @@
-# docker-compose.yml - Development Stack
+# docker-compose.yml - All-in-One Development Setup
+# 
+# This file runs everything in one command:
+#   docker-compose up
+#   make docker-up
+#
+# Services included:
+#   - Frontend (Next.js dev server on port 3000)
+#   - Backend (FastAPI on port 8000)
+#   - Database (PostgreSQL on port 5432)
+#   - Redis (on port 6379)
+#   - x402 Verifier (on port 3002)
+#   - Prometheus (on port 9090)
+#
+# NOTE: This Docker Compose setup is for LOCAL DEVELOPMENT ONLY
+# For production deployment, use:
+#   - Render: See render.yaml and GUIDE/SIMPLIFIED_SETUP.md
+#   - VPS: See scripts/start_production.sh
+#   - Direct Python: uvicorn hyperagent.api.main:app
+#
+# Production deployments should use:
+#   - Supabase for database (cloud PostgreSQL)
+#   - Direct Python execution (no Docker)
+#   - Optional Redis Cloud (if needed for multiple instances)
+#
 # Note: version field is obsolete in Docker Compose v2+
 
 services:
   # ============================================================================
-  # MAIN APPLICATION
+  # FRONTEND (NEXT.JS DEV SERVER)
+  # ============================================================================
+  
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: hyperagent_frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_TELEMETRY_DISABLED=1
+      # API URL for browser (client-side) - must be accessible from host
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+      - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL:-ws://localhost:8000/ws}
+      # Thirdweb configuration
+      - NEXT_PUBLIC_THIRDWEB_CLIENT_ID=${NEXT_PUBLIC_THIRDWEB_CLIENT_ID:-}
+      # Enable Turbopack for faster builds (set to "1" to disable)
+      # Empty value enables Turbopack, which is 3-5x faster than webpack
+      - NEXT_DISABLE_TURBOPACK=${NEXT_DISABLE_TURBOPACK:-}
+    volumes:
+      # Mount source code for hot reload with :cached flag for better Windows/WSL2 performance
+      - ./frontend:/app:cached
+      # Use named volumes for node_modules and .next to improve I/O performance
+      - frontend_node_modules:/app/node_modules
+      - frontend_next:/app/.next
+    networks:
+      - hyperagent_network
+    restart: unless-stopped
+    # Increased memory limit for better performance (4GB for Turbopack + dev server)
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      hyperagent:
+        condition: service_healthy
+
+  # ============================================================================
+  # MAIN APPLICATION (BACKEND)
   # ============================================================================
   
   hyperagent:
+    image: hyperagent:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -42,6 +115,30 @@ services:
       - HYPERION_TESTNET_CHAIN_ID=${HYPERION_TESTNET_CHAIN_ID:-133717}
       - MANTLE_TESTNET_RPC=${MANTLE_TESTNET_RPC:-https://rpc.sepolia.mantle.xyz}
       - MANTLE_TESTNET_CHAIN_ID=${MANTLE_TESTNET_CHAIN_ID:-5003}
+      - AVALANCHE_FUJI_RPC=${AVALANCHE_FUJI_RPC:-https://api.avax-test.network/ext/bc/C/rpc}
+      - AVALANCHE_FUJI_CHAIN_ID=${AVALANCHE_FUJI_CHAIN_ID:-43113}
+      - AVALANCHE_MAINNET_RPC=${AVALANCHE_MAINNET_RPC:-https://api.avax.network/ext/bc/C/rpc}
+      - AVALANCHE_MAINNET_CHAIN_ID=${AVALANCHE_MAINNET_CHAIN_ID:-43114}
+      
+      # Thirdweb Configuration
+      - THIRDWEB_CLIENT_ID=${THIRDWEB_CLIENT_ID:-}
+      - THIRDWEB_SECRET_KEY=${THIRDWEB_SECRET_KEY:-}
+      - THIRDWEB_SERVER_WALLET_ADDRESS=${THIRDWEB_SERVER_WALLET_ADDRESS:-}
+      - THIRDWEB_SERVER_WALLET_PRIVATE_KEY=${THIRDWEB_SERVER_WALLET_PRIVATE_KEY:-}
+      - MERCHANT_WALLET_ADDRESS=${MERCHANT_WALLET_ADDRESS:-}
+      
+      # x402 Configuration
+      - X402_ENABLED=${X402_ENABLED:-false}
+      - X402_ENABLED_NETWORKS=${X402_ENABLED_NETWORKS:-avalanche_fuji,avalanche_mainnet}
+      - X402_SERVICE_URL=http://x402-verifier:3001
+      - X402_SERVICE_PORT=${X402_SERVICE_PORT:-3002}
+      - USDC_ADDRESS_FUJI=${USDC_ADDRESS_FUJI:-}
+      - USDC_ADDRESS_AVALANCHE=${USDC_ADDRESS_AVALANCHE:-}
+      - USDC_ADDRESS_ETHEREUM=${USDC_ADDRESS_ETHEREUM:-}
+      - USDC_ADDRESS_POLYGON=${USDC_ADDRESS_POLYGON:-}
+      - USDC_ADDRESS_BASE=${USDC_ADDRESS_BASE:-}
+      - USDC_ADDRESS_OPTIMISM=${USDC_ADDRESS_OPTIMISM:-}
+      - USDC_ADDRESS_ARBITRUM=${USDC_ADDRESS_ARBITRUM:-}
       
       # Security & Wallet
       - PRIVATE_KEY=${PRIVATE_KEY:-}
@@ -72,6 +169,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      x402-verifier:
+        condition: service_healthy
     volumes:
       # Development: mount source code for hot reload
       - ./hyperagent:/app/hyperagent:ro
@@ -92,6 +191,9 @@ services:
   # ============================================================================
   
   postgres:
+    # Using pg15 to match existing database (was upgraded to pg16 but database needs migration)
+    # TODO: Migrate database to pg16 or use pg_upgrade
+    # For now, using pg15 to match existing data directory
     image: pgvector/pgvector:pg15
     container_name: hyperagent_postgres
     environment:
@@ -120,7 +222,9 @@ services:
   # ============================================================================
   
   redis:
-    image: redis:7-alpine
+    # Using latest 7.4-alpine with newest alpine base (3.23) for security patches
+    # Note: Go stdlib vulnerabilities in Redis binary require upstream fixes
+    image: redis:7.4-alpine
     container_name: hyperagent_redis
     ports:
       - "${REDIS_PORT:-6379}:6379"
@@ -143,6 +247,60 @@ services:
       - hyperagent_network
     restart: unless-stopped
 
+  # ============================================================================
+  # MONITORING (PROMETHEUS)
+  # ============================================================================
+  
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: hyperagent_prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - hyperagent_network
+    depends_on:
+      hyperagent:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ============================================================================
+  # x402 VERIFICATION SERVICE (TYPESCRIPT)
+  # ============================================================================
+  
+  x402-verifier:
+    image: hyperagent-x402-verifier:latest
+    build:
+      context: ./services/x402-verifier
+      dockerfile: Dockerfile
+    container_name: hyperagent_x402_verifier
+    ports:
+      - "${X402_SERVICE_PORT:-3002}:3001"
+    environment:
+      - THIRDWEB_SECRET_KEY=${THIRDWEB_SECRET_KEY:-}
+      - THIRDWEB_SERVER_WALLET_ADDRESS=${THIRDWEB_SERVER_WALLET_ADDRESS:-}
+      - MERCHANT_WALLET_ADDRESS=${MERCHANT_WALLET_ADDRESS:-}
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=3001
+      - WAIT_UNTIL=${WAIT_UNTIL:-confirmed}
+    networks:
+      - hyperagent_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
 networks:
   hyperagent_network:
     driver: bridge
@@ -150,4 +308,8 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  prometheus_data:
+  # Named volumes for frontend to improve I/O performance on Windows/WSL2
+  frontend_node_modules:
+  frontend_next:
 

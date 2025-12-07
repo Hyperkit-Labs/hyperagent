@@ -1,0 +1,25 @@
+# Prometheus configuration for HyperAgent
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'hyperagent'
+
+# Scrape configurations
+scrape_configs:
+  # HyperAgent API metrics
+  - job_name: 'hyperagent'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: '/api/v1/metrics/prometheus'
+    static_configs:
+      - targets: ['hyperagent:8000']
+        labels:
+          service: 'hyperagent'
+          environment: 'development'
+
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+

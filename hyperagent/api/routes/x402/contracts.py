@@ -25,9 +25,9 @@ async def generate_contract_with_payment(
 
     # Extract wallet address from headers (case-insensitive) or request body
     wallet_address = (
-        http_request.headers.get("x-wallet-address") or
-        http_request.headers.get("X-Wallet-Address") or
-        getattr(request, 'wallet_address', None)
+        http_request.headers.get("x-wallet-address")
+        or http_request.headers.get("X-Wallet-Address")
+        or getattr(request, "wallet_address", None)
     )
     merchant = "contract-generation"
 

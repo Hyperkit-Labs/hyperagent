@@ -1,11 +1,6 @@
 # HyperAgent Developer Guide
 
-**Document Type**: Tutorial (Learning-Oriented)  
-**Category**: Developer Documentation  
-**Audience**: Developers, Engineers  
-**Location**: `GUIDE/DEVELOPER_GUIDE.md`
-
-This guide helps developers understand HyperAgent's architecture, extend the system, and integrate new features. It provides step-by-step instructions for common development tasks.
+Guide for developers to understand HyperAgent's architecture, extend the system, and integrate new features.
 
 ## Table of Contents
 

@@ -2,12 +2,16 @@
   <img src="/public/ascii-art-doh-HyperAgent.png" alt="HyperAgent ASCII Art" width="800">
 </div>
 
+<div align="center">
+  
 <!-- Badges: start -->
 ![Version](https://img.shields.io/badge/version-1.0.0-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Status](https://img.shields.io/badge/status-production%20ready-success)
 <!-- Badges: end -->
+
+</div>
 
 ## Overview
 
@@ -36,7 +40,10 @@ HyperAgent is an AI-powered platform that streamlines smart contract development
 - 🔍 **AI-Powered Contract Generation** - Convert natural language descriptions into Solidity smart contracts using LLM (Gemini/GPT-4)
 - 🛡️ **Automated Security Auditing** - Comprehensive security analysis using Slither, Mythril, and Echidna
 - 🧪 **Automated Testing** - Compile contracts and generate unit tests automatically
-- 🚀 **On-Chain Deployment** - Deploy contracts to Hyperion and Mantle networks using Alith SDK
+- 🚀 **On-Chain Deployment** - Deploy contracts to Hyperion, Mantle, and Avalanche networks
+- 💳 **x402 Payment Gating** - Pay-per-use smart contract generation on Avalanche networks
+- 👛 **User-Wallet-Based Deployments** - Deploy contracts using your own wallet (no server private keys needed)
+- ⛽ **Gasless Deployments** - Optional facilitator-sponsored gas for seamless UX
 - 📚 **RAG-Enhanced Generation** - Retrieve similar contract templates for better code quality
 - ⚡ **Parallel Batch Deployment** - Deploy multiple contracts in parallel using Hyperion PEF (10-50x faster)
 - 🎯 **MetisVM Optimization** - Generate contracts optimized for MetisVM with floating-point and AI inference support
@@ -56,17 +63,15 @@ HyperAgent is an AI-powered platform that streamlines smart contract development
    - **Linux**: Use package manager (e.g., `sudo apt-get install python3` on Ubuntu)
    - Verify installation: `python --version`
 
-2. **PostgreSQL 15+** (or use Supabase cloud)
-   - **Windows**: Download from [postgresql.org/download/windows](https://www.postgresql.org/download/windows/)
-   - **macOS**: Download from [postgresql.org/download/macosx](https://www.postgresql.org/download/macosx/) or use Homebrew: `brew install postgresql@15`
-   - **Linux**: Use package manager (e.g., `sudo apt-get install postgresql-15` on Ubuntu)
-   - **Cloud Alternative**: Use [Supabase](https://supabase.com) (free tier available)
+2. **PostgreSQL 15+** (or use Supabase cloud - **Recommended**)
+   - **Recommended**: Use [Supabase](https://supabase.com) (free tier available) - no local setup needed
+   - **Local Option**: Download from [postgresql.org/download](https://www.postgresql.org/download/)
+   - See [GUIDE/SIMPLIFIED_SETUP.md](./GUIDE/SIMPLIFIED_SETUP.md) for Supabase setup
 
-3. **Redis 7+**
-   - **Windows**: Download from [github.com/microsoftarchive/redis/releases](https://github.com/microsoftarchive/redis/releases) or use Docker: `docker run -d -p 6379:6379 redis:7-alpine`
-   - **macOS**: Use Homebrew: `brew install redis`
-   - **Linux**: Use package manager (e.g., `sudo apt-get install redis-server` on Ubuntu)
-   - **Cloud Alternative**: Use [Redis Cloud](https://redis.com/try-free/) (free tier available)
+3. **Redis 7+** (Optional - uses in-memory fallback if not available)
+   - **Not Required**: HyperAgent works without Redis for single-instance deployments
+   - **Only Needed**: For multiple instances or distributed deployments
+   - **Cloud Option**: Use [Redis Cloud](https://redis.com/try-free/) (free tier available)
 
 4. **Git**
    - **Windows**: Download from [git-scm.com/download/win](https://git-scm.com/download/win)
@@ -103,6 +108,9 @@ HyperAgent is an AI-powered platform that streamlines smart contract development
   - Get from: [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
 - **OpenAI API Key** (Optional - fallback LLM provider)
   - Get from: [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+- **Thirdweb Client ID & Secret Key** (Required for x402 payments on Avalanche)
+  - Get from: [portal.thirdweb.com](https://portal.thirdweb.com)
+  - Create ERC-4337 Smart Account in Server Wallets section
 
 ### Installation
 
@@ -143,9 +151,41 @@ HyperAgent is an AI-powered platform that streamlines smart contract development
    alembic upgrade head
    ```
 
-6. **Start the API server**
+6. **Start the services**
+   
+   **Option A: Simplified Setup (Recommended for Production)**
    ```bash
+   # Direct Python execution (no Docker needed)
+   # See GUIDE/SIMPLIFIED_SETUP.md for details
    uvicorn hyperagent.api.main:app --reload
+   ```
+   
+   **Option B: Docker Compose (Development Only)**
+   ```bash
+   # Using Docker Compose (includes x402 service, database, Redis)
+   # Note: Docker is for local development only
+   # For production, use direct Python deployment (see render.yaml)
+   docker-compose up -d
+   ```
+   
+   **Option C: Hybrid Setup (Recommended for Windows/WSL2)**
+   ```bash
+   # Start only backend services in Docker (3-5x faster frontend development)
+   # Unix/Linux/Mac:
+   ./scripts/start-backend.sh
+   
+   # Windows:
+   scripts\start-backend.bat
+   
+   # Then run frontend locally in a separate terminal:
+   cd frontend && npm run dev
+   ```
+   
+   > **Why Hybrid?** On Windows/WSL2, Docker volume mounts are slow. Running frontend locally provides **3-5x faster** builds and **10x faster** hot reload. See [Docker Guide](./GUIDE/DOCKER.md#hybrid-development-setup) for details.
+
+7. **Verify x402 setup** (if using x402 payments)
+   ```bash
+   python scripts/verify_x402_setup.py
    ```
 
 7. **Verify installation**
@@ -163,39 +203,47 @@ For detailed setup instructions, see [Getting Started Guide](./GUIDE/GETTING_STA
 
 HyperAgent includes a Next.js web frontend for non-developers:
 
-1. **Navigate to frontend directory**
-   ```bash
-   cd frontend
-   ```
+**If using Hybrid Setup** (backend in Docker, frontend local - recommended for Windows):
+```bash
+# Backend services should already be running from Option C above
+cd frontend
+npm install  # First time only
+npm run dev
+```
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+**If using Full Docker Setup** (all services in Docker):
+```bash
+# Frontend is included in docker-compose, no separate setup needed
+# Access at http://localhost:3000
+```
 
-3. **Start development server**
-   ```bash
-   npm run dev
-   ```
+**If using Simplified Setup** (no Docker):
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-4. **Access the frontend**
-   - Open [http://localhost:3000](http://localhost:3000) in your browser
-   - Create workflows, view contracts, and monitor deployments through the web interface
+**Access the frontend:**
+- Open [http://localhost:3000](http://localhost:3000) in your browser
+- Create workflows, view contracts, and monitor deployments through the web interface
+
+> **Performance Tip**: On Windows/WSL2, use the Hybrid Setup for **3-5x faster** frontend development. See [Docker Guide](./GUIDE/DOCKER.md#hybrid-development-setup) for details.
 
 See [Frontend README](./frontend/README.md) for detailed frontend documentation.
 
-### Monitoring with Grafana
+### Monitoring with Prometheus
 
-HyperAgent includes Grafana and Prometheus for system monitoring:
+HyperAgent includes Prometheus for system monitoring:
 
-1. **Start monitoring services** (included in docker-compose)
+1. **Start monitoring service** (included in docker-compose)
    ```bash
-   docker-compose up -d prometheus grafana
+   docker-compose up -d prometheus
    ```
 
-2. **Access Grafana**
-   - URL: [http://localhost:3001](http://localhost:3001)
-   - Default credentials: `admin` / `admin`
+2. **Access Prometheus**
+   - URL: [http://localhost:9090](http://localhost:9090)
+   - Metrics endpoint: [http://localhost:9090/metrics](http://localhost:9090/metrics)
    - Pre-configured dashboards:
      - System Health Dashboard
      - Workflow Metrics Dashboard
@@ -272,6 +320,171 @@ print(f"Status: {status['status']}, Progress: {status['progress_percentage']}%")
 
 See [Usage Examples](./GUIDE/GETTING_STARTED.md#example-workflows) for more examples.
 
+## x402 Payment Gating
+
+HyperAgent supports pay-per-use smart contract generation on Avalanche networks using the x402 payment protocol. Users pay in USDC for each service (contract generation, deployment, etc.) with full spending controls and payment history tracking.
+
+### What is x402?
+
+x402 is a payment protocol that enables pay-per-use APIs on blockchain networks. When a user requests a service:
+1. Backend checks if payment exists
+2. If not, returns HTTP 402 "Payment Required"
+3. Frontend shows payment modal
+4. User approves USDC spend in wallet
+5. Payment is processed on-chain
+6. Original request proceeds with payment proof
+
+### Architecture Overview
+
+```
+┌─────────────┐
+│   Frontend  │
+│  (Next.js)  │
+└──────┬──────┘
+       │
+       │ 1. Request Service
+       │    (e.g., /x402/contracts/generate)
+       ▼
+┌─────────────────────────────────────┐
+│         Backend API                 │
+│      (FastAPI)                      │
+│                                     │
+│  ┌──────────────────────────────┐  │
+│  │   x402 Middleware            │  │
+│  │  - Check spending controls   │  │
+│  │  - Verify payment status      │  │
+│  │  - Log payments               │  │
+│  └──────────────────────────────┘  │
+│            │                        │
+│            │ 2. Check Payment       │
+│            ▼                        │
+│  ┌──────────────────────────────┐  │
+│  │   x402-Verifier Service       │  │
+│  │  (Thirdweb Integration)       │  │
+│  │  - Verify USDC approval       │  │
+│  │  - Check on-chain payment     │  │
+│  └──────────────────────────────┘  │
+│            │                        │
+│            │ 3. Payment Status      │
+│            │    (200 or 402)        │
+│            ▼                        │
+│  ┌──────────────────────────────┐  │
+│  │   Service Handler             │  │
+│  │  (Contract Generation, etc.)   │  │
+│  └──────────────────────────────┘  │
+└─────────────────────────────────────┘
+       │
+       │ 4. Payment Logged
+       ▼
+┌─────────────┐
+│  Database   │
+│ (PostgreSQL)│
+│             │
+│ - Payment   │
+│   History   │
+│ - Spending  │
+│   Controls  │
+└─────────────┘
+```
+
+### Payment Flow
+
+1. **User Request**: Frontend makes API request (e.g., generate contract)
+2. **Backend Check**: x402 middleware checks if payment exists
+3. **Payment Required**: If not paid, backend returns 402 with JWT token
+4. **Frontend Modal**: Payment modal appears with price and details
+5. **Wallet Approval**: User approves USDC spend in wallet (Core, MetaMask, etc.)
+6. **On-Chain Payment**: Transaction is broadcast to Avalanche
+7. **Retry Request**: Frontend retries original request with payment proof
+8. **Service Proceeds**: Backend verifies payment and processes request
+9. **Payment Logged**: Payment is stored in database for analytics
+
+### Spending Controls
+
+Users can set spending limits to prevent accidental overspending:
+
+- **Daily Limits**: Maximum spending per day
+- **Monthly Limits**: Maximum spending per month
+- **Merchant Whitelist**: Only allow payments to specific merchants
+- **Time Restrictions**: Only allow payments during certain hours
+
+Budget tracking shows:
+- Current spending vs. limits
+- Remaining budget
+- Visual progress bars
+- Real-time updates
+
+### Payment History & Analytics
+
+All payments are logged with:
+- Transaction hash (clickable to Snowtrace)
+- Amount and currency
+- Endpoint that triggered payment
+- Timestamp and status
+- Merchant information
+
+Analytics dashboard shows:
+- Daily and monthly totals
+- Transaction count and averages
+- Top merchants
+- Complete payment history
+
+### Quick Start with Avalanche Fuji
+
+1. **Set up Thirdweb Facilitator**:
+   - Create account at [Thirdweb Dashboard](https://portal.thirdweb.com)
+   - Go to Server Wallets → Enable "Show ERC-4337 Smart Account"
+   - Switch to Avalanche Fuji Testnet
+   - Copy Smart Account address (this is your `THIRDWEB_SERVER_WALLET_ADDRESS`)
+   - Fund the Smart Account with testnet AVAX
+
+2. **Configure Environment**:
+   ```bash
+   X402_ENABLED=true
+   THIRDWEB_CLIENT_ID=your_client_id
+   THIRDWEB_SECRET_KEY=your_secret_key
+   THIRDWEB_SERVER_WALLET_ADDRESS=0x... # ERC-4337 Smart Account
+   MERCHANT_WALLET_ADDRESS=0x... # Receives payments
+   USDC_ADDRESS_FUJI=0x5425890298aed601595a70AB815c96711a31Bc65
+   ```
+
+3. **Access Avalanche Studio**:
+   - Navigate to `/avax/studio` in the frontend
+   - Connect your wallet (Core, MetaMask, etc.)
+   - Select a contract recipe and generate
+
+4. **View Payment History**:
+   - Navigate to `/avax/payments` to see:
+     - Spending budget and remaining limits
+     - Payment history with transaction links
+     - Analytics and summaries
+
+### User-Wallet-Based Deployments
+
+All deployments use your connected wallet:
+- No server `PRIVATE_KEY` needed for x402 networks
+- Users sign transactions directly in their wallets
+- Optional gasless deployment via facilitator
+- Full control over deployment transactions
+
+### Error Handling
+
+The system provides clear error messages for:
+- **402 Payment Required**: User needs to approve payment
+- **403 Forbidden**: Spending limit exceeded or payment not allowed
+- **502/503/504**: Payment service temporarily unavailable
+- **Wallet Issues**: Connection failures, insufficient balance, etc.
+
+Each error includes actionable instructions for resolution.
+
+### Demo Script
+
+See [Avalanche Demo Script](./docs/AVALANCHE_DEMO_SCRIPT.md) for a complete step-by-step demo flow.
+
+For more details, see:
+- [x402 Architecture Guide](docs/X402_ARCHITECTURE.md)
+- [x402 Integration Guide](docs/X402_AVALANCHE_INTEGRATION.md)
+
 ## Documentation
 
 ### Getting Started
@@ -281,30 +494,55 @@ See [Usage Examples](./GUIDE/GETTING_STARTED.md#example-workflows) for more exam
 
 ### How-To Guides
 - **[Deployment Guide](./GUIDE/DEPLOYMENT.md)** - Deploy contracts to blockchain
-- **[Docker Setup](./GUIDE/DOCKER.md)** - Run HyperAgent with Docker
+- **[Docker Quick Start](./README.DOCKER.md)** - Get started with Docker in minutes (Make commands)
+- **[Docker Reference Guide](./GUIDE/DOCKER.md)** - Comprehensive Docker documentation (Dockerfile, production, CI/CD)
+- **[x402 Integration Guide](./docs/X402_AVALANCHE_INTEGRATION.md)** - x402 payment setup on Avalanche
+- **[x402 Architecture](./docs/X402_ARCHITECTURE.md)** - Technical architecture of x402 payments
 - **[Hyperion PEF Guide](./docs/HYPERION_PEF_GUIDE.md)** - Parallel batch deployment
 - **[MetisVM Optimization](./docs/METISVM_OPTIMIZATION.md)** - MetisVM-specific features
 - **[Troubleshooting](./docs/TROUBLESHOOTING.md)** - Common issues and solutions
 
 ### Technical Documentation
+- **[Technology Stack](./docs/TECH_STACK.md)** - Complete list of all technologies, libraries, and SDKs
+- **[Architecture Structure](./docs/ARCHITECTURE_STRUCTURE.md)** - Project structure aligned with modern conventions
 - **[Architecture Diagrams](./docs/ARCHITECTURE_DIAGRAMS.md)** - System architecture and patterns
 - **[Complete Technical Specification](./docs/complete-tech-spec.md)** - Full technical details
 - **[Network Compatibility](./docs/NETWORK_COMPATIBILITY.md)** - Supported networks and features
 - **[Testing Setup Guide](./docs/TESTING_SETUP_GUIDE.md)** - Testing configuration and examples
 
+### Engineering Documentation
+- **[Engineering Overview](./docs/ENGINEERING_OVERVIEW.md)** - Quick navigation to all engineering docs
+- **[Engineering Standards](./docs/ENGINEERING_STANDARDS.md)** - Coding standards, naming conventions, design patterns, testing
+- **[Architecture Guide](./docs/ARCHITECTURE_GUIDE.md)** - SOA patterns, event-driven architecture, ERC4337/x402 flows
+- **[DevOps & SRE Guide](./docs/DEVOPS_SRE_GUIDE.md)** - CI/CD, monitoring, scaling, incident response
+- **[Delivery Process](./docs/DELIVERY_PROCESS.md)** - Sprint structure, user stories, tech debt management
+
 ### Frontend & Monitoring
 - **[Frontend README](./frontend/README.md)** - Next.js frontend setup and usage
-- **Grafana Dashboards** - Access at `http://localhost:3001` (default: admin/admin)
 - **Prometheus Metrics** - Access at `http://localhost:9090`
 
 ## Architecture
 
-HyperAgent follows a **Service-Oriented Architecture (SOA)** with:
+HyperAgent follows a **Service-Oriented Architecture (SOA)** with modern project structure conventions:
 
-- **Agent-to-Agent (A2A) Protocol**: Decoupled agent communication via event bus
-- **Event-Driven Architecture**: Redis Streams for event persistence and real-time updates
-- **Service Orchestration**: Sequential and parallel service execution patterns
-- **RAG System**: Template retrieval and similarity matching for enhanced generation
+- **Project Structure**: Aligned with 12-Factor App principles and modern JavaScript/React conventions
+  - Clear separation of concerns (application code, config, tooling, documentation)
+  - Root-level tooling config (Docker, Make, linting, formatting)
+  - Monorepo-style organization with minimal root directory
+  - See [Architecture Structure Guide](./docs/ARCHITECTURE_STRUCTURE.md) for details
+
+- **Technology Stack**: Comprehensive modern stack
+  - Backend: Python 3.10+ with FastAPI, SQLAlchemy, Redis
+  - Frontend: Next.js 16 with React 19, TypeScript, Tailwind CSS
+  - Blockchain: Web3.py, Alith SDK, Thirdweb, multi-chain support
+  - AI/LLM: Google Gemini, OpenAI, LangChain
+  - See [Technology Stack Documentation](./docs/TECH_STACK.md) for complete details
+
+- **Architecture Patterns**:
+  - **Agent-to-Agent (A2A) Protocol**: Decoupled agent communication via event bus
+  - **Event-Driven Architecture**: Redis Streams for event persistence and real-time updates
+  - **Service Orchestration**: Sequential and parallel service execution patterns
+  - **RAG System**: Template retrieval and similarity matching for enhanced generation
 
 ### Core Components
 
@@ -336,9 +574,26 @@ We welcome contributions! HyperAgent is an open-source project and we appreciate
 4. **Write tests** for your changes
 5. **Commit** your changes (`git commit -m 'feat: Add amazing feature'`)
 6. **Push** to your branch (`git push origin feature/amazing-feature`)
-7. **Open a Pull Request**
+7. **Open a Pull Request** using our [PR template](.github/pull_request_template.md)
 
 For detailed contribution guidelines, see [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+### Branch Protection & Development Standards
+
+HyperAgent follows Microsoft Engineering Fundamentals standards for repository management:
+
+- **Protected Main Branch**: No direct pushes allowed
+- **Pull Request Required**: All changes must go through PRs
+- **2+ Reviewers Required**: CODEOWNERS file auto-assigns reviewers
+- **CI Checks Must Pass**: All tests, linting, and security scans must pass
+- **Squash Merge Only**: Maintains clean, linear commit history
+- **80%+ Test Coverage**: Enforced in CI pipeline
+
+**Resources:**
+- [Branch Protection Setup](./docs/BRANCH_PROTECTION.md) - Complete setup instructions
+- [Pull Request Template](.github/pull_request_template.md) - PR checklist and guidelines
+- [CODEOWNERS](.github/CODEOWNERS) - Auto-reviewer assignments
+- [Contributing Guide](./CONTRIBUTING.md) - Development workflow and standards
 
 ### Development Workflow
 

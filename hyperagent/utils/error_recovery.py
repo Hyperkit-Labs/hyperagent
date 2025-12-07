@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 class CircuitState(Enum):
     """Circuit breaker states"""
+
     CLOSED = "closed"  # Normal operation
     OPEN = "open"  # Failing, reject requests
     HALF_OPEN = "half_open"  # Testing if service recovered
@@ -21,6 +22,7 @@ class CircuitState(Enum):
 @dataclass
 class CircuitBreakerConfig:
     """Circuit breaker configuration"""
+
     failure_threshold: int = 5  # Open circuit after N failures
     success_threshold: int = 2  # Close circuit after N successes in half-open
     timeout_seconds: int = 60  # Time before trying half-open
@@ -30,6 +32,7 @@ class CircuitBreakerConfig:
 @dataclass
 class CircuitBreakerStats:
     """Circuit breaker statistics"""
+
     failures: int = 0
     successes: int = 0
     last_failure_time: Optional[datetime] = None
@@ -133,18 +136,15 @@ class CircuitBreaker:
             "failures": self.stats.failures,
             "successes": self.stats.successes,
             "last_failure_time": (
-                self.stats.last_failure_time.isoformat()
-                if self.stats.last_failure_time
-                else None
+                self.stats.last_failure_time.isoformat() if self.stats.last_failure_time else None
             ),
-            "opened_at": (
-                self.stats.opened_at.isoformat() if self.stats.opened_at else None
-            ),
+            "opened_at": (self.stats.opened_at.isoformat() if self.stats.opened_at else None),
         }
 
 
 class CircuitBreakerOpenError(Exception):
     """Circuit breaker is open"""
+
     pass
 
 
@@ -187,10 +187,8 @@ async def retry_with_backoff(
 
             if attempt < max_retries:
                 # Calculate delay with exponential backoff
-                delay = min(initial_delay * (exponential_base ** attempt), max_delay)
-                logger.warning(
-                    f"Retry attempt {attempt + 1}/{max_retries} after {delay:.2f}s: {e}"
-                )
+                delay = min(initial_delay * (exponential_base**attempt), max_delay)
+                logger.warning(f"Retry attempt {attempt + 1}/{max_retries} after {delay:.2f}s: {e}")
                 await asyncio.sleep(delay)
             else:
                 logger.error(f"All {max_retries + 1} retry attempts failed")
@@ -216,4 +214,3 @@ def get_circuit_breaker(name: str, config: Optional[CircuitBreakerConfig] = None
 def get_all_circuit_breakers() -> Dict[str, Dict[str, Any]]:
     """Get state of all circuit breakers"""
     return {name: cb.get_state() for name, cb in _circuit_breakers.items()}
-

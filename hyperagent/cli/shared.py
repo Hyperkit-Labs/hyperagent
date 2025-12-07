@@ -93,7 +93,9 @@ def monitor_workflow_progress(
                 except UnicodeEncodeError:
                     # Final fallback: use ASCII only
                     sys.stdout.write(
-                        f"\r[...] Workflow: {progress}% - {stage}".encode("ascii", "replace").decode("ascii")
+                        f"\r[...] Workflow: {progress}% - {stage}".encode(
+                            "ascii", "replace"
+                        ).decode("ascii")
                     )
                     sys.stdout.flush()
 
@@ -125,4 +127,3 @@ def monitor_workflow_progress(
         handle_api_error(e, f"workflow {workflow_id}")
     except Exception as e:
         format_error("Error monitoring workflow", str(e))
-

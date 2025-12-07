@@ -43,9 +43,7 @@ def is_x402_network(network: str) -> bool:
 
 @router.post("/deploy", response_model=DeploymentResponse)
 async def deploy_with_payment(
-    request: DeploymentRequest, 
-    http_request: Request,
-    db: AsyncSession = Depends(get_db)
+    request: DeploymentRequest, http_request: Request, db: AsyncSession = Depends(get_db)
 ):
     if not is_x402_network(request.network):
         logger.info(f"Network {request.network} not x402-enabled, bypassing payment")
@@ -53,9 +51,9 @@ async def deploy_with_payment(
 
     # Extract wallet address from headers (case-insensitive) or request body
     wallet_address = (
-        request.wallet_address or
-        http_request.headers.get("x-wallet-address") or
-        http_request.headers.get("X-Wallet-Address")
+        request.wallet_address
+        or http_request.headers.get("x-wallet-address")
+        or http_request.headers.get("X-Wallet-Address")
     )
     merchant = "deployment"
 
@@ -79,16 +77,14 @@ async def deploy_with_payment(
 
 @router.post("/prepare", response_model=DeploymentPrepareResponse)
 async def prepare_deployment(
-    request: DeploymentPrepareRequest, 
-    http_request: Request,
-    db: AsyncSession = Depends(get_db)
+    request: DeploymentPrepareRequest, http_request: Request, db: AsyncSession = Depends(get_db)
 ):
     if is_x402_network(request.network):
         # Extract wallet address from headers (case-insensitive) or request body
         wallet_address = (
-            request.wallet_address or
-            http_request.headers.get("x-wallet-address") or
-            http_request.headers.get("X-Wallet-Address")
+            request.wallet_address
+            or http_request.headers.get("x-wallet-address")
+            or http_request.headers.get("X-Wallet-Address")
         )
         merchant = "deployment-prepare"
 

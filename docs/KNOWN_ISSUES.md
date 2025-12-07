@@ -142,6 +142,48 @@ If you encounter issues not listed here:
    - Error message
    - Steps to reproduce
 
+### 4. CLI Command Stubs (Non-Blocking)
+
+**Status**: ⚠️ Minor - Workarounds Available
+
+**Stubbed Commands**:
+
+1. **`hyperagent contract test`**
+   - **Status**: Shows warning message, not implemented
+   - **Location**: `hyperagent/cli/commands/contracts.py`
+   - **Reason**: Pending test endpoint availability
+   - **Impact**: Low - Testing happens automatically in workflows
+   - **Workaround**: Use workflow testing or test endpoints directly
+
+2. **`hyperagent deployment interact`**
+   - **Status**: Placeholder with helpful message
+   - **Location**: `hyperagent/cli/commands/deployments.py`
+   - **Reason**: Pending implementation
+   - **Impact**: Low - Users can interact via Web3.py directly
+   - **Workaround**: Use Web3.py or contract interaction libraries directly
+
+**Impact**: 
+- These are convenience commands, not critical functionality
+- Core testing and deployment work through workflows and API
+- Users have alternative methods available
+
+### 5. Event Handler Database Logging (Optional)
+
+**Status**: ⚠️ Optional Feature - Console Logging Works
+
+**Current State**:
+- `AuditLoggerHandler.handle()` has TODO for database logging
+- **Location**: `hyperagent/events/handlers.py:86-96`
+- **Status**: Commented-out code, not implemented
+- **Current Behavior**: Events are logged to console/files
+
+**Impact**:
+- Low - Events are still logged and tracked
+- Database logging would be nice-to-have for analytics
+- Console/file logging provides sufficient debugging capability
+
+**Planned**: Will be implemented when database logging infrastructure is prioritized
+
 ## Related Documentation
 
 - `docs/NETWORK_COMPATIBILITY.md` - Network feature compatibility matrix (Phase 5)

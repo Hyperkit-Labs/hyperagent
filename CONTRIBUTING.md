@@ -247,48 +247,75 @@ docs(readme): Update installation instructions
 
 2. **Run tests and linting**
    ```bash
+   # Backend
    pytest tests/ -v
    black --check hyperagent/
-   flake8 hyperagent/
+   isort --check-only hyperagent/
    mypy hyperagent/
+   
+   # Frontend
+   cd frontend
+   npm ci
+   npm run lint
+   npm run format:check
+   npm test
    ```
 
 3. **Create Pull Request**
-   - Use clear, descriptive title
-   - Link to related issue or feature request
+   - Use the [Pull Request Template](.github/pull_request_template.md) - automatically loaded when creating PR
+   - Use clear, descriptive title following conventional commits
+   - Link to related issue or feature request using `Closes #issue_number`
    - Describe changes in detail
    - List affected agents/services
    - Include test coverage information
    - Note any breaking changes
+   - Complete all checklist items in the PR template
 
-4. **PR Description Template**
-   ```markdown
-   ## Description
-   Brief description of changes
-   
-   ## Type of Change
-   - [ ] Bug fix
-   - [ ] New feature
-   - [ ] Breaking change
-   - [ ] Documentation update
-   
-   ## Testing
-   - [ ] Unit tests added/updated
-   - [ ] Integration tests added/updated
-   - [ ] Manual testing completed
-   
-   ## Checklist
-   - [ ] Code follows style guidelines
-   - [ ] Tests pass locally
-   - [ ] Documentation updated
-   - [ ] No breaking changes (or documented)
-   ```
+4. **PR Requirements**
+   - All CI checks must pass (see [Branch Protection](./docs/BRANCH_PROTECTION.md))
+   - 2+ reviewers must approve (CODEOWNERS file auto-assigns reviewers)
+   - Code must follow style guidelines (Black, isort, ESLint, Prettier)
+   - Tests must pass with 80%+ coverage (enforced in CI)
+   - Documentation must be updated if needed
+   - No hardcoded secrets or credentials
+   - Security scan must pass (Bandit, Trivy)
 
 5. **Respond to Review**
    - Address review comments promptly
    - Make requested changes
    - Update PR description if needed
    - Re-request review when ready
+
+### Code Owners
+
+The repository uses a [CODEOWNERS file](.github/CODEOWNERS) to automatically assign reviewers based on code paths. Reviewers are automatically requested when you open a PR.
+
+**How it works:**
+- GitHub automatically requests reviews from code owners based on file paths
+- Different code areas have different owners (backend, frontend, tests, docs)
+- At least 2 approvals are required, including from code owners
+
+### Required CI Checks
+
+Before merging, the following checks must pass:
+
+**Code Quality:**
+- `[*] Code Quality Checks` - Black, isort, MyPy type checking
+- `[*] Frontend Code Quality` - ESLint, Prettier formatting
+
+**Security:**
+- `[*] Security Scan` - Bandit (Python), Trivy (vulnerability scanning)
+
+**Testing:**
+- `[TEST] Unit Tests` - 80%+ coverage required (job fails if below threshold)
+- `[TEST] Integration Tests` - Full integration test suite
+- `[TEST] Frontend Tests` - Frontend test suite (Jest)
+
+**Build & Deployment:**
+- `[BUILD] Docker Image` - Docker image builds successfully
+- `[TEST] Docker Compose Integration` - Services start and health checks pass
+
+**See [Branch Protection Documentation](./docs/BRANCH_PROTECTION.md) for complete setup instructions and troubleshooting.**
 
 ## Code Style Guidelines
 

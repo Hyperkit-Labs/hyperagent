@@ -228,3 +228,7 @@ frontend/.env.local
 frontend/.env*.local
 frontend/.vercel
 frontend/.swc/
+
+reference/
+.cursor/
+.cursor/rules

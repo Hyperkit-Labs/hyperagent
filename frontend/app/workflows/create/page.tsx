@@ -127,10 +127,10 @@ export default function CreateWorkflowPage() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Create New Workflow</h1>
         <p className="mt-2 text-gray-600">
-          Describe the smart contract you want to create and we&apos;ll generate it for you
+          Describe the smart contract you want to create and we'll generate it for you
         </p>
         <p className="mt-2 text-sm text-blue-600">
-          Note: Avalanche networks require x402 payment. You&apos;ll be prompted to approve payments in your wallet.
+          Note: Avalanche networks require x402 payment. You'll be prompted to approve payments in your wallet.
         </p>
       </div>
 

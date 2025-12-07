@@ -68,7 +68,9 @@ def register_system_commands(system_group: click.Group) -> None:
         import os
         import shutil
 
-        script_path = Path(__file__).parent.parent.parent.parent / "scripts" / "completion" / f"{shell}.sh"
+        script_path = (
+            Path(__file__).parent.parent.parent.parent / "scripts" / "completion" / f"{shell}.sh"
+        )
 
         if not script_path.exists():
             format_error(f"Completion script not found: {script_path}")
@@ -165,11 +167,12 @@ def register_config_group(config_group: click.Group) -> None:
                     return response.status_code == 200
 
             if asyncio.run(test_api()):
-                table.add_row("API Connectivity", "[green][+] Connected[/green]", "API is reachable")
+                table.add_row(
+                    "API Connectivity", "[green][+] Connected[/green]", "API is reachable"
+                )
             else:
                 table.add_row("API Connectivity", "[red][-] Failed[/red]", "API not responding")
         except:
             table.add_row("API Connectivity", "[red][-] Failed[/red]", "Cannot connect to API")
 
         console.print(table)
-

@@ -9,6 +9,7 @@ from hyperagent.core.config import settings
 
 class LLMError(Exception):
     """LLM provider error"""
+
     pass
 
 

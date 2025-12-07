@@ -40,7 +40,7 @@ def get_thirdweb_client() -> Any:
 def load_price_tiers() -> Dict[str, float]:
     """
     Load price tiers from configuration
-    
+
     Returns:
         Dict mapping price tier names to USDC amounts
     """
@@ -49,15 +49,15 @@ def load_price_tiers() -> Dict[str, float]:
         if not price_tiers_str:
             logger.debug("x402_price_tiers not configured, using defaults")
             return _DEFAULT_PRICE_TIERS.copy()
-        
+
         # Parse JSON string
         price_tiers = json.loads(price_tiers_str)
-        
+
         # Validate structure
         if not isinstance(price_tiers, dict):
             logger.error(f"Invalid price tiers format: expected dict, got {type(price_tiers)}")
             return _DEFAULT_PRICE_TIERS.copy()
-        
+
         # Validate values are numbers
         validated_tiers = {}
         for key, value in price_tiers.items():
@@ -65,14 +65,14 @@ def load_price_tiers() -> Dict[str, float]:
                 validated_tiers[key] = float(value)
             except (ValueError, TypeError):
                 logger.warning(f"Invalid price tier value for {key}: {value}, skipping")
-        
+
         if not validated_tiers:
             logger.error("No valid price tiers found, using defaults")
             return _DEFAULT_PRICE_TIERS.copy()
-        
+
         logger.info(f"Loaded {len(validated_tiers)} price tiers from configuration")
         return validated_tiers
-        
+
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse x402_price_tiers JSON: {e}, using defaults")
         return _DEFAULT_PRICE_TIERS.copy()
@@ -170,11 +170,15 @@ class X402Middleware:
     ):
         """Log payment transaction to database"""
         if not db:
-            logger.warning(f"Payment not logged: db session not provided. wallet={wallet_address}, amount={amount}, endpoint={endpoint}")
+            logger.warning(
+                f"Payment not logged: db session not provided. wallet={wallet_address}, amount={amount}, endpoint={endpoint}"
+            )
             return
 
         if not wallet_address:
-            logger.warning(f"Payment not logged: wallet_address not provided. amount={amount}, endpoint={endpoint}")
+            logger.warning(
+                f"Payment not logged: wallet_address not provided. amount={amount}, endpoint={endpoint}"
+            )
             return
 
         try:
@@ -190,7 +194,9 @@ class X402Middleware:
             )
             db.add(payment)
             await db.flush()  # Flush to get ID but don't commit - let get_db() dependency handle commit
-            logger.info(f"Payment logged successfully: wallet={wallet_address}, amount={amount}, merchant={merchant}, tx_hash={transaction_hash}")
+            logger.info(
+                f"Payment logged successfully: wallet={wallet_address}, amount={amount}, merchant={merchant}, tx_hash={transaction_hash}"
+            )
         except Exception as e:
             logger.error(f"Error logging payment: {e}", exc_info=True)
             await db.rollback()
@@ -257,7 +263,9 @@ class X402Middleware:
                     merchant=merchant,
                 )
             else:
-                logger.warning(f"Payment verified but not logged: wallet_address missing. endpoint={endpoint}, amount={price_usdc}")
+                logger.warning(
+                    f"Payment verified but not logged: wallet_address missing. endpoint={endpoint}, amount={price_usdc}"
+                )
             return None
 
         if result.get("status") == 402:

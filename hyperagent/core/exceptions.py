@@ -18,64 +18,77 @@ class HyperAgentError(Exception):
 
 class DeploymentError(HyperAgentError):
     """Deployment-related errors"""
+
     pass
 
 
 class NetworkError(HyperAgentError):
     """Network-related errors (RPC, connectivity, etc.)"""
+
     pass
 
 
 class CompilationError(HyperAgentError):
     """Contract compilation errors"""
+
     pass
 
 
 class ValidationError(HyperAgentError):
     """Input validation errors"""
+
     pass
 
 
 class WalletError(HyperAgentError):
     """Wallet-related errors (address validation, balance, etc.)"""
+
     pass
 
 
 class GenerationError(HyperAgentError):
     """Contract generation errors"""
+
     pass
 
 
 class AuditError(HyperAgentError):
     """Security audit errors"""
+
     pass
 
 
 class TestingError(HyperAgentError):
     """Contract testing errors"""
+
     pass
 
 
 class ConfigurationError(HyperAgentError):
     """Configuration errors"""
+
     pass
 
 
 class AuthenticationError(HyperAgentError):
     """Authentication errors"""
+
     pass
 
 
 class AuthorizationError(HyperAgentError):
     """Authorization errors (permissions, roles)"""
+
     pass
 
 
 class RateLimitError(HyperAgentError):
     """Rate limiting errors"""
+
     pass
 
 
 class PaymentError(HyperAgentError):
     """x402 payment errors"""
+
     pass

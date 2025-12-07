@@ -82,9 +82,7 @@ class StandardDeploymentHelper:
                 constructor_inputs = item.get("inputs", [])
                 break
 
-        logger.debug(
-            f"Constructor ABI found: inputs: {len(constructor_inputs)}"
-        )
+        logger.debug(f"Constructor ABI found: inputs: {len(constructor_inputs)}")
         logger.debug(
             f"Constructor args provided: {constructor_args is not None}, count: {len(constructor_args) if constructor_args else 0}"
         )
@@ -216,4 +214,3 @@ class StandardDeploymentHelper:
             "deployment_method": "web3_standard",
             "network": network,
         }
-

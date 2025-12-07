@@ -49,7 +49,7 @@ class DeploymentService(ServiceInterface):
         self.eigenda_client = eigenda_client
         self.use_alith_autonomous = use_alith_autonomous
         self.use_pef = use_pef
-        
+
         # Initialize deployment helpers
         self.base_helper = BaseDeploymentHelper(network_manager)
         self.x402_helper = X402DeploymentHelper(network_manager)
@@ -213,7 +213,11 @@ class DeploymentService(ServiceInterface):
                     source_code = input_data.get("source_code")
                     constructor_args = input_data.get("constructor_args", [])
                     return await self.gasless_helper.deploy_gasless_via_facilitator(
-                        compiled, network, constructor_args, wallet_address, self._deploy_manual_with_retry
+                        compiled,
+                        network,
+                        constructor_args,
+                        wallet_address,
+                        self._deploy_manual_with_retry,
                     )
 
         # METHOD 3: No valid deployment method available
@@ -381,7 +385,7 @@ class DeploymentService(ServiceInterface):
     ) -> Dict[str, Any]:
         """
         Deploy contract using signed transaction from user's wallet - delegates to x402 helper
-        
+
         Note: This method is kept for backward compatibility but delegates to X402DeploymentHelper
         """
         result = await self.x402_helper.deploy_with_signed_transaction(
@@ -665,7 +669,7 @@ class DeploymentService(ServiceInterface):
         deployment_result = await self.standard_helper.deploy_manual(
             compiled, network, private_key, source_code, constructor_args
         )
-        
+
         # Add EigenDA integration if supported (service-specific logic)
         from hyperagent.blockchain.network_features import NetworkFeature, NetworkFeatureManager
         from eth_account import Account
@@ -678,16 +682,18 @@ class DeploymentService(ServiceInterface):
             # Store EigenDA metadata in background (non-blocking)
             account = Account.from_key(private_key)
             tx_hash_hex = deployment_result.get("transaction_hash")
-            
+
             # Get receipt for EigenDA storage
             w3 = self.network_manager.get_web3(network)
-            tx_hash = w3.to_bytes(hexstr=tx_hash_hex) if isinstance(tx_hash_hex, str) else tx_hash_hex
+            tx_hash = (
+                w3.to_bytes(hexstr=tx_hash_hex) if isinstance(tx_hash_hex, str) else tx_hash_hex
+            )
             receipt = w3.eth.get_transaction_receipt(tx_hash)
-            
+
             # Initialize EigenDA fields
             deployment_result["eigenda_commitment"] = None
             deployment_result["eigenda_metadata_stored"] = False
-            
+
             # Schedule EigenDA storage in background
             try:
                 asyncio.create_task(
@@ -839,6 +845,7 @@ class DeploymentService(ServiceInterface):
         Returns:
             Batch deployment results
         """
+
         async def deploy_single(contract_config: Dict[str, Any]) -> Dict[str, Any]:
             """Helper to deploy a single contract"""
             result = await self.process(

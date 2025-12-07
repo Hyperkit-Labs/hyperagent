@@ -86,9 +86,6 @@ class GenerationService(ServiceInterface):
                 )
             else:
                 # Log warning but continue without optimization
-                import logging
-
-                logger = logging.getLogger(__name__)
                 logger.warning(
                     f"MetisVM optimization requested but not available for {network}. "
                     f"Continuing without optimization."

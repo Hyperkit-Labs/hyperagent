@@ -143,4 +143,3 @@ class BatchDeploymentHelper:
             "failed_count": len(deployments) - success_count,
             "batches_deployed": 1,
         }
-

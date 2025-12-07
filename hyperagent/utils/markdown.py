@@ -68,4 +68,3 @@ def extract_solidity_code(text: str) -> str:
     Alias for strip_markdown_code_blocks for backward compatibility
     """
     return strip_markdown_code_blocks(text)
-

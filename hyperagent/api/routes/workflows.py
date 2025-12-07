@@ -742,19 +742,19 @@ async def list_workflows(
     """
     try:
         stmt = select(Workflow)
-        
+
         if status:
             stmt = stmt.where(Workflow.status == status)
         if network:
             stmt = stmt.where(Workflow.network == network)
-        
+
         stmt = stmt.order_by(Workflow.created_at.desc()).limit(limit).offset(offset)
-        
+
         result = await db.execute(stmt)
         workflows = result.scalars().all()
-        
+
         from hyperagent.models.contract import GeneratedContract
-        
+
         workflow_list = []
         for workflow in workflows:
             # Get contract count
@@ -762,35 +762,39 @@ async def list_workflows(
                 select(GeneratedContract).where(GeneratedContract.workflow_id == workflow.id)
             )
             contracts = contracts_result.scalars().all()
-            
+
             # Extract contract_type from first contract or use default
             contract_type = "Custom"
             if contracts:
                 contract_type = contracts[0].contract_type or "Custom"
             elif workflow.meta_data and isinstance(workflow.meta_data, dict):
                 contract_type = workflow.meta_data.get("contract_type", "Custom")
-            
-            workflow_list.append({
-                "workflow_id": str(workflow.id),
-                "status": workflow.status,
-                "progress_percentage": workflow.progress_percentage,
-                "network": workflow.network,
-                "contract_type": contract_type,
-                "name": workflow.name,
-                "created_at": workflow.created_at.isoformat() if workflow.created_at else None,
-                "updated_at": workflow.updated_at.isoformat() if workflow.updated_at else None,
-                "completed_at": workflow.completed_at.isoformat() if workflow.completed_at else None,
-                "error_message": workflow.error_message,
-                "contracts": [
-                    {
-                        "id": str(c.id),
-                        "contract_name": c.contract_name,
-                        "contract_type": c.contract_type,
-                    }
-                    for c in contracts
-                ],
-            })
-        
+
+            workflow_list.append(
+                {
+                    "workflow_id": str(workflow.id),
+                    "status": workflow.status,
+                    "progress_percentage": workflow.progress_percentage,
+                    "network": workflow.network,
+                    "contract_type": contract_type,
+                    "name": workflow.name,
+                    "created_at": workflow.created_at.isoformat() if workflow.created_at else None,
+                    "updated_at": workflow.updated_at.isoformat() if workflow.updated_at else None,
+                    "completed_at": (
+                        workflow.completed_at.isoformat() if workflow.completed_at else None
+                    ),
+                    "error_message": workflow.error_message,
+                    "contracts": [
+                        {
+                            "id": str(c.id),
+                            "contract_name": c.contract_name,
+                            "contract_type": c.contract_type,
+                        }
+                        for c in contracts
+                    ],
+                }
+            )
+
         return workflow_list
     except Exception as e:
         logger.error(f"Failed to list workflows: {e}", exc_info=True)
@@ -851,7 +855,7 @@ async def get_workflow_status(workflow_id: str, db: AsyncSession = Depends(get_d
             contract_type = contracts[0].contract_type or "Custom"
         elif workflow.meta_data and isinstance(workflow.meta_data, dict):
             contract_type = workflow.meta_data.get("contract_type", "Custom")
-        
+
         return {
             "workflow_id": str(workflow.id),
             "status": workflow.status,

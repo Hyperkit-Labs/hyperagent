@@ -74,4 +74,3 @@ class GaslessDeploymentHelper:
         return await deploy_manual_with_retry(
             compiled, network, facilitator_private_key, source_code, constructor_args
         )
-

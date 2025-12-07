@@ -160,15 +160,17 @@ async def create_workflow_from_contract(
 ) -> WorkflowResponse:
     # Extract wallet address from headers (case-insensitive) or request body
     wallet_address = (
-        request.wallet_address or
-        http_request.headers.get("x-wallet-address") or
-        http_request.headers.get("X-Wallet-Address")
+        request.wallet_address
+        or http_request.headers.get("x-wallet-address")
+        or http_request.headers.get("X-Wallet-Address")
     )
-    
+
     # Workflow creation is FREE when created from a contract that was already paid for
     # The contract generation already includes the payment, so no additional payment needed
     # This ensures single payment per contract type (ERC20=$0.01, ERC721=$0.02, Custom=$0.15)
-    logger.info(f"Creating workflow from contract for {wallet_address} - workflow creation is free (contract already paid)")
+    logger.info(
+        f"Creating workflow from contract for {wallet_address} - workflow creation is free (contract already paid)"
+    )
 
     try:
         workflow_id, workflow = await _create_workflow_record(

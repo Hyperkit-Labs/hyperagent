@@ -158,7 +158,9 @@ class SecretsManager:
 
             # Try KV v2 first (secret/data/path)
             try:
-                response = client.secrets.kv.v2.read_secret_version(path=path, mount_point=mount_point)
+                response = client.secrets.kv.v2.read_secret_version(
+                    path=path, mount_point=mount_point
+                )
                 return response["data"]["data"].get("value") or str(response["data"]["data"])
             except Exception:
                 # Fallback to KV v1 (secret/path)

@@ -30,7 +30,9 @@ def register_deployment_commands(deployment_group: click.Group) -> None:
     @click.option(
         "--network",
         "-n",
-        type=click.Choice(["hyperion_testnet", "hyperion_mainnet", "mantle_testnet", "mantle_mainnet"]),
+        type=click.Choice(
+            ["hyperion_testnet", "hyperion_mainnet", "mantle_testnet", "mantle_mainnet"]
+        ),
         required=True,
         help="Target network",
     )
@@ -205,7 +207,9 @@ def register_deployment_commands(deployment_group: click.Group) -> None:
     @click.option(
         "--network",
         "-n",
-        type=click.Choice(["hyperion_testnet", "hyperion_mainnet", "mantle_testnet", "mantle_mainnet"]),
+        type=click.Choice(
+            ["hyperion_testnet", "hyperion_mainnet", "mantle_testnet", "mantle_mainnet"]
+        ),
         required=True,
         help="Target network",
     )
@@ -309,7 +313,9 @@ def register_deployment_commands(deployment_group: click.Group) -> None:
     @click.option(
         "--network",
         "-n",
-        type=click.Choice(["hyperion_testnet", "hyperion_mainnet", "mantle_testnet", "mantle_mainnet"]),
+        type=click.Choice(
+            ["hyperion_testnet", "hyperion_mainnet", "mantle_testnet", "mantle_mainnet"]
+        ),
         help="Network (if not using deployment-id)",
     )
     @click.option("--value", "-v", help="ETH value to send (for payable functions)")
@@ -353,7 +359,8 @@ def register_deployment_commands(deployment_group: click.Group) -> None:
 
                 if not contract_addr:
                     format_error(
-                        "Contract address not found", suggestions=["Verify deployment ID is correct"]
+                        "Contract address not found",
+                        suggestions=["Verify deployment ID is correct"],
                     )
                     return
 
@@ -409,4 +416,3 @@ def register_deployment_commands(deployment_group: click.Group) -> None:
             handle_api_error(e, f"deployment {deployment_id or 'interaction'}")
         except Exception as e:
             format_error("Failed to interact with contract", str(e))
-

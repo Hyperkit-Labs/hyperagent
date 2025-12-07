@@ -135,6 +135,7 @@ npm run dev
 ## Contributing
 
 We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+
 <a href="https://github.com/HyperionKit/HyperAgent/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=HyperionKit/HyperAgent" />
 </a>

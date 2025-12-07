@@ -7,6 +7,16 @@
 
 This guide explains the branch structure and workflow for HyperAgent development and production releases.
 
+
+Best practices
+Development work → Always push to origin-dev
+   git push origin-dev development
+Production releases → Always push to origin-prod
+   git push origin-prod main
+Use sync script for production releases
+   bash scripts/sync_main_branch.sh
+   git push origin-prod main
+
 ## Branch Structure
 
 ### `development` (Default Branch)

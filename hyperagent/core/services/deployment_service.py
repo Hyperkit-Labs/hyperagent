@@ -671,9 +671,11 @@ class DeploymentService(ServiceInterface):
         )
 
         # Add EigenDA integration if supported (service-specific logic)
-        from hyperagent.blockchain.network_features import NetworkFeature, NetworkFeatureManager
-        from eth_account import Account
         import asyncio
+
+        from eth_account import Account
+
+        from hyperagent.blockchain.network_features import NetworkFeature, NetworkFeatureManager
 
         if (
             NetworkFeatureManager.supports_feature(network, NetworkFeature.EIGENDA)

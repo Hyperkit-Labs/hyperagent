@@ -1,11 +1,6 @@
 # HyperAgent User Guide
 
-**Document Type**: How-To Guide (Goal-Oriented)  
-**Category**: User Documentation  
-**Audience**: End Users  
-**Location**: `GUIDE/USER_GUIDE.md`
-
-This guide helps you accomplish specific tasks with HyperAgent. Each section focuses on a specific goal and provides step-by-step instructions to achieve it.
+Step-by-step guide to accomplish specific tasks with HyperAgent.
 
 ## Table of Contents
 

@@ -44,7 +44,11 @@ export function WorkflowForm({ onSubmit, loading = false }: WorkflowFormProps) {
   const [useGasless, setUseGasless] = useState(false);
   const [networks, setNetworks] = useState<Network[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [thirdwebConfigured] = useState(() => isThirdwebConfigured());
+  const [thirdwebConfigured, setThirdwebConfigured] = useState(false);
+
+  useEffect(() => {
+    setThirdwebConfigured(isThirdwebConfigured());
+  }, []);
 
   useEffect(() => {
     getNetworks()

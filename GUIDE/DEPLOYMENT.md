@@ -1,8 +1,6 @@
 # HyperAgent Production Deployment Guide
 
-## Overview
-
-This guide covers deploying HyperAgent to production environments with security, monitoring, and reliability best practices.
+Deployment guide for production environments with security, monitoring, and reliability best practices.
 
 ## Prerequisites
 
@@ -10,8 +8,10 @@ This guide covers deploying HyperAgent to production environments with security,
 - PostgreSQL 15+ with pgvector extension
 - Redis 7+
 - Python 3.10+
-- Required API keys (Gemini, OpenAI, etc.)
+- Node.js 18+ (for x402 verification service)
+- Required API keys (Gemini, OpenAI, Thirdweb, etc.)
 - Blockchain RPC endpoints accessible
+- Thirdweb account with ERC-4337 Smart Account (for x402 payments)
 
 ## Pre-Deployment Checklist
 
@@ -43,13 +43,81 @@ This guide covers deploying HyperAgent to production environments with security,
 - [ ] Set up database backups
 - [ ] Configure connection pooling
 
-### 4. Infrastructure
+### 4. x402 Service Setup (If Using x402 Payments)
+
+- [ ] Create Thirdweb account at [portal.thirdweb.com](https://portal.thirdweb.com)
+- [ ] Get Client ID and Secret Key from Thirdweb Dashboard
+- [ ] Create ERC-4337 Smart Account in Server Wallets section
+- [ ] Fund facilitator wallet with AVAX (for gas sponsorship)
+- [ ] Set `THIRDWEB_SERVER_WALLET_ADDRESS` to ERC-4337 Smart Account address
+- [ ] Set `MERCHANT_WALLET_ADDRESS` to receive payments
+- [ ] Configure USDC addresses for target networks
+- [ ] Verify x402 service: `python scripts/verify_x402_setup.py`
+
+### 5. Infrastructure
 
 - [ ] Set up PostgreSQL (managed service or self-hosted)
 - [ ] Set up Redis (managed service or self-hosted)
+- [ ] Set up x402 verification service (TypeScript service)
 - [ ] Configure load balancer (if needed)
 - [ ] Set up monitoring (Prometheus, Grafana)
 - [ ] Configure logging aggregation
+
+## x402 Service Deployment
+
+### Setting Up x402 Payments
+
+1. **Create Thirdweb Account**:
+   - Go to [Thirdweb Dashboard](https://portal.thirdweb.com)
+   - Log in with your wallet
+   - Create a new project or use existing one
+   - Get your Client ID and Secret Key
+
+2. **Set Up Facilitator Wallet**:
+   - Go to Server Wallets section
+   - Enable "Show ERC-4337 Smart Account"
+   - Switch to Avalanche Fuji Testnet (or Mainnet)
+   - Copy the Smart Account address
+   - This is your `THIRDWEB_SERVER_WALLET_ADDRESS`
+
+3. **Fund Facilitator Wallet**:
+   - Send AVAX to the Smart Account address
+   - Minimum recommended: 0.1 AVAX for testnet, 1 AVAX for mainnet
+   - Facilitator uses this to sponsor gas for users
+
+4. **Configure Environment Variables**:
+   ```bash
+   X402_ENABLED=true
+   THIRDWEB_CLIENT_ID=your_client_id
+   THIRDWEB_SECRET_KEY=your_secret_key
+   THIRDWEB_SERVER_WALLET_ADDRESS=0x... # ERC-4337 Smart Account
+   MERCHANT_WALLET_ADDRESS=0x... # Receives x402 payments
+   USDC_ADDRESS_FUJI=0x5425890298aed601595a70AB815c96711a31Bc65
+   USDC_ADDRESS_AVALANCHE=0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E
+   ```
+
+5. **Start x402 Verification Service**:
+   ```bash
+   # Included in docker-compose.yml
+   docker-compose up -d x402-verifier
+   
+   # Or manually
+   cd services/x402-verifier
+   npm install
+   npm start
+   ```
+
+6. **Verify Setup**:
+   ```bash
+   python scripts/verify_x402_setup.py
+   ```
+
+### Important Notes
+
+- **ERC-4337 Required**: Facilitator must be ERC-4337 Smart Account (not EOA)
+- **Network Support**: x402 payments only work on Avalanche networks currently
+- **Gas Sponsorship**: Facilitator wallet must be funded with AVAX
+- **Payment Recipient**: Merchant wallet receives USDC payments from users
 
 ## Deployment Methods
 
@@ -70,7 +138,10 @@ docker-compose -f docker-compose.production.yml up -d
 # 4. Run migrations
 docker-compose exec hyperagent alembic upgrade head
 
-# 5. Verify deployment
+# 5. Verify x402 setup (if using x402 payments)
+docker-compose exec hyperagent python scripts/verify_x402_setup.py
+
+# 6. Verify deployment
 curl http://localhost:8000/api/v1/health
 ```
 

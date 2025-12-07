@@ -174,7 +174,7 @@ export function SpendingControls() {
         {!controls && !loading && (
           <div className="pt-4 border-t border-gray-200">
             <p className="text-xs text-gray-500 text-center">
-              No spending controls configured yet. Set your limits above and click "Create Controls" to get started.
+              No spending controls configured yet. Set your limits above and click &quot;Create Controls&quot; to get started.
             </p>
           </div>
         )}

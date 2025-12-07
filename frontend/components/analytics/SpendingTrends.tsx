@@ -67,10 +67,11 @@ export function SpendingTrends({ history, summary }: SpendingTrendsProps) {
   const cumulativeData = useMemo(() => {
     let cumulative = 0;
     return dailyData.map((item) => {
-      cumulative += item.amount;
+      const newCumulative = cumulative + item.amount;
+      cumulative = newCumulative;
       return {
         ...item,
-        cumulative,
+        cumulative: newCumulative,
       };
     });
   }, [dailyData]);

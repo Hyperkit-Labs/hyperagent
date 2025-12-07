@@ -1,22 +1,22 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export function usePolling<T>(
   fetchFn: () => Promise<T>,
   interval: number,
   condition: (data: T) => boolean = () => true
 ) {
-  const dataRef = useRef<T | null>(null);
+  const [data, setData] = useState<T | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const poll = async () => {
       try {
-        const data = await fetchFn();
-        dataRef.current = data;
+        const result = await fetchFn();
+        setData(result);
         
-        if (!condition(data)) {
+        if (!condition(result)) {
           if (intervalRef.current) {
             clearInterval(intervalRef.current);
             intervalRef.current = null;
@@ -37,6 +37,6 @@ export function usePolling<T>(
     };
   }, [fetchFn, interval, condition]);
 
-  return dataRef.current;
+  return data;
 }
 

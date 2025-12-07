@@ -43,6 +43,7 @@ class SpendingControlResponse(BaseModel):
 
 class SpendingControlWithBudgetResponse(BaseModel):
     """Spending control with remaining budget calculations"""
+
     id: str
     wallet_address: str
     daily_limit: Optional[float]

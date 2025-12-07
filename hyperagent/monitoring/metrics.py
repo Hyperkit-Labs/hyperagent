@@ -58,7 +58,7 @@ llm_requests = Counter(
 llm_tokens = Counter(
     "hyperagent_llm_tokens_total",
     "Total number of LLM tokens processed",
-    ["provider", "type"],  # type: input or output
+    ["provider", "type"],  # type can be "input" or "output"
 )
 
 llm_duration = Histogram(

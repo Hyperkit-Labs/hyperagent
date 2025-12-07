@@ -1,8 +1,10 @@
 'use client';
 
 import { useParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { useWorkflow } from '@/hooks/useWorkflow';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { getWorkflowContracts } from '@/lib/api';
 import { WorkflowProgress } from '@/components/workflows/WorkflowProgress';
 import { ContractViewer } from '@/components/contracts/ContractViewer';
 import { Card } from '@/components/ui/Card';
@@ -11,14 +13,46 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ExplorerLink } from '@/components/deployments/ExplorerLink';
 import { formatDate } from '@/lib/utils';
 
+interface ContractWithCode {
+  id: string;
+  contract_name: string;
+  contract_type: string;
+  solidity_version: string;
+  source_code: string;
+  bytecode: string;
+  abi: any;
+  deployed_bytecode?: string;
+  created_at: string;
+}
+
 export default function WorkflowDetailPage() {
   const params = useParams();
   const workflowId = params.id as string;
   const { workflow, loading } = useWorkflow(workflowId);
   const { workflow: wsWorkflow, connected } = useWebSocket(workflowId);
+  const [contractsWithCode, setContractsWithCode] = useState<ContractWithCode[]>([]);
+  const [loadingContracts, setLoadingContracts] = useState(false);
 
   // Use WebSocket data if available, otherwise fall back to polling
   const activeWorkflow = wsWorkflow || workflow;
+
+  // Fetch contract details with source code when workflow has contracts
+  useEffect(() => {
+    if (activeWorkflow?.contracts && activeWorkflow.contracts.length > 0) {
+      const fetchContracts = async () => {
+        setLoadingContracts(true);
+        try {
+          const data = await getWorkflowContracts(workflowId);
+          setContractsWithCode(data.contracts);
+        } catch (error) {
+          console.error('Failed to fetch contract details:', error);
+        } finally {
+          setLoadingContracts(false);
+        }
+      };
+      fetchContracts();
+    }
+  }, [workflowId, activeWorkflow?.contracts]);
 
   if (loading) {
     return (
@@ -71,14 +105,30 @@ export default function WorkflowDetailPage() {
       {activeWorkflow.contracts && activeWorkflow.contracts.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-2xl font-semibold">Generated Contract</h2>
-          {activeWorkflow.contracts.map((contract) => (
-            <ContractViewer
-              key={contract.id}
-              contractCode={contract.contract_code}
-              abi={contract.abi}
-              contractName={contract.contract_type}
-            />
-          ))}
+          {loadingContracts ? (
+            <Card>
+              <div className="flex items-center justify-center py-8">
+                <LoadingSpinner size="md" text="Loading contract code..." />
+              </div>
+            </Card>
+          ) : contractsWithCode.length > 0 ? (
+            contractsWithCode.map((contract) => (
+              <ContractViewer
+                key={contract.id}
+                contractCode={contract.source_code || ''}
+                abi={contract.abi}
+                contractName={contract.contract_name || contract.contract_type}
+              />
+            ))
+          ) : (
+            <Card>
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-yellow-800">
+                  Contract code is being generated. Please refresh the page in a moment.
+                </p>
+              </div>
+            </Card>
+          )}
         </div>
       )}
 

@@ -5,7 +5,7 @@
 ![Version](https://img.shields.io/badge/version-1.0.0-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
-![Status](https://img.shields.io/badge/status-production%20ready-success)
+![Status](https://img.shields.io/badge/status-partially%20ready-success)
 <!-- Badges: end -->
   
 </div>

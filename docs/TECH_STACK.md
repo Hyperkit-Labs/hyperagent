@@ -306,14 +306,13 @@ See [Frontend Stack - Testing](#testing) section above.
 | Library | Version | Purpose |
 |---------|---------|---------|
 | **prometheus-client** | 0.21.0 | Prometheus metrics |
-| **opentelemetry-api** | 1.28.0 | OpenTelemetry API |
-| **opentelemetry-sdk** | 1.28.0 | OpenTelemetry SDK |
 
 ### Monitoring Stack
 
-- **Prometheus**: Metrics collection
-- **Grafana**: Visualization dashboards
+- **Prometheus**: Metrics collection (active)
 - **Health Checks**: Built-in endpoints
+- **Note**: Grafana removed per team decision. Use Prometheus UI directly at `http://localhost:9090`
+- **Note**: OpenTelemetry not implemented (dependencies removed)
 
 ---
 

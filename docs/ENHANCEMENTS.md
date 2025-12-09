@@ -497,7 +497,7 @@ GEMINI_API_KEY=your_gemini_api_key_here
 
 ## Future Enhancement Opportunities
 
-1. **OpenTelemetry Integration**: Distributed tracing across services
+1. **OpenTelemetry Integration**: Distributed tracing across services (not implemented - dependencies removed)
 2. **Multi-Signature Wallet Support**: Enhanced wallet security
 3. **OAuth2 Integration**: Alternative authentication method
 4. **GraphQL API**: Flexible query interface

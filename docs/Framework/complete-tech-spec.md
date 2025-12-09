@@ -68,7 +68,7 @@ Generated: 2025-12-07 | Target Networks: Hyperion, Mantle | Tech Stack: Python-F
 │  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐   │
 │  │Security Layer  │  │Monitoring      │  │Audit Log       │   │
 │  │- Mythril       │  │- Prometheus    │  │- All Actions   │   │
-│  │- Slither       │  │- Grafana       │  │- Immutable     │   │
+│  │- Slither       │  │- Prometheus UI │  │- Immutable     │   │
 │  │- Echidna       │  │- ELK Stack     │  │- Timestamped   │   │
 │  └────────────────┘  └────────────────┘  └────────────────┘   │
 │                                                                   │
@@ -576,8 +576,9 @@ CMD ["uvicorn", "hyperagent.api.main:app", "--host", "0.0.0.0", "--port", "8000"
 | Component | Technology | Purpose | Configuration |
 |-----------|-----------|---------|----------------|
 | **Logging** | Python logging | Structured logs | JSON format |
-| **Tracing** | OpenTelemetry | Distributed tracing | Jaeger exporter |
 | **Metrics** | Prometheus | Performance metrics | Scrape interval |
+| **Note** | OpenTelemetry | Not implemented (dependencies removed) | - |
+| **Note** | Grafana | Removed per team decision | Use Prometheus UI |
 
 **Installation:**
 ```bash
@@ -2965,22 +2966,7 @@ services:
       - hyperagent_network
     restart: unless-stopped
   
-  grafana:
-    image: grafana/grafana:latest
-    container_name: hyperagent_grafana
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards
-    depends_on:
-      - prometheus
-    networks:
-      - hyperagent_network
-    restart: unless-stopped
+  # use Prometheus UI at http://localhost:9090
   
   # ============================================================================
   # LOGGING
@@ -3022,7 +3008,7 @@ volumes:
   postgres_data:
   redis_data:
   prometheus_data:
-  grafana_data:
+  # grafana_data: (removed - Grafana service removed)
   elasticsearch_data:
 ```
 

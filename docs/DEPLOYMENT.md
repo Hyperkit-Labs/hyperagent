@@ -48,7 +48,7 @@ This guide covers deploying HyperAgent to production environments with security,
 - [ ] Set up PostgreSQL (managed service or self-hosted)
 - [ ] Set up Redis (managed service or self-hosted)
 - [ ] Configure load balancer (if needed)
-- [ ] Set up monitoring (Prometheus, Grafana)
+- [ ] Set up monitoring (Prometheus - Grafana removed per team decision)
 - [ ] Configure logging aggregation
 
 ## Deployment Methods
@@ -139,7 +139,7 @@ curl -X POST https://your-domain.com/api/v1/workflows/generate \
 ### 2. Monitoring Setup
 
 - Configure Prometheus to scrape `/api/v1/metrics/prometheus`
-- Set up Grafana dashboards
+- Access Prometheus UI at `http://localhost:9090` for metrics visualization
 - Configure alerting rules
 - Set up log aggregation
 

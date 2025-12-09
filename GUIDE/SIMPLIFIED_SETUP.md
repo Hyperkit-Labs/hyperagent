@@ -96,7 +96,7 @@ uvicorn hyperagent.api.main:app --reload
 - **No Docker** - Run Python directly
 - **No local PostgreSQL** - Use Supabase cloud database
 - **No Redis** - Uses in-memory fallback (works for single instance)
-- **No Prometheus/Grafana** - Optional, can be added later
+- **No Prometheus/Grafana** - Prometheus available in docker-compose
 
 ### Benefits
 

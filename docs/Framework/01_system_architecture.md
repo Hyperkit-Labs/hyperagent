@@ -41,7 +41,7 @@ graph TB
     subgraph "Security & Monitoring"
         SEC[Security Tools<br/>Slither, Mythril, Echidna]
         PROM[Prometheus<br/>Metrics Collection]
-        GRAF[Grafana<br/>Dashboards]
+        PROMUI[Prometheus UI<br/>Grafana Removed]
     end
 
     CLI --> EB
@@ -115,7 +115,7 @@ graph TB
 - **LLM**: Google Gemini, OpenAI GPT-4
 - **Security**: Slither, Mythril, Echidna
 - **Frontend**: Next.js, React, TypeScript
-- **Monitoring**: Prometheus, Grafana
+- **Monitoring**: Prometheus
 
 ## Architecture Principles
 

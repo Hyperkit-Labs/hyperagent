@@ -214,7 +214,7 @@ python scripts/rollback.py --version v1.0.0
 2. **EigenDA SDK**: Placeholder implementation until SDK available
 3. **Test Coverage**: Currently < 80%, working towards > 80%
 4. **E2E Tests**: In progress
-5. **Grafana Dashboards**: Not yet created (metrics available)
+5. **Monitoring**: Prometheus metrics available at `/api/v1/metrics/prometheus`
 
 ## Support & Resources
 

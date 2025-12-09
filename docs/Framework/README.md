@@ -13,7 +13,7 @@ Complete system architecture showing all layers, components, and their relations
 - Agent Layer (Generation, Audit, Testing, Deployment)
 - Blockchain Layer (Network Manager, Hyperion, Mantle, EigenDA)
 - Data Persistence Layer (PostgreSQL, Redis, IPFS)
-- Security & Monitoring (Security Tools, Prometheus, Grafana)
+- Security & Monitoring (Security Tools, Prometheus)
 
 ### 2. [Complete Workflow Sequence](./02_workflow_sequence.md)
 End-to-end sequence diagram showing workflow execution from user request to deployed contract.
@@ -234,7 +234,7 @@ mmdc -i diagram.mmd -o diagram.png
 - **LLM**: Google Gemini, OpenAI GPT-4
 - **Security**: Slither, Mythril, Echidna
 - **Frontend**: Next.js, React, TypeScript
-- **Monitoring**: Prometheus, Grafana
+- **Monitoring**: Prometheus (Grafana removed per team decision)
 
 ## Related Documentation
 

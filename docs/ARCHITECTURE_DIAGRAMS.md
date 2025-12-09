@@ -64,7 +64,7 @@
 │  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐          │
 │  │Security Layer   │  │Monitoring      │  │Audit Log       │          │
 │  │- Mythril       │  │- Prometheus    │  │- All Actions   │          │
-│  │- Slither       │  │- Grafana       │  │- Immutable     │          │
+│  │- Slither       │  │- Prometheus    │  │- Immutable     │          │
 │  │- Echidna       │  │- Structured    │  │- Timestamped   │          │
 │  └────────────────┘  │  Logging       │  └────────────────┘          │
 │                       └────────────────┘                               │
@@ -81,7 +81,7 @@
 - **Blockchain Layer**: Web3 integration for Hyperion and Mantle networks
 - **Data Layer**: PostgreSQL with pgvector, Redis cache, IPFS storage
 - **Security Layer**: Automated security auditing tools
-- **Monitoring**: Prometheus metrics and Grafana dashboards
+- **Monitoring**: Prometheus metrics (Grafana removed per team decision)
 
 ---
 
@@ -268,8 +268,9 @@ User Input (NLP)
 │                       └────────────────┘                   │
 │                                                               │
 │  ┌──────────────┐      ┌──────────────┐      ┌──────────┐ │
-│  │  Prometheus  │      │   Grafana    │      │  Alert   │ │
-│  │  (Metrics)   │◀─────│  (Dashboards)│─────▶│ Manager  │ │
+│  │  Prometheus  │      │ Prometheus UI │      │  Alert   │ │
+│  │  (Metrics)   │◀─────│  (Port 9090)  │─────▶│ Manager  │ │
+│  │              │      │ (Grafana Removed)   │          │ │
 │  └──────────────┘      └──────────────┘      └──────────┘ │
 │                                                               │
 │  ┌──────────────┐      ┌──────────────┐                     │

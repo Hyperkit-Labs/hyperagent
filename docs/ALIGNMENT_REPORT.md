@@ -269,13 +269,16 @@ All enhancements beyond the original plan have been documented in `docs/ENHANCEM
 5. ✅ `docs/SECURITY_AUDIT.md` - Security audit process and requirements
 6. ✅ `docs/ALIGNMENT_REPORT.md` - This alignment report
 
-### Grafana Dashboards
+### Monitoring (Grafana Removed)
 
-1. ✅ `config/grafana/dashboards/workflow-metrics.json` - Workflow metrics dashboard
-2. ✅ `config/grafana/dashboards/agent-performance.json` - Agent performance dashboard
-3. ✅ `config/grafana/dashboards/system-health.json` - System health dashboard
-4. ✅ `config/grafana/dashboards/error-rates.json` - Error rates and alerts dashboard
-5. ✅ `config/grafana/provisioning/dashboards/dashboards.yml` - Grafana provisioning config
+**Status**: Grafana has been removed from the monitoring stack per team decision.
+
+**Current Monitoring**:
+- Prometheus metrics available at `/api/v1/metrics/prometheus`
+- Prometheus UI accessible at `http://localhost:9090`
+- Health checks at `/api/v1/health`
+
+**Note**: The Grafana dashboards mentioned in previous reports were never implemented. Use Prometheus UI directly for metrics visualization.
 
 ---
 

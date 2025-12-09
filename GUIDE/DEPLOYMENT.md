@@ -60,7 +60,7 @@ Deployment guide for production environments with security, monitoring, and reli
 - [ ] Set up Redis (managed service or self-hosted)
 - [ ] Set up x402 verification service (TypeScript service)
 - [ ] Configure load balancer (if needed)
-- [ ] Set up monitoring (Prometheus, Grafana)
+- [ ] Set up monitoring
 - [ ] Configure logging aggregation
 
 ## x402 Service Deployment
@@ -210,6 +210,7 @@ curl -X POST https://your-domain.com/api/v1/workflows/generate \
 ### 2. Monitoring Setup
 
 - Configure Prometheus to scrape `/api/v1/metrics/prometheus`
+- Access Prometheus UI at `http://localhost:9090` for metrics visualization
 - Set up Grafana dashboards
 - Configure alerting rules
 - Set up log aggregation

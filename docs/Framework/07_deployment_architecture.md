@@ -30,7 +30,7 @@ graph TB
 
     subgraph "Tier 6: Monitoring Stack"
         PROM[Prometheus<br/>Scrapes: /api/v1/metrics/prometheus<br/>Port: 9090<br/>Storage: Time-series DB]
-        GRAF[Grafana<br/>Dashboards: System, Workflow, Agent<br/>Port: 3001<br/>Data Source: Prometheus]
+        PROMUI[Prometheus UI<br/>Access: http://localhost:9090<br/>Grafana Removed]
         ALERT[AlertManager<br/>Optional<br/>Alerts: High error rate, SLA violations]
     end
 
@@ -232,11 +232,15 @@ networks:
 - **Workflow Metrics**: Workflow count, success rate, SLA compliance
 - **Agent Metrics**: Agent execution time, error rate
 
-### Grafana Dashboards
-- **System Health Dashboard**: Overall system status
-- **Workflow Metrics Dashboard**: Workflow performance
-- **Agent Performance Dashboard**: Agent execution metrics
-- **Error Tracking Dashboard**: Error rates and types
+### Monitoring (Grafana Removed)
+**Status**: Grafana has been removed from the monitoring stack per team decision.
+
+**Current Monitoring**:
+- **Prometheus UI**: Access at `http://localhost:9090` for metrics visualization
+- **Metrics Endpoint**: `/api/v1/metrics/prometheus` - Prometheus text format
+- **Health Checks**: `/api/v1/health` - Service health status
+
+**Note**: Use Prometheus UI directly for querying metrics and creating basic visualizations.
 
 ### Alerting
 - **High Error Rate**: > 5% error rate

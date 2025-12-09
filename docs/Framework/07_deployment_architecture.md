@@ -232,7 +232,7 @@ networks:
 - **Workflow Metrics**: Workflow count, success rate, SLA compliance
 - **Agent Metrics**: Agent execution time, error rate
 
-### Monitoring (Grafana Removed)
+### Monitoring
 **Status**: Grafana has been removed from the monitoring stack per team decision.
 
 **Current Monitoring**:

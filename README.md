@@ -5,7 +5,9 @@
 ![Version](https://img.shields.io/badge/version-1.0.0-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
-![Status](https://img.shields.io/badge/status-partially%20ready-success)
+![Node.js](https://img.shields.io/badge/node.js-18.18%2B-green)
+![Next.js](https://img.shields.io/badge/next.js-16-black)
+![Status](https://img.shields.io/badge/status-active-success)
 <!-- Badges: end -->
   
 </div>
@@ -53,49 +55,93 @@
 
 ### Prerequisites
 
-- Python 3.10+
-- PostgreSQL 15+ (or [Supabase](https://supabase.com) - recommended)
-- [Google Gemini API Key](https://aistudio.google.com/app/apikey)
+#### Required Software
 
-## Hardware
-For development:
-- Minimum: 8 GB RAM, 2 cores (works but slow)
-- Recommended: 16 GB RAM, 4 cores (smooth)
-- Optimal: 32 GB RAM, 6+ cores (best experience)
-For production deployment:
-- Use cloud services (Supabase, Redis Cloud) to reduce local requirements
-See [GUIDE/SIMPLIFIED_SETUP.md](./GUIDE/SIMPLIFIED_SETUP.md) for cloud-based setup
+| Software | Version | Notes |
+|----------|---------|-------|
+| **Python** | 3.10+ | Required for backend |
+| **Node.js** | 18.18+ | Required for frontend (Next.js 16) |
+| **npm** | 9.0+ | Comes with Node.js |
+| **Git** | 2.30+ | Version control |
+| **PostgreSQL** | 15+ | Database (or use [Supabase](https://supabase.com)) |
+| **Redis** | 7.0+ | Caching (optional, can use Redis Cloud) |
+| **Docker** | 24.0+ | Optional, for containerized deployment |
+| **Docker Compose** | 2.20+ | Optional, comes with Docker Desktop |
 
-Minimum Local Storage
-- Fresh Install: ~10-12 GB
-- After 1 Month: ~15-18 GB
-- After 3 Months: ~22-28 GB
+#### Required API Keys
 
-Recommended Free Space
-- Minimum: 30 GB free
-- Recommended: 50 GB free
-- Optimal: 100 GB free (SSD)
+| Service | Purpose | Get Key |
+|---------|---------|---------|
+| **Google Gemini** | AI contract generation | [Get API Key](https://aistudio.google.com/app/apikey) |
+| **Thirdweb** | x402 payments & wallet | [Get Client ID](https://thirdweb.com/dashboard) |
+| **OpenAI** (optional) | Alternative AI provider | [Get API Key](https://platform.openai.com/api-keys) |
 
-Largest Components
-- Docker Images: ~5-8 GB (can be cleaned)
-- Docker Volumes: ~5-15 GB (grows with usage)
-- Python venv: ~1 GB
-- Frontend node_modules: ~500 MB
+#### Blockchain Requirements (for deployment)
 
-Quick Savings
-- Use Supabase (saves ~5-15 GB database volume)
-- Clean Docker regularly (saves ~2-5 GB)
+- **Test AVAX** - For Avalanche Fuji testnet ([Faucet](https://core.app/tools/testnet-faucet/))
+- **Test USDC** - For x402 payments on testnets
+- **Wallet** - MetaMask, Core, or any Web3 wallet
+
+#### Verify Installation
+
+```bash
+# Check versions
+python --version    # Should be 3.10+
+node --version      # Should be 18.18+
+npm --version       # Should be 9.0+
+git --version       # Should be 2.30+
+docker --version    # Should be 24.0+ (optional)
+```
+
+### Hardware Requirements
+
+#### Development Machine
+
+| Resource | Minimum | Recommended | Optimal |
+|----------|---------|-------------|---------|
+| **RAM** | 8 GB | 16 GB | 32 GB |
+| **CPU** | 2 cores | 4 cores | 6+ cores |
+| **Storage** | 30 GB free | 50 GB free | 100 GB free (SSD) |
+
+> 💡 **Tip**: Use cloud services (Supabase, Redis Cloud) to reduce local requirements.
+> See [GUIDE/SIMPLIFIED_SETUP.md](./GUIDE/SIMPLIFIED_SETUP.md) for cloud-based setup.
+
+#### Storage Breakdown
+
+| Component | Size | Notes |
+|-----------|------|-------|
+| Docker Images | ~5-8 GB | Can be cleaned periodically |
+| Docker Volumes | ~5-15 GB | Grows with usage |
+| Python venv | ~1 GB | One-time setup |
+| Frontend node_modules | ~500 MB | One-time setup |
+
+#### Storage Over Time
+
+- **Fresh Install**: ~10-12 GB
+- **After 1 Month**: ~15-18 GB
+- **After 3 Months**: ~22-28 GB
+
+<details>
+<summary>💾 Storage Optimization Tips</summary>
+
+- Use **Supabase** instead of local PostgreSQL (saves ~5-15 GB)
+- Clean Docker regularly: `docker system prune` (saves ~2-5 GB)
 - Limit Prometheus retention (saves ~1-2 GB)
 - Rotate logs (saves ~500 MB - 1 GB)
-- Total potential savings: ~8-23 GB
-For development, 30-50 GB free space is recommended.
+- **Total potential savings**: ~8-23 GB
 
-## Performance
-- First build: ~25-45 minutes
-- Rebuild (with cache): ~5-15 minutes
-- Frontend only: ~3-5 minutes
-- Backend only: ~20-35 minutes
-The multi-stage build and layer caching help reduce rebuild times. Most time is spent installing Python dependencies and Solidity compilers.
+</details>
+
+### Build Performance
+
+| Build Type | Time | Notes |
+|------------|------|-------|
+| **First build** | ~25-45 min | Full setup |
+| **Rebuild (cached)** | ~5-15 min | Layer caching enabled |
+| **Frontend only** | ~3-5 min | `npm run build` |
+| **Backend only** | ~20-35 min | Python deps + Solidity |
+
+> Multi-stage builds and layer caching optimize rebuild times. Most time is spent installing Python dependencies and Solidity compilers.
 
 ### Quick Install
 

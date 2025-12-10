@@ -78,9 +78,9 @@
 
 #### Blockchain Requirements (for deployment)
 
-- **Test AVAX** - For Avalanche Fuji testnet ([Faucet](https://core.app/tools/testnet-faucet/))
-- **Test USDC** - For x402 payments on testnets
-- **Wallet** - MetaMask, Core, or any Web3 wallet
+- **Test AVAX** - For Avalanche Fuji testnet ([Faucet](https://build.avax.network/console/primary-network/faucet))
+- **Test USDC** - For x402 payments on testnets ([Facuet](https://faucet.circle.com/))
+- **Wallet** - MetaMask, Core(Recommended), or any Web3 wallet
 
 #### Verify Installation
 

@@ -692,7 +692,7 @@ export default function ArchitecturePage() {
                             className="overflow-hidden border-t border-white/5"
                           >
                             <div className="p-2 space-y-1 bg-slate-900/20">
-                              {nodes.map((node) => {
+                              {nodes.map((node, nodeIndex) => {
                                 const NodeIcon = node.icon;
                                 const isSelected = selectedNode === node.id;
                                 const isHovered = hoveredNodeId === node.id;

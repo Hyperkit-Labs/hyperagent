@@ -165,7 +165,7 @@ cp .env.example .env
 alembic upgrade head
 
 # or make if you prefer straight forward requires Make installed
-Make up
+make up
 
 # Run development server | If you prefer not used Docker
 uvicorn hyperagent.api.main:app --reload

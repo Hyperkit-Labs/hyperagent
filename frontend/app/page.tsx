@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { getNetworks } from '@/lib/api';
+import { useHealth } from '@/hooks/useHealth';
 import Link from 'next/link';
 import type { Network } from '@/lib/types';
 import {

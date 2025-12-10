@@ -164,8 +164,12 @@ cp .env.example .env
 # Initialize database
 alembic upgrade head
 
-# Run development server
+# or make if you prefer straight forward requires Make installed
+Make up
+
+# Run development server | If you prefer not used Docker
 uvicorn hyperagent.api.main:app --reload
+
 ```
 
 ### Docker

@@ -72,6 +72,7 @@ export function WorkflowForm({ onSubmit, loading = false, onCostUpdate, initialP
 
   const isAvalancheFuji = walletChainId === 43113;
   const isX402Network = network.toLowerCase().includes('avalanche') || network.toLowerCase().includes('fuji');
+  const needsNetworkSwitch = isX402Network && !isAvalancheFuji && walletChainId !== null;
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -86,8 +87,8 @@ export function WorkflowForm({ onSubmit, loading = false, onCostUpdate, initialP
       return;
     }
 
-    if (!thirdwebConfigured) {
-      setError('Thirdweb client not configured. Please set NEXT_PUBLIC_THIRDWEB_CLIENT_ID in your .env.local file.');
+    if (needsNetworkSwitch) {
+      setError('Please switch your wallet to Avalanche Fuji network to continue');
       return;
     }
 

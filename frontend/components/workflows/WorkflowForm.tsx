@@ -52,12 +52,26 @@ export function WorkflowForm({ onSubmit, loading = false, onCostUpdate, initialP
   const [networks, setNetworks] = useState<Network[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [thirdwebConfigured, setThirdwebConfigured] = useState(() => isThirdwebConfigured());
+  const [walletChainId, setWalletChainId] = useState<number | null>(null);
 
   useEffect(() => {
     getNetworks()
       .then(setNetworks)
       .catch((err) => setError(err.message));
   }, []);
+
+  useEffect(() => {
+    if (wallet) {
+      wallet.getChain?.()?.then((chain: any) => {
+        setWalletChainId(chain?.id || null);
+      }).catch(() => setWalletChainId(null));
+    } else {
+      setWalletChainId(null);
+    }
+  }, [wallet]);
+
+  const isAvalancheFuji = walletChainId === 43113;
+  const isX402Network = network.toLowerCase().includes('avalanche') || network.toLowerCase().includes('fuji');
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -119,14 +133,29 @@ export function WorkflowForm({ onSubmit, loading = false, onCostUpdate, initialP
             {thirdwebClient && <ConnectButton client={thirdwebClient} />}
           </div>
           {!wallet || !account ? (
-            <p className="text-sm text-gray-600">
-              Please connect your wallet to create a workflow. All deployments require a connected wallet.
-            </p>
-          ) : (
-            <p className="text-sm text-green-600">
-              Connected: {account.address.slice(0, 6)}...{account.address.slice(-4)}
-            </p>
-          )}
+              <p className="text-sm text-gray-600">
+                Please connect your wallet to create a workflow. All deployments require a connected wallet.
+              </p>
+            ) : (
+              <div className="space-y-1">
+                <p className="text-sm text-green-600">
+                  Connected: {account.address.slice(0, 6)}...{account.address.slice(-4)}
+                </p>
+                {isX402Network && !isAvalancheFuji && walletChainId && (
+                  <p className="text-sm text-amber-600 font-medium">
+                    ⚠️ Please switch to Avalanche Fuji (Chain ID: 43113) for x402 payments
+                  </p>
+                )}
+                {isX402Network && (
+                  <p className="text-xs text-gray-500">
+                    x402 payments require USDC on Avalanche Fuji. Get test USDC from{' '}
+                    <a href="https://core.app/tools/testnet-faucet/?subnet=c&token=usdc" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                      core.app faucet
+                    </a>
+                  </p>
+                )}
+              </div>
+            )}
         </div>
 
         <Textarea

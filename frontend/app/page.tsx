@@ -3,6 +3,8 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { 
   Paperclip, 
   Palette, 
@@ -12,65 +14,71 @@ import {
   Sparkles,
   Zap,
   Shield,
-  Activity
+  Activity,
+  Code2,
+  Globe,
+  Lock,
+  Cpu
 } from 'lucide-react';
 
 export default function Home() {
+  const router = useRouter();
+  const [prompt, setPrompt] = useState('');
+
+  const handleBuild = () => {
+    if (!prompt.trim()) return;
+    router.push(`/workflows/create?prompt=${encodeURIComponent(prompt)}`);
+  };
+
   const templates = [
     {
-      title: "Ecommerce store",
-      description: "Premium design for webstore",
-      image: "https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=800&q=80",
+      title: "Mantle Bridge DApp",
+      description: "Cross-chain bridge for ERC20/ETH",
+      image: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&q=80",
+      link: "/templates/mantle-bridge"
     },
     {
-      title: "Architect portfolio",
-      description: "Firm website & showcase",
-      image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&q=80",
+      title: "Avalanche DeFi Studio",
+      description: "Launch DEX or Liquidity Pools",
+      image: "https://images.unsplash.com/photo-1639322537228-f710d846310a?w=800&q=80",
+      link: "/avax/studio"
     },
     {
-      title: "Personal blog",
-      description: "Muted, intimate design",
-      image: "https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=800&q=80",
+      title: "NFT Marketplace Hub",
+      description: "End-to-end NFT minting & sales",
+      image: "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=800&q=80",
+      link: "/templates/nft-hub"
     },
     {
-      title: "Fashion blog",
-      description: "Minimal, playful design",
-      image: "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=800&q=80",
+      title: "DAO Governance Portal",
+      description: "On-chain voting & treasury management",
+      image: "https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?w=800&q=80",
+      link: "/templates/dao"
     }
   ];
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full bg-[#030712] text-white selection:bg-blue-500/30">
       {/* Hero Section */}
-      <section className="relative flex w-full flex-col items-center justify-center min-h-[85vh] overflow-hidden px-6 pt-20 pb-32">
-        {/* Vibrant Gradient Background */}
-        <div className="absolute inset-0 z-0 bg-[#fcfaef]">
-          <div 
-            className="absolute top-0 left-0 w-full h-[70vh] opacity-90 blur-[100px] animate-gradient-pulse"
-            style={{
-              background: 'radial-gradient(circle at 50% 0%, #ff2d55 0%, #ff9500 50%, #ffcc00 100%)',
-              transform: 'scale(1.5)',
-            }}
-          />
+      <section className="relative flex w-full flex-col items-center justify-center min-h-[95vh] overflow-hidden px-6 pt-20 pb-32">
+        {/* Animated Web3 Background */}
+        <div className="absolute inset-0 z-0">
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/20 rounded-full blur-[120px] animate-pulse" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/20 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }} />
+          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100" />
         </div>
 
-        <div className="relative z-10 w-full max-w-4xl flex flex-col items-center text-center">
+        <div className="relative z-10 w-full max-w-5xl flex flex-col items-center text-center">
           {/* Top Pill Link */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <Link 
-              href="/workflows/create"
-              className="flex items-center gap-2 px-4 py-1.5 mb-8 rounded-full border border-white/20 bg-white/10 backdrop-blur-md text-[13px] font-medium text-white hover:bg-white/20 transition-colors"
-            >
-              <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center">
-                <Sparkles className="w-3 h-3 text-[#ff2d55]" />
-              </div>
-              Build with AI Agent
-              <ChevronRight className="w-3 h-3 ml-1" />
-            </Link>
+            <div className="flex items-center gap-2 px-4 py-1.5 mb-8 rounded-full border border-white/10 bg-white/5 backdrop-blur-xl text-[13px] font-medium text-blue-400 ring-1 ring-white/10 group cursor-default">
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+              Build End-to-End Web3 Applications
+            </div>
           </motion.div>
 
           {/* Headline */}
@@ -78,18 +86,19 @@ export default function Home() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1, duration: 0.5 }}
-            className="text-5xl md:text-7xl font-semibold text-white tracking-tight leading-[1.1] mb-6"
+            className="text-6xl md:text-8xl font-bold tracking-tight leading-[1.05] mb-8 bg-clip-text text-transparent bg-gradient-to-b from-white via-white to-white/40"
           >
-            Build something <br /> <span className="text-white/90">HyperAgent</span>
+            The Intelligent <br /> Web3 Architect
           </motion.h1>
 
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.5 }}
-            className="text-xl md:text-2xl text-white/80 max-w-2xl mb-12 font-medium"
+            className="text-xl md:text-2xl text-gray-400 max-w-3xl mb-12 font-medium"
           >
-            Create smart contracts and workflows by chatting with AI
+            Deploy cross-chain bridges, smart contracts, and full-stack dApps 
+            with AI-driven ROMA reasoning and x402 payment security.
           </motion.p>
 
           {/* Action Bar / Search Input */}
@@ -99,31 +108,35 @@ export default function Home() {
             transition={{ delay: 0.3, duration: 0.5 }}
             className="w-full max-w-3xl"
           >
-            <div className="relative group bg-white/95 backdrop-blur-xl p-2 rounded-[28px] shadow-2xl ring-1 ring-black/5 flex flex-col gap-2 transition-all focus-within:ring-black/10">
+            <div className="relative group bg-gray-900/50 backdrop-blur-2xl p-2 rounded-[32px] shadow-2xl ring-1 ring-white/10 flex flex-col gap-2 transition-all focus-within:ring-blue-500/50 focus-within:bg-gray-900/80">
               <textarea 
-                placeholder="What would you like to build?"
-                className="w-full bg-transparent border-none resize-none px-4 pt-4 pb-2 text-[17px] focus:ring-0 placeholder:text-gray-400 min-h-[60px]"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleBuild())}
+                placeholder="Deploy a bridge from Sepolia to Mantle with USDC support..."
+                className="w-full bg-transparent border-none resize-none px-6 pt-5 pb-2 text-[18px] focus:ring-0 placeholder:text-gray-600 min-h-[80px] text-white"
               />
               
-              <div className="flex items-center gap-2 px-2 pb-2">
-                <div className="flex gap-1.5">
-                  <Button variant="ghost" size="sm" className="h-9 px-3 rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-100/80 gap-2">
-                    <Paperclip className="w-4 h-4" />
-                    <span className="hidden md:inline font-medium text-[13px]">Attach</span>
+              <div className="flex items-center justify-between gap-2 px-3 pb-3">
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" className="h-10 px-4 rounded-full text-gray-400 hover:text-white hover:bg-white/5 gap-2 border border-white/5">
+                    <Code2 className="w-4 h-4" />
+                    <span className="hidden md:inline font-medium text-[13px]">Solidity</span>
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-9 px-3 rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-100/80 gap-2">
-                    <Palette className="w-4 h-4" />
-                    <span className="hidden md:inline font-medium text-[13px]">Theme</span>
+                  <Button variant="ghost" size="sm" className="h-10 px-4 rounded-full text-gray-400 hover:text-white hover:bg-white/5 gap-2 border border-white/5">
+                    <Globe className="w-4 h-4" />
+                    <span className="hidden md:inline font-medium text-[13px]">Network</span>
                   </Button>
                 </div>
 
-                <div className="ml-auto flex items-center gap-2">
-                  <Button variant="ghost" size="sm" className="h-9 px-4 rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-100/80 gap-2 font-medium text-[13px]">
-                    <MessageSquare className="w-4 h-4" />
-                    Chat
-                  </Button>
-                  <Button size="icon" className="h-9 w-9 bg-gray-900 hover:bg-gray-800 text-white rounded-full">
-                    <ArrowUp className="w-5 h-5" />
+                <div className="flex items-center gap-2">
+                  <span className="hidden md:block text-[12px] text-gray-600 font-medium px-3 italic">ROMA Reasoning Active</span>
+                  <Button 
+                    onClick={handleBuild}
+                    className="h-10 px-6 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-bold shadow-lg shadow-blue-500/20 transition-all hover:scale-105 active:scale-95 gap-2"
+                  >
+                    Build
+                    <ArrowUp className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
@@ -133,20 +146,23 @@ export default function Home() {
       </section>
 
       {/* Templates Section */}
-      <section className="max-w-[1440px] mx-auto px-6 py-24">
-        <div className="flex flex-col gap-12">
+      <section className="max-w-[1440px] mx-auto px-6 py-32 border-t border-white/5">
+        <div className="flex flex-col gap-16">
           <div className="flex items-end justify-between">
             <div>
-              <h2 className="text-3xl font-semibold text-gray-900 mb-2">Discover templates</h2>
-              <p className="text-lg text-gray-500">Start your next project with a template</p>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 text-xs font-bold mb-4 uppercase tracking-wider">
+                Blueprints
+              </div>
+              <h2 className="text-4xl font-bold text-white mb-4">Start from a Template</h2>
+              <p className="text-xl text-gray-500">Verified end-to-end architectures for Web3 ecosystems.</p>
             </div>
-            <Link href="/templates" className="flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
-              View all
-              <ChevronRight className="w-4 h-4" />
+            <Link href="/templates" className="group flex items-center gap-2 text-sm font-bold text-gray-400 hover:text-white transition-colors">
+              Explores All Blueprints
+              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {templates.map((template, i) => (
               <motion.div
                 key={template.title}
@@ -154,44 +170,88 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
-                className="group cursor-pointer"
+                onClick={() => router.push(template.link)}
+                className="group cursor-pointer relative"
               >
-                <div className="relative aspect-video rounded-2xl overflow-hidden mb-4 bg-gray-100 ring-1 ring-black/5">
+                <div className="relative aspect-[4/3] rounded-3xl overflow-hidden mb-6 bg-gray-900 ring-1 ring-white/10 group-hover:ring-blue-500/50 transition-all">
                   <img 
                     src={template.image} 
                     alt={template.title}
-                    className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105"
+                    className="object-cover w-full h-full opacity-60 group-hover:opacity-100 transition-all duration-700 group-hover:scale-110"
                   />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#030712] via-transparent to-transparent" />
+                  <div className="absolute bottom-4 left-4 right-4 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
+                    <Button className="w-full bg-white text-black font-bold h-10 rounded-xl">Use Blueprint</Button>
+                  </div>
                 </div>
-                <h3 className="text-[15px] font-semibold text-gray-900 mb-0.5">{template.title}</h3>
-                <p className="text-[13px] text-gray-500">{template.description}</p>
+                <h3 className="text-lg font-bold text-white mb-1 group-hover:text-blue-400 transition-colors">{template.title}</h3>
+                <p className="text-sm text-gray-500 leading-relaxed">{template.description}</p>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Subtle Platform Features */}
-      <section className="bg-gray-50/50 py-24">
+      {/* Platform Features - Web3 Pillars */}
+      <section className="bg-white/[0.02] py-32 border-y border-white/5">
         <div className="max-w-[1440px] mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
             {[
-              { icon: Zap, label: "Fast Deployment", desc: "One-click deployment to multiple chains" },
-              { icon: Shield, label: "Security Audit", desc: "Automated AI-driven vulnerability detection" },
-              { icon: Activity, label: "Monitoring", desc: "Real-time health and performance metrics" },
-              { icon: Sparkles, label: "AI Reasoning", desc: "Advanced ROMA planner for complex tasks" },
+              { 
+                icon: Zap, 
+                label: "x402 Protocol", 
+                desc: "Micro-payment verification for AI reasoning steps, ensuring fair computation exchange.",
+                color: "text-blue-400"
+              },
+              { 
+                icon: Lock, 
+                label: "TEE Security", 
+                desc: "Trusted Execution Environments for secure smart contract auditing and deployment.",
+                color: "text-purple-400"
+              },
+              { 
+                icon: Cpu, 
+                label: "ROMA Planner", 
+                desc: "Advanced multi-step reasoning that handles complex cross-chain logic automatically.",
+                color: "text-emerald-400"
+              },
+              { 
+                icon: Shield, 
+                label: "Audit Guard", 
+                desc: "Real-time vulnerability detection for every smart contract before it hits mainnet.",
+                color: "text-red-400"
+              },
             ].map((feature) => (
-              <div key={feature.label} className="flex flex-col gap-4">
-                <div className="w-10 h-10 bg-white rounded-xl shadow-sm ring-1 ring-black/5 flex items-center justify-center">
-                  <feature.icon className="w-5 h-5 text-gray-600" />
+              <div key={feature.label} className="flex flex-col gap-6 p-8 rounded-3xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-all group">
+                <div className={`w-12 h-12 bg-gray-900 rounded-2xl shadow-inner flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                  <feature.icon className={`w-6 h-6 ${feature.color}`} />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900 mb-1">{feature.label}</h4>
-                  <p className="text-sm text-gray-500 leading-relaxed">{feature.desc}</p>
+                  <h4 className="text-lg font-bold text-white mb-3">{feature.label}</h4>
+                  <p className="text-gray-500 leading-relaxed text-sm">{feature.desc}</p>
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Footer */}
+      <section className="py-32 px-6">
+        <div className="max-w-4xl mx-auto text-center bg-gradient-to-br from-blue-600 to-purple-700 p-16 rounded-[48px] shadow-2xl shadow-blue-500/20 relative overflow-hidden">
+          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay" />
+          <h2 className="text-4xl md:text-5xl font-bold mb-8 relative z-10">Ready to build the <br /> future of Web3?</h2>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center relative z-10">
+            <Link href="/workflows/create">
+              <Button size="lg" className="bg-white text-blue-600 hover:bg-blue-50 font-bold px-10 h-14 rounded-2xl shadow-xl">
+                Start Building Now
+              </Button>
+            </Link>
+            <Link href="/templates">
+              <Button size="lg" variant="ghost" className="text-white hover:bg-white/10 font-bold px-10 h-14 rounded-2xl border border-white/20">
+                Browse Templates
+              </Button>
+            </Link>
           </div>
         </div>
       </section>

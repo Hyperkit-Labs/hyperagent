@@ -31,12 +31,13 @@ interface WorkflowFormProps {
   }) => void;
   loading?: boolean;
   onCostUpdate?: (cost: TaskCostBreakdown | null) => void;  // NEW: Cost update callback
+  initialPrompt?: string; // NEW: Initial prompt from landing page
 }
 
-export function WorkflowForm({ onSubmit, loading = false, onCostUpdate }: WorkflowFormProps) {
+export function WorkflowForm({ onSubmit, loading = false, onCostUpdate, initialPrompt = '' }: WorkflowFormProps) {
   const wallet = useActiveWallet();
   const account = useActiveAccount();
-  const [nlpInput, setNlpInput] = useState('');
+  const [nlpInput, setNlpInput] = useState(initialPrompt);
   const [network, setNetwork] = useState('');
   const [contractType, setContractType] = useState('Custom');
   const [name, setName] = useState('');

@@ -18,8 +18,13 @@ function isX402Network(network: string): boolean {
   return x402Networks.some(n => network.toLowerCase().includes(n.toLowerCase()));
 }
 
-export default function CreateWorkflowPage() {
+import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
+
+function CreateWorkflowContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialPrompt = searchParams.get('prompt') || '';
   const wallet = useActiveWallet();
   const account = useActiveAccount();
   const [loading, setLoading] = useState(false);
@@ -167,8 +172,17 @@ export default function CreateWorkflowPage() {
         onSubmit={handleSubmit} 
         loading={loading}
         onCostUpdate={(cost) => setCostBreakdown(cost)}
+        initialPrompt={initialPrompt}
       />
     </div>
+  );
+}
+
+export default function CreateWorkflowPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <CreateWorkflowContent />
+    </Suspense>
   );
 }
 

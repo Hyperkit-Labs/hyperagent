@@ -198,6 +198,12 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     api_workers: int = 4
+    
+    @property
+    def api_url(self) -> str:
+        """Get the full API URL"""
+        host = "localhost" if self.api_host == "0.0.0.0" else self.api_host
+        return f"http://{host}:{self.api_port}"
     cors_origins: str = (
         "*"  # Can be overridden with comma-separated list: "http://localhost:3000,http://localhost:3001"
     )

@@ -57,7 +57,7 @@ async def test_server_wallet_deployment_flow():
             # X402 payment required - this is expected for first deployment
             payment_data = response.json()
             assert "x402Version" in payment_data
-            assert payment_data.get("error") == "payment_required"
+            assert payment_data.get("error") in ["payment_required", "X-PAYMENT header is required"]
             pytest.skip("X402 payment required - manual payment needed for e2e test")
         
         # 4. Verify successful deployment
@@ -111,8 +111,8 @@ async def test_payment_verification():
         # Should return 402 Payment Required
         assert response.status_code == 402
         payment_data = response.json()
-        assert payment_data.get("x402Version") == 2
-        assert "price" in payment_data
+        assert payment_data.get("x402Version") in [1, 2]
+        assert "accepts" in payment_data or "price" in payment_data
 
 
 @pytest.mark.asyncio

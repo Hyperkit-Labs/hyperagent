@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import Mock, AsyncMock, patch
 
 from hyperagent.api.middleware.x402 import X402Middleware
-from hyperagent.api.middleware.rate_limiter import DeploymentRateLimiter
+from hyperagent.api.middleware.rate_limit import RateLimiter
 from hyperagent.blockchain.networks import NetworkManager
 
 
@@ -75,52 +75,44 @@ async def test_rate_limiter_redis_failure():
     """Test rate limiter gracefully handles Redis unavailability"""
     
     # Initialize rate limiter without Redis
-    rate_limiter = DeploymentRateLimiter(redis_manager=None)
+    rate_limiter = RateLimiter(redis_manager=None)
     
     # Should allow deployment when Redis is unavailable
-    allowed, error = await rate_limiter.check_rate_limit(
-        wallet_address="0x123",
-        network="avalanche_fuji"
+    allowed, remaining = await rate_limiter.check_rate_limit(
+        identifier="wallet:0x123",
+        max_requests=10,
+        window_seconds=3600
     )
     
     assert allowed is True
-    assert error is None
 
 
 @pytest.mark.asyncio
 async def test_rate_limiter_limits():
     """Test rate limiter enforces configured limits"""
     
-    from hyperagent.cache.redis_manager import RedisManager
-    from unittest.mock import AsyncMock
+    # Use in-memory rate limiter for testing
+    rate_limiter = RateLimiter(redis_manager=None)
     
-    # Mock Redis manager
-    mock_redis = AsyncMock()
-    mock_redis.get.return_value = "9"  # 9 deployments already
-    mock_redis.client.ttl.return_value = 1800  # 30 minutes remaining
+    # Simulate multiple requests up to limit
+    identifier = "wallet:0x123:avalanche_fuji"
+    max_requests = 10
     
-    redis_manager = Mock(spec=RedisManager)
-    redis_manager.get = mock_redis.get
-    redis_manager.client = mock_redis.client
+    # Make requests up to the limit
+    for i in range(max_requests):
+        allowed, remaining = await rate_limiter.check_rate_limit(
+            identifier=identifier,
+            max_requests=max_requests,
+            window_seconds=3600
+        )
+        assert allowed is True
     
-    rate_limiter = DeploymentRateLimiter(redis_manager=redis_manager)
-    
-    # 10th deployment should be allowed
-    allowed, error = await rate_limiter.check_rate_limit(
-        wallet_address="0x123",
-        network="avalanche_fuji"
-    )
-    
-    assert allowed is True
-    
-    # Mock 11th deployment (exceeds limit)
-    mock_redis.get.return_value = "10"
-    
-    allowed, error = await rate_limiter.check_rate_limit(
-        wallet_address="0x123",
-        network="avalanche_fuji"
+    # Next request should be denied
+    allowed, remaining = await rate_limiter.check_rate_limit(
+        identifier=identifier,
+        max_requests=max_requests,
+        window_seconds=3600
     )
     
     assert allowed is False
-    assert "Rate limit exceeded" in error
 

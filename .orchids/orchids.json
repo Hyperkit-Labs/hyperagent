@@ -3,6 +3,6 @@
   "createdAt": 1735430400000,
   "startupCommands": [
     "uvicorn hyperagent.api.main:app --host 0.0.0.0 --port 8000",
-    "cd frontend && bun run dev"
+    "cd frontend; bun run dev"
   ]
 }

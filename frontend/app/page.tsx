@@ -30,32 +30,33 @@ export default function Home() {
     router.push(`/workflows/create?prompt=${encodeURIComponent(prompt)}`);
   };
 
-  const templates = [
-    {
-      title: "Mantle Bridge DApp",
-      description: "Cross-chain bridge for ERC20/ETH",
-      image: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&q=80",
-      link: "/templates/mantle-bridge"
-    },
-    {
-      title: "Avalanche DeFi Studio",
-      description: "Launch DEX or Liquidity Pools",
-      image: "https://images.unsplash.com/photo-1639322537228-f710d846310a?w=800&q=80",
-      link: "/avax/studio"
-    },
-    {
-      title: "NFT Marketplace Hub",
-      description: "End-to-end NFT minting & sales",
-      image: "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=800&q=80",
-      link: "/templates/nft-hub"
-    },
-    {
-      title: "DAO Governance Portal",
-      description: "On-chain voting & treasury management",
-      image: "https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?w=800&q=80",
-      link: "/templates/dao"
-    }
-  ];
+    const templates = [
+      {
+        title: "Mantle Bridge DApp",
+        description: "Cross-chain bridge for ERC20/ETH",
+        image: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&q=80",
+        link: "/workflows/create?prompt=Deploy a cross-chain bridge for ERC20 and ETH between Sepolia and Mantle"
+      },
+      {
+        title: "Avalanche DeFi Studio",
+        description: "Launch DEX or Liquidity Pools",
+        image: "https://images.unsplash.com/photo-1639322537228-f710d846310a?w=800&q=80",
+        link: "/avax/studio"
+      },
+      {
+        title: "NFT Marketplace Hub",
+        description: "End-to-end NFT minting & sales",
+        image: "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=800&q=80",
+        link: "/workflows/create?prompt=Create a comprehensive NFT marketplace with minting, bidding, and secondary sales"
+      },
+      {
+        title: "DAO Governance Portal",
+        description: "On-chain voting & treasury management",
+        image: "https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?w=800&q=80",
+        link: "/workflows/create?prompt=Deploy a DAO governance system with treasury management and weighted voting"
+      }
+    ];
+
 
   return (
     <div className="relative w-full bg-[#030712] text-white selection:bg-blue-500/30">

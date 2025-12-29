@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { ConnectButton } from 'thirdweb/react';
 import { createWallet } from 'thirdweb/wallets';
 import { avalancheFuji, avalanche } from 'thirdweb/chains';
@@ -11,13 +12,16 @@ import { getThirdwebClient } from '@/lib/thirdwebClient';
  * Uses Thirdweb's ConnectButton for automatic wallet detection
  */
 export function WalletConnect() {
+  const [mounted, setMounted] = useState(false);
   const client = getThirdwebClient();
   
-  if (!client) {
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  
+  if (!client || !mounted) {
     return (
-      <div className="text-red-600 text-sm">
-        Thirdweb not configured. Please set NEXT_PUBLIC_THIRDWEB_CLIENT_ID.
-      </div>
+      <div className="h-[40px] w-[165px] bg-gray-100 rounded-lg animate-pulse" />
     );
   }
 
@@ -60,9 +64,18 @@ export function WalletConnect() {
  * Compact Wallet Button for Navigation Bar
  */
 export function CompactWalletButton() {
+  const [mounted, setMounted] = useState(false);
   const client = getThirdwebClient();
   
-  if (!client) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  
+  if (!client || !mounted) {
+    return (
+      <div className="h-[36px] w-[80px] bg-gray-100 rounded-md animate-pulse" />
+    );
+  }
 
   const wallets = [
     createWallet('io.metamask'),

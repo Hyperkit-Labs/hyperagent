@@ -7,7 +7,7 @@ import { WorkflowForm } from '@/components/workflows/WorkflowForm';
 import { createWorkflow, handleApiError } from '@/lib/api';
 import { createFetchWithPayment, isThirdwebConfigured } from '@/lib/thirdwebClient';
 import { Card } from '@/components/ui/Card';
-import { handleX402FetchError, parseX402ErrorResponse, handleX402ResponseError, parseResponseData, CONTRACT_PRICE, WORKFLOW_PRICE } from '@/lib/x402ErrorHandler';
+import { handleX402FetchError, parseX402ErrorResponse, handleX402ResponseError, parseResponseData, MAX_PAYMENT_ALLOWED } from '@/lib/x402ErrorHandler';
 import type { TaskCostBreakdown } from '@/components/workflows/TaskSelector';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
@@ -50,7 +50,7 @@ function CreateWorkflowContent() {
         }
 
         // For x402 networks, we need to:
-        const fetchWithPayment = createFetchWithPayment(wallet, CONTRACT_PRICE);
+        const fetchWithPayment = createFetchWithPayment(wallet, MAX_PAYMENT_ALLOWED);
         
         let contractResponse: Response;
         try {
@@ -84,9 +84,8 @@ function CreateWorkflowContent() {
 
         const contractData = await parseResponseData(contractResponse);
 
-        // Use cost breakdown if available, otherwise fallback to WORKFLOW_PRICE
-        const workflowPrice = data.cost_breakdown?.total_usdc || WORKFLOW_PRICE;
-        const fetchWorkflowWithPayment = createFetchWithPayment(wallet, workflowPrice);
+        // Use cost breakdown if available, otherwise fallback to MAX_PAYMENT_ALLOWED
+        const fetchWorkflowWithPayment = createFetchWithPayment(wallet, MAX_PAYMENT_ALLOWED);
 
         let workflowResponse: Response;
         try {
@@ -185,4 +184,3 @@ export default function CreateWorkflowPage() {
     </Suspense>
   );
 }
-

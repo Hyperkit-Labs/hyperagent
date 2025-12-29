@@ -62,9 +62,12 @@ export function WorkflowForm({ onSubmit, loading = false, onCostUpdate, initialP
 
   useEffect(() => {
     if (wallet) {
-      wallet.getChain?.()?.then((chain: any) => {
+      try {
+        const chain = wallet.getChain();
         setWalletChainId(chain?.id || null);
-      }).catch(() => setWalletChainId(null));
+      } catch (err) {
+        setWalletChainId(null);
+      }
     } else {
       setWalletChainId(null);
     }

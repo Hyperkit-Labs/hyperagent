@@ -3,6 +3,7 @@
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
 import type { Workflow } from '@/lib/types';
 
 interface WorkflowProgressProps {
@@ -17,8 +18,42 @@ const stages = [
   { key: 'deploying', label: 'Deployment', progress: 100 },
 ];
 
+function RAGContextMetadata({ metadata }: { metadata: any }) {
+  if (!metadata || !metadata.has_context) return null;
+
+  return (
+    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+      <h4 className="text-sm font-semibold text-blue-900 mb-2">📚 Documentation Context Used</h4>
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <div>
+          <span className="text-blue-700 font-medium">Protocols:</span>
+          <div className="flex flex-wrap gap-1 mt-1">
+            {metadata.protocols_used?.map((protocol: string, idx: number) => (
+              <Badge key={idx} variant="outline" className="text-xs bg-white">
+                {protocol}
+              </Badge>
+            ))}
+          </div>
+        </div>
+        <div>
+          <span className="text-blue-700 font-medium">Context Size:</span>
+          <span className="ml-2 text-blue-600">{metadata.context_length?.toLocaleString()} chars</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function WorkflowProgress({ workflow }: WorkflowProgressProps) {
-  const currentStageIndex = stages.findIndex((s) => workflow.status === s.key);
+  // Normalize status to lowercase for comparison
+  const normalizedStatus = workflow.status?.toLowerCase() || 'pending';
+  const currentStageIndex = stages.findIndex((s) => normalizedStatus === s.key);
+  
+  // Use progress_percentage if available, otherwise calculate from stage
+  const progress = workflow.progress_percentage ?? (currentStageIndex >= 0 ? stages[currentStageIndex].progress : 0);
+
+  // Extract RAG metadata if available
+  const ragMetadata = workflow.metadata?.rag_metadata;
 
   return (
     <Card>
@@ -28,7 +63,9 @@ export function WorkflowProgress({ workflow }: WorkflowProgressProps) {
           <StatusBadge status={workflow.status} />
         </div>
 
-        <ProgressBar progress={workflow.progress_percentage} />
+        <ProgressBar progress={progress} />
+
+        {ragMetadata && <RAGContextMetadata metadata={ragMetadata} />}
 
         <div className="space-y-2">
           {stages.map((stage, index) => {

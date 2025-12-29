@@ -6,13 +6,7 @@ from hyperagent.core.agent_system import ServiceInterface
 
 
 class ServiceRegistry:
-    """
-    Service Discovery Pattern
-
-    Concept: Central registry for service lookup
-    Logic: Services register themselves with metadata
-    Usage: Orchestrators query registry to find services
-    """
+    """Central registry for service lookup"""
 
     def __init__(self):
         self._services: Dict[str, ServiceInterface] = {}
@@ -44,13 +38,7 @@ class ServiceRegistry:
 
 
 class SequentialOrchestrator:
-    """
-    Pipeline Pattern - Sequential Execution
-
-    Concept: Execute services one after another
-    Logic: Output of service N becomes input to service N+1
-    Use Case: Workflow stages (Generate → Audit → Test → Deploy)
-    """
+    """Execute services sequentially in pipeline pattern"""
 
     def __init__(self, registry: ServiceRegistry, event_bus, progress_callback=None):
         self.registry = registry
@@ -58,16 +46,7 @@ class SequentialOrchestrator:
         self.progress_callback = progress_callback
 
     async def orchestrate(self, workflow_context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Execute services sequentially
-
-        Example Flow:
-            Input: {"nlp_description": "Create ERC20 token"}
-            Stage 1 (Generation): {"contract_code": "pragma solidity..."}
-            Stage 2 (Audit): {"vulnerabilities": [], "risk_score": 10}
-            Stage 3 (Testing): {"tests_passed": 10, "coverage": 85}
-            Stage 4 (Deploy): {"contract_address": "0x123..."}
-        """
+        """Execute services sequentially"""
         pipeline = workflow_context.get("pipeline", [])
         result = workflow_context.get("initial_data", {})
         initial_data = result.copy()  # Keep a reference to initial_data for fallback
@@ -76,42 +55,30 @@ class SequentialOrchestrator:
             service_name = stage["service"]
             service = self.registry.get_service(service_name)
 
-            # Map previous output to current input (also check initial_data for values not in previous stages)
             request = self._map_inputs(stage, result, initial_data)
 
-            # Validate
             if not await service.validate(request):
                 raise ValueError(f"Validation failed for {service_name}")
 
-            # Execute
             service_result = await service.process(request)
 
-            # Merge service result into overall result (preserve previous data)
-            # Service-specific keys are stored under service name for clarity
             if isinstance(service_result, dict):
-                # Store service result under service name
                 result[f"{service_name}_result"] = service_result
 
-                # For deployment service, also store under "deployment" and "deployment_result" keys
-                # for backward compatibility and easier access
                 if service_name == "deployment":
                     result["deployment"] = service_result
                     result["deployment_result"] = service_result
 
-                # Also merge top-level keys for backward compatibility
                 for key, value in service_result.items():
                     if key not in result or result[key] is None:
                         result[key] = value
                     elif isinstance(result[key], dict) and isinstance(value, dict):
-                        # Merge nested dictionaries
                         result[key].update(value)
                     else:
-                        # Overwrite if not a dict
                         result[key] = value
             else:
                 result[f"{service_name}_result"] = service_result
 
-            # Call progress callback if provided
             if self.progress_callback:
                 try:
                     # Stage progress mapping (progress percentage)

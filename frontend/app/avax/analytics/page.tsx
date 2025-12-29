@@ -20,6 +20,7 @@ export default function AnalyticsPage() {
   const [history, setHistory] = useState<PaymentHistoryItem[]>([]);
   const [allHistoryForCharts, setAllHistoryForCharts] = useState<PaymentHistoryItem[]>([]);
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
@@ -42,52 +43,62 @@ export default function AnalyticsPage() {
       setTotal(historyData.total);
 
       // Fetch all history for charts (up to MAX_HISTORY_FOR_CHARTS)
-      // Fetch in larger chunks to minimize API calls
       const allPages: PaymentHistoryItem[] = [];
       const chunkSize = 100;
       const maxPages = Math.ceil(MAX_HISTORY_FOR_CHARTS / chunkSize);
       
       try {
-        // Fetch first page to get total count
         const firstPageData = await getPaymentHistory(address, 1, chunkSize);
         allPages.push(...firstPageData.items);
         
-        // If we have more data and haven't reached the limit, fetch more pages in parallel
         if (firstPageData.total > chunkSize && allPages.length < MAX_HISTORY_FOR_CHARTS) {
           const remainingPages = Math.min(
             Math.ceil((firstPageData.total - chunkSize) / chunkSize),
             maxPages - 1
           );
           
-          // Fetch remaining pages in parallel (but limit concurrency)
           const pagePromises: Promise<PaymentHistoryResponse>[] = [];
           for (let i = 2; i <= remainingPages + 1 && allPages.length < MAX_HISTORY_FOR_CHARTS; i++) {
             pagePromises.push(getPaymentHistory(address, i, chunkSize));
           }
           
-          // Use Promise.allSettled to handle partial failures gracefully
           const pageResults = await Promise.allSettled(pagePromises);
           pageResults.forEach((result) => {
             if (result.status === 'fulfilled') {
               allPages.push(...result.value.items);
-            } else {
-              console.warn('Failed to fetch payment history page:', result.reason);
             }
           });
         }
 
         setAllHistoryForCharts(allPages.slice(0, MAX_HISTORY_FOR_CHARTS));
       } catch (error) {
-        console.error('Error fetching payment history for charts:', error);
-        // Still set what we have, even if incomplete
         setAllHistoryForCharts(allPages);
       }
 
       // Fetch summary
-      const summaryData = await getPaymentSummary(address);
-      setSummary(summaryData);
+      try {
+        const summaryData = await getPaymentSummary(address);
+        setSummary(summaryData);
+      } catch (summaryError) {
+        console.error('Error fetching payment summary:', summaryError);
+        // Set default summary on error
+        setSummary({
+          total_spent: 0,
+          total_transactions: 0,
+          average_transaction: 0,
+          daily_total: 0,
+          monthly_total: 0,
+          top_merchants: [],
+          networks: {},
+        });
+      }
     } catch (error) {
       console.error("Error fetching analytics:", error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch analytics');
+      // Set empty defaults on error
+      setHistory([]);
+      setAllHistoryForCharts([]);
+      setTotal(0);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -179,7 +190,7 @@ export default function AnalyticsPage() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-900">Payment History</h2>
               <div className="text-sm text-gray-600">
-                Showing {history.length} of {total} transactions
+                Showing {history?.length || 0} of {total} transactions
               </div>
             </div>
             <PaymentHistoryTable

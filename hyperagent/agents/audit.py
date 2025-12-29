@@ -16,13 +16,14 @@ from hyperagent.security.audit import SecurityAuditor
 
 logger = logging.getLogger(__name__)
 
+AUDIT_TIMEOUT_SECONDS = 300
+RISK_SCORE_PASS_THRESHOLD = 30
+RISK_SCORE_WARNING_THRESHOLD = 70
+
 
 class AuditAgent(ServiceInterface):
-    """
-    Audit Agent
-
-    Concept: Security analysis of smart contracts
-    Logic: Parallel execution of Slither, Mythril, Echidna
+    """Security analysis of smart contracts using parallel execution of Slither, Mythril, Echidna
+    
     SLA: p99 < 90s, p95 < 60s
     """
 
@@ -31,17 +32,7 @@ class AuditAgent(ServiceInterface):
         self.event_bus = event_bus
 
     async def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Run security audit with multiple tools
-
-        Logic:
-        1. Compile contract for Mythril (bytecode analysis)
-        2. Write contract to temp file for Slither and Echidna
-        3. Run all tools in parallel
-        4. Aggregate and deduplicate results
-        5. Calculate risk score
-        6. Format audit report
-        """
+        """Run security audit with multiple tools in parallel"""
         workflow_id = input_data.get("workflow_id", str(uuid.uuid4()))
         contract_code = input_data["contract_code"]
         audit_level = input_data.get("audit_level", "standard")  # standard or comprehensive
@@ -81,13 +72,12 @@ class AuditAgent(ServiceInterface):
             if audit_level == "comprehensive":
                 tasks.append(self.auditor.run_echidna(str(contract_file)))
 
-            # Run tools in parallel with timeout
             try:
                 results = await asyncio.wait_for(
-                    asyncio.gather(*tasks, return_exceptions=True), timeout=300  # 5 minute timeout
+                    asyncio.gather(*tasks, return_exceptions=True), timeout=AUDIT_TIMEOUT_SECONDS
                 )
             except asyncio.TimeoutError:
-                logger.error("Audit timeout after 5 minutes")
+                logger.error(f"Audit timeout after {AUDIT_TIMEOUT_SECONDS} seconds")
                 results = []
 
         # Aggregate vulnerabilities
@@ -107,19 +97,17 @@ class AuditAgent(ServiceInterface):
                 vulns = result.get("vulnerabilities", [])
                 all_vulns.extend(vulns)
 
-        # Deduplicate vulnerabilities
         all_vulns = self._deduplicate_vulnerabilities(all_vulns)
-
-        # Calculate risk score
         risk_score = self._calculate_risk_score(all_vulns)
 
-        # Generate audit report
         audit_result = {
             "status": "success",
             "vulnerabilities": all_vulns,
             "overall_risk_score": risk_score,
             "audit_status": (
-                "passed" if risk_score < 30 else "warning" if risk_score < 70 else "failed"
+                "passed" if risk_score < RISK_SCORE_PASS_THRESHOLD 
+                else "warning" if risk_score < RISK_SCORE_WARNING_THRESHOLD 
+                else "failed"
             ),
             "critical_count": sum(1 for v in all_vulns if v.get("severity") == "critical"),
             "high_count": sum(1 for v in all_vulns if v.get("severity") == "high"),

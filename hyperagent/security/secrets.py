@@ -53,6 +53,41 @@ class SecretsManager:
         """Decrypt sensitive data"""
         return self.cipher.decrypt(ciphertext.encode()).decode()
 
+    async def get_server_wallet_key(self) -> str:
+        """
+        Get server wallet private key from configured secrets manager
+        
+        Returns:
+            Server wallet private key
+        """
+        from hyperagent.core.config import settings
+        
+        if settings.secrets_mode == "aws":
+            return await self._get_from_aws_async("hyperagent/server-wallet-key")
+        elif settings.secrets_mode == "vault":
+            return await self._get_from_vault_async("hyperagent/server-wallet-key")
+        else:
+            return settings.private_key
+    
+    async def _get_from_aws_async(self, secret_name: str) -> str:
+        """Get secret from AWS Secrets Manager asynchronously"""
+        import asyncio
+        return await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: self._get_aws_secret(secret_name, os.getenv("AWS_SECRETS_REGION", "us-east-1"))
+        )
+    
+    async def _get_from_vault_async(self, secret_name: str) -> str:
+        """Get secret from HashiCorp Vault asynchronously"""
+        import asyncio
+        vault_url = os.getenv("VAULT_URL")
+        if not vault_url:
+            raise ValueError("VAULT_URL not configured")
+        return await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: self._get_vault_secret(secret_name, vault_url)
+        )
+
     @staticmethod
     def get_secret(secret_name: str, default: Optional[str] = None) -> str:
         """
@@ -73,7 +108,7 @@ class SecretsManager:
             return value
 
         # Check AWS Secrets Manager if configured
-        aws_region = os.getenv("AWS_REGION")
+        aws_region = os.getenv("AWS_SECRETS_REGION")
         if aws_region:
             try:
                 return SecretsManager._get_aws_secret(secret_name, aws_region)
@@ -81,7 +116,7 @@ class SecretsManager:
                 logger.warning(f"Failed to get secret from AWS Secrets Manager: {e}")
 
         # Check HashiCorp Vault if configured
-        vault_addr = os.getenv("VAULT_ADDR")
+        vault_addr = os.getenv("VAULT_URL")
         if vault_addr:
             try:
                 return SecretsManager._get_vault_secret(secret_name, vault_addr)

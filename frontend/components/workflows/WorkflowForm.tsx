@@ -11,6 +11,7 @@ import type { Network } from '@/lib/types';
 import { useEffect } from 'react';
 import { useActiveWallet, useActiveAccount, ConnectButton } from 'thirdweb/react';
 import { thirdwebClient, isThirdwebConfigured } from '@/lib/thirdwebClient';
+import { TaskSelector, type TaskCostBreakdown } from '@/components/workflows/TaskSelector';
 
 interface WorkflowFormProps {
   onSubmit: (data: {
@@ -18,26 +19,31 @@ interface WorkflowFormProps {
     network: string;
     contract_type?: string;
     name?: string;
-    skip_audit?: boolean;
-    skip_deployment?: boolean;
+    selected_tasks?: string[];  // NEW: Selected tasks
+    skip_audit?: boolean;  // Deprecated: kept for backward compatibility
+    skip_deployment?: boolean;  // Deprecated: kept for backward compatibility
     optimize_for_metisvm?: boolean;
     enable_floating_point?: boolean;
     enable_ai_inference?: boolean;
     wallet_address: string;  // REQUIRED: User wallet address
     use_gasless?: boolean;  // Use facilitator for gasless deployment
+    cost_breakdown?: TaskCostBreakdown;  // NEW: Cost breakdown for payment
   }) => void;
   loading?: boolean;
+  onCostUpdate?: (cost: TaskCostBreakdown | null) => void;  // NEW: Cost update callback
 }
 
-export function WorkflowForm({ onSubmit, loading = false }: WorkflowFormProps) {
+export function WorkflowForm({ onSubmit, loading = false, onCostUpdate }: WorkflowFormProps) {
   const wallet = useActiveWallet();
   const account = useActiveAccount();
   const [nlpInput, setNlpInput] = useState('');
   const [network, setNetwork] = useState('');
   const [contractType, setContractType] = useState('Custom');
   const [name, setName] = useState('');
-  const [skipAudit, setSkipAudit] = useState(false);
-  const [skipDeployment, setSkipDeployment] = useState(false);
+  const [selectedTasks, setSelectedTasks] = useState<string[]>(['generation', 'audit', 'testing', 'deployment']);
+  const [costBreakdown, setCostBreakdown] = useState<TaskCostBreakdown | null>(null);
+  const [skipAudit, setSkipAudit] = useState(false);  // Deprecated: kept for backward compatibility
+  const [skipDeployment, setSkipDeployment] = useState(false);  // Deprecated: kept for backward compatibility
   const [optimizeForMetisVM, setOptimizeForMetisVM] = useState(false);
   const [enableFloatingPoint, setEnableFloatingPoint] = useState(false);
   const [enableAIInference, setEnableAIInference] = useState(false);
@@ -75,13 +81,15 @@ export function WorkflowForm({ onSubmit, loading = false }: WorkflowFormProps) {
       network,
       contract_type: contractType,
       name: name || undefined,
-      skip_audit: skipAudit,
-      skip_deployment: skipDeployment,
+      selected_tasks: selectedTasks,  // NEW: Pass selected tasks
+      skip_audit: skipAudit,  // Deprecated: kept for backward compatibility
+      skip_deployment: skipDeployment,  // Deprecated: kept for backward compatibility
       optimize_for_metisvm: optimizeForMetisVM,
       enable_floating_point: enableFloatingPoint,
       enable_ai_inference: enableAIInference,
       wallet_address: account.address,  // REQUIRED: Pass wallet address from connected account
       use_gasless: useGasless,  // Pass gasless option
+      cost_breakdown: costBreakdown,  // NEW: Pass cost breakdown for payment
     });
   };
 
@@ -154,6 +162,21 @@ export function WorkflowForm({ onSubmit, loading = false }: WorkflowFormProps) {
           onChange={(e) => setName(e.target.value)}
           placeholder="My Workflow"
         />
+
+        {network && (
+          <TaskSelector
+            selectedTasks={selectedTasks}
+            onTasksChange={setSelectedTasks}
+            network={network}
+            model="gemini-2.5-flash"
+            contractComplexity="standard"
+            promptLength={nlpInput.length}
+            onCostUpdate={(cost) => {
+              setCostBreakdown(cost);
+              onCostUpdate?.(cost);
+            }}
+          />
+        )}
 
         <div className="space-y-3">
           <label className="text-sm font-medium text-gray-700">Advanced Options</label>

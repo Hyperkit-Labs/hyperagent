@@ -39,10 +39,22 @@ def register_workflow_commands(workflow_group: click.Group) -> None:
         "--network",
         "-n",
         type=click.Choice(
-            ["hyperion_testnet", "hyperion_mainnet", "mantle_testnet", "mantle_mainnet"]
+            [
+                "hyperion_testnet",
+                "hyperion_mainnet",
+                "mantle_testnet",
+                "mantle_mainnet",
+                "avalanche_fuji",
+                "avalanche_mainnet",
+            ]
         ),
         default="hyperion_testnet",
         help="Target blockchain",
+    )
+    @click.option(
+        "--wallet-address",
+        "-w",
+        help="Wallet address for deployment (required for all workflows)",
     )
     @click.option(
         "--type",
@@ -72,6 +84,7 @@ def register_workflow_commands(workflow_group: click.Group) -> None:
         enable_fp: bool,
         enable_ai: bool,
         confirm_steps: bool,
+        wallet_address: Optional[str],
     ) -> None:
         """[>] Create workflow to generate and deploy smart contract"""
         print_banner()
@@ -80,7 +93,7 @@ def register_workflow_commands(workflow_group: click.Group) -> None:
         if interactive:
             from hyperagent.cli.interactive import run_interactive_prompts
 
-            description, network, type, options = run_interactive_prompts()
+            description, network, type, wallet_address, options = run_interactive_prompts()
             no_audit = options.get("skip_audit", False)
             no_deploy = options.get("skip_deployment", False)
             optimize_metisvm = options.get("optimize_metisvm", False)
@@ -106,9 +119,22 @@ def register_workflow_commands(workflow_group: click.Group) -> None:
             if not click.confirm(f"{CLIStyle.INFO} Step 3: Deploy to blockchain?", default=True):
                 no_deploy = True
 
+        # Validate wallet address
+        if not wallet_address:
+            format_error(
+                "Wallet address required",
+                "All workflows now require a wallet address for deployment",
+                suggestions=[
+                    "Use --wallet-address to provide your wallet address",
+                    "Format: 0x followed by 40 hexadecimal characters",
+                ],
+            )
+            return
+
         console.print(f"\n{CLIStyle.INFO} Creating workflow...")
         console.print(f"{CLIStyle.INFO} Network: {network}")
         console.print(f"{CLIStyle.INFO} Contract Type: {type}")
+        console.print(f"{CLIStyle.INFO} Wallet: {wallet_address[:10]}...{wallet_address[-8:]}")
         console.print(f"{CLIStyle.INFO} Description: {description[:60]}...")
 
         try:
@@ -124,6 +150,7 @@ def register_workflow_commands(workflow_group: click.Group) -> None:
                             "network": network,
                             "contract_type": type,
                             "name": name,
+                            "wallet_address": wallet_address,
                             "skip_audit": no_audit,
                             "skip_deployment": no_deploy,
                             "optimize_for_metisvm": optimize_metisvm,

@@ -41,7 +41,7 @@ export function WorkflowCard({ workflow }: WorkflowCardProps) {
             <StatusBadge status={workflow.status} />
           </div>
 
-          <ProgressBar progress={workflow.progress_percentage} />
+          <ProgressBar progress={workflow.progress_percentage ?? 0} />
 
           <div className="flex items-center justify-between pt-2 border-t border-gray-200/50">
             <div className="flex items-center gap-2 text-sm text-gray-600">

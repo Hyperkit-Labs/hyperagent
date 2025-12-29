@@ -1,0 +1,11 @@
+    # MLflow Dockerfile with PostgreSQL support
+# Extends official MLflow image and adds psycopg2 for PostgreSQL connectivity
+
+FROM ghcr.io/mlflow/mlflow:v2.14.0
+
+# Install psycopg2-binary for PostgreSQL support
+RUN pip install --no-cache-dir psycopg2-binary==2.9.10
+
+# Keep the default MLflow entrypoint
+# The command will be overridden in docker-compose.yml
+

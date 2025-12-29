@@ -1,5 +1,6 @@
 """Monitoring and observability package"""
 
+from hyperagent.monitoring.dune_integration import DuneIntegration
 from hyperagent.monitoring.metrics import (
     MetricsCollector,
     Timer,
@@ -13,6 +14,7 @@ from hyperagent.monitoring.metrics import (
     workflow_created,
     workflow_duration,
 )
+from hyperagent.monitoring.mlflow_tracker import MLflowTracker
 
 __all__ = [
     "MetricsCollector",
@@ -26,4 +28,6 @@ __all__ = [
     "llm_duration",
     "audit_scans",
     "deployments",
+    "DuneIntegration",
+    "MLflowTracker",
 ]

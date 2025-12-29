@@ -50,6 +50,26 @@ agent_errors = Counter(
     "hyperagent_agent_errors_total", "Total number of agent errors", ["agent_name", "error_type"]
 )
 
+# Build metrics
+build_completed = Counter(
+    "hyperagent_builds_completed_total",
+    "Total number of builds completed",
+    ["chain", "status"],
+)
+
+build_duration = Histogram(
+    "hyperagent_build_duration_seconds",
+    "Build execution duration in seconds",
+    ["chain"],
+    buckets=[10, 30, 60, 120, 300, 600],
+)
+
+build_credits_used = Counter(
+    "hyperagent_build_credits_used_total",
+    "Total credits used for builds",
+    ["model"],
+)
+
 # LLM metrics
 llm_requests = Counter(
     "hyperagent_llm_requests_total", "Total number of LLM API requests", ["provider", "model"]

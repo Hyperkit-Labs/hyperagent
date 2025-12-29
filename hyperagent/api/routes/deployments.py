@@ -1,5 +1,6 @@
 """Deployment API routes"""
 
+import logging
 from typing import Any, Dict, List
 
 import redis.asyncio as redis
@@ -20,17 +21,23 @@ from hyperagent.cache.redis_manager import RedisManager
 from hyperagent.core.config import settings
 from hyperagent.core.services.deployment_service import DeploymentService
 from hyperagent.events.event_bus import EventBus
+from hyperagent.security.secrets import SecretsManager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/deployments", tags=["deployments"])
 
 
-def get_deployment_service() -> DeploymentService:
+async def get_deployment_service() -> DeploymentService:
     """Dependency to get DeploymentService instance"""
+    secrets_manager = SecretsManager()
+    server_private_key = await secrets_manager.get_server_wallet_key()
+    
     network_manager = NetworkManager()
     alith_client = AlithClient()
     eigenda_client = EigenDAClient(
         disperser_url=settings.eigenda_disperser_url,
-        private_key=settings.private_key,
+        private_key=server_private_key,
         use_authenticated=settings.eigenda_use_authenticated,
     )
     return DeploymentService(
@@ -54,12 +61,15 @@ async def deploy_contract(request: DeploymentRequest) -> DeploymentResponse:
     4. Wait for confirmation
     5. Return deployment info
     """
-    # Initialize components
+    # Initialize components with SecretsManager
+    secrets_manager = SecretsManager()
+    server_private_key = await secrets_manager.get_server_wallet_key()
+    
     network_manager = NetworkManager()
     alith_client = AlithClient()
     eigenda_client = EigenDAClient(
         disperser_url=settings.eigenda_disperser_url,
-        private_key=settings.private_key,
+        private_key=server_private_key,
         use_authenticated=settings.eigenda_use_authenticated,
     )
 
@@ -184,12 +194,16 @@ async def deploy_batch(
             )
 
         # Deploy batch
+        # Get server private key from SecretsManager
+        secrets_manager = SecretsManager()
+        server_private_key = await secrets_manager.get_server_wallet_key()
+        
         result = await deployment_service.deploy_batch(
             contracts=contracts,
             network=network,
             use_pef=request.use_pef,
             max_parallel=request.max_parallel or 10,
-            private_key=request.private_key or settings.private_key,
+            private_key=request.private_key or server_private_key,
         )
 
         # Convert to response format

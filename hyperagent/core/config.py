@@ -2,7 +2,7 @@
 
 from typing import Optional, Union
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -72,6 +72,41 @@ class Settings(BaseSettings):
     )
     openai_api_key: Optional[str] = ""
     openai_model: str = "gpt-4o"  # Updated to GPT-4o
+    anthropic_api_key: Optional[str] = ""
+    claude_api_key: Optional[str] = ""
+    firecrawl_api_key: Optional[str] = ""
+    pinecone_api_key: Optional[str] = ""
+    pinecone_index_name: str = "hyperkit-docs"
+    guardian_model_url: Optional[str] = ""
+    guardian_model_api_key: Optional[str] = ""
+    lazai_api_key: Optional[str] = ""
+    lazai_url: str = "https://api.lazai.com"
+    attestation_contract_address: Optional[str] = ""
+    mlflow_tracking_uri: str = "http://localhost:5000"
+    dune_api_key: Optional[str] = ""
+    dune_mantle_query_id: Optional[int] = 6388392
+    dune_tvl_query_ethereum: Optional[int] = None
+    dune_tvl_query_polygon: Optional[int] = None
+    dune_tvl_query_avalanche: Optional[int] = None
+    dune_tvl_query_mantle: Optional[int] = None
+    dune_gas_savings_query: Optional[int] = None
+    dune_revenue_query: Optional[int] = None
+    moralis_api_key: Optional[str] = ""
+    moralis_webhook_url: Optional[str] = ""
+    
+    # Secrets Management
+    secrets_mode: str = Field(default="env")  # env, aws, vault
+    aws_secrets_region: Optional[str] = None
+    vault_url: Optional[str] = None
+    
+    # Rate Limiting
+    deployment_rate_limit_per_wallet: int = Field(default=10)
+    deployment_rate_limit_per_network: int = Field(default=100)
+    
+    # ERC-4337 Paymaster
+    x402_paymaster_service_url: str = "http://x402-verifier:3001"
+    entrypoint_address: str = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"  # EntryPoint v0.6
+    factory_address: str = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"  # Smart Account Factory
 
     # Acontext AI Memory API
     acontext_url: Optional[str] = ""  # Acontext API base URL
@@ -264,11 +299,34 @@ class Settings(BaseSettings):
     @classmethod
     def validate_thinking_budget(cls, v):
         """Validate thinking budget range"""
-        if v is not None:
+        if v is None or v == "":
+            return None
+        try:
             v = int(v)
             if not (1 <= v <= 1000):
                 raise ValueError("gemini_thinking_budget must be between 1 and 1000")
-        return v
+            return v
+        except (ValueError, TypeError):
+            return None
+
+    @field_validator(
+        "dune_tvl_query_ethereum",
+        "dune_tvl_query_polygon",
+        "dune_tvl_query_avalanche",
+        "dune_tvl_query_mantle",
+        "dune_gas_savings_query",
+        "dune_revenue_query",
+        mode="before",
+    )
+    @classmethod
+    def parse_dune_query_id(cls, v):
+        """Parse Dune query ID from string to int, handling empty strings"""
+        if v is None or v == "":
+            return None
+        try:
+            return int(v)
+        except (ValueError, TypeError):
+            return None
 
     model_config = SettingsConfigDict(
         env_file=".env",

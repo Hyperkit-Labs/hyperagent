@@ -12,18 +12,7 @@ from hyperagent.events.event_types import Event, EventType
 
 @dataclass
 class A2AMessage:
-    """
-    Agent-to-Agent Message
-
-    Concept: Structured message between agents
-    Logic: Request/Response pattern with correlation tracking
-    Fields:
-        - sender_agent: Who sent the message
-        - receiver_agent: Who should receive it
-        - message_type: request, response, or event
-        - correlation_id: Links request to response
-        - payload: Actual data
-    """
+    """Structured message between agents using request/response pattern"""
 
     sender_agent: str
     receiver_agent: str
@@ -36,13 +25,7 @@ class A2AMessage:
 
 
 class A2AProtocol:
-    """
-    Agent-to-Agent Communication Protocol
-
-    Concept: Decoupled agent communication
-    Logic: Agents send messages via event bus, wait for responses
-    Benefits: Loose coupling, async communication, retry logic
-    """
+    """Decoupled agent communication via event bus with async responses and retry logic"""
 
     def __init__(self, event_bus: EventBus):
         self.event_bus = event_bus

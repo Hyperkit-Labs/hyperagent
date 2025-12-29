@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from hyperagent.billing.spending_controls import SpendingControlsManager
 from hyperagent.db.session import get_db
 from hyperagent.models.payment_history import PaymentHistory
 from hyperagent.models.spending_control import SpendingControl
@@ -16,6 +17,7 @@ from hyperagent.models.spending_control import SpendingControl
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/x402/spending-controls", tags=["x402-spending-controls"])
+spending_manager = SpendingControlsManager()
 
 
 class SpendingControlRequest(BaseModel):
@@ -65,33 +67,25 @@ async def create_or_update_spending_control(
 ):
     """Create or update spending controls for a wallet"""
     try:
-        stmt = select(SpendingControl).where(
-            SpendingControl.wallet_address == request.wallet_address
-        )
-        result = await db.execute(stmt)
-        control = result.scalar_one_or_none()
-
-        if control:
-            if request.daily_limit is not None:
-                control.daily_limit = request.daily_limit
-            if request.monthly_limit is not None:
-                control.monthly_limit = request.monthly_limit
-            if request.whitelist_merchants is not None:
-                control.whitelist_merchants = request.whitelist_merchants
-            if request.time_restrictions is not None:
-                control.time_restrictions = request.time_restrictions
-        else:
-            control = SpendingControl(
-                wallet_address=request.wallet_address,
+        if request.daily_limit is not None or request.monthly_limit is not None:
+            control = await spending_manager.update_limits(
+                user_wallet=request.wallet_address,
                 daily_limit=request.daily_limit,
                 monthly_limit=request.monthly_limit,
-                whitelist_merchants=request.whitelist_merchants,
-                time_restrictions=request.time_restrictions,
+                db=db
             )
-            db.add(control)
-
-        await db.commit()
-        await db.refresh(control)
+        else:
+            control = await spending_manager._get_or_create_controls(
+                user_wallet=request.wallet_address,
+                db=db
+            )
+        
+        if request.whitelist_merchants is not None:
+            control = await spending_manager.update_whitelist(
+                user_wallet=request.wallet_address,
+                merchants=request.whitelist_merchants,
+                db=db
+            )
 
         return SpendingControlResponse(**control.to_dict())
     except Exception as e:

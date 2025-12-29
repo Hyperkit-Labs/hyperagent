@@ -7,12 +7,7 @@ from hyperagent.events.event_types import Event, EventType
 
 
 class StateManagerHandler:
-    """
-    State Manager Handler
-
-    Concept: Manages workflow state based on events
-    Logic: Updates state cache when events occur
-    """
+    """Manages workflow state based on events"""
 
     def __init__(self, redis_manager: RedisManager):
         self.redis = redis_manager
@@ -20,12 +15,10 @@ class StateManagerHandler:
     async def handle(self, event: Event) -> None:
         """Handle state update events"""
         if event.type == EventType.GENERATION_COMPLETED:
-            # Update state with generated contract
             await self.update_state(
                 event.workflow_id, {"contract_code": event.data.get("contract_code")}
             )
         elif event.type == EventType.DEPLOYMENT_CONFIRMED:
-            # Update state with deployed address
             await self.update_state(
                 event.workflow_id, {"deployed_address": event.data.get("contract_address")}
             )
@@ -38,25 +31,25 @@ class StateManagerHandler:
 
 
 class WebSocketBroadcasterHandler:
-    """
-    WebSocket Broadcaster Handler
-
-    Concept: Broadcasts events to connected clients
-    Logic: Sends events via WebSocket for real-time updates
-    """
+    """Broadcasts events to connected clients via WebSocket"""
 
     def __init__(self):
-        self.connections: Dict[str, list] = {}  # workflow_id -> [websocket connections]
+        self.connections: Dict[str, list] = {}
 
     async def handle(self, event: Event) -> None:
         """Broadcast event to WebSocket clients"""
-        if event.workflow_id in self.connections:
-            for ws in self.connections[event.workflow_id]:
-                try:
-                    await ws.send_json(event.to_dict())
-                except Exception:
-                    # Remove dead connections
-                    self.connections[event.workflow_id].remove(ws)
+        if event.workflow_id not in self.connections:
+            return
+        
+        dead_connections = []
+        for ws in self.connections[event.workflow_id]:
+            try:
+                await ws.send_json(event.to_dict())
+            except Exception:
+                dead_connections.append(ws)
+        
+        for ws in dead_connections:
+            self.connections[event.workflow_id].remove(ws)
 
     def register(self, workflow_id: str, websocket):
         """Register WebSocket connection"""
@@ -71,26 +64,25 @@ class WebSocketBroadcasterHandler:
 
 
 class AuditLoggerHandler:
-    """
-    Audit Logger Handler
-
-    Concept: Logs all events to audit table
-    Logic: Persists events for compliance and debugging
-    """
+    """Logs events to audit table for compliance and debugging"""
 
     def __init__(self, db_session):
         self.db_session = db_session
 
     async def handle(self, event: Event) -> None:
         """Log event to database"""
-        # TODO: Implement database logging
-        # from hyperagent.models.audit import EventLog
-        # event_log = EventLog(
-        #     event_type=event.type.value,
-        #     workflow_id=event.workflow_id,
-        #     data=event.data,
-        #     source_agent=event.source_agent
-        # )
-        # self.db_session.add(event_log)
-        # self.db_session.commit()
-        pass
+        try:
+            from hyperagent.models.event_log import EventLog
+            
+            event_log = EventLog(
+                event_type=event.type.value,
+                workflow_id=event.workflow_id,
+                data=event.data,
+                source_agent=event.source_agent
+            )
+            self.db_session.add(event_log)
+            await self.db_session.commit()
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to log event to database: {e}")

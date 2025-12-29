@@ -17,7 +17,8 @@ aioredis==2.0.1  # Legacy support
 sqlalchemy==2.0.36
 alembic==1.14.0
 asyncpg==0.30.0
-psycopg2-binary==2.9.10
+psycopg[binary]>=3.1.0  # psycopg3 for async support with pgbouncer compatibility
+psycopg2-binary==2.9.10  # Legacy sync support
 pgvector==0.3.0
 
 # Blockchain
@@ -37,10 +38,13 @@ alith>=0.1.0
 # LLM Providers
 google-generativeai==0.8.3
 openai==1.54.0
+anthropic==0.39.0
 langchain==0.3.27  # Fixed: CVE-2025-2828, CVE-2024-5998, CVE-2025-6984, CVE-2024-3095, CVE-2024-2965 (requires >=0.3.26 for langchain-community compatibility)
 langchain-community==0.3.27  # Fixed: CVE-2025-2828, CVE-2024-5998, CVE-2025-6984, CVE-2024-3095, CVE-2024-2965
 
 requests==2.32.4  # Fixed: CVE-2024-35195, CVE-2024-47081
+firecrawl-py>=0.0.16
+pinecone-client>=3.0.0
 
 # Security Tools
 # Updated to latest versions with security patches
@@ -78,4 +82,6 @@ numpy>=1.26.0  # Python 3.12 compatible
 prometheus-client==0.21.0
 opentelemetry-api==1.28.0
 opentelemetry-sdk==1.28.0
+mlflow==2.14.0
+dune-client>=1.5.0
 

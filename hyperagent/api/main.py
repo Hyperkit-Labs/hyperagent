@@ -12,6 +12,7 @@ from hyperagent.api.middleware.security import (
 from hyperagent.api.routes import (
     auth,
     contracts,
+    deployment,
     deployments,
     health,
     metrics,
@@ -19,6 +20,7 @@ from hyperagent.api.routes import (
     templates,
     workflows,
 )
+from hyperagent.api.routes.contracts.interact import router as contract_interact
 from hyperagent.api.routes.x402 import analytics as x402_analytics
 from hyperagent.api.routes.x402 import contracts as x402_contracts
 from hyperagent.api.routes.x402 import deployments as x402_deployments
@@ -82,6 +84,8 @@ app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(workflows.router)
 app.include_router(contracts.router)
+app.include_router(contract_interact)  # Contract interaction API
+app.include_router(deployment.router)  # User-signed deployment
 app.include_router(deployments.router)
 app.include_router(templates.router)
 app.include_router(networks.router)

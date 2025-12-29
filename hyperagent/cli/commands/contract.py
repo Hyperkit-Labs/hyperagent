@@ -158,8 +158,25 @@ def register_contract_commands(contract_group: click.Group) -> None:
     def test(contract_id: str, framework: str) -> None:
         """[TEST] Run tests on contract"""
         console.print(f"{CLIStyle.INFO} Running tests with {framework}...")
-        console.print(f"{CLIStyle.WAIT} Test API endpoint not yet implemented")
-        # TODO: Implement when test endpoint is available
+        try:
+            api_url = get_api_url()
+            async def test_contract_async():
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(
+                        f"{api_url}/api/v1/contracts/{contract_id}/test",
+                        json={"framework": framework}
+                    )
+                    response.raise_for_status()
+                    return response.json()
+            
+            result = asyncio.run(test_contract_async())
+            format_success(f"Tests completed: {result.get('status', 'unknown')}")
+        except httpx.RequestError as e:
+            format_error("Failed to connect to API", str(e))
+        except httpx.HTTPStatusError as e:
+            handle_api_error(e, f"contract {contract_id} test")
+        except Exception as e:
+            format_error("Failed to run tests", str(e))
 
     @contract_group.command()
     @click.option("--contract-id", "-c", required=True)

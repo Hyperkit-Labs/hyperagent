@@ -4,12 +4,14 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import type { PaymentInfo } from '@/lib/x402Client';
 import { createPaymentWallet, createFetchWithPayment } from '@/lib/thirdwebClient';
+import type { TaskCostBreakdown } from '@/components/workflows/TaskSelector';
 
 interface PaymentModalProps {
   paymentInfo: PaymentInfo;
   onPaymentComplete: (paymentData: string) => void;
   onCancel: () => void;
   isOpen: boolean;
+  costBreakdown?: TaskCostBreakdown | null;
 }
 
 export function PaymentModal({
@@ -17,6 +19,7 @@ export function PaymentModal({
   onPaymentComplete,
   onCancel,
   isOpen,
+  costBreakdown,
 }: PaymentModalProps) {
   const [status, setStatus] = useState<'idle' | 'pending' | 'success' | 'failed'>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -129,10 +132,56 @@ export function PaymentModal({
             <p className="font-mono text-sm">{paymentInfo.endpoint}</p>
           </div>
           
-          <div>
-            <p className="text-sm text-gray-600">Price</p>
-            <p className="text-2xl font-bold">${paymentInfo.price_usdc} {paymentInfo.currency}</p>
-          </div>
+          {costBreakdown ? (
+            <>
+              <div>
+                <p className="text-sm text-gray-600 mb-2">Task Breakdown</p>
+                <div className="space-y-2">
+                  {costBreakdown.selected_tasks.map((task) => {
+                    const taskBreakdown = costBreakdown.breakdown[task];
+                    if (!taskBreakdown) return null;
+                    
+                    const taskLabels: Record<string, string> = {
+                      generation: 'Code Generation',
+                      audit: 'Security Audit',
+                      testing: 'Automated Testing',
+                      deployment: 'Deployment',
+                    };
+                    
+                    return (
+                      <div key={task} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                        <span className="text-sm text-gray-700">{taskLabels[task] || task}</span>
+                        <div className="text-right">
+                          <span className="text-sm font-medium text-gray-900">
+                            ${taskBreakdown.final.toFixed(4)}
+                          </span>
+                          {taskBreakdown.multiplier !== 1 && (
+                            <span className="text-xs text-gray-500 ml-1">
+                              (×{taskBreakdown.multiplier.toFixed(2)})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              
+              <div className="pt-2 border-t">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-gray-700">Total</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    ${costBreakdown.total_usdc.toFixed(4)} {paymentInfo.currency}
+                  </p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div>
+              <p className="text-sm text-gray-600">Price</p>
+              <p className="text-2xl font-bold">${paymentInfo.price_usdc} {paymentInfo.currency}</p>
+            </div>
+          )}
           
           <div>
             <p className="text-sm text-gray-600">Network</p>

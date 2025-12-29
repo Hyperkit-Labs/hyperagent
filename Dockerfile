@@ -47,24 +47,25 @@ RUN python3 -c "from solcx import install_solc; install_solc('0.8.20'); install_
 RUN npm install -g solc@latest && \
     npx solcjs --version || echo "npm solc installation completed"
 
-    # Install Hardhat and OpenZeppelin contracts
-    # Create package.json for npm install
-    RUN mkdir -p /build/node_modules && \
-        cd /build && \
-        npm init -y && \
-        npm install --save-dev --legacy-peer-deps hardhat \
-          @openzeppelin/contracts \
-          @openzeppelin/contracts-upgradeable \
-          @nomicfoundation/hardhat-chai-matchers \
-          chai \
-          ethereum-waffle \
-          ethers \
-          typechain \
-          @typechain/hardhat \
-          solidity-coverage \
-          prettier prettier-plugin-solidity solhint \
-          hardhat-contract-sizer \
-          dotenv
+# Install Hardhat and OpenZeppelin contracts
+# Create package.json for npm install
+RUN mkdir -p /build/node_modules && \
+    cd /build && \
+    npm init -y && \
+    npm install --save --legacy-peer-deps \
+      @openzeppelin/contracts \
+      @openzeppelin/contracts-upgradeable && \
+    npm install --save-dev --legacy-peer-deps hardhat \
+      @nomicfoundation/hardhat-chai-matchers \
+      chai \
+      ethereum-waffle \
+      ethers \
+      typechain \
+      @typechain/hardhat \
+      solidity-coverage \
+      prettier prettier-plugin-solidity solhint \
+      hardhat-contract-sizer \
+      dotenv
 
 # Stage 2: Runtime
 # Updated to Python 3.12-slim for latest security patches

@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from hyperagent.agents.testing import TestingAgent
 from hyperagent.api.middleware.x402 import X402Middleware
 from hyperagent.api.models import DeploymentResponse, WorkflowResponse
+from hyperagent.billing.cost_estimator import CostEstimator
 from hyperagent.api.routes.workflows import (
     get_or_create_default_user,
     update_workflow_and_persist_contracts,
@@ -74,15 +75,35 @@ async def _create_services_and_coordinator(
     )
 
     redis_client = None
+    redis_manager = None
     if settings.redis_url:
         try:
             redis_client = await redis.from_url(settings.redis_url, decode_responses=False)
+            from hyperagent.cache.redis_manager import RedisManager
+
+            redis_manager = RedisManager(url=settings.redis_url)
+            await redis_manager.connect()
         except Exception as e:
             logger.warning(f"Failed to connect to Redis: {e} - using in-memory fallback")
     event_bus = EventBus(redis_client)
 
+    from hyperagent.core.planning.roma_planner import ROMAPlanner
+    from hyperagent.core.routing.multi_model_router import MultiModelRouter
+    from hyperagent.rag.firecrawl_rag import FirecrawlRAG
+    from hyperagent.rag.vector_store import VectorStore
+
+    roma_planner = ROMAPlanner(redis_manager=redis_manager) if redis_manager else None
+    multi_model_router = MultiModelRouter(redis_manager=redis_manager) if redis_manager else None
+    vector_store = VectorStore(db) if db else None
+    firecrawl_rag = FirecrawlRAG(
+        redis_manager=redis_manager, vector_store=vector_store, llm_provider=llm_provider
+    ) if redis_manager else None
+
     service_registry = ServiceRegistry()
-    service_registry.register("generation", GenerationService(llm_provider, template_retriever))
+    service_registry.register(
+        "generation",
+        GenerationService(llm_provider, template_retriever, multi_model_router=multi_model_router),
+    )
     service_registry.register("compilation", CompilationService())
     service_registry.register("audit", AuditService(SecurityAuditor()))
     service_registry.register("testing", TestingService(TestingAgent(event_bus, llm_provider)))
@@ -93,12 +114,25 @@ async def _create_services_and_coordinator(
     async def progress_callback(status: str, progress: int) -> None:
         await update_workflow_progress(workflow_id, status, progress, db)
 
-    coordinator = WorkflowCoordinator(service_registry, event_bus, progress_callback)
+    coordinator = WorkflowCoordinator(
+        service_registry,
+        event_bus,
+        progress_callback,
+        redis_manager=redis_manager,
+        roma_planner=roma_planner,
+        firecrawl_rag=firecrawl_rag,
+        multi_model_router=multi_model_router,
+    )
     return coordinator, service_registry
 
 
 async def _create_workflow_record(
-    db: AsyncSession, contract_type: str, network: str, name: Optional[str]
+    db: AsyncSession,
+    contract_type: str,
+    network: str,
+    name: Optional[str],
+    selected_tasks: Optional[List[str]] = None,
+    cost_breakdown: Optional[Dict[str, Any]] = None,
 ) -> Tuple[str, Workflow]:
     """Create and persist workflow record."""
     user_id = await get_or_create_default_user(db)
@@ -112,6 +146,13 @@ async def _create_workflow_record(
         progress_percentage=20,
         name=name or f"{contract_type} Contract Workflow",
     )
+    
+    # Store selected_tasks and cost_breakdown in workflow metadata
+    if hasattr(workflow, "meta_data"):
+        if workflow.meta_data is None:
+            workflow.meta_data = {}
+        workflow.meta_data["selected_tasks"] = selected_tasks
+        workflow.meta_data["cost_breakdown"] = cost_breakdown
 
     db.add(workflow)
     await db.commit()
@@ -152,6 +193,10 @@ class WorkflowFromContractRequest(BaseModel):
     name: Optional[str] = Field(None, description="Workflow name")
     wallet_address: Optional[str] = Field(None, description="User's wallet address for deployment")
     use_gasless: Optional[bool] = Field(True, description="Use facilitator for gasless deployment")
+    selected_tasks: Optional[List[str]] = Field(
+        default=["compilation", "audit", "testing", "deployment"],
+        description="List of tasks to execute (generation skipped since contract provided)"
+    )
 
 
 @router.post("/create-from-contract", response_model=WorkflowResponse)
@@ -165,16 +210,51 @@ async def create_workflow_from_contract(
         or http_request.headers.get("X-Wallet-Address")
     )
 
-    # Workflow creation is FREE when created from a contract that was already paid for
-    # The contract generation already includes the payment, so no additional payment needed
-    # This ensures single payment per contract type (ERC20=$0.01, ERC721=$0.02, Custom=$0.15)
+    # Convert selected_tasks (default excludes generation since contract is provided)
+    selected_tasks = request.selected_tasks or ["compilation", "audit", "testing", "deployment"]
+    selected_tasks = [task.lower() for task in selected_tasks]
+    
+    # Calculate cost for selected tasks (excluding generation)
+    estimator = CostEstimator()
+    cost_breakdown = estimator.calculate_task_cost(
+        selected_tasks=selected_tasks,
+        network=request.network,
+        model=getattr(settings, "gemini_model", "gemini-2.5-flash"),
+        contract_complexity="standard",
+        contract_lines=len(request.contract_code.split("\n")),
+        contract_size=len(request.contract_code.encode("utf-8")),
+    )
+    
+    # Verify payment via x402 middleware with task breakdown
+    payment_response = await x402_middleware.verify_and_handle_payment(
+        request=http_request,
+        endpoint="/api/v1/x402/workflows/create-from-contract",
+        price_tier="workflow",
+        price_usdc=cost_breakdown["total_usdc"],
+        network=request.network,
+        db=db,
+        wallet_address=wallet_address,
+        merchant="workflow-from-contract",
+        selected_tasks=selected_tasks,
+        cost_breakdown=cost_breakdown,
+    )
+    
+    if payment_response is not None:
+        return payment_response
+    
     logger.info(
-        f"Creating workflow from contract for {wallet_address} - workflow creation is free (contract already paid)"
+        f"Creating workflow from contract for {wallet_address} - "
+        f"payment verified: ${cost_breakdown['total_usdc']:.4f} for tasks {selected_tasks}"
     )
 
     try:
         workflow_id, workflow = await _create_workflow_record(
-            db=db, contract_type=request.contract_type, network=request.network, name=request.name
+            db=db,
+            contract_type=request.contract_type,
+            network=request.network,
+            name=request.name,
+            selected_tasks=selected_tasks,
+            cost_breakdown=cost_breakdown,
         )
 
         asyncio.create_task(
@@ -186,6 +266,7 @@ async def create_workflow_from_contract(
                 constructor_args=request.constructor_args,
                 wallet_address=request.wallet_address,
                 use_gasless=request.use_gasless,
+                selected_tasks=selected_tasks,
             )
         )
 
@@ -209,6 +290,7 @@ async def execute_workflow_from_contract_background(
     constructor_args: Optional[List[Any]] = None,
     wallet_address: Optional[str] = None,
     use_gasless: bool = True,
+    selected_tasks: Optional[List[str]] = None,
 ) -> None:
     """Execute workflow from contract in background task."""
     from hyperagent.db.session import AsyncSessionLocal
@@ -234,6 +316,7 @@ async def execute_workflow_from_contract_background(
                 constructor_args=constructor_args,
                 wallet_address=wallet_address,
                 use_gasless=use_gasless,
+                selected_tasks=selected_tasks,  # NEW: Pass selected tasks
             )
 
             await update_workflow_and_persist_contracts(

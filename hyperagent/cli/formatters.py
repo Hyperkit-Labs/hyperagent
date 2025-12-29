@@ -83,7 +83,15 @@ def format_workflow_status(workflow_data: Dict[str, Any]) -> None:
 
     # Status with color coding
     status = workflow_data.get("status", "unknown")
-    status_style = "green" if status == "completed" else "red" if status == "failed" else "yellow"
+    status_lower = status.lower() if status else "unknown"
+    if status_lower == "completed":
+        status_style = "green"
+    elif status_lower == "failed":
+        status_style = "red"
+    elif status_lower in ["generating", "compiling", "auditing", "testing", "deploying", "created"]:
+        status_style = "blue"
+    else:
+        status_style = "yellow"
     table.add_row("Status", f"[{status_style}]{status}[/{status_style}]")
 
     # Progress
@@ -109,11 +117,26 @@ def format_workflow_status(workflow_data: Dict[str, Any]) -> None:
     if workflow_data.get("retry_count", 0) > 0:
         table.add_row("Retries", str(workflow_data["retry_count"]))
 
+    # RAG Context Metadata (NEW)
+    if workflow_data.get("metadata", {}).get("rag_metadata"):
+        rag_meta = workflow_data["metadata"]["rag_metadata"]
+        if rag_meta.get("has_context"):
+            protocols = ", ".join(rag_meta.get("protocols_used", []))
+            context_length = rag_meta.get("context_length", 0)
+            protocol_count = len(rag_meta.get("protocols_used", []))
+            table.add_row(
+                "RAG Context",
+                f"[blue]{protocol_count} protocols ({context_length:,} chars)[/blue]"
+            )
+            if protocols:
+                table.add_row("Protocols", f"[cyan]{protocols}[/cyan]")
+
     console.print(table)
 
     # Progress bar if in progress
-    if status in ["generating", "auditing", "testing", "deploying"]:
-        with console.status(f"{CLIStyle.WAIT} {status.title()}..."):
+    status_lower = status.lower() if status else ""
+    if status_lower in ["generating", "compiling", "auditing", "testing", "deploying", "created"]:
+        with console.status(f"{CLIStyle.WAIT} {get_stage_name(status)}..."):
             pass
 
 
@@ -466,8 +489,14 @@ def format_progress_bar_windows_safe(
 
 def get_stage_name(status: str) -> str:
     """Map workflow status to human-readable stage name"""
+    status_lower = status.lower() if status else "unknown"
     stage_map = {
         "created": "Initializing",
+        "generating": "Generating Contract",
+        "compiling": "Compiling Contract",
+        "auditing": "Security Audit",
+        "testing": "Running Tests",
+        "deploying": "Deploying Contract",
         "generating": "Generating",
         "compiling": "Compiling",
         "auditing": "Auditing",
@@ -476,7 +505,7 @@ def get_stage_name(status: str) -> str:
         "completed": "Completed",
         "failed": "Failed",
     }
-    return stage_map.get(status, status.title())
+    return stage_map.get(status_lower, status.title() if status else "Unknown")
 
 
 def format_error(

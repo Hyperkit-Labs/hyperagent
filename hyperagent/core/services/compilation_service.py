@@ -11,17 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class CompilationService(ServiceInterface):
-    """
-    Compilation Service
-
-    Concept: Compile Solidity source code to bytecode and ABI
-    Logic:
-        1. Extract Solidity version from pragma (or default to 0.8.30)
-        2. Ensure correct solc version is available via solc-select
-        3. Compile using solcx (py-solc-x)
-        4. Extract bytecode, ABI, and contract name
-        5. Return compiled contract data
-    """
+    """Compiles Solidity source code to bytecode and ABI"""
 
     def __init__(self, default_solc_version: str = "0.8.30"):
         """
@@ -34,14 +24,7 @@ class CompilationService(ServiceInterface):
         self._ensure_solc_available()
 
     def _ensure_solc_available(self):
-        """
-        Ensure Solidity compiler is available via solc-select or system solc
-
-        Logic:
-        1. Try solc-select first (preferred method)
-        2. Fallback to system solc if solc-select fails
-        3. Log warnings if neither is available
-        """
+        """Ensure Solidity compiler is available via solc-select or system solc"""
         try:
             # Try solc-select first
             import solc_select
@@ -144,91 +127,103 @@ class CompilationService(ServiceInterface):
             # Configure import paths for OpenZeppelin contracts
             # Use environment variable or default to /app/node_modules
             node_modules_path = os.getenv("NODE_MODULES_PATH", "/app/node_modules")
-            import_remappings = {}
+            import_remappings = []
 
+            # Always add node_modules to remappings if it exists
             if os.path.exists(node_modules_path):
+                logger.info(f"Found node_modules at: {node_modules_path}")
+                
                 # Create remappings for OpenZeppelin and other common packages
                 openzeppelin_path = os.path.join(node_modules_path, "@openzeppelin")
+                openzeppelin_contracts_path = os.path.join(openzeppelin_path, "contracts")
                 nomicfoundation_path = os.path.join(node_modules_path, "@nomicfoundation")
 
+                # Check and add OpenZeppelin remapping
+                # Map @openzeppelin/ to the root of the package (not contracts subdirectory)
+                # This allows imports like @openzeppelin/contracts/... to resolve correctly
                 if os.path.exists(openzeppelin_path):
-                    import_remappings["@openzeppelin/"] = openzeppelin_path + "/"
-                    logger.debug(f"Configured OpenZeppelin import path: {openzeppelin_path}")
+                    # Map @openzeppelin/ to /app/node_modules/@openzeppelin/
+                    # So @openzeppelin/contracts/... resolves to /app/node_modules/@openzeppelin/contracts/...
+                    remapping = f"@openzeppelin/={openzeppelin_path}/"
+                    import_remappings.append(remapping)
+                    logger.info(f"Configured OpenZeppelin import path: {remapping}")
+                else:
+                    logger.warning(f"OpenZeppelin not found at {openzeppelin_path}")
 
+                # Check and add NomicFoundation remapping
                 if os.path.exists(nomicfoundation_path):
-                    import_remappings["@nomicfoundation/"] = nomicfoundation_path + "/"
-                    logger.debug(f"Configured NomicFoundation import path: {nomicfoundation_path}")
+                    remapping = f"@nomicfoundation/={nomicfoundation_path}/"
+                    import_remappings.append(remapping)
+                    logger.info(f"Configured NomicFoundation import path: {remapping}")
+            else:
+                logger.warning(f"node_modules not found at {node_modules_path}. OpenZeppelin imports may fail.")
 
             # Compile contract with import remappings
             # Use compile_standard for better control over compilation options
+            # Always use compile_standard to support remappings properly
+            compile_input = {
+                "language": "Solidity",
+                "sources": {"contract.sol": {"content": contract_code}},
+                "settings": {
+                    "outputSelection": {
+                        "*": {
+                            "*": [
+                                "abi",
+                                "evm.bytecode",
+                                "evm.deployedBytecode",
+                                "evm.bytecode.object",
+                                "evm.deployedBytecode.object",
+                            ]
+                        }
+                    },
+                    "remappings": import_remappings,
+                    "optimizer": {"enabled": False},
+                },
+            }
+            
             if import_remappings:
-                # Use compile_standard which supports settings.remappings
-                compile_input = {
-                    "language": "Solidity",
-                    "sources": {"contract.sol": {"content": contract_code}},
-                    "settings": {
-                        "outputSelection": {
-                            "*": {
-                                "*": [
-                                    "abi",
-                                    "evm.bytecode",
-                                    "evm.deployedBytecode",
-                                    "evm.bytecode.object",
-                                    "evm.deployedBytecode.object",
-                                ]
-                            }
+                logger.info(f"Compiling with remappings: {import_remappings}")
+            else:
+                logger.warning("Compiling without remappings - OpenZeppelin imports may fail")
+
+            # Use the version that was successfully set (may have been changed by fallback)
+            if version_to_use:
+                compiled_output = compile_standard(compile_input, solc_version=version_to_use)
+            else:
+                # Don't specify version - use whatever is currently set
+                compiled_output = compile_standard(compile_input)
+
+            # Convert compile_standard output to compile_source format for compatibility
+            if "contracts" not in compiled_output or not compiled_output["contracts"]:
+                raise ValueError("Compilation returned empty result")
+
+            # Extract contract from standard JSON output
+            contracts = compiled_output["contracts"]["contract.sol"]
+            if not contracts:
+                raise ValueError("No contracts found in compilation output")
+
+            # Get first contract
+            contract_name = list(contracts.keys())[0]
+            contract_data = contracts[contract_name]
+
+            # Convert to compile_source format
+            compiled = {
+                f"<stdin>:{contract_name}": {
+                    "abi": contract_data.get("abi", []),
+                    "evm": {
+                        "bytecode": {
+                            "object": contract_data.get("evm", {})
+                            .get("bytecode", {})
+                            .get("object", "")
                         },
-                        "remappings": (
-                            [f"{k}={v}" for k, v in import_remappings.items()]
-                            if import_remappings
-                            else []
-                        ),
-                        "optimizer": {"enabled": False},
+                        "deployedBytecode": {
+                            "object": contract_data.get("evm", {})
+                            .get("deployedBytecode", {})
+                            .get("object", "")
+                        },
                     },
                 }
-
-                # Use the version that was successfully set (may have been changed by fallback)
-                if version_to_use:
-                    compiled_output = compile_standard(compile_input, solc_version=version_to_use)
-                else:
-                    # Don't specify version - use whatever is currently set
-                    compiled_output = compile_standard(compile_input)
-
-                # Convert compile_standard output to compile_source format for compatibility
-                if "contracts" not in compiled_output or not compiled_output["contracts"]:
-                    raise ValueError("Compilation returned empty result")
-
-                # Extract contract from standard JSON output
-                contracts = compiled_output["contracts"]["contract.sol"]
-                if not contracts:
-                    raise ValueError("No contracts found in compilation output")
-
-                # Get first contract
-                contract_name = list(contracts.keys())[0]
-                contract_data = contracts[contract_name]
-
-                # Convert to compile_source format
-                compiled = {
-                    f"<stdin>:{contract_name}": {
-                        "abi": contract_data.get("abi", []),
-                        "evm": {
-                            "bytecode": {
-                                "object": contract_data.get("evm", {})
-                                .get("bytecode", {})
-                                .get("object", "")
-                            },
-                            "deployedBytecode": {
-                                "object": contract_data.get("evm", {})
-                                .get("deployedBytecode", {})
-                                .get("object", "")
-                            },
-                        },
-                    }
-                }
-            else:
-                # No remappings needed, use standard compile_source
-                # Note: compile_source uses the version set by set_solc_version above
-                compiled = compile_source(contract_code)
+            }
 
             if not compiled:
                 raise ValueError("Compilation returned empty result")

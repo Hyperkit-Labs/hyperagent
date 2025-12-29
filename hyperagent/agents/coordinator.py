@@ -17,11 +17,8 @@ logger = logging.getLogger(__name__)
 
 
 class CoordinatorAgent(ServiceInterface):
-    """
-    Coordinator Agent
-
-    Concept: Orchestrates workflow execution
-    Logic: Manages state, coordinates agents, handles errors
+    """Orchestrates workflow execution, manages state, coordinates agents, handles errors
+    
     SLA: p99 < 800s, p95 < 600s
     """
 
@@ -38,15 +35,7 @@ class CoordinatorAgent(ServiceInterface):
         self.state = {}
 
     async def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Execute complete workflow with error handling and retry logic
-
-        Logic:
-            1. Check for cancellation flag
-            2. Execute workflow
-            3. Handle errors with retry logic
-            4. Persist state
-        """
+        """Execute complete workflow with error handling and retry logic"""
         workflow_id = input_data["workflow_id"]
         nlp_input = input_data["nlp_input"]
         network = input_data["network"]
@@ -157,19 +146,11 @@ class CoordinatorAgent(ServiceInterface):
                     )
 
     async def cancel_workflow(self, workflow_id: str) -> Dict[str, Any]:
-        """
-        Cancel running workflow
-
-        Concept: Graceful cancellation with cleanup
-        Logic:
-            1. Set cancellation flag in Redis
-            2. Stop current agent execution
-            3. Clean up resources
-            4. Update state to CANCELLED
-        """
-        # Set cancellation flag in Redis
+        """Cancel running workflow with graceful cleanup"""
         if self.redis_client:
-            await self.redis_client.set(f"workflow:{workflow_id}:cancelled", "true", ex=3600)
+            await self.redis_client.set(
+                f"workflow:{workflow_id}:cancelled", "true", ex=CANCELLATION_FLAG_TTL_SECONDS
+            )
 
         # Update state
         self.state["status"] = WorkflowStage.CANCELLED.value
@@ -213,10 +194,19 @@ class CoordinatorAgent(ServiceInterface):
         if self.redis_client:
             try:
                 await self.redis_client.set(
-                    f"workflow:{self.workflow_id}:state", str(self.state), ex=86400  # 24 hours
+                    f"workflow:{self.workflow_id}:state", str(self.state), ex=WORKFLOW_STATE_TTL_SECONDS
                 )
             except Exception as e:
                 logger.warning(f"Failed to persist state to Redis: {e}")
 
-        # TODO: Persist to database via Workflow model
-        # This would require database session injection
+        try:
+            from hyperagent.db.session import get_db
+            async for db in get_db():
+                from hyperagent.models.workflow import Workflow
+                workflow = await db.get(Workflow, self.workflow_id)
+                if workflow:
+                    workflow.state = self.state
+                    await db.commit()
+                break
+        except Exception as e:
+            logger.warning(f"Failed to persist state to database: {e}")

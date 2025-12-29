@@ -7,6 +7,7 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import { getWorkflowContracts } from '@/lib/api';
 import { WorkflowProgress } from '@/components/workflows/WorkflowProgress';
 import { ContractViewer } from '@/components/contracts/ContractViewer';
+import { DynamicIsland } from '@/components/workflow/DynamicIsland';
 import { Card } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -72,6 +73,8 @@ export default function WorkflowDetailPage() {
 
   return (
     <div className="space-y-6">
+      <DynamicIsland workflowId={workflowId} />
+      
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">

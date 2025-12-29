@@ -28,6 +28,13 @@ from hyperagent.core.services.testing_service import TestingService
 from hyperagent.db.session import get_db
 from hyperagent.events.event_bus import EventBus
 from hyperagent.llm.provider import LLMProviderFactory
+from hyperagent.api.middleware.x402 import X402Middleware
+from hyperagent.api.models import (
+    TaskCostBreakdownResponse,
+    WorkflowCostEstimateRequest,
+    WorkflowCreateRequest,
+)
+from hyperagent.billing.cost_estimator import CostEstimator
 from hyperagent.models.user import User
 from hyperagent.models.workflow import Workflow, WorkflowStatus
 from hyperagent.rag.template_retriever import TemplateRetriever
@@ -35,28 +42,23 @@ from hyperagent.security.audit import SecurityAuditor
 
 logger = logging.getLogger(__name__)
 
+MAX_DESCRIPTION_LENGTH = 200
+DEFAULT_PAGE_LIMIT = 100
+
 
 async def get_or_create_default_user(db: AsyncSession) -> uuid.UUID:
-    """
-    Get or create default user for workflows
-
-    Concept: Ensure a default user exists for workflows
-    Logic: Check for default user, create if not exists
-    Note: username=None to avoid unique constraint violations
-    """
-    # Try to find default user by email
+    """Get or create default user for workflows"""
     result = await db.execute(select(User).where(User.email == "default@hyperagent.local"))
     user = result.scalar_one_or_none()
 
     if not user:
-        # Create default user (username=None to avoid unique constraint)
         user = User(
             email="default@hyperagent.local",
-            username=None,  # Nullable field - avoids unique constraint conflict
+            username=None,
             is_active=True,
         )
         db.add(user)
-        await db.commit()  # Commit user first
+        await db.commit()
         await db.refresh(user)
         logger.info(f"Created default user: {user.id}")
     else:
@@ -77,6 +79,7 @@ async def execute_workflow_background(
     wallet_address: str,  # REQUIRED: User wallet address
     use_gasless: bool = False,  # Use facilitator for gasless deployment
     signed_transaction: Optional[str] = None,  # Pre-signed transaction (optional)
+    selected_tasks: Optional[List[str]] = None,  # NEW: Selected tasks to execute
 ):
     """
     Execute workflow in background task
@@ -144,18 +147,20 @@ async def execute_workflow_background(
             # Initialize Redis and EventBus
             # Redis is optional - EventBus has in-memory fallback
             redis_client = None
+            redis_manager = None
             if settings.redis_url:
                 try:
                     redis_client = redis.from_url(settings.redis_url, decode_responses=False)
+                    from hyperagent.cache.redis_manager import RedisManager
+
+                    redis_manager = RedisManager(url=settings.redis_url)
+                    await redis_manager.connect()
                 except Exception as e:
                     logger.warning(f"Failed to connect to Redis: {e} - using in-memory fallback")
             event_bus = EventBus(redis_client)
 
-            # Register services
+            # Register services (will be updated with multi_model_router later)
             service_registry = ServiceRegistry()
-            service_registry.register(
-                "generation", GenerationService(llm_provider, template_retriever)
-            )
             service_registry.register("compilation", CompilationService())
             service_registry.register("audit", AuditService(SecurityAuditor()))
             service_registry.register(
@@ -171,7 +176,52 @@ async def execute_workflow_background(
                 await update_workflow_progress(workflow_id, status, progress, db)
 
             # Create coordinator with progress callback
-            coordinator = WorkflowCoordinator(service_registry, event_bus, progress_callback)
+            from hyperagent.core.planning.roma_planner import ROMAPlanner
+            from hyperagent.core.routing.multi_model_router import MultiModelRouter
+            from hyperagent.rag.firecrawl_rag import FirecrawlRAG
+            from hyperagent.rag.vector_store import VectorStore
+
+            roma_planner = ROMAPlanner(redis_manager=redis_manager) if redis_manager else None
+            multi_model_router = MultiModelRouter(redis_manager=redis_manager) if redis_manager else None
+            vector_store = VectorStore(db) if db else None
+            firecrawl_rag = (
+                FirecrawlRAG(
+                    redis_manager=redis_manager,
+                    vector_store=vector_store,
+                    llm_provider=llm_provider,
+                )
+                if redis_manager
+                else None
+            )
+
+            # Update GenerationService with multi_model_router
+            # Register will overwrite existing service with same name
+            service_registry.register(
+                "generation",
+                GenerationService(llm_provider, template_retriever, multi_model_router=multi_model_router),
+            )
+
+            coordinator = WorkflowCoordinator(
+                service_registry,
+                event_bus,
+                progress_callback,
+                redis_manager=redis_manager,
+                roma_planner=roma_planner,
+                firecrawl_rag=firecrawl_rag,
+                multi_model_router=multi_model_router,
+            )
+
+            # Convert skip flags to selected_tasks if selected_tasks not provided (backward compatibility)
+            workflow_selected_tasks = selected_tasks
+            if workflow_selected_tasks is None:
+                workflow_selected_tasks = ["generation", "compilation"]
+                if not skip_audit:
+                    workflow_selected_tasks.append("audit")
+                if not getattr(settings, "skip_testing", False):
+                    workflow_selected_tasks.append("testing")
+                if not skip_deployment:
+                    workflow_selected_tasks.append("deployment")
+                logger.info(f"Converted skip flags to selected_tasks in background: {workflow_selected_tasks}")
 
             # Execute workflow with wallet information
             result = await coordinator.execute_workflow(
@@ -184,6 +234,7 @@ async def execute_workflow_background(
                 wallet_address=wallet_address,  # REQUIRED: Pass wallet address
                 use_gasless=use_gasless,  # Pass gasless option
                 signed_transaction=signed_transaction,  # Pass signed transaction if provided
+                selected_tasks=workflow_selected_tasks,  # NEW: Pass selected tasks
             )
 
             # Update workflow status and persist contracts
@@ -453,6 +504,8 @@ class WorkflowCreateRequest(BaseModel):
     wallet_address: str  # User's wallet address (REQUIRED for all workflows)
     use_gasless: Optional[bool] = False  # Use facilitator for gasless deployment
     signed_transaction: Optional[str] = None  # Pre-signed deployment transaction (optional)
+    # Task selection (new modular approach)
+    selected_tasks: Optional[List[str]] = None  # List of tasks to execute
 
 
 class WorkflowResponse(BaseModel):
@@ -463,6 +516,43 @@ class WorkflowResponse(BaseModel):
     message: str
     warnings: Optional[List[str]] = None
     features_used: Optional[Dict[str, Any]] = None
+
+
+@router.post("/estimate-cost", response_model=TaskCostBreakdownResponse)
+async def estimate_workflow_cost(
+    request: WorkflowCostEstimateRequest, db: AsyncSession = Depends(get_db)
+):
+    """
+    Estimate cost for selected tasks before workflow creation
+    
+    Returns cost breakdown so frontend can display payment modal with
+    individual task prices and total.
+    
+    Args:
+        request: Cost estimation request with selected tasks and parameters
+        db: Database session
+    
+    Returns:
+        Task cost breakdown with individual task prices and total
+    """
+    try:
+        estimator = CostEstimator()
+        cost_breakdown = estimator.calculate_task_cost(
+            selected_tasks=request.selected_tasks,
+            network=request.network,
+            model=request.model or "gemini-2.5-flash",
+            contract_complexity=request.contract_complexity or "standard",
+            prompt_length=request.prompt_length,
+            contract_lines=request.contract_lines,
+            contract_size=request.contract_size,
+        )
+        
+        return TaskCostBreakdownResponse(**cost_breakdown)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error estimating workflow cost: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to estimate workflow cost")
 
 
 @router.post("/generate", response_model=WorkflowResponse)
@@ -513,6 +603,59 @@ async def create_workflow(request: WorkflowCreateRequest, db: AsyncSession = Dep
         request.wallet_address = normalized_address
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Wallet address validation failed: {str(e)}")
+
+    # Convert skip_* flags to selected_tasks for backward compatibility
+    selected_tasks = request.selected_tasks
+    if selected_tasks is None:
+        # Build selected_tasks from skip flags
+        selected_tasks = ["generation", "compilation"]
+        if not request.skip_audit:
+            selected_tasks.append("audit")
+        if not getattr(request, "skip_testing", False):
+            selected_tasks.append("testing")
+        if not request.skip_deployment:
+            selected_tasks.append("deployment")
+        logger.info(f"Converted skip flags to selected_tasks: {selected_tasks}")
+    else:
+        # Normalize selected_tasks
+        selected_tasks = [task.lower() for task in selected_tasks]
+        # Ensure compilation is included if audit/testing/deployment are selected
+        if any(task in selected_tasks for task in ["audit", "testing", "deployment"]):
+            if "compilation" not in selected_tasks:
+                selected_tasks.insert(1, "compilation") if "generation" in selected_tasks else selected_tasks.insert(0, "compilation")
+
+    # Calculate cost for selected tasks
+    estimator = CostEstimator()
+    cost_breakdown = estimator.calculate_task_cost(
+        selected_tasks=selected_tasks,
+        network=request.network,
+        model=getattr(settings, "gemini_model", "gemini-2.5-flash"),
+        contract_complexity="standard",
+        prompt_length=len(request.nlp_input),
+    )
+
+    # Verify payment via x402 middleware (if x402 enabled)
+    if settings.x402_enabled:
+        from fastapi import Request as FastAPIRequest
+        from hyperagent.blockchain.network_features import NetworkFeatureManager
+        
+        # Check if network supports x402
+        is_x402_network = NetworkFeatureManager.is_x402_network(
+            request.network, settings.x402_enabled, settings.x402_enabled_networks
+        )
+        
+        if is_x402_network:
+            # Create a mock request object for x402 middleware
+            # In actual implementation, this would come from the FastAPI request
+            x402_middleware = X402Middleware()
+            
+            # Note: We need the actual HTTP request object here
+            # For now, we'll handle payment verification in the x402 workflows endpoint
+            # This is a placeholder - actual implementation should use the request object
+            logger.info(
+                f"Cost calculated for workflow: ${cost_breakdown['total_usdc']:.4f} "
+                f"for tasks {selected_tasks}"
+            )
 
     try:
         # Get or create default user (in same transaction)
@@ -632,13 +775,20 @@ async def create_workflow(request: WorkflowCreateRequest, db: AsyncSession = Dep
             user_id=user_id,
             name=request.name
             or f"Contract Generation - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-            description=request.nlp_input[:200],  # First 200 chars
+            description=request.nlp_input[:MAX_DESCRIPTION_LENGTH],
             nlp_input=request.nlp_input,
             network=request.network,
             is_testnet=True,  # Default to testnet
             status=WorkflowStatus.CREATED.value,
             progress_percentage=0,
         )
+        
+        # Store selected_tasks and cost_breakdown in workflow metadata if available
+        if hasattr(workflow, "meta_data"):
+            if workflow.meta_data is None:
+                workflow.meta_data = {}
+            workflow.meta_data["selected_tasks"] = selected_tasks
+            workflow.meta_data["cost_breakdown"] = cost_breakdown
 
         db.add(workflow)
         await db.commit()  # Commit both user and workflow together
@@ -689,11 +839,12 @@ async def create_workflow(request: WorkflowCreateRequest, db: AsyncSession = Dep
                 optimize_for_metisvm=request.optimize_for_metisvm,
                 enable_floating_point=request.enable_floating_point,
                 enable_ai_inference=request.enable_ai_inference,
-                skip_audit=request.skip_audit,
-                skip_deployment=request.skip_deployment,
+                skip_audit=request.skip_audit,  # Keep for backward compatibility
+                skip_deployment=request.skip_deployment,  # Keep for backward compatibility
                 wallet_address=request.wallet_address,  # REQUIRED: Pass wallet address
                 use_gasless=request.use_gasless or False,  # Pass gasless option
                 signed_transaction=request.signed_transaction,  # Pass signed transaction if provided
+                selected_tasks=selected_tasks,  # NEW: Pass selected tasks
             )
         )
 
@@ -722,8 +873,8 @@ async def create_workflow(request: WorkflowCreateRequest, db: AsyncSession = Dep
 @router.get("")
 async def list_workflows(
     status: Optional[str] = None,
+    limit: int = DEFAULT_PAGE_LIMIT,
     network: Optional[str] = None,
-    limit: int = 100,
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
 ):

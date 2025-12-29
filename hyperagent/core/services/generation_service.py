@@ -5,6 +5,7 @@ from typing import Any, Dict, Optional
 
 from hyperagent.core.agent_system import ServiceInterface
 from hyperagent.core.config import settings
+from hyperagent.core.routing.multi_model_router import MultiModelRouter
 from hyperagent.llm.acontext_client import AcontextClient
 from hyperagent.llm.provider import LLMProvider
 from hyperagent.rag.template_retriever import TemplateRetriever
@@ -15,9 +16,15 @@ logger = logging.getLogger(__name__)
 class GenerationService(ServiceInterface):
     """LLM-based contract generation service with Acontext memory integration"""
 
-    def __init__(self, llm_provider: LLMProvider, template_retriever: TemplateRetriever):
+    def __init__(
+        self,
+        llm_provider: LLMProvider,
+        template_retriever: TemplateRetriever,
+        multi_model_router: Optional[MultiModelRouter] = None,
+    ):
         self.llm_provider = llm_provider
         self.template_retriever = template_retriever
+        self.multi_model_router = multi_model_router
         # Initialize Acontext client if enabled
         self.acontext = AcontextClient() if settings.enable_acontext else None
 
@@ -26,6 +33,7 @@ class GenerationService(ServiceInterface):
         nlp_desc = input_data.get("nlp_description")
         contract_type = input_data.get("contract_type", "Custom")
         network = input_data.get("network", "")
+        rag_context = input_data.get("rag_context", "")
 
         # Enhance prompt with Acontext memory (if enabled)
         enhanced_prompt = nlp_desc
@@ -55,10 +63,27 @@ class GenerationService(ServiceInterface):
                 )
                 enhanced_prompt = nlp_desc
 
-        # Generate contract using RAG with enhanced prompt
-        contract_code = await self.template_retriever.retrieve_and_generate(
-            enhanced_prompt, contract_type
-        )
+        # Use Multi-Model Router if available, otherwise fallback to template retriever
+        if self.multi_model_router and rag_context:
+            try:
+                logger.info("Using Multi-Model Router for code generation")
+                contract_code, credits_used = await self.multi_model_router.route_task(
+                    task="solidity_codegen",
+                    context=rag_context,
+                    budget=100,
+                    is_private=input_data.get("is_private", False),
+                )
+                logger.info(f"Generated code using Multi-Model Router (credits: {credits_used})")
+            except Exception as e:
+                logger.warning(f"Multi-Model Router failed: {e}, falling back to template retriever")
+                contract_code = await self.template_retriever.retrieve_and_generate(
+                    enhanced_prompt, contract_type
+                )
+        else:
+            # Generate contract using RAG with enhanced prompt
+            contract_code = await self.template_retriever.retrieve_and_generate(
+                enhanced_prompt, contract_type
+            )
 
         # Optimize for MetisVM if requested (with feature check and fallback)
         metisvm_optimized = False

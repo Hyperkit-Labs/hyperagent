@@ -397,13 +397,37 @@ def register_deployment_commands(deployment_group: click.Group) -> None:
             if value:
                 console.print(f"{CLIStyle.INFO} Value: {value} ETH")
 
-            console.print(f"\n{CLIStyle.WARNING} Contract interaction API not yet implemented")
-            console.print(
-                f"{CLIStyle.INFO} Use Web3.py or ethers.js to interact with contract directly"
-            )
-            if deployment_id:
-                console.print(
-                    f"{CLIStyle.INFO} Contract ABI available via: hyperagent contract view {deployment_data.get('contract_id', '')}"
+            # Call contract interaction API
+            async def call_contract_async():
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    payload = {
+                        "contract_address": contract_addr,
+                        "network": deploy_network,
+                        "function_name": function,
+                        "function_args": function_args,
+                    }
+                    if value:
+                        from web3 import Web3
+                        payload["value"] = str(Web3.to_wei(float(value), "ether"))
+                    
+                    response = await client.post(
+                        f"{api_url}/api/v1/contracts/call",
+                        json=payload
+                    )
+                    response.raise_for_status()
+                    return response.json()
+            
+            result = asyncio.run(call_contract_async())
+            
+            if result.get("success"):
+                console.print(f"{CLIStyle.SUCCESS} Transaction prepared successfully")
+                console.print(f"{CLIStyle.INFO} Transaction data: {result.get('result', {}).get('transaction', {})}")
+                console.print(f"{CLIStyle.INFO} Sign this transaction in your wallet and submit it to the blockchain")
+            else:
+                format_error(
+                    "Failed to prepare contract call",
+                    result.get("error", "Unknown error"),
+                    suggestions=["Check function name and arguments", "Verify contract address and network"]
                 )
 
         except httpx.RequestError as e:

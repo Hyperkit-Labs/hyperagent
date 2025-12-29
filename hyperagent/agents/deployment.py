@@ -3,9 +3,10 @@
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from eth_account import Account
+from sqlalchemy.ext.asyncio import AsyncSession
 from web3 import Web3
 
 from hyperagent.blockchain.alith_client import AlithClient
@@ -33,11 +34,13 @@ class DeploymentAgent(ServiceInterface):
         alith_client: AlithClient,
         eigenda_client: EigenDAClient,
         event_bus: EventBus,
+        db: Optional[AsyncSession] = None,
     ):
         self.network_manager = network_manager
         self.alith_client = alith_client
         self.eigenda_client = eigenda_client
         self.event_bus = event_bus
+        self.db = db
 
     async def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Deploy contract to blockchain"""
@@ -86,6 +89,29 @@ class DeploymentAgent(ServiceInterface):
 
             # Wait for confirmation
             receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=300)
+            
+            # Log deployment audit
+            if self.db:
+                try:
+                    audit = DeploymentAudit(
+                        deployment_id=uuid.UUID(workflow_id) if workflow_id else uuid.uuid4(),
+                        user_wallet=input_data.get("wallet_address", account.address),
+                        server_wallet=account.address,
+                        deployment_method="server-wallet",
+                        network=network,
+                        payment_tx_hash=input_data.get("payment_tx_hash"),
+                        deployment_tx_hash=tx_hash.hex(),
+                        contract_address=receipt["contractAddress"],
+                        gas_used=str(receipt["gasUsed"]),
+                        gas_paid_by_server=str(receipt["gasUsed"] * receipt.get("effectiveGasPrice", w3.eth.gas_price)),
+                        gas_price_gwei=str(w3.from_wei(receipt.get("effectiveGasPrice", w3.eth.gas_price), "gwei")),
+                    )
+                    self.db.add(audit)
+                    await self.db.commit()
+                    logger.info(f"Deployment audit logged: {audit.id}")
+                except Exception as e:
+                    logger.error(f"Failed to log deployment audit: {e}")
+                    await self.db.rollback()
 
             # EigenDA integration (for Mantle)
             eigenda_commitment = None

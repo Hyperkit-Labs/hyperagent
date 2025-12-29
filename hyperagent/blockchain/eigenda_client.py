@@ -33,6 +33,10 @@ class EigenDAClient:
     Documentation: https://docs.eigencloud.xyz/products/eigenda/api/disperser-v1-API/overview
     """
 
+    MIN_BLOB_SIZE = 128 * 1024
+    MAX_BLOB_SIZE = 16 * 1024 * 1024
+    ALIGNMENT_BYTES = 32
+
     def __init__(
         self,
         disperser_url: Optional[str] = None,
@@ -49,14 +53,12 @@ class EigenDAClient:
             private_key: Ethereum private key for authenticated requests
             use_authenticated: Use authenticated endpoint (production) or unauthenticated (testing)
         """
-        # Default to mainnet disperser
         self.disperser_url = (disperser_url or "https://disperser.eigenda.xyz").rstrip("/")
         self.private_key = private_key
         self.use_authenticated = use_authenticated
-        self._submitted_blobs: Dict[str, Dict] = {}  # Track submitted blobs by data_hash
-        self._pending_requests: Dict[str, str] = {}  # Track pending request IDs
+        self._submitted_blobs: Dict[str, Dict] = {}
+        self._pending_requests: Dict[str, str] = {}
 
-        # Initialize account if private key provided
         if self.private_key:
             try:
                 self.account = Account.from_key(private_key)
@@ -70,29 +72,61 @@ class EigenDAClient:
             self.account = None
             self.account_id = None
 
+    def _validate_blob_size(self, data: bytes) -> bytes:
+        """
+        Validate and pad blob to meet EigenDA requirements
+
+        Requirements:
+        - Minimum: 128 KiB (131,072 bytes)
+        - Maximum: 16 MiB (16,777,216 bytes)
+        - Alignment: Must be multiple of 32 bytes (BN254 field element)
+
+        Args:
+            data: Raw blob data
+
+        Returns:
+            Validated and padded blob data
+
+        Raises:
+            EigenDAError: If blob exceeds maximum size
+        """
+        size = len(data)
+
+        if size > self.MAX_BLOB_SIZE:
+            raise EigenDAError(
+                f"Blob size {size} bytes exceeds maximum {self.MAX_BLOB_SIZE} bytes (16 MiB)"
+            )
+
+        if size < self.MIN_BLOB_SIZE:
+            padding_needed = self.MIN_BLOB_SIZE - size
+            data = data + b'\x00' * padding_needed
+            logger.info(f"Padded blob from {size} to {self.MIN_BLOB_SIZE} bytes (minimum requirement)")
+
+        if len(data) % self.ALIGNMENT_BYTES != 0:
+            padding_needed = self.ALIGNMENT_BYTES - (len(data) % self.ALIGNMENT_BYTES)
+            data = data + b'\x00' * padding_needed
+            logger.debug(f"Added {padding_needed} bytes for 32-byte alignment (BN254 compatibility)")
+
+        return data
+
     def _validate_blob_serialization(self, data: bytes) -> bool:
         """
-        Validate blob serialization requirements
+        Validate blob serialization requirements (deprecated, use _validate_blob_size)
 
         Concept: Each 32-byte segment must be compatible with BN254 field element
         Logic: Check that data length is multiple of 32 bytes
         Requirements: https://docs.eigencloud.xyz/products/eigenda/api/disperser-v1-API/blob-serialization-requirements
         """
-        # Blob must be multiple of 32 bytes for BN254 field element compatibility
         if len(data) % 32 != 0:
             logger.warning(
                 f"Blob size {len(data)} not multiple of 32 bytes, padding may be required"
             )
             return False
 
-        # Check size limits (from EigenDA docs - mainnet)
-        min_size = 128 * 1024  # 128 KiB minimum
-        max_size = 16 * 1024 * 1024  # 16 MiB maximum
-
-        if len(data) < min_size:
-            raise EigenDAError(f"Blob too small: {len(data)} bytes (minimum: {min_size} bytes)")
-        if len(data) > max_size:
-            raise EigenDAError(f"Blob too large: {len(data)} bytes (maximum: {max_size} bytes)")
+        if len(data) < self.MIN_BLOB_SIZE:
+            raise EigenDAError(f"Blob too small: {len(data)} bytes (minimum: {self.MIN_BLOB_SIZE} bytes)")
+        if len(data) > self.MAX_BLOB_SIZE:
+            raise EigenDAError(f"Blob too large: {len(data)} bytes (maximum: {self.MAX_BLOB_SIZE} bytes)")
 
         return True
 
@@ -103,7 +137,6 @@ class EigenDAClient:
         Concept: Ensure blob meets serialization requirements
         Logic: Pad to multiple of 32 bytes if necessary
         """
-        # Pad to multiple of 32 bytes
         remainder = len(data) % 32
         if remainder != 0:
             padding = 32 - remainder
@@ -167,8 +200,7 @@ class EigenDAClient:
                 "request_id": "..."
             }
         """
-        # Prepare blob
-        prepared_data = self._prepare_blob(data)
+        prepared_data = self._validate_blob_size(data)
         data_hash = hashlib.sha256(prepared_data).hexdigest()
 
         # Check if already submitted

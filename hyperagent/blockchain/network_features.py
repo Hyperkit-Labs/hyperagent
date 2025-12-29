@@ -140,14 +140,31 @@ class NetworkFeatureManager:
 
     @staticmethod
     async def get_network_config_async(network: str) -> Dict[str, Any]:
-        """Get network config from hyperionkit (async) with fallback"""
-        client = NetworkFeatureManager._get_hyperionkit_client()
-        if client:
+        """
+        Get network config from NetworkRegistry (async) with fallback
+        
+        Priority:
+        1. NetworkRegistry (uses HyperionKit API if available)
+        2. Hardcoded NETWORK_FEATURES
+        """
+        try:
+            from hyperagent.blockchain.network_registry import NetworkRegistry
+            from hyperagent.cache.redis_manager import RedisManager
+            from hyperagent.core.config import settings
+            
+            # Initialize registry with Redis if available
+            redis_manager = None
+            if settings.redis_url:
             try:
-                return await client.get_network_config(network)
+                    redis_manager = RedisManager(settings.redis_url)
+                except Exception:
+                    pass
+            
+            registry = NetworkRegistry(redis_manager=redis_manager)
+            return await registry.get_network(network)
             except Exception as e:
-                logger.warning(f"Failed to load from hyperionkit: {e} - using fallback")
-
+            logger.warning(f"NetworkRegistry unavailable: {e} - using fallback")
+            # Fallback to hardcoded configs
         return NetworkFeatureManager.get_network_config(network)
 
     @staticmethod

@@ -4,6 +4,7 @@ import express, { Request, Response } from "express";
 import cors from "cors";
 import { settlePayment } from "thirdweb/x402";
 import { thirdwebFacilitator, getChain } from "./facilitator";
+import { PaymasterService } from "./paymaster";
 
 const app = express();
 // Default to 3002 to match X402_SERVICE_URL in env.example
@@ -12,6 +13,8 @@ const PORT = process.env.PORT || 3002;
 
 app.use(cors());
 app.use(express.json());
+
+const paymasterService = new PaymasterService();
 
 app.get("/health", (req: Request, res: Response) => {
   res.json({ status: "healthy", service: "x402-verifier" });

@@ -1,13 +1,14 @@
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from hyperagent.billing.cost_estimator import CostEstimator
 from hyperagent.core.config import settings
 from hyperagent.models.payment_history import PaymentHistory
 from hyperagent.models.spending_control import SpendingControl
@@ -89,6 +90,7 @@ class X402Middleware:
     def __init__(self):
         self.enabled = settings.x402_enabled
         self.price_tiers = load_price_tiers()
+        self.cost_estimator = CostEstimator()
 
     async def check_spending_controls(
         self,
@@ -212,12 +214,40 @@ class X402Middleware:
         db: Optional[AsyncSession] = None,
         wallet_address: Optional[str] = None,
         merchant: Optional[str] = None,
+        prompt_length: Optional[int] = None,
+        model: Optional[str] = None,
+        contract_size: Optional[int] = None,
+        operation_type: str = "generation",
+        selected_tasks: Optional[List[str]] = None,
+        cost_breakdown: Optional[Dict[str, Any]] = None,
     ) -> Optional[JSONResponse]:
         if not self.enabled:
             return None
 
-        if price_usdc is None:
-            price_usdc = self.price_tiers.get(price_tier, 0.05)
+        # If cost_breakdown is provided, use it (task-based pricing)
+        if cost_breakdown and "total_usdc" in cost_breakdown:
+            price_usdc = cost_breakdown["total_usdc"]
+            logger.info(
+                f"Using task-based pricing: ${price_usdc:.4f} for tasks {selected_tasks or []}"
+            )
+        elif price_usdc is None:
+            if operation_type == "generation" and prompt_length and model:
+                price_usdc = self.cost_estimator.estimate_generation_cost(
+                    prompt_length=prompt_length,
+                    model=model,
+                    chain=network or "avalanche_fuji"
+                )
+                logger.info(f"Dynamic pricing: ${price_usdc:.4f} for {model} on {network} ({prompt_length} chars)")
+            elif operation_type == "deployment" and contract_size:
+                price_usdc = self.cost_estimator.estimate_deployment_cost(
+                    contract_size=contract_size,
+                    chain=network or "avalanche_fuji",
+                    use_gasless=True
+                )
+                logger.info(f"Dynamic pricing: ${price_usdc:.4f} for deployment ({contract_size} bytes)")
+            else:
+                price_usdc = self.price_tiers.get(price_tier, 0.05)
+                logger.info(f"Fixed tier pricing: ${price_usdc:.4f} (tier: {price_tier})")
 
         network = network or "avalanche_fuji"
 
@@ -253,6 +283,14 @@ class X402Middleware:
             transaction_hash = result.get("transactionHash")
             # Always try to log payment if we have wallet_address and db
             if wallet_address:
+                # Store task breakdown in payment metadata if available
+                payment_metadata = None
+                if cost_breakdown:
+                    payment_metadata = json.dumps({
+                        "selected_tasks": selected_tasks,
+                        "cost_breakdown": cost_breakdown,
+                    })
+                
                 await self.log_payment(
                     db=db,
                     wallet_address=wallet_address,
@@ -262,6 +300,21 @@ class X402Middleware:
                     transaction_hash=transaction_hash,
                     merchant=merchant,
                 )
+                
+                # Store breakdown in payment history if metadata field exists
+                if payment_metadata and db:
+                    try:
+                        from hyperagent.models.payment_history import PaymentHistory
+                        stmt = select(PaymentHistory).where(
+                            PaymentHistory.transaction_hash == transaction_hash
+                        ).order_by(PaymentHistory.timestamp.desc()).limit(1)
+                        result = await db.execute(stmt)
+                        payment = result.scalar_one_or_none()
+                        if payment and hasattr(payment, 'metadata'):
+                            payment.metadata = payment_metadata
+                            await db.flush()
+                    except Exception as e:
+                        logger.warning(f"Failed to store payment metadata: {e}")
             else:
                 logger.warning(
                     f"Payment verified but not logged: wallet_address missing. endpoint={endpoint}, amount={price_usdc}"
@@ -278,20 +331,49 @@ class X402Middleware:
             # in the response body or headers
             if isinstance(response_body, str):
                 # JWT token string - return as JSON with the token
-                response = JSONResponse(
-                    status_code=402,
-                    content={"x402_token": response_body, "error": "Payment Required"},
-                )
+                # Note: In x402 v2, payment requirements are typically in dict format, not JWT strings
+                # But we handle both for backward compatibility
+                content = {
+                        "x402Version": 2,
+                        "x402_token": response_body,
+                        "error": "Payment Required"
+                }
+                # Add task breakdown if available
+                if cost_breakdown:
+                    content["cost_breakdown"] = cost_breakdown
+                if selected_tasks:
+                    content["selected_tasks"] = selected_tasks
+                response = JSONResponse(status_code=402, content=content)
             elif isinstance(response_body, dict):
-                # Already a dict - return as-is
+                # Already a dict (should be x402 v2 PaymentRequired format from settlePayment)
+                # Add task breakdown to response if available
+                if cost_breakdown:
+                    response_body["cost_breakdown"] = cost_breakdown
+                if selected_tasks:
+                    response_body["selected_tasks"] = selected_tasks
                 response = JSONResponse(status_code=402, content=response_body)
             else:
-                # Fallback
-                response = JSONResponse(status_code=402, content={"error": "Payment Required"})
+                # Fallback - use x402 v2 format
+                content = {
+                        "x402Version": 2,
+                        "error": "Payment Required"
+                    }
+                # Add task breakdown if available
+                if cost_breakdown:
+                    content["cost_breakdown"] = cost_breakdown
+                if selected_tasks:
+                    content["selected_tasks"] = selected_tasks
+                response = JSONResponse(status_code=402, content=content)
 
             # Set response headers from settlePayment result
             for key, value in response_headers.items():
                 response.headers[key] = str(value)
+            
+            # Add task breakdown to headers for frontend parsing
+            if cost_breakdown:
+                response.headers["X-Cost-Breakdown"] = json.dumps(cost_breakdown)
+            if selected_tasks:
+                response.headers["X-Selected-Tasks"] = ",".join(selected_tasks)
 
             return response
 
@@ -313,11 +395,12 @@ class X402Middleware:
             logger.error(f"Payment verification failed (status {status_code}): {error_message}")
 
         # For 502/504 errors, return appropriate status code
+        # Updated to x402 v2 to match thirdweb SDK 5.114.1+ expectations
         if status_code in [502, 503, 504]:
             return JSONResponse(
                 status_code=status_code,
                 content={
-                    "x402Version": 1,
+                    "x402Version": 2,
                     "error": "Settlement error",
                     "errorMessage": error_message,
                 },
@@ -326,7 +409,7 @@ class X402Middleware:
         return JSONResponse(
             status_code=status_code,
             content={
-                "x402Version": 1,
+                "x402Version": 2,
                 "error": "Payment verification failed",
                 "errorMessage": error_message,
             },

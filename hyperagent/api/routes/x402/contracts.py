@@ -3,7 +3,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from hyperagent.api.middleware.x402 import X402Middleware
 from hyperagent.api.models import ContractGenerationRequest, ContractGenerationResponse
-from hyperagent.api.routes.contracts import _generate_contract_internal
+# Import from contracts.py file directly (avoiding directory/package conflict)
+# Use importlib to load the .py file directly
+import importlib.util
+import sys
+from pathlib import Path
+
+contracts_file_path = Path(__file__).parent.parent / "contracts.py"
+spec = importlib.util.spec_from_file_location("contracts_routes", contracts_file_path)
+contracts_routes = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(contracts_routes)
+_generate_contract_internal = contracts_routes._generate_contract_internal
 from hyperagent.db.session import get_db
 
 router = APIRouter(prefix="/api/v1/x402/contracts", tags=["x402-contracts"])

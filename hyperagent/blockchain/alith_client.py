@@ -16,21 +16,12 @@ class AlithError(Exception):
 
 
 class AlithClient:
-    """
-    Alith SDK Client
-
-    Concept: Wrapper for Alith SDK integration
-    Logic: Provides interface to Alith agent framework
-    Usage: Initialize agents, execute AI operations
-    Benefits: Decentralized AI, optional TEE support, high-performance inference
-
+    """Wrapper for Alith SDK integration providing interface to agent framework
+    
     Documentation: https://alith.lazai.network/docs/get-started
     Installation: pip install alith -U
-
-    Note:
-    - Alith SDK does not require an API key
-    - TEE (Trusted Execution Environment) is optional and provides secure execution
-      for sensitive operations but is not required for basic agent functionality
+    
+    Note: Alith SDK does not require an API key. TEE is optional.
     """
 
     def __init__(self):

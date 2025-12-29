@@ -26,6 +26,21 @@ class WorkflowCreateRequest(BaseModel):
     signed_transaction: Optional[str] = Field(
         None, description="Pre-signed deployment transaction (optional, can be provided later)"
     )
+    # Task selection (new modular approach)
+    selected_tasks: Optional[List[str]] = Field(
+        default=["generation", "audit", "testing", "deployment"],
+        description="List of tasks to execute: generation, audit, testing, deployment"
+    )
+    # Backward compatibility fields (deprecated - use selected_tasks instead)
+    skip_audit: Optional[bool] = Field(
+        None, description="Skip audit (deprecated, use selected_tasks instead)"
+    )
+    skip_testing: Optional[bool] = Field(
+        None, description="Skip testing (deprecated, use selected_tasks instead)"
+    )
+    skip_deployment: Optional[bool] = Field(
+        None, description="Skip deployment (deprecated, use selected_tasks instead)"
+    )
 
     @field_validator("nlp_input")
     @classmethod
@@ -213,6 +228,38 @@ class DeploymentResponse(BaseModel):
     eigenda_commitment: Optional[str] = None
 
 
+class UserOpDeploymentPrepareRequest(BaseModel):
+    """Request model for preparing ERC-4337 UserOperation deployment"""
+    
+    user_smart_account: str = Field(..., description="User's Smart Account address")
+    compiled_contract: Dict[str, Any] = Field(..., description="Compiled contract with bytecode and ABI")
+    network: str = Field(..., description="Target blockchain network")
+    wallet_address: str = Field(..., description="User's wallet address for payment verification")
+    
+    @field_validator("user_smart_account")
+    @classmethod
+    def validate_smart_account(cls, v: str) -> str:
+        """Validate Smart Account address format"""
+        if not re.match(r"^0x[a-fA-F0-9]{40}$", v):
+            raise ValueError("Invalid Smart Account address format")
+        return v
+
+
+class UserOpDeploymentPrepareResponse(BaseModel):
+    """Response model for prepared UserOperation"""
+    
+    userOp: Dict[str, Any] = Field(..., description="UserOperation ready for signing")
+    paymasterData: Dict[str, Any] = Field(..., description="Paymaster sponsorship data")
+    estimatedGas: str = Field(..., description="Estimated total gas for operation")
+
+
+class UserOpDeploymentSubmitRequest(BaseModel):
+    """Request model for submitting signed UserOperation"""
+    
+    signed_user_op: Dict[str, Any] = Field(..., description="User-signed UserOperation")
+    network: str = Field(..., description="Target blockchain network")
+
+
 class BatchDeploymentContract(BaseModel):
     """Single contract in batch deployment"""
 
@@ -253,3 +300,66 @@ class BatchDeploymentResponse(BaseModel):
     success_count: int
     failed_count: int
     batches_deployed: int
+
+
+class WorkflowCostEstimateRequest(BaseModel):
+    """Request model for estimating workflow cost"""
+
+    selected_tasks: List[str] = Field(
+        ..., description="List of tasks to estimate: generation, audit, testing, deployment"
+    )
+    network: str = Field(..., description="Target blockchain network")
+    model: Optional[str] = Field(
+        "gemini-2.5-flash", description="LLM model for generation (only affects generation cost)"
+    )
+    contract_complexity: Optional[str] = Field(
+        "standard", description="Contract complexity: simple, standard, complex"
+    )
+    prompt_length: Optional[int] = Field(
+        None, description="Length of prompt in characters (for accurate generation cost)"
+    )
+    contract_lines: Optional[int] = Field(
+        None, description="Number of contract lines (for accurate audit/testing cost)"
+    )
+    contract_size: Optional[int] = Field(
+        None, description="Size of contract in bytes (for accurate deployment cost)"
+    )
+
+    @field_validator("selected_tasks")
+    @classmethod
+    def validate_selected_tasks(cls, v: List[str]) -> List[str]:
+        """Validate selected tasks"""
+        valid_tasks = ["generation", "audit", "testing", "deployment"]
+        normalized = [task.lower() for task in v]
+        invalid = [task for task in normalized if task not in valid_tasks]
+        if invalid:
+            raise ValueError(
+                f"Invalid tasks: {invalid}. Valid tasks are: {', '.join(valid_tasks)}"
+            )
+        if not normalized:
+            raise ValueError("At least one task must be selected")
+        return normalized
+
+    @field_validator("contract_complexity")
+    @classmethod
+    def validate_complexity(cls, v: str) -> str:
+        """Validate contract complexity"""
+        valid = ["simple", "standard", "complex"]
+        if v.lower() not in valid:
+            raise ValueError(f"Invalid complexity: {v}. Valid options: {', '.join(valid)}")
+        return v.lower()
+
+
+class TaskCostBreakdownResponse(BaseModel):
+    """Response model for task cost breakdown"""
+
+    total_usdc: float = Field(..., description="Total cost in USDC")
+    breakdown: Dict[str, Dict[str, float]] = Field(
+        ...,
+        description="Cost breakdown per task: {task: {base, multiplier, final}}"
+    )
+    network_multiplier: float = Field(..., description="Network cost multiplier")
+    model_multiplier: float = Field(..., description="Model cost multiplier (1.0 if no generation)")
+    complexity_multiplier: float = Field(..., description="Complexity cost multiplier")
+    selected_tasks: List[str] = Field(..., description="List of selected tasks")
+    network: str = Field(..., description="Target network")

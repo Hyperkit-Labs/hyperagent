@@ -42,9 +42,27 @@ def run_interactive_prompts():
 
     description = "\n".join(description_lines)
 
+    # Wallet address (required)
+    console.print(f"\n{CLIStyle.PROGRESS} Wallet Address:")
+    console.print(f"{CLIStyle.INFO} (Required for all workflows - format: 0x followed by 40 hex characters)")
+    wallet_address = click.prompt("Wallet Address", type=str)
+    
+    # Validate wallet address format
+    if not wallet_address.startswith("0x") or len(wallet_address) != 42:
+        raise click.ClickException(
+            f"Invalid wallet address format. Expected 0x followed by 40 hexadecimal characters, got {len(wallet_address)} characters"
+        )
+
     # Network selection with feature preview
     console.print(f"\n{CLIStyle.PROGRESS} Select Network:")
-    networks = ["hyperion_testnet", "hyperion_mainnet", "mantle_testnet", "mantle_mainnet"]
+    networks = [
+        "hyperion_testnet",
+        "hyperion_mainnet",
+        "mantle_testnet",
+        "mantle_mainnet",
+        "avalanche_fuji",
+        "avalanche_mainnet",
+    ]
     for i, net in enumerate(networks, 1):
         features = get_network_features_preview(net)
         console.print(f"  {i}. {net} ({features})")
@@ -72,6 +90,7 @@ def run_interactive_prompts():
         description,
         network,
         contract_type,
+        wallet_address,
         {
             "skip_audit": skip_audit,
             "skip_deployment": skip_deploy,

@@ -7,6 +7,8 @@ import { WorkflowForm } from '@/components/workflows/WorkflowForm';
 import { createWorkflow, handleApiError } from '@/lib/api';
 import { createFetchWithPayment, isThirdwebConfigured } from '@/lib/thirdwebClient';
 import { Card } from '@/components/ui/Card';
+import { handleX402FetchError, parseX402ErrorResponse, handleX402ResponseError, parseResponseData, CONTRACT_PRICE, WORKFLOW_PRICE } from '@/lib/x402ErrorHandler';
+import type { TaskCostBreakdown } from '@/components/workflows/TaskSelector';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -22,6 +24,7 @@ export default function CreateWorkflowPage() {
   const account = useActiveAccount();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [costBreakdown, setCostBreakdown] = useState<TaskCostBreakdown | null>(null);
 
   const handleSubmit = async (data: any) => {
     setLoading(true);
@@ -42,76 +45,89 @@ export default function CreateWorkflowPage() {
         }
 
         // For x402 networks, we need to:
-        // 1. First generate the contract with payment
-        // 2. Then create workflow from contract with payment
+        const fetchWithPayment = createFetchWithPayment(wallet, CONTRACT_PRICE);
         
-        // Step 1: Generate contract with x402 payment
-        const contractPrice = BigInt(10000); // $0.01 USDC
-        const fetchWithPayment = createFetchWithPayment(wallet, contractPrice);
-        
-        const contractResponse = await fetchWithPayment(
-          `${API_BASE_URL}/x402/contracts/generate`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-wallet-address': account.address,
-            },
-            body: JSON.stringify({
-              nlp_description: data.nlp_input,
-              contract_type: data.contract_type,
-              network: data.network,
-            }),
-          }
-        );
+        let contractResponse: Response;
+        try {
+          contractResponse = await fetchWithPayment(
+            `${API_BASE_URL}/x402/contracts/generate`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-wallet-address': account.address,
+              },
+              body: JSON.stringify({
+                nlp_description: data.nlp_input,
+                contract_type: data.contract_type,
+                network: data.network,
+              }),
+            }
+          );
+        } catch (fetchError) {
+          handleX402FetchError(fetchError);
+        }
 
         if (!contractResponse.ok) {
           if (contractResponse.status === 402) {
-            throw new Error('Payment required. Please approve the transaction in your wallet.');
+            const errorData = await parseX402ErrorResponse(contractResponse);
+            handleX402ResponseError(contractResponse, errorData);
           }
           const errorData = await contractResponse.json().catch(() => ({}));
-          throw new Error(errorData.error || errorData.message || `Contract generation failed: ${contractResponse.statusText}`);
+          throw new Error((errorData as any).error || (errorData as any).message || `Contract generation failed: ${contractResponse.statusText}`);
         }
 
-        const contractData = await contractResponse.json();
+        const contractData = await parseResponseData(contractResponse);
 
-        // Step 2: Create workflow from contract with x402 payment
-        const workflowPrice = BigInt(100000); // $0.10 USDC
+        // Use cost breakdown if available, otherwise fallback to WORKFLOW_PRICE
+        const workflowPrice = data.cost_breakdown?.total_usdc || WORKFLOW_PRICE;
         const fetchWorkflowWithPayment = createFetchWithPayment(wallet, workflowPrice);
 
-        const workflowResponse = await fetchWorkflowWithPayment(
-          `${API_BASE_URL}/x402/workflows/create-from-contract`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-wallet-address': account.address,
-            },
-            body: JSON.stringify({
-              contract_code: contractData.contract_code,
-              contract_type: contractData.contract_type,
-              network: data.network,
-              constructor_args: contractData.constructor_args || [],
-              wallet_address: account.address,
-              use_gasless: data.use_gasless || false,
-              name: data.name,
-            }),
-          }
-        );
+        let workflowResponse: Response;
+        try {
+          workflowResponse = await fetchWorkflowWithPayment(
+            `${API_BASE_URL}/x402/workflows/create-from-contract`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-wallet-address': account.address,
+              },
+              body: JSON.stringify({
+                contract_code: contractData.contract_code,
+                contract_type: contractData.contract_type,
+                network: data.network,
+                constructor_args: contractData.constructor_args || [],
+                wallet_address: account.address,
+                use_gasless: data.use_gasless || false,
+                name: data.name,
+                selected_tasks: data.selected_tasks || ['compilation', 'audit', 'testing', 'deployment'],
+              }),
+            }
+          );
+        } catch (fetchError) {
+          handleX402FetchError(fetchError);
+        }
 
         if (!workflowResponse.ok) {
           if (workflowResponse.status === 402) {
-            throw new Error('Payment required for workflow creation. Please approve the transaction in your wallet.');
+            const errorData = await parseX402ErrorResponse(workflowResponse);
+            handleX402ResponseError(workflowResponse, errorData);
           }
           const errorData = await workflowResponse.json().catch(() => ({}));
-          throw new Error(errorData.error || errorData.message || `Workflow creation failed: ${workflowResponse.statusText}`);
+          throw new Error((errorData as any).error || (errorData as any).message || `Workflow creation failed: ${workflowResponse.statusText}`);
         }
 
-        const workflowData = await workflowResponse.json();
+        const workflowData = await parseResponseData(workflowResponse);
         router.push(`/workflows/${workflowData.workflow_id}`);
       } else {
         // Use regular workflow creation for non-x402 networks
-        const response = await createWorkflow(data);
+        // Include selected_tasks in request
+        const workflowData = {
+          ...data,
+          selected_tasks: data.selected_tasks || ['generation', 'audit', 'testing', 'deployment'],
+        };
+        const response = await createWorkflow(workflowData);
         router.push(`/workflows/${response.workflow_id}`);
       }
     } catch (err: any) {
@@ -147,7 +163,11 @@ export default function CreateWorkflowPage() {
         </Card>
       )}
 
-      <WorkflowForm onSubmit={handleSubmit} loading={loading} />
+      <WorkflowForm 
+        onSubmit={handleSubmit} 
+        loading={loading}
+        onCostUpdate={(cost) => setCostBreakdown(cost)}
+      />
     </div>
   );
 }

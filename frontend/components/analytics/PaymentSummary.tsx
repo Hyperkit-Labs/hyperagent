@@ -18,6 +18,12 @@ import { Card } from '@/components/ui/Card';
 import { DollarSign, Calendar, History, TrendingUp } from 'lucide-react';
 
 export function PaymentSummary({ summary }: PaymentSummaryProps) {
+  // Safely handle undefined or null values
+  const dailyTotal = summary?.daily_total ?? 0;
+  const monthlyTotal = summary?.monthly_total ?? 0;
+  const transactionCount = summary?.transaction_count ?? 0;
+  const averageAmount = summary?.average_amount ?? 0;
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       <Card hover>
@@ -26,7 +32,7 @@ export function PaymentSummary({ summary }: PaymentSummaryProps) {
             <DollarSign className="w-4 h-4" />
             <span className="text-sm font-semibold">Daily Total</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">${summary.daily_total.toFixed(2)}</p>
+          <p className="text-2xl font-bold text-gray-900">${dailyTotal.toFixed(2)}</p>
         </div>
       </Card>
       
@@ -36,7 +42,7 @@ export function PaymentSummary({ summary }: PaymentSummaryProps) {
             <Calendar className="w-4 h-4" />
             <span className="text-sm font-semibold">Monthly Total</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">${summary.monthly_total.toFixed(2)}</p>
+          <p className="text-2xl font-bold text-gray-900">${monthlyTotal.toFixed(2)}</p>
         </div>
       </Card>
       
@@ -46,7 +52,7 @@ export function PaymentSummary({ summary }: PaymentSummaryProps) {
             <History className="w-4 h-4" />
             <span className="text-sm font-semibold">Transactions</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{summary.transaction_count}</p>
+          <p className="text-2xl font-bold text-gray-900">{transactionCount}</p>
         </div>
       </Card>
       
@@ -56,7 +62,7 @@ export function PaymentSummary({ summary }: PaymentSummaryProps) {
             <TrendingUp className="w-4 h-4" />
             <span className="text-sm font-semibold">Average Amount</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">${summary.average_amount.toFixed(2)}</p>
+          <p className="text-2xl font-bold text-gray-900">${averageAmount.toFixed(2)}</p>
         </div>
       </Card>
     </div>

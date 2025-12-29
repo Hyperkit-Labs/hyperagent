@@ -155,14 +155,14 @@ class NetworkFeatureManager:
             # Initialize registry with Redis if available
             redis_manager = None
             if settings.redis_url:
-            try:
+                try:
                     redis_manager = RedisManager(settings.redis_url)
                 except Exception:
                     pass
             
             registry = NetworkRegistry(redis_manager=redis_manager)
             return await registry.get_network(network)
-            except Exception as e:
+        except Exception as e:
             logger.warning(f"NetworkRegistry unavailable: {e} - using fallback")
             # Fallback to hardcoded configs
         return NetworkFeatureManager.get_network_config(network)

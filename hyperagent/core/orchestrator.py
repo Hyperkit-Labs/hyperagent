@@ -92,9 +92,9 @@ class WorkflowCoordinator:
         
         # Fallback to static map if not found
         if stage_key is None or stage_key not in progress_ranges:
-        if stage not in STAGE_PROGRESS_MAP:
-            logger.warning(f"Unknown stage '{stage}', defaulting to planning")
-            stage = "planning"
+            if stage not in STAGE_PROGRESS_MAP:
+                logger.warning(f"Unknown stage '{stage}', defaulting to planning")
+                stage = "planning"
             start, end = STAGE_PROGRESS_MAP[stage]
         else:
             start, end = progress_ranges[stage_key]

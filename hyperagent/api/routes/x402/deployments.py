@@ -54,11 +54,11 @@ async def get_eigenda_client():
         from hyperagent.security.secrets import SecretsManager
         secrets_manager = SecretsManager()
         server_private_key = await secrets_manager.get_server_wallet_key()
-_eigenda_client = EigenDAClient(
-    disperser_url=settings.eigenda_disperser_url,
+        _eigenda_client = EigenDAClient(
+            disperser_url=settings.eigenda_disperser_url,
             private_key=server_private_key,
-    use_authenticated=settings.eigenda_use_authenticated,
-)
+            use_authenticated=settings.eigenda_use_authenticated,
+        )
     return _eigenda_client
 _deployment_service = DeploymentService(_network_manager, _alith_client, _eigenda_client)
 _erc4337_helper = ERC4337DeploymentHelper(_network_manager)

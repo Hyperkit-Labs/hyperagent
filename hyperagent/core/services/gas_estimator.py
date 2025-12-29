@@ -7,7 +7,10 @@ Provides accurate gas estimation for contract deployments and function calls
 import logging
 from typing import Dict, Any, Optional, List
 from web3 import Web3
-from web3.exceptions import ContractLogicError, ValidationError
+try:
+    from web3.exceptions import ContractLogicError, Web3ValidationError as ValidationError
+except ImportError:
+    from web3.exceptions import ContractLogicError, ValidationError
 
 from hyperagent.blockchain.networks import NetworkManager
 

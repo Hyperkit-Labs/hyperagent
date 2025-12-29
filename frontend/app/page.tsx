@@ -1,325 +1,200 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Card } from '@/components/ui/Card';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { getNetworks } from '@/lib/api';
-import { useHealth } from '@/hooks/useHealth';
+import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
-import type { Network } from '@/lib/types';
-import {
+import { 
+  Paperclip, 
+  Palette, 
+  MessageSquare, 
+  ArrowUp,
+  ChevronRight,
   Sparkles,
   Zap,
   Shield,
-  Network as NetworkIcon,
-  Rocket,
-  Code,
-  FileText,
-  Activity,
-  CheckCircle2,
-  AlertCircle,
-  Clock,
+  Activity
 } from 'lucide-react';
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-    },
-  },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-  },
-};
-
 export default function Home() {
-  const { health, loading: healthLoading } = useHealth();
-  const [networks, setNetworks] = useState<Network[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    getNetworks()
-      .then(setNetworks)
-      .catch((error) => {
-        console.error('Failed to fetch networks:', error);
-        setNetworks([]);
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  const getStatusIcon = (status?: string) => {
-    switch (status) {
-      case 'healthy':
-        return <CheckCircle2 className="w-5 h-5 text-green-500" />;
-      case 'degraded':
-        return <AlertCircle className="w-5 h-5 text-yellow-500" />;
-      default:
-        return <Clock className="w-5 h-5 text-gray-400" />;
+  const templates = [
+    {
+      title: "Ecommerce store",
+      description: "Premium design for webstore",
+      image: "https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=800&q=80",
+    },
+    {
+      title: "Architect portfolio",
+      description: "Firm website & showcase",
+      image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&q=80",
+    },
+    {
+      title: "Personal blog",
+      description: "Muted, intimate design",
+      image: "https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=800&q=80",
+    },
+    {
+      title: "Fashion blog",
+      description: "Minimal, playful design",
+      image: "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=800&q=80",
     }
-  };
-
-  const quickActions = [
-    {
-      icon: Sparkles,
-      label: 'Create Workflow',
-      href: '/workflows/create',
-      description: 'Generate smart contracts with AI',
-      gradient: 'from-blue-500 to-cyan-500',
-    },
-    {
-      icon: FileText,
-      label: 'Browse Templates',
-      href: '/templates',
-      description: 'Explore contract templates',
-      gradient: 'from-purple-500 to-pink-500',
-    },
-    {
-      icon: Activity,
-      label: 'View Workflows',
-      href: '/workflows',
-      description: 'Monitor your workflows',
-      gradient: 'from-indigo-500 to-blue-500',
-    },
-    {
-      icon: Shield,
-      label: 'Monitoring',
-      href: '/monitoring',
-      description: 'System health & metrics',
-      gradient: 'from-green-500 to-emerald-500',
-    },
   ];
 
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="space-y-8"
-    >
+    <div className="relative w-full">
       {/* Hero Section */}
-      <motion.div variants={itemVariants} className="text-center md:text-left">
-        <motion.div
-          initial={{ scale: 0.9 }}
-          animate={{ scale: 1 }}
-          transition={{ duration: 0.5 }}
-          className="inline-flex items-center gap-2 px-4 py-2 mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-full border border-blue-100"
-        >
-          <Sparkles className="w-4 h-4 text-blue-600" />
-          <span className="text-sm font-medium text-blue-700">AI-Powered Smart Contract Platform</span>
-        </motion.div>
-        
-        <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-4">
-          <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
-            HyperAgent
-          </span>
-          <br />
-          <span className="text-gray-900">Dashboard</span>
-        </h1>
-        
-        <p className="text-xl text-gray-800 max-w-2xl leading-relaxed font-medium">
-          Transform natural language into production-ready smart contracts. 
-          Generate, audit, test, and deploy across multiple blockchains with AI assistance.
-        </p>
-      </motion.div>
+      <section className="relative flex w-full flex-col items-center justify-center min-h-[85vh] overflow-hidden px-6 pt-20 pb-32">
+        {/* Vibrant Gradient Background */}
+        <div className="absolute inset-0 z-0 bg-[#fcfaef]">
+          <div 
+            className="absolute top-0 left-0 w-full h-[70vh] opacity-90 blur-[100px] animate-gradient-pulse"
+            style={{
+              background: 'radial-gradient(circle at 50% 0%, #ff2d55 0%, #ff9500 50%, #ffcc00 100%)',
+              transform: 'scale(1.5)',
+            }}
+          />
+        </div>
 
-      {/* System Health Cards */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <motion.div
-          whileHover={{ scale: 1.02, y: -4 }}
-          transition={{ type: 'spring', stiffness: 300 }}
-        >
-          <Card hover gradient className="relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-400/20 to-transparent rounded-full blur-2xl" />
-            <div className="relative space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-gray-700" />
-                  System Status
-                </h3>
-                {getStatusIcon(health?.status)}
+        <div className="relative z-10 w-full max-w-4xl flex flex-col items-center text-center">
+          {/* Top Pill Link */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Link 
+              href="/workflows/create"
+              className="flex items-center gap-2 px-4 py-1.5 mb-8 rounded-full border border-white/20 bg-white/10 backdrop-blur-md text-[13px] font-medium text-white hover:bg-white/20 transition-colors"
+            >
+              <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center">
+                <Sparkles className="w-3 h-3 text-[#ff2d55]" />
               </div>
-              {healthLoading ? (
-                <LoadingSpinner size="sm" />
-              ) : (
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`w-3 h-3 rounded-full shadow-lg animate-pulse ${
-                      health?.status === 'healthy'
-                        ? 'bg-green-500 ring-4 ring-green-200/50'
-                        : health?.status === 'degraded'
-                        ? 'bg-yellow-500 ring-4 ring-yellow-200/50'
-                        : 'bg-red-500 ring-4 ring-red-200/50'
-                    }`}
-                  />
-                  <span className="text-3xl font-bold capitalize text-gray-900">
-                    {health?.status || 'Unknown'}
-                  </span>
+              Build with AI Agent
+              <ChevronRight className="w-3 h-3 ml-1" />
+            </Link>
+          </motion.div>
+
+          {/* Headline */}
+          <motion.h1 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.5 }}
+            className="text-5xl md:text-7xl font-semibold text-white tracking-tight leading-[1.1] mb-6"
+          >
+            Build something <br /> <span className="text-white/90">HyperAgent</span>
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+            className="text-xl md:text-2xl text-white/80 max-w-2xl mb-12 font-medium"
+          >
+            Create smart contracts and workflows by chatting with AI
+          </motion.p>
+
+          {/* Action Bar / Search Input */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+            className="w-full max-w-3xl"
+          >
+            <div className="relative group bg-white/95 backdrop-blur-xl p-2 rounded-[28px] shadow-2xl ring-1 ring-black/5 flex flex-col gap-2 transition-all focus-within:ring-black/10">
+              <textarea 
+                placeholder="What would you like to build?"
+                className="w-full bg-transparent border-none resize-none px-4 pt-4 pb-2 text-[17px] focus:ring-0 placeholder:text-gray-400 min-h-[60px]"
+              />
+              
+              <div className="flex items-center gap-2 px-2 pb-2">
+                <div className="flex gap-1.5">
+                  <Button variant="ghost" size="sm" className="h-9 px-3 rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-100/80 gap-2">
+                    <Paperclip className="w-4 h-4" />
+                    <span className="hidden md:inline font-medium text-[13px]">Attach</span>
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-9 px-3 rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-100/80 gap-2">
+                    <Palette className="w-4 h-4" />
+                    <span className="hidden md:inline font-medium text-[13px]">Theme</span>
+                  </Button>
                 </div>
-              )}
-            </div>
-          </Card>
-        </motion.div>
 
-        <motion.div
-          whileHover={{ scale: 1.02, y: -4 }}
-          transition={{ type: 'spring', stiffness: 300 }}
-        >
-          <Card hover gradient className="relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-indigo-400/20 to-transparent rounded-full blur-2xl" />
-            <div className="relative space-y-3">
-              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
-                <NetworkIcon className="w-4 h-4 text-gray-700" />
-                Supported Networks
-              </h3>
-              {loading ? (
-                <LoadingSpinner size="sm" />
-              ) : (
-                <div className="flex items-center gap-3">
-                  <span className="text-3xl font-bold text-gray-900">{networks.length}</span>
-                  <span className="text-sm text-gray-700 font-medium">networks</span>
+                <div className="ml-auto flex items-center gap-2">
+                  <Button variant="ghost" size="sm" className="h-9 px-4 rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-100/80 gap-2 font-medium text-[13px]">
+                    <MessageSquare className="w-4 h-4" />
+                    Chat
+                  </Button>
+                  <Button size="icon" className="h-9 w-9 bg-gray-900 hover:bg-gray-800 text-white rounded-full">
+                    <ArrowUp className="w-5 h-5" />
+                  </Button>
                 </div>
-              )}
-            </div>
-          </Card>
-        </motion.div>
-
-        <motion.div
-          whileHover={{ scale: 1.02, y: -4 }}
-          transition={{ type: 'spring', stiffness: 300 }}
-        >
-          <Card hover gradient className="relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-400/20 to-transparent rounded-full blur-2xl" />
-            <div className="relative space-y-3">
-              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
-                <Code className="w-4 h-4 text-gray-700" />
-                Version
-              </h3>
-              <span className="text-3xl font-bold text-gray-900">{health?.version || 'N/A'}</span>
-            </div>
-          </Card>
-        </motion.div>
-      </motion.div>
-
-      {/* Quick Actions */}
-      <motion.div variants={itemVariants}>
-        <Card gradient className="relative overflow-hidden border-0 shadow-xl">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50" />
-          <div className="relative">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg">
-                <Zap className="w-5 h-5 text-white" />
               </div>
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                Quick Actions
-              </h2>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {quickActions.map((action, index) => {
-                const Icon = action.icon;
-                return (
-                  <motion.div
-                    key={action.href}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <Link href={action.href}>
-                      <div className="group relative p-6 bg-white/80 backdrop-blur-sm rounded-xl border border-gray-200/50 hover:border-blue-300 transition-all duration-300 hover:shadow-lg">
-                        <div className={`absolute inset-0 bg-gradient-to-br ${action.gradient} opacity-0 group-hover:opacity-5 rounded-xl transition-opacity`} />
-                        <div className="relative flex items-start gap-4">
-                          <div className={`p-3 bg-gradient-to-br ${action.gradient} rounded-lg shadow-lg group-hover:scale-110 transition-transform`}>
-                            <Icon className="w-6 h-6 text-white" />
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="font-bold text-lg text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">
-                              {action.label}
-                            </h3>
-                            <p className="text-sm text-gray-700 font-medium">{action.description}</p>
-                          </div>
-                          <Rocket className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
-                        </div>
-                      </div>
-                    </Link>
-                  </motion.div>
-                );
-              })}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Templates Section */}
+      <section className="max-w-[1440px] mx-auto px-6 py-24">
+        <div className="flex flex-col gap-12">
+          <div className="flex items-end justify-between">
+            <div>
+              <h2 className="text-3xl font-semibold text-gray-900 mb-2">Discover templates</h2>
+              <p className="text-lg text-gray-500">Start your next project with a template</p>
             </div>
+            <Link href="/templates" className="flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+              View all
+              <ChevronRight className="w-4 h-4" />
+            </Link>
           </div>
-        </Card>
-      </motion.div>
 
-      {/* Network Info */}
-      {networks.length > 0 && (
-        <motion.div variants={itemVariants}>
-          <Card gradient className="relative overflow-hidden border-0 shadow-xl">
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/50 via-blue-50/30 to-purple-50/50" />
-            <div className="relative">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-lg">
-                  <NetworkIcon className="w-5 h-5 text-white" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {templates.map((template, i) => (
+              <motion.div
+                key={template.title}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className="group cursor-pointer"
+              >
+                <div className="relative aspect-video rounded-2xl overflow-hidden mb-4 bg-gray-100 ring-1 ring-black/5">
+                  <img 
+                    src={template.image} 
+                    alt={template.title}
+                    className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
                 </div>
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                  Supported Networks
-                </h2>
+                <h3 className="text-[15px] font-semibold text-gray-900 mb-0.5">{template.title}</h3>
+                <p className="text-[13px] text-gray-500">{template.description}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Subtle Platform Features */}
+      <section className="bg-gray-50/50 py-24">
+        <div className="max-w-[1440px] mx-auto px-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
+            {[
+              { icon: Zap, label: "Fast Deployment", desc: "One-click deployment to multiple chains" },
+              { icon: Shield, label: "Security Audit", desc: "Automated AI-driven vulnerability detection" },
+              { icon: Activity, label: "Monitoring", desc: "Real-time health and performance metrics" },
+              { icon: Sparkles, label: "AI Reasoning", desc: "Advanced ROMA planner for complex tasks" },
+            ].map((feature) => (
+              <div key={feature.label} className="flex flex-col gap-4">
+                <div className="w-10 h-10 bg-white rounded-xl shadow-sm ring-1 ring-black/5 flex items-center justify-center">
+                  <feature.icon className="w-5 h-5 text-gray-600" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-1">{feature.label}</h4>
+                  <p className="text-sm text-gray-500 leading-relaxed">{feature.desc}</p>
+                </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {networks.map((network, index) => (
-                  <motion.div
-                    key={network.network}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: index * 0.05 }}
-                    whileHover={{ scale: 1.02, y: -4 }}
-                    className={`group relative p-5 rounded-xl border transition-all duration-300 ${
-                      network.status === 'coming_soon'
-                        ? 'border-gray-300 bg-gray-50/50 opacity-75'
-                        : 'border-gray-200/50 bg-white/80 backdrop-blur-sm hover:border-indigo-300 hover:shadow-lg'
-                    }`}
-                  >
-                    {network.status !== 'coming_soon' && (
-                      <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 rounded-xl transition-opacity" />
-                    )}
-                    <div className="relative">
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-bold text-lg text-gray-900 group-hover:text-indigo-600 transition-colors">
-                          {network.network.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
-                        </h3>
-                        {network.status === 'coming_soon' ? (
-                          <span className="px-3 py-1 text-xs font-semibold bg-yellow-100 text-yellow-800 rounded-full border border-yellow-200">
-                            Coming Soon
-                          </span>
-                        ) : (
-                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                        )}
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="font-semibold text-gray-800">Chain ID:</span>
-                          <span className="text-gray-700 font-mono font-semibold">{network.chain_id || 'N/A'}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="font-semibold text-gray-800">Currency:</span>
-                          <span className="text-gray-700 font-semibold">{network.currency || 'N/A'}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </Card>
-        </motion.div>
-      )}
-    </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }

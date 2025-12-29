@@ -6,36 +6,37 @@ import { motion } from 'framer-motion';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'outline' | 'ghost' | 'gradient';
-  size?: 'sm' | 'md' | 'lg';
-  children: ReactNode;
-  loading?: boolean;
-}
-
-export function Button({
-  variant = 'primary',
-  size = 'md',
-  className,
-  children,
-  disabled,
-  loading = false,
-  ...props
-}: ButtonProps) {
-  const baseStyles = 'inline-flex items-center justify-center rounded-xl font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none disabled:cursor-not-allowed relative overflow-hidden';
+    size?: 'sm' | 'md' | 'lg' | 'icon';
+    children: ReactNode;
+    loading?: boolean;
+  }
   
-  const variants = {
-    primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 shadow-lg hover:shadow-xl active:scale-95',
-    secondary: 'bg-gray-100 text-gray-900 hover:bg-gray-200 focus:ring-gray-500 shadow-sm hover:shadow-md',
-    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 shadow-lg hover:shadow-xl active:scale-95',
-    outline: 'border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 focus:ring-gray-500 bg-white',
-    ghost: 'text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
-    gradient: 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 focus:ring-blue-500 shadow-lg hover:shadow-xl active:scale-95',
-  };
-
-  const sizes = {
-    sm: 'px-4 py-2 text-sm',
-    md: 'px-5 py-2.5 text-base',
-    lg: 'px-6 py-3 text-lg',
-  };
+  export function Button({
+    variant = 'primary',
+    size = 'md',
+    className,
+    children,
+    disabled,
+    loading = false,
+    ...props
+  }: ButtonProps) {
+    const baseStyles = 'inline-flex items-center justify-center rounded-xl font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none disabled:cursor-not-allowed relative overflow-hidden';
+    
+    const variants = {
+      primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 shadow-lg hover:shadow-xl active:scale-95',
+      secondary: 'bg-gray-100 text-gray-900 hover:bg-gray-200 focus:ring-gray-500 shadow-sm hover:shadow-md',
+      danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 shadow-lg hover:shadow-xl active:scale-95',
+      outline: 'border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 focus:ring-gray-500 bg-white',
+      ghost: 'text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
+      gradient: 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 focus:ring-blue-500 shadow-lg hover:shadow-xl active:scale-95',
+    };
+  
+    const sizes = {
+      sm: 'px-4 py-2 text-sm',
+      md: 'px-5 py-2.5 text-base',
+      lg: 'px-6 py-3 text-lg',
+      icon: 'h-10 w-10 p-0',
+    };
 
   return (
     <motion.button

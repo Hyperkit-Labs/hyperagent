@@ -27,17 +27,17 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen bg-gradient-to-br from-white via-blue-50/20 to-indigo-50/10`}
-      >
-        <ThirdwebProviderWrapper>
-          <Header />
-          <main className="flex-1 max-w-[1920px] mx-auto w-full px-6 sm:px-8 lg:px-12 py-10">
-            {children}
-          </main>
-          <Footer />
-        </ThirdwebProviderWrapper>
-      </body>
+        <body
+          className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen bg-background text-foreground`}
+        >
+          <ThirdwebProviderWrapper>
+            <Header />
+            <main className="flex-1 w-full">
+              {children}
+            </main>
+            <Footer />
+          </ThirdwebProviderWrapper>
+        </body>
     </html>
   );
 }

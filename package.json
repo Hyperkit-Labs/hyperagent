@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "AI Agent Platform for On-Chain Smart Contract Generation",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "commit": "node scripts/version/parallel-commit.js",
     "commit:dry": "node scripts/version/parallel-commit.js --dry-run",
@@ -34,4 +38,3 @@
     "node": ">=18.0.0"
   }
 }
-

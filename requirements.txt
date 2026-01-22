@@ -74,6 +74,7 @@ isort==5.13.2
 mypy==1.8.0
 pre-commit==3.6.0
 bandit==1.7.6
+datamodel-code-generator==0.28.4
 
 # Math & Vector Operations
 numpy>=1.26.0  # Python 3.12 compatible

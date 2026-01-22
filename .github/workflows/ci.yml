@@ -19,6 +19,28 @@ jobs:
   # STAGE 1: CODE QUALITY & LINTING
   # ============================================================================
   
+  spec-drift-check:
+    name: '[*] Spec Drift Check (TS canonical)'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Run spec drift check
+        run: |
+          bash scripts/spec/check_spec_drift.sh
+  
   lint-and-format:
     name: '[*] Code Quality Checks'
     runs-on: ubuntu-latest

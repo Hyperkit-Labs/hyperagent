@@ -49,6 +49,9 @@ services:
       # Database
       - DATABASE_URL=${DATABASE_URL:-postgresql://hyperagent_user:secure_password@postgres:5432/hyperagent_db}
       - SUPABASE_URL=${SUPABASE_URL:-}
+      # Override Supabase database password in local Docker to force use of local Postgres
+      # This prevents accidental connections to remote Supabase during development
+      - SUPABASE_PASSWORD=${SUPABASE_PASSWORD:-}
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}
       
       # Redis
@@ -307,6 +310,43 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+  # ============================================================================
+  # TS ORCHESTRATOR API (TYPESCRIPT)
+  # ============================================================================
+  
+  ts-orchestrator:
+    image: hyperagent-ts-orchestrator:latest
+    build:
+      context: .
+      dockerfile: ts/api/Dockerfile
+    container_name: hyperagent_ts_orchestrator
+    ports:
+      - "${TS_API_PORT:-4000}:4000"
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=4000
+      - HOST=0.0.0.0
+      - PYTHON_BACKEND_URL=http://hyperagent:8000
+      - X402_VERIFIER_URL=http://x402-verifier:3001
+      - DATABASE_URL=${DATABASE_URL:-postgresql://hyperagent_user:secure_password@postgres:5432/hyperagent_db}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+    networks:
+      - hyperagent_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      hyperagent:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
 networks:
   hyperagent_network:

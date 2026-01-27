@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Optional
 from eth_account import Account
 from web3 import Web3
 
-from hyperagent.blockchain.alith_client import AlithClient
 from hyperagent.blockchain.eigenda_client import EigenDAClient
 from hyperagent.blockchain.mantle_sdk import MantleSDKClient
 from hyperagent.blockchain.networks import NetworkManager
@@ -32,23 +31,17 @@ class DeploymentService(ServiceInterface):
     def __init__(
         self,
         network_manager: Optional[NetworkManager] = None,
-        alith_client: Optional[AlithClient] = None,
         eigenda_client: Optional[EigenDAClient] = None,
-        use_alith_autonomous: bool = False,
     ):
         """
         Initialize deployment service
 
         Args:
             network_manager: Network manager for Web3 operations
-            alith_client: Alith client for optional autonomous deployment
             eigenda_client: EigenDA client for Mantle deployments
-            use_alith_autonomous: If True, use Alith tool calling for autonomous deployment
         """
         self.network_manager = network_manager or NetworkManager()
-        self.alith_client = alith_client
         self.eigenda_client = eigenda_client
-        self.use_alith_autonomous = use_alith_autonomous
 
         # Initialize deployment helpers
         self.base_helper = BaseDeploymentHelper(self.network_manager)
@@ -224,9 +217,6 @@ class DeploymentService(ServiceInterface):
                         details={"network": network},
                     )
 
-            if self.use_alith_autonomous and self.alith_client:
-                return await self._deploy_via_alith(compiled, network, private_key)
-
             return await self._deploy_manual_with_retry(
                 compiled=compiled,
                 network=network,
@@ -386,73 +376,6 @@ class DeploymentService(ServiceInterface):
     async def validate(self, data: Dict[str, Any]) -> bool:
         """Validate deployment input"""
         return bool(data.get("compiled_contract") and data.get("network"))
-
-    async def _deploy_via_alith(
-        self, compiled: Dict[str, Any], network: str, private_key: str
-    ) -> Dict[str, Any]:
-        """Deploy contract using Alith autonomous agent with tool calling"""
-        BYTECODE_PREVIEW_LENGTH = 100
-
-        try:
-            from hyperagent.blockchain.alith_tools import AlithToolHandler, get_deployment_tools
-
-            tool_handler = AlithToolHandler(
-                network_manager=self.network_manager,
-                eigenda_client=self.eigenda_client,
-                private_key=private_key,
-            )
-
-            tools = get_deployment_tools()
-
-            agent_name = "autonomous_deployer"
-            if agent_name not in self.alith_client.list_agents():
-                await self.alith_client.initialize_agent(
-                    name=agent_name,
-                    preamble="You are an autonomous smart contract deployment agent. Use the deploy_contract tool to deploy contracts to the blockchain.",
-                )
-
-            bytecode = compiled.get("bytecode", "")
-            abi = compiled.get("abi", [])
-
-            prompt = f"Deploy this contract to {network}. Bytecode: {bytecode[:BYTECODE_PREVIEW_LENGTH]}..."
-
-            result = await self.alith_client.execute_agent_with_tools(
-                agent_name=agent_name,
-                prompt=prompt,
-                tools=tools,
-                context={"bytecode": bytecode, "abi": abi, "network": network},
-                tool_handler=tool_handler,
-            )
-
-            if result.get("success") and result.get("tool_results"):
-                for tool_result in result["tool_results"]:
-                    if tool_result.get("tool") == "deploy_contract":
-                        deploy_result = tool_result.get("result", {})
-                        if deploy_result.get("success"):
-                            return {
-                                "status": "success",
-                                "contract_address": deploy_result.get("contract_address"),
-                                "transaction_hash": deploy_result.get("transaction_hash"),
-                                "block_number": deploy_result.get("block_number"),
-                                "gas_used": deploy_result.get("gas_used"),
-                                "eigenda_commitment": deploy_result.get("eigenda_commitment"),
-                                "deployment_method": "alith_autonomous",
-                            }
-                        else:
-                            raise ValueError(
-                                f"Alith deployment failed: {deploy_result.get('error')}"
-                            )
-
-            logger.warning(
-                "Alith agent did not execute deploy_contract tool, falling back to manual deployment"
-            )
-            return await self._deploy_manual(compiled, network, private_key)
-
-        except Exception as e:
-            logger.error(
-                f"Alith autonomous deployment failed: {e}, falling back to manual", exc_info=True
-            )
-            return await self._deploy_manual(compiled, network, private_key)
 
     async def validate_deployment_requirements(
         self, network: str, private_key: str, wallet_address: Optional[str] = None

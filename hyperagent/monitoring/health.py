@@ -78,26 +78,41 @@ class HealthMonitor:
 
     async def _check_error_rate(self) -> Dict[str, Any]:
         """Check error rate from metrics"""
+        threshold = self.alert_thresholds["error_rate"]
+        
         try:
-            # Attempt to query Prometheus metrics if available
-            # In production, this would query Prometheus API endpoint
-            # For now, use placeholder with note about future integration
-            threshold = self.alert_thresholds["error_rate"]
+            # Try to get actual error rate from Prometheus
+            from hyperagent.monitoring.prometheus_client import create_prometheus_client
             
-            # TODO: Integrate with Prometheus API to get actual error rate
-            # Example: query = 'rate(hyperagent_agent_errors_total[5m]) / rate(hyperagent_agent_executions_total[5m]) * 100'
-            # This requires Prometheus client library and API endpoint
+            prometheus_client = create_prometheus_client()
             
-            return {
-                "value": 0.5,
-                "threshold": threshold,
-                "status": "healthy",
-                "note": "Using placeholder - Prometheus integration pending"
-            }
+            # Check if Prometheus is available
+            if await prometheus_client.is_available():
+                error_rate = await prometheus_client.get_error_rate(window="5m")
+                
+                if error_rate is not None:
+                    status = "healthy" if error_rate <= threshold else "degraded"
+                    return {
+                        "value": round(error_rate, 2),
+                        "threshold": threshold,
+                        "status": status,
+                    }
+                else:
+                    logger.warning("Prometheus available but error rate query returned no data")
+            else:
+                logger.debug("Prometheus not available, using fallback")
+        except ImportError:
+            logger.debug("Prometheus client not available, using fallback")
         except Exception as e:
-            logger.warning(f"Could not calculate error rate from metrics: {e}")
-            # Fallback to placeholder
-            return {"value": 0.5, "threshold": self.alert_thresholds["error_rate"], "status": "healthy"}
+            logger.warning(f"Failed to query Prometheus for error rate: {e}")
+        
+        # Fallback to placeholder if Prometheus unavailable or query fails
+        return {
+            "value": 0.5,
+            "threshold": threshold,
+            "status": "healthy",
+            "note": "Using placeholder - Prometheus unavailable or metrics not found"
+        }
 
     async def _check_response_times(self) -> Dict[str, Any]:
         """Check response time percentiles"""

@@ -1,0 +1,644 @@
+{
+	"info": {
+		"_postman_id": "hyperagent-ts-api-collection",
+		"name": "HyperAgent TS API",
+		"description": "Complete API collection for HyperAgent TypeScript API service",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health",
+			"item": [
+				{
+					"name": "Liveness Probe",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/healthz",
+							"host": ["{{base_url}}"],
+							"path": ["healthz"]
+						},
+						"description": "Kubernetes liveness probe endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "Readiness Probe",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/readyz",
+							"host": ["{{base_url}}"],
+							"path": ["readyz"]
+						},
+						"description": "Kubernetes readiness probe endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/health",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "health"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Detailed Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/health/detailed",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "health", "detailed"]
+						},
+						"description": "Detailed health check with service status"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "V2 Workflows",
+			"item": [
+				{
+					"name": "Create Workflow",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"intent\": \"Create a simple ERC20 token contract\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v2/workflows",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v2", "workflows"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Workflow",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v2/workflows/{{workflow_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v2", "workflows", "{{workflow_id}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Workflows",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v2/workflows",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v2", "workflows"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "V1 Workflows",
+			"item": [
+				{
+					"name": "Estimate Cost",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"selected_tasks\": [\"generation\", \"audit\", \"testing\", \"deployment\"],\n  \"network\": \"avalanche_fuji\",\n  \"model\": \"gemini-2.5-flash\",\n  \"contract_complexity\": \"standard\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/workflows/estimate-cost",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "workflows", "estimate-cost"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Generate Workflow",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "payment-signature",
+								"value": "{{payment_signature}}",
+								"disabled": true
+							},
+							{
+								"key": "x-payment",
+								"value": "{{x_payment}}",
+								"disabled": true
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nlp_input\": \"Create a simple ERC20 token with name MyToken and symbol MTK\",\n  \"network\": \"avalanche_fuji\",\n  \"contract_type\": \"ERC20\",\n  \"name\": \"MyToken\",\n  \"wallet_address\": \"0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb\",\n  \"selected_tasks\": [\"generation\", \"audit\", \"testing\", \"deployment\"],\n  \"use_gasless\": false\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/workflows/generate",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "workflows", "generate"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Workflow",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/workflows/{{workflow_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "workflows", "{{workflow_id}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Workflows",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/workflows",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "workflows"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Cancel Workflow",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/workflows/{{workflow_id}}/cancel",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "workflows", "{{workflow_id}}", "cancel"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Workflow Contracts",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/workflows/{{workflow_id}}/contracts",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "workflows", "{{workflow_id}}", "contracts"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Confirm Deployment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tx_hash\": \"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef\",\n  \"network\": \"avalanche_fuji\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/workflows/{{workflow_id}}/deploy/confirm",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "workflows", "{{workflow_id}}", "deploy", "confirm"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Networks",
+			"item": [
+				{
+					"name": "List Networks",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/networks?search=&page=1&limit=50",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "networks"],
+							"query": [
+								{
+									"key": "search",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "page",
+									"value": "1",
+									"disabled": true
+								},
+								{
+									"key": "limit",
+									"value": "50",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Network",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/networks/avalanche_fuji",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "networks", "avalanche_fuji"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Network Features",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/networks/avalanche_fuji/features",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "networks", "avalanche_fuji", "features"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get x402 Networks",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/networks/x402",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "networks", "x402"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Templates",
+			"item": [
+				{
+					"name": "List Templates",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/templates",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "templates"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Templates (GET)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/templates/search?q=ERC20",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "templates", "search"],
+							"query": [
+								{
+									"key": "q",
+									"value": "ERC20",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Templates (POST)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"query\": \"ERC20\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/templates/search",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "templates", "search"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Metrics",
+			"item": [
+				{
+					"name": "Get Metrics",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/metrics",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "metrics"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "x402 Analytics",
+			"item": [
+				{
+					"name": "Get Payment History",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/x402/analytics/history?wallet_address={{wallet_address}}&page=1&page_size=50",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "x402", "analytics", "history"],
+							"query": [
+								{
+									"key": "wallet_address",
+									"value": "{{wallet_address}}"
+								},
+								{
+									"key": "page",
+									"value": "1",
+									"disabled": true
+								},
+								{
+									"key": "page_size",
+									"value": "50",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Payment Summary",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/x402/analytics/summary?wallet_address={{wallet_address}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "x402", "analytics", "summary"],
+							"query": [
+								{
+									"key": "wallet_address",
+									"value": "{{wallet_address}}"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "x402 Spending Controls",
+			"item": [
+				{
+					"name": "Get Spending Control",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/x402/spending-controls/{{wallet_address}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "x402", "spending-controls", "{{wallet_address}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create/Update Spending Control",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"wallet_address\": \"0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb\",\n  \"daily_limit\": 100.0,\n  \"monthly_limit\": 1000.0,\n  \"whitelist_merchants\": []\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/x402/spending-controls",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "x402", "spending-controls"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "x402 Contracts",
+			"item": [
+				{
+					"name": "Generate Contract",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "x-wallet-address",
+								"value": "{{wallet_address}}"
+							},
+							{
+								"key": "payment-signature",
+								"value": "{{payment_signature}}",
+								"disabled": true
+							},
+							{
+								"key": "x-payment",
+								"value": "{{x_payment}}",
+								"disabled": true
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nlp_description\": \"Create a simple ERC20 token contract\",\n  \"contract_type\": \"ERC20\",\n  \"network\": \"avalanche_fuji\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/x402/contracts/generate",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "x402", "contracts", "generate"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "x402 Workflows",
+			"item": [
+				{
+					"name": "Create Workflow from Contract",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "payment-signature",
+								"value": "{{payment_signature}}",
+								"disabled": true
+							},
+							{
+								"key": "x-payment",
+								"value": "{{x_payment}}",
+								"disabled": true
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"contract_code\": \"pragma solidity ^0.8.0;\\n\\ncontract SimpleToken {\\n    string public name = \\\"SimpleToken\\\";\\n    string public symbol = \\\"ST\\\";\\n    uint8 public decimals = 18;\\n    uint256 public totalSupply = 1000000 * 10**18;\\n    mapping(address => uint256) public balanceOf;\\n\\n    constructor() {\\n        balanceOf[msg.sender] = totalSupply;\\n    }\\n}\",\n  \"contract_type\": \"Custom\",\n  \"network\": \"avalanche_fuji\",\n  \"wallet_address\": \"0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb\",\n  \"use_gasless\": false,\n  \"selected_tasks\": [\"audit\", \"testing\", \"deployment\"]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/x402/workflows/create-from-contract",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "x402", "workflows", "create-from-contract"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "x402 Deployments",
+			"item": [
+				{
+					"name": "Deploy Contract",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "payment-signature",
+								"value": "{{payment_signature}}",
+								"disabled": true
+							},
+							{
+								"key": "x-payment",
+								"value": "{{x_payment}}",
+								"disabled": true
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"compiled_contract\": {\n    \"contract_name\": \"SimpleToken\",\n    \"source_code\": \"pragma solidity ^0.8.0;\\n\\ncontract SimpleToken {\\n    string public name = \\\"SimpleToken\\\";\\n    string public symbol = \\\"ST\\\";\\n    uint8 public decimals = 18;\\n    uint256 public totalSupply = 1000000 * 10**18;\\n    mapping(address => uint256) public balanceOf;\\n\\n    constructor() {\\n        balanceOf[msg.sender] = totalSupply;\\n    }\\n}\",\n    \"bytecode\": \"\",\n    \"abi\": []\n  },\n  \"network\": \"avalanche_fuji\",\n  \"wallet_address\": \"0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb\",\n  \"use_gasless\": false,\n  \"constructor_args\": []\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/x402/deployments/deploy",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "x402", "deployments", "deploy"]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:4000",
+			"type": "string"
+		},
+		{
+			"key": "workflow_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "wallet_address",
+			"value": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+			"type": "string"
+		},
+		{
+			"key": "payment_signature",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "x_payment",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
+

@@ -21,7 +21,7 @@
 | **Billing** | Post-hoc x402 settlement | Real-time x402 in build loop |
 | **Networks** | 8 (includes deprecated ones) | 6 (Mantle, Avalanche, BNB, Solana, Sui, PL) |
 | **External Tools** | Generic RPC, LLM APIs | Mantle SDK, Avalanche integrations, thirdweb, Pinata |
-| **TEE Auditing** | LazAI (Optional) | Removed (use Slither + semantic only) |
+| **TEE Auditing** | Removed | Removed (use Slither + semantic only) |
 | **Data Availability** | EigenDA (future) | EigenDA-ready (not required MVP) |
 | **Deployment Target** | Hackathon MVP only | Mantle Global Hackathon + production |
 

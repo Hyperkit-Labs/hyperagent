@@ -31,10 +31,10 @@ class AppDocument(Base):
 
     __tablename__ = "app_documents"
     __table_args__ = (
-        {"schema": "hyperagent"},
         UniqueConstraint(
             "file_path", "checksum", "chunk_index", name="uq_app_documents_file_checksum_chunk"
         ),
+        {"schema": "hyperagent"},
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -50,7 +50,8 @@ class AppDocument(Base):
 
     # Optional metadata
     tokens_estimate = Column(Integer, nullable=True)
-    metadata = Column(JSONB, nullable=True)
+    # Metadata storage - using 'meta_data' as both Python attribute and DB column name to avoid SQLAlchemy reserved 'metadata' conflict
+    meta_data = Column("meta_data", JSONB, nullable=True)
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -10,9 +10,10 @@ When enabled, this will provide:
 - Attestation verification
 """
 
-# Feature flag check
-import os
-ENABLED = os.getenv("ENABLE_TEE", "false").lower() == "true"
+from hyperagent.core.feature_flags import is_tee_enabled
+
+# Runtime feature flag check
+ENABLED = is_tee_enabled()
 
 __all__ = ["ENABLED"]
 

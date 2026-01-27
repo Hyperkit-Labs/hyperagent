@@ -131,7 +131,7 @@ docker --version    # Should be 24.0+ (optional)
 
 ```bash
 # Clone repository
-git clone https://github.com/JustineDevs/HyperAgent.git
+git clone https://github.com/<username>/HyperAgent.git
 cd Hyperkit_agent
 
 # Create virtual environment
@@ -192,30 +192,61 @@ npm run dev
 
 ## Features
 
-- 🤖 **AI-Powered Generation** - Natural language → Solidity contracts
-- 🛡️ **Automated Auditing** - Security analysis with Slither, Mythril, Echidna
-- 🚀 **Multi-Chain Deployment** - Mantle, Avalanche, Base, Arbitrum (config-driven)
-- 💳 **x402 Payments** - Pay-per-use on Avalanche networks
+- **AI-Powered Generation** - Convert natural language prompts into production-ready Solidity contracts using advanced LLM models
+- **Automated Security Auditing** - Comprehensive security analysis with Slither, Mythril, and Echidna integration
+- **Multi-Chain Deployment** - Deploy to Mantle, Avalanche, Base, Arbitrum, and more with config-driven network support
+- **x402 Payments** - Pay-per-use payment system integrated with Thirdweb on Avalanche networks
+- **Spec-Locked Orchestration** - TypeScript-based state machine ensuring deterministic contract generation
+- **Memory Integration** - Chroma vector database for contract similarity search and IPFS for immutable proof storage
+- **Account Abstraction** - ERC-4337 support for gasless deployments and smart account management
 
 
 ---
 
 ## Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+We welcome contributions from the community. Please see our [Contributing Guidelines](./CONTRIBUTING.md) for details on:
+
+- Development workflow and setup
+- Code style and standards
+- Testing requirements
+- Pull request process
+- Code of conduct
+
+### Quick Start for Contributors
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes and add tests
+4. Ensure all tests pass (`npm test` and `pytest`)
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to your branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for complete guidelines.
 
 
 ---
 
 ## License
 
-MIT License - see [LICENSE](./LICENSE) for details.
+This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
+
+Contributions to this project are accepted under the same license.
 
 ---
 
-## Links
+## Support
 
-- **GitHub**: [github.com/JustineDevs/HyperAgent](https://github.com/JustineDevs/HyperAgent)
+- **Documentation**: [docs/](./docs/) - Complete architecture and API documentation
+- **Issues**: [GitHub Issues](https://github.com/JustineDevs/HyperAgent/issues) - Report bugs or request features
+- **Discussions**: [GitHub Discussions](https://github.com/JustineDevs/HyperAgent/discussions) - Ask questions and share ideas
+
+## Acknowledgments
+
+- Built with [FastAPI](https://fastapi.tiangolo.com/) and [Next.js](https://nextjs.org/)
+- Uses [Thirdweb](https://thirdweb.com/) for Web3 infrastructure
+- Powered by [Anthropic Claude](https://www.anthropic.com/) and [Google Gemini](https://deepmind.google/technologies/gemini/) for AI generation
 
 ---
 

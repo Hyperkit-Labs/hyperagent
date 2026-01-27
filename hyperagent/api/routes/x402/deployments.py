@@ -16,7 +16,6 @@ from hyperagent.api.models import (
     UserOpDeploymentSubmitRequest,
 )
 from hyperagent.api.routes.deployments import deploy_contract as base_deploy_contract
-from hyperagent.blockchain.alith_client import AlithClient
 from hyperagent.blockchain.eigenda_client import EigenDAClient
 from hyperagent.blockchain.erc4337 import ERC4337AccountAbstraction
 from hyperagent.blockchain.networks import NetworkManager
@@ -43,7 +42,6 @@ if settings.redis_url:
 rate_limiter = RateLimiter(_redis_manager)
 
 _network_manager = NetworkManager()
-_alith_client = AlithClient()
 # Initialize with SecretsManager (lazy initialization)
 _eigenda_client = None
 
@@ -60,7 +58,7 @@ async def get_eigenda_client():
             use_authenticated=settings.eigenda_use_authenticated,
         )
     return _eigenda_client
-_deployment_service = DeploymentService(_network_manager, _alith_client, _eigenda_client)
+_deployment_service = DeploymentService(_network_manager, _eigenda_client)
 _erc4337_helper = ERC4337DeploymentHelper(_network_manager)
 _erc4337 = ERC4337AccountAbstraction(_network_manager)
 

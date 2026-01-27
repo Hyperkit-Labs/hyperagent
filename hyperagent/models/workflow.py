@@ -63,8 +63,8 @@ class Workflow(Base):
     error_stacktrace = Column(Text)
     retry_count = Column(Integer, default=0)
 
-    # Metadata (flexible JSON storage) - renamed to meta_data to avoid SQLAlchemy reserved name
-    meta_data = Column("metadata", JSONB, default={})
+    # Metadata (flexible JSON storage) - using 'meta_data' as both Python attribute and DB column name to avoid SQLAlchemy reserved 'metadata' conflict
+    meta_data = Column("meta_data", JSONB, default={})
 
     # Relationships
     user = relationship("User", back_populates="workflows")

@@ -37,7 +37,6 @@ def load_network_config_file(config_path: str) -> Dict[str, Any]:
           "currency": "ETH",
           "features": {
             "pef": false,
-            "metisvm": false,
             "eigenda": false,
             "batch_deployment": true,
             "floating_point": false,

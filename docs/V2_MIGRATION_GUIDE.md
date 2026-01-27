@@ -187,16 +187,33 @@ if (apiVersion === 'v2') {
 
 ## Migration Checklist
 
-- [ ] Update API base URLs to v2
+### Pre-Migration
+- [ ] Review feature comparison (`docs/V2_FEATURE_COMPARISON.md`)
+- [ ] Identify features used in your integration
+- [ ] Check if all required features are available in v2
+- [ ] Plan rollback strategy
+
+### API Updates
+- [ ] Update API base URLs to v2 (`http://localhost:4000/api/v2`)
 - [ ] Change `nlp_input` to `prompt` in workflow creation
-- [ ] Update status enum values (uppercase)
+- [ ] Update status enum values (uppercase: `PENDING`, `PROCESSING`, etc.)
 - [ ] Handle `meta` field in workflow responses
 - [ ] Update error handling for v2 error codes
-- [ ] Test workflow creation flow
-- [ ] Test workflow status polling
-- [ ] Test x402 payment flows
 - [ ] Update TypeScript types to use v2 interfaces
-- [ ] Remove v1 API calls once migration is complete
+
+### Testing
+- [ ] Test workflow creation flow
+- [ ] Test workflow status polling (note: WebSocket not available in v2)
+- [ ] Test x402 payment flows
+- [ ] Test memory integration (Chroma search, IPFS storage)
+- [ ] Test audit with Slither fallback
+- [ ] Test deployment flow
+
+### Post-Migration
+- [ ] Monitor error rates and performance
+- [ ] Verify all features work as expected
+- [ ] Update documentation
+- [ ] Remove v1 API calls once migration is complete (optional)
 
 ## Benefits of v2 API
 

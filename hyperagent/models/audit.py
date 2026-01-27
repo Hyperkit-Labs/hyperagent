@@ -50,7 +50,8 @@ class SecurityAudit(Base):
     full_report = Column(JSONB)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    meta_data = Column("metadata", JSONB, default={})
+    # Metadata storage - using 'meta_data' as both Python attribute and DB column name to avoid SQLAlchemy reserved 'metadata' conflict
+    meta_data = Column("meta_data", JSONB, default={})
 
     # Relationships
     contract = relationship("GeneratedContract", back_populates="audits")

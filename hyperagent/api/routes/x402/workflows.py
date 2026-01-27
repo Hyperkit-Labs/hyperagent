@@ -19,7 +19,6 @@ from hyperagent.api.routes.workflows import (
     update_workflow_progress,
 )
 from hyperagent.architecture.soa import ServiceRegistry
-from hyperagent.blockchain.alith_client import AlithClient
 from hyperagent.blockchain.eigenda_client import EigenDAClient
 from hyperagent.blockchain.networks import NetworkManager
 from hyperagent.core.config import settings
@@ -67,7 +66,6 @@ async def _create_services_and_coordinator(
     llm_provider = await _create_llm_provider()
     template_retriever = TemplateRetriever(llm_provider, db)
     network_manager = NetworkManager()
-    alith_client = AlithClient()
     eigenda_client = EigenDAClient(
         disperser_url=settings.eigenda_disperser_url,
         private_key=settings.private_key,
@@ -108,7 +106,7 @@ async def _create_services_and_coordinator(
     service_registry.register("audit", AuditService(SecurityAuditor()))
     service_registry.register("testing", TestingService(TestingAgent(event_bus, llm_provider)))
     service_registry.register(
-        "deployment", DeploymentService(network_manager, alith_client, eigenda_client)
+        "deployment", DeploymentService(network_manager, eigenda_client)
     )
 
     async def progress_callback(status: str, progress: int) -> None:
@@ -163,13 +161,12 @@ async def _create_workflow_record(
 def _create_deployment_service() -> DeploymentService:
     """Create deployment service instance."""
     network_manager = NetworkManager()
-    alith_client = AlithClient()
     eigenda_client = EigenDAClient(
         disperser_url=settings.eigenda_disperser_url,
         private_key=settings.private_key,
         use_authenticated=settings.eigenda_use_authenticated,
     )
-    return DeploymentService(network_manager, alith_client, eigenda_client)
+    return DeploymentService(network_manager, eigenda_client)
 
 
 def _update_workflow_after_deployment(workflow: Workflow) -> None:

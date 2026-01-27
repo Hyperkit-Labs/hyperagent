@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '20250122_add_deployment_audit'
-down_revision = None  # Update this to the latest revision
+down_revision = '011'
 depends_on = None
 
 

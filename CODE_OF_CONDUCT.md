@@ -63,7 +63,7 @@ reported to the community leaders responsible for enforcement. Please contact
 the project maintainers through:
 
 - GitHub Issues (use `code-of-conduct` label)
-- Email: conduct@hyperionkit.xyz
+- Email: conduct@hyperagent.dev
 - Project maintainers: [@JustineDevs](https://github.com/JustineDevs)
 
 All complaints will be reviewed and investigated promptly and fairly.

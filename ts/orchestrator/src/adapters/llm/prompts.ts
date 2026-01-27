@@ -1,4 +1,4 @@
-export function buildContractPrompt(intent: string, references: string[]): string {
+export function buildContractPrompt(intent: string, references: string[] = []): string {
   const refBlock =
     references.length > 0
       ? `\n\nReference contracts:\n${references.map((r, i) => `[${i + 1}]\n${r}`).join("\n\n")}\n`

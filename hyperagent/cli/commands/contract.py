@@ -220,7 +220,7 @@ def register_contract_commands(contract_group: click.Group) -> None:
     @click.option(
         "--explorer",
         "-e",
-        type=click.Choice(["blockscout", "etherscan", "hyperion", "mantle"]),
+        type=click.Choice(["blockscout", "etherscan", "mantle"]),
         default="blockscout",
         help="Explorer to use",
     )
@@ -295,7 +295,6 @@ def register_contract_commands(contract_group: click.Group) -> None:
                     explorer_urls = {
                         "blockscout": f"https://blockscout.com/{deploy_network}/address/{contract_address}",
                         "etherscan": f"https://etherscan.io/address/{contract_address}",
-                        "hyperion": f"https://hyperion-testnet-explorer.metisdevops.link/address/{contract_address}",
                         "mantle": f"https://explorer.mantle.xyz/address/{contract_address}",
                     }
 
@@ -322,7 +321,6 @@ def register_contract_commands(contract_group: click.Group) -> None:
                 explorer_urls = {
                     "blockscout": f"https://blockscout.com/{network}/address/{address}",
                     "etherscan": f"https://etherscan.io/address/{address}",
-                    "hyperion": f"https://hyperion-testnet-explorer.metisdevops.link/address/{address}",
                     "mantle": f"https://explorer.mantle.xyz/address/{address}",
                 }
 

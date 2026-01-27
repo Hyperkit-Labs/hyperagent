@@ -36,16 +36,16 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy local workspace package needed by ts/api
+# Copy local workspace package with its node_modules
 COPY --from=builder /app/packages/env ./packages/env
 
-# Copy built artifacts
-COPY --from=builder /app/ts/orchestrator/dist ./orchestrator/dist
-COPY --from=builder /app/ts/orchestrator/package.json ./orchestrator/
-COPY --from=builder /app/ts/orchestrator/node_modules ./orchestrator/node_modules
+# Copy built artifacts and node_modules from builder
 COPY --from=builder /app/ts/api/dist ./api/dist
 COPY --from=builder /app/ts/api/package.json ./api/
 COPY --from=builder /app/ts/api/node_modules ./api/node_modules
+COPY --from=builder /app/ts/orchestrator/dist ./orchestrator/dist
+COPY --from=builder /app/ts/orchestrator/package.json ./orchestrator/
+COPY --from=builder /app/ts/orchestrator/node_modules ./orchestrator/node_modules
 
 WORKDIR /app/api
 

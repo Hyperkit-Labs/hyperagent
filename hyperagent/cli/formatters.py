@@ -342,7 +342,7 @@ def format_deployment_confirmation(deployment_data: Dict[str, Any]) -> None:
     # Success message
     console.print(f"\n{CLIStyle.SUCCESS} Contract deployed successfully!")
     console.print(
-        f"{CLIStyle.INFO} View on explorer: [link]https://explorer.hyperion.metis.io/address/{contract_address}[/link]"
+        f"{CLIStyle.INFO} View contract on blockchain explorer"
     )
 
 

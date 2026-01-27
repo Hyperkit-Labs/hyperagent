@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision = '20250122_spending_tracking'
-down_revision = None
+down_revision = '20250122_add_deployment_audit'
 branch_labels = None
 depends_on = None
 

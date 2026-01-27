@@ -45,7 +45,7 @@ const x402WorkflowFromContractSchema = z.object({
   selected_tasks: z.array(z.string()).optional(),
 });
 
-type V1Opts = { store: WorkflowStore | null; env: Env; workflowEvents?: EventEmitter };
+type V1Opts = { store: WorkflowStore; env: Env; workflowEvents?: EventEmitter };
 
 type V1WorkflowStatus =
   | "created"
@@ -352,8 +352,7 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
           });
 
           const wallet = body.wallet_address;
-          if (opts.store) {
-            const sc = await opts.store.getSpendingControl(wallet);
+          const sc = await opts.store.getSpendingControl(wallet);
             if (sc && sc.is_active === false) {
               return reply.status(403).send({ message: "Spending controls are disabled" });
             }
@@ -371,7 +370,6 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
                   .send({ message: `Monthly limit exceeded. Remaining: $${monthlyRemaining.toFixed(2)}` });
               }
             }
-          }
 
           const paymentData =
             (req.headers["payment-signature"] as string | undefined) ||
@@ -402,8 +400,7 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
             });
           }
 
-          if (opts.store) {
-            await opts.store.recordSpending({ wallet_address: wallet, amount: estimate.total_usdc });
+          await opts.store.recordSpending({ wallet_address: wallet, amount: estimate.total_usdc });
             await opts.store.recordPaymentHistory({
               wallet_address: wallet,
               amount: estimate.total_usdc,
@@ -414,7 +411,6 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
               status: "completed",
             });
           }
-        }
 
         // Create state and align chain selection.
         let state = initialState(body.nlp_input);
@@ -429,14 +425,12 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
           } as any,
         });
 
-        if (opts.store) {
-          await opts.store.appendEvent({
+        await opts.store.appendEvent({
             workflowId: state.meta.workflowId,
             step: state.meta.execution.step,
             node: "created",
             state,
           });
-        }
 
         // Background execution.
         setImmediate(async () => {
@@ -456,9 +450,6 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
                 });
               }
 
-              if (!opts.store) {
-                return;
-              }
               await opts.store.appendEvent({
                 workflowId: state.meta.workflowId,
                 step: state.meta.execution.step,
@@ -489,13 +480,6 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
   app.get(
     "/api/v1/workflows/:id",
     async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      if (!opts.store) {
-        return reply.status(501).send({
-          error: "Not implemented",
-          message: "Workflow persistence is disabled (DATABASE_URL not set)",
-        });
-      }
-
       const workflowId = req.params.id;
       const state = await opts.store.getLatestState(workflowId);
       if (!state) {
@@ -507,13 +491,6 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
   );
 
   app.get("/api/v1/workflows", async (_req: FastifyRequest, reply: FastifyReply) => {
-    if (!opts.store) {
-      return reply.status(501).send({
-        error: "Not implemented",
-        message: "Workflow persistence is disabled (DATABASE_URL not set)",
-      });
-    }
-
     const items = await opts.store.listWorkflows(50);
     const workflows = items.map((i) => mapStateToWorkflowResponse(i.state));
     return reply.send(workflows);
@@ -531,13 +508,6 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
   app.get(
     "/api/v1/workflows/:id/contracts",
     async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      if (!opts.store) {
-        return reply.status(501).send({
-          error: "Not implemented",
-          message: "Workflow persistence is disabled (DATABASE_URL not set)",
-        });
-      }
-
       const workflowId = req.params.id;
       const state = await opts.store.getLatestState(workflowId);
       if (!state) {
@@ -677,10 +647,6 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
   // Templates
   // ---------------------------------------------------------------------------
   app.get("/api/v1/templates", async (_req, reply) => {
-    if (!opts.store) {
-      return reply.send({ templates: [] });
-    }
-
     const templates = await opts.store.listTemplates(200);
     return reply.send({ templates });
   });
@@ -689,9 +655,6 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
   app.get(
     "/api/v1/templates/search",
     async (req: FastifyRequest<{ Querystring: { q?: string } }>, reply: FastifyReply) => {
-      if (!opts.store) {
-        return reply.send({ templates: [] });
-      }
       const q = (req.query.q ?? "").trim();
       if (!q) {
         const templates = await opts.store.listTemplates(200);
@@ -705,9 +668,6 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
   app.post(
     "/api/v1/templates/search",
     async (req: FastifyRequest<{ Body: any }>, reply: FastifyReply) => {
-      if (!opts.store) {
-        return reply.send([]);
-      }
       const bodyAny = req.body as any;
       const q = typeof bodyAny?.query === "string" ? bodyAny.query : "";
       if (!q.trim()) {
@@ -721,14 +681,6 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
   // Metrics
   // ---------------------------------------------------------------------------
   app.get("/api/v1/metrics", async (_req, reply) => {
-    if (!opts.store) {
-      return reply.send({
-        workflows: { total: 0, completed: 0, failed: 0, in_progress: 0 },
-        deployments: { total: 0, by_network: {} },
-        performance: { avg_generation_time: 0, avg_compilation_time: 0, avg_deployment_time: 0 },
-      });
-    }
-
     return reply.send(await opts.store.getMetrics());
   });
 
@@ -753,9 +705,6 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
       req: FastifyRequest<{ Querystring: { wallet_address?: string; page?: string; page_size?: string } }>,
       reply,
     ) => {
-      if (!opts.store) {
-        return reply.send({ items: [], total: 0, page: 1, page_size: 50 });
-      }
       const wallet = (req.query.wallet_address ?? "").trim();
       if (!wallet) {
         return reply.send({ items: [], total: 0, page: 1, page_size: 50 });
@@ -769,15 +718,6 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
   app.get(
     "/api/v1/x402/analytics/summary",
     async (req: FastifyRequest<{ Querystring: { wallet_address?: string } }>, reply) => {
-      if (!opts.store) {
-        return reply.send({
-          daily_total: 0,
-          monthly_total: 0,
-          transaction_count: 0,
-          average_amount: 0,
-          top_merchants: [],
-        });
-      }
       const wallet = (req.query.wallet_address ?? "").trim();
       if (!wallet) {
         return reply.send({
@@ -804,26 +744,18 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
     async (req: FastifyRequest<{ Params: { wallet: string } }>, reply: FastifyReply) => {
       const wallet = req.params.wallet.toLowerCase();
 
-      if (opts.store) {
-        const sc = await opts.store.getSpendingControl(wallet);
-        if (!sc) {
-          return reply.status(404).send({ detail: "Spending controls not found" });
-        }
-        return reply.send({
-          id: String(sc.id),
-          wallet_address: sc.wallet_address,
-          daily_limit: sc.daily_limit,
-          monthly_limit: sc.monthly_limit,
-          whitelist_merchants: sc.whitelist_merchants ?? [],
-          time_restrictions: sc.time_restrictions ?? {},
-        });
-      }
-
-      const existing = spendingControls.get(wallet);
-      if (!existing) {
+      const sc = await opts.store.getSpendingControl(wallet);
+      if (!sc) {
         return reply.status(404).send({ detail: "Spending controls not found" });
       }
-      return reply.send(existing);
+      return reply.send({
+        id: String(sc.id),
+        wallet_address: sc.wallet_address,
+        daily_limit: sc.daily_limit,
+        monthly_limit: sc.monthly_limit,
+        whitelist_merchants: sc.whitelist_merchants ?? [],
+        time_restrictions: sc.time_restrictions ?? {},
+      });
     },
   );
 
@@ -841,33 +773,20 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
         const body = schema.parse(req.body);
         const key = body.wallet_address.toLowerCase();
 
-        if (opts.store) {
-          const sc = await opts.store.upsertSpendingControl({
-            wallet_address: key,
-            daily_limit: body.daily_limit ?? undefined,
-            monthly_limit: body.monthly_limit ?? undefined,
-            whitelist_merchants: body.whitelist_merchants ?? undefined,
-          });
-          return reply.send({
-            id: String(sc.id),
-            wallet_address: sc.wallet_address,
-            daily_limit: sc.daily_limit,
-            monthly_limit: sc.monthly_limit,
-            whitelist_merchants: sc.whitelist_merchants ?? [],
-            time_restrictions: sc.time_restrictions ?? {},
-          });
-        }
-
-        const next = {
-          id: spendingControls.get(key)?.id ?? `sc_${Math.random().toString(36).slice(2, 10)}`,
-          wallet_address: body.wallet_address,
-          daily_limit: body.daily_limit ?? null,
-          monthly_limit: body.monthly_limit ?? null,
-          whitelist_merchants: body.whitelist_merchants ?? [],
-          time_restrictions: {},
-        };
-        spendingControls.set(key, next);
-        return reply.send(next);
+        const sc = await opts.store.upsertSpendingControl({
+          wallet_address: key,
+          daily_limit: body.daily_limit ?? undefined,
+          monthly_limit: body.monthly_limit ?? undefined,
+          whitelist_merchants: body.whitelist_merchants ?? undefined,
+        });
+        return reply.send({
+          id: String(sc.id),
+          wallet_address: sc.wallet_address,
+          daily_limit: sc.daily_limit,
+          monthly_limit: sc.monthly_limit,
+          whitelist_merchants: sc.whitelist_merchants ?? [],
+          time_restrictions: sc.time_restrictions ?? {},
+        });
       } catch (error) {
         if (error instanceof z.ZodError) {
           return reply.status(400).send({ detail: "Invalid request", errors: error.errors });
@@ -893,8 +812,7 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
             return reply.status(400).send({ error: "Missing x-wallet-address header" });
           }
 
-          if (opts.store) {
-            const sc = await opts.store.getSpendingControl(wallet);
+          const sc = await opts.store.getSpendingControl(wallet);
             if (sc && sc.is_active === false) {
               return reply.status(403).send({ message: "Spending controls are disabled" });
             }
@@ -912,7 +830,6 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
                   .send({ message: `Monthly limit exceeded. Remaining: $${monthlyRemaining.toFixed(2)}` });
               }
             }
-          }
 
           const paymentData =
             (req.headers["payment-signature"] as string | undefined) ||
@@ -942,18 +859,16 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
             });
           }
 
-          if (opts.store) {
-            await opts.store.recordSpending({ wallet_address: wallet, amount: opts.env.X402_CONTRACT_PRICE_USDC });
-            await opts.store.recordPaymentHistory({
-              wallet_address: wallet,
-              amount: opts.env.X402_CONTRACT_PRICE_USDC,
-              network: body.network,
-              endpoint: "/api/v1/x402/contracts/generate",
-              merchant: opts.env.MERCHANT_WALLET_ADDRESS ?? null,
-              transaction_hash: null,
-              status: "completed",
-            });
-          }
+          await opts.store.recordSpending({ wallet_address: wallet, amount: opts.env.X402_CONTRACT_PRICE_USDC });
+          await opts.store.recordPaymentHistory({
+            wallet_address: wallet,
+            amount: opts.env.X402_CONTRACT_PRICE_USDC,
+            network: body.network,
+            endpoint: "/api/v1/x402/contracts/generate",
+            merchant: opts.env.MERCHANT_WALLET_ADDRESS ?? null,
+            transaction_hash: null,
+            status: "completed",
+          });
         }
 
         let state = initialState(body.nlp_description);
@@ -993,24 +908,22 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
         if (isX402Network(opts.env, body.network)) {
           const wallet = body.wallet_address;
 
-          if (opts.store) {
-            const sc = await opts.store.getSpendingControl(wallet);
-            if (sc && sc.is_active === false) {
-              return reply.status(403).send({ message: "Spending controls are disabled" });
+          const sc = await opts.store.getSpendingControl(wallet);
+          if (sc && sc.is_active === false) {
+            return reply.status(403).send({ message: "Spending controls are disabled" });
+          }
+          if (sc) {
+            const dailyRemaining = Number(sc.daily_limit ?? 0) - Number(sc.daily_spent ?? 0);
+            const monthlyRemaining = Number(sc.monthly_limit ?? 0) - Number(sc.monthly_spent ?? 0);
+            if (opts.env.X402_WORKFLOW_PRICE_USDC > dailyRemaining) {
+              return reply
+                .status(403)
+                .send({ message: `Daily limit exceeded. Remaining: $${dailyRemaining.toFixed(2)}` });
             }
-            if (sc) {
-              const dailyRemaining = Number(sc.daily_limit ?? 0) - Number(sc.daily_spent ?? 0);
-              const monthlyRemaining = Number(sc.monthly_limit ?? 0) - Number(sc.monthly_spent ?? 0);
-              if (opts.env.X402_WORKFLOW_PRICE_USDC > dailyRemaining) {
-                return reply
-                  .status(403)
-                  .send({ message: `Daily limit exceeded. Remaining: $${dailyRemaining.toFixed(2)}` });
-              }
-              if (opts.env.X402_WORKFLOW_PRICE_USDC > monthlyRemaining) {
-                return reply
-                  .status(403)
-                  .send({ message: `Monthly limit exceeded. Remaining: $${monthlyRemaining.toFixed(2)}` });
-              }
+            if (opts.env.X402_WORKFLOW_PRICE_USDC > monthlyRemaining) {
+              return reply
+                .status(403)
+                .send({ message: `Monthly limit exceeded. Remaining: $${monthlyRemaining.toFixed(2)}` });
             }
           }
 
@@ -1042,18 +955,16 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
             });
           }
 
-          if (opts.store) {
-            await opts.store.recordSpending({ wallet_address: wallet, amount: opts.env.X402_WORKFLOW_PRICE_USDC });
-            await opts.store.recordPaymentHistory({
-              wallet_address: wallet,
-              amount: opts.env.X402_WORKFLOW_PRICE_USDC,
-              network: body.network,
-              endpoint: "/api/v1/x402/workflows/create-from-contract",
-              merchant: opts.env.MERCHANT_WALLET_ADDRESS ?? null,
-              transaction_hash: null,
-              status: "completed",
-            });
-          }
+          await opts.store.recordSpending({ wallet_address: wallet, amount: opts.env.X402_WORKFLOW_PRICE_USDC });
+          await opts.store.recordPaymentHistory({
+            wallet_address: wallet,
+            amount: opts.env.X402_WORKFLOW_PRICE_USDC,
+            network: body.network,
+            endpoint: "/api/v1/x402/workflows/create-from-contract",
+            merchant: opts.env.MERCHANT_WALLET_ADDRESS ?? null,
+            transaction_hash: null,
+            status: "completed",
+          });
         }
 
         // Create a workflow id compatible with the TS orchestrator.
@@ -1066,14 +977,12 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
           } as any,
         });
 
-        if (opts.store) {
-          await opts.store.appendEvent({
-            workflowId: state.meta.workflowId,
-            step: state.meta.execution.step,
-            node: "created",
-            state,
-          });
-        }
+        await opts.store.appendEvent({
+          workflowId: state.meta.workflowId,
+          step: state.meta.execution.step,
+          node: "created",
+          state,
+        });
 
         setImmediate(async () => {
           try {
@@ -1092,9 +1001,6 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
                 });
               }
 
-              if (!opts.store) {
-                return;
-              }
               await opts.store.appendEvent({
                 workflowId: state.meta.workflowId,
                 step: state.meta.execution.step,
@@ -1149,24 +1055,22 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
         if (isX402Network(opts.env, body.network)) {
           const wallet = body.wallet_address;
 
-          if (opts.store) {
-            const sc = await opts.store.getSpendingControl(wallet);
-            if (sc && sc.is_active === false) {
-              return reply.status(403).send({ message: "Spending controls are disabled" });
+          const sc = await opts.store.getSpendingControl(wallet);
+          if (sc && sc.is_active === false) {
+            return reply.status(403).send({ message: "Spending controls are disabled" });
+          }
+          if (sc) {
+            const dailyRemaining = Number(sc.daily_limit ?? 0) - Number(sc.daily_spent ?? 0);
+            const monthlyRemaining = Number(sc.monthly_limit ?? 0) - Number(sc.monthly_spent ?? 0);
+            if (opts.env.X402_DEPLOY_PRICE_USDC > dailyRemaining) {
+              return reply
+                .status(403)
+                .send({ message: `Daily limit exceeded. Remaining: $${dailyRemaining.toFixed(2)}` });
             }
-            if (sc) {
-              const dailyRemaining = Number(sc.daily_limit ?? 0) - Number(sc.daily_spent ?? 0);
-              const monthlyRemaining = Number(sc.monthly_limit ?? 0) - Number(sc.monthly_spent ?? 0);
-              if (opts.env.X402_DEPLOY_PRICE_USDC > dailyRemaining) {
-                return reply
-                  .status(403)
-                  .send({ message: `Daily limit exceeded. Remaining: $${dailyRemaining.toFixed(2)}` });
-              }
-              if (opts.env.X402_DEPLOY_PRICE_USDC > monthlyRemaining) {
-                return reply
-                  .status(403)
-                  .send({ message: `Monthly limit exceeded. Remaining: $${monthlyRemaining.toFixed(2)}` });
-              }
+            if (opts.env.X402_DEPLOY_PRICE_USDC > monthlyRemaining) {
+              return reply
+                .status(403)
+                .send({ message: `Monthly limit exceeded. Remaining: $${monthlyRemaining.toFixed(2)}` });
             }
           }
 
@@ -1199,18 +1103,16 @@ export async function registerV1Routes(app: FastifyInstance, opts: V1Opts) {
             });
           }
 
-          if (opts.store) {
-            await opts.store.recordSpending({ wallet_address: wallet, amount: opts.env.X402_DEPLOY_PRICE_USDC });
-            await opts.store.recordPaymentHistory({
-              wallet_address: wallet,
-              amount: opts.env.X402_DEPLOY_PRICE_USDC,
-              network: body.network,
-              endpoint: "/api/v1/x402/deployments/deploy",
-              merchant: opts.env.MERCHANT_WALLET_ADDRESS ?? null,
-              transaction_hash: null,
-              status: "completed",
-            });
-          }
+          await opts.store.recordSpending({ wallet_address: wallet, amount: opts.env.X402_DEPLOY_PRICE_USDC });
+          await opts.store.recordPaymentHistory({
+            wallet_address: wallet,
+            amount: opts.env.X402_DEPLOY_PRICE_USDC,
+            network: body.network,
+            endpoint: "/api/v1/x402/deployments/deploy",
+            merchant: opts.env.MERCHANT_WALLET_ADDRESS ?? null,
+            transaction_hash: null,
+            status: "completed",
+          });
         }
 
         // Compile if the client didn't provide bytecode/abi.

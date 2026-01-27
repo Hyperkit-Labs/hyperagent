@@ -10,9 +10,10 @@ When enabled, this will provide:
 - Capability-based routing
 """
 
-# Feature flag check
-import os
-ENABLED = os.getenv("ENABLE_CAPABILITIES", "false").lower() == "true"
+from hyperagent.core.feature_flags import is_capabilities_enabled
+
+# Runtime feature flag check
+ENABLED = is_capabilities_enabled()
 
 __all__ = ["ENABLED"]
 

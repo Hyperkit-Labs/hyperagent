@@ -1,5 +1,6 @@
 import { HyperAgentState, withUpdates } from "../core/spec/state";
 import { NodeDefinition, NodeImplementation } from "../core/spec/nodes";
+import { NODE_TIMEOUTS, NODE_RETRIES } from "../core/constants";
 
 /**
  * NODE SPECIFICATION: ValidateNode
@@ -7,18 +8,18 @@ import { NodeDefinition, NodeImplementation } from "../core/spec/nodes";
  */
 export const validateNode: NodeImplementation = {
   definition: {
-    input: "HyperAgentState" as any,
-    output: "HyperAgentState" as any,
-    maxRetries: 1,
-    timeoutMs: 10000,
+    input: "HyperAgentState",
+    output: "HyperAgentState",
+    maxRetries: NODE_RETRIES.VALIDATE,
+    timeoutMs: NODE_TIMEOUTS.VALIDATE,
     nextNode: "deploy", // Default, engine will override based on validation result
   },
-  async execute(state: HyperAgentState): Promise<HyperAgentState> {
-    // TODO: Validate contract schema, bytecode size, etc.
-    const isValid =
-      state.contract.length > 0 &&
-      state.auditResults.passed &&
-      !containsForbiddenOpcodes(state.contract);
+      async execute(state: HyperAgentState): Promise<HyperAgentState> {
+        // Validate contract schema, bytecode size, and forbidden opcodes
+        const isValid =
+          state.contract.length > 0 &&
+          state.auditResults.passed &&
+          !containsForbiddenOpcodes(state.contract);
 
     if (!isValid) {
       // Engine will route back to generate based on validation result

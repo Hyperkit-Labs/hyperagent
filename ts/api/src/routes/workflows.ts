@@ -11,7 +11,7 @@ const createWorkflowSchema = z.object({
 
 export async function registerWorkflowRoutes(
   app: FastifyInstance,
-  opts: { store: WorkflowStore | null; env: Env },
+  opts: { store: WorkflowStore; env: Env },
 ) {
   /**
    * POST /api/v2/workflows
@@ -43,9 +43,6 @@ export async function registerWorkflowRoutes(
           initial,
           apiNodeRegistry,
           async ({ node, state }) => {
-            if (!opts.store) {
-              return;
-            }
             await opts.store.appendEvent({
               workflowId: state.meta.workflowId,
               step: state.meta.execution.step,
@@ -90,13 +87,6 @@ export async function registerWorkflowRoutes(
   app.get(
     "/api/v2/workflows/:id",
     async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      if (!opts.store) {
-        return reply.status(501).send({
-          error: "Not implemented",
-          message: "Workflow persistence is disabled (DATABASE_URL not set)",
-        });
-      }
-
       const workflowId = req.params.id;
       const state = await opts.store.getLatestState(workflowId);
       if (!state) {
@@ -112,13 +102,6 @@ export async function registerWorkflowRoutes(
    * List workflows (stub)
    */
   app.get("/api/v2/workflows", async (req: FastifyRequest, reply: FastifyReply) => {
-    if (!opts.store) {
-      return reply.status(501).send({
-        error: "Not implemented",
-        message: "Workflow persistence is disabled (DATABASE_URL not set)",
-      });
-    }
-
     const items = await opts.store.listWorkflows(50);
     return reply.send({
       workflows: items.map((i) => i.state),

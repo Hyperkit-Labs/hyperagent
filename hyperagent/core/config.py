@@ -79,8 +79,6 @@ class Settings(BaseSettings):
     pinecone_index_name: str = "hyperkit-docs"
     guardian_model_url: Optional[str] = ""
     guardian_model_api_key: Optional[str] = ""
-    lazai_api_key: Optional[str] = ""
-    lazai_url: str = "https://api.lazai.com"
     attestation_contract_address: Optional[str] = ""
     mlflow_tracking_uri: str = "http://localhost:5000"
     dune_api_key: Optional[str] = ""
@@ -169,28 +167,13 @@ class Settings(BaseSettings):
         "http://localhost:3002"  # TypeScript Mantle SDK bridge service
     )
 
-    # Network-specific USDC addresses (only for supported networks)
-    usdc_address_fuji: Optional[str] = ""  # USDC on Avalanche Fuji
-    usdc_address_avalanche: Optional[str] = ""  # USDC on Avalanche Mainnet
-    usdc_address_mantle: Optional[str] = ""  # USDC on Mantle mainnet
-    usdc_address_mantle_sepolia: Optional[str] = ""  # USDC on Mantle Sepolia
-    usdc_address_ethereum: Optional[str] = ""  # USDC on Ethereum mainnet
-    usdc_address_ethereum_sepolia: Optional[str] = ""  # USDC on Ethereum Sepolia
-    usdc_address_polygon: Optional[str] = ""  # USDC on Polygon mainnet
-    usdc_address_polygon_amoy: Optional[str] = ""  # USDC on Polygon Amoy
-    usdc_address_base: Optional[str] = ""  # USDC on Base mainnet
-    usdc_address_base_sepolia: Optional[str] = ""  # USDC on Base Sepolia
-    usdc_address_arbitrum: Optional[str] = ""  # USDC on Arbitrum One
-    usdc_address_arbitrum_sepolia: Optional[str] = ""  # USDC on Arbitrum Sepolia
-    usdc_address_optimism: Optional[str] = ""  # USDC on Optimism mainnet
-    usdc_address_optimism_sepolia: Optional[str] = ""  # USDC on Optimism Sepolia
+    # Network-specific USDC addresses are now loaded from config/tokens.yaml
+    # Use: from hyperagent.core.config_loader import get_token_address
+    #      usdc_address = get_token_address("usdc", "avalanche_mainnet")
 
-    # x402 Price Tiers Configuration
-    # JSON string with price tiers: {"ERC20": 0.01, "ERC721": 0.02, "Custom": 0.15, "basic": 0.01, "advanced": 0.02, "deployment": 0.10}
-    # Default values match current hardcoded PRICE_TIERS
-    x402_price_tiers: str = (
-        '{"ERC20": 0.01, "ERC721": 0.02, "Custom": 0.15, "basic": 0.01, "advanced": 0.02, "deployment": 0.10}'
-    )
+    # x402 Price Tiers are now loaded from config/pricing.yaml
+    # Use: from hyperagent.core.config_loader import get_contract_price, get_workflow_price
+    #      price = get_contract_price("ERC20") or get_workflow_price("advanced")
 
     # EigenDA Configuration
     eigenda_disperser_url: str = "https://disperser.eigenda.xyz"  # Mainnet
@@ -198,8 +181,8 @@ class Settings(BaseSettings):
 
     # Security & Wallet
     # Note: PRIVATE_KEY is optional - only needed for:
-    # 1. Non-x402 deployments (legacy networks like Hyperion, Mantle)
-    # 2. Server-side operations (EigenDA, Alith, etc.)
+    # 1. Non-x402 deployments (legacy networks like Mantle)
+    # 2. Server-side operations (EigenDA, etc.)
     # For x402 networks, users sign transactions in their wallets (no PRIVATE_KEY needed)
     private_key: Optional[str] = ""
     public_address: Optional[str] = ""

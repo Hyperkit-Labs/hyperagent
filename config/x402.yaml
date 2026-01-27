@@ -1,0 +1,309 @@
+# ============================================================================
+# x402 Payment Protocol Configuration
+# ============================================================================
+# x402 is the payment verification and settlement protocol for HyperKit
+# This file contains all x402 settings except sensitive API keys
+#
+# Sensitive keys remain in .env:
+# - THIRDWEB_SECRET_KEY
+# - THIRDWEB_CLIENT_ID
+# - MERCHANT_WALLET_ADDRESS (now in deployment.yaml)
+#
+# Last updated: 2025-01-28
+
+# Global x402 settings
+enabled: false  # Set to true to enable x402 payments
+version: "1.0"
+protocol_standard: "ERC-4337"  # Or "EIP-7702" when supported
+
+# Supported networks for x402 payments
+# These networks have USDC deployed and support payment verification
+supported_networks:
+  - avalanche_fuji        # Testnet
+  - avalanche_mainnet     # Production
+  - mantle_testnet        # Testnet
+  - mantle_mainnet        # Production
+  - base_mainnet          # Production
+  - base_sepolia          # Testnet
+  - arbitrum_one          # Production
+  - arbitrum_sepolia      # Testnet
+  - optimism_mainnet      # Production
+  - optimism_sepolia      # Testnet
+  - polygon_mainnet       # Production
+  - ethereum_mainnet      # Production (high gas)
+
+# Network-specific settings
+network_settings:
+  avalanche_fuji:
+    enabled: true
+    testnet: true
+    confirmation_blocks: 1
+    timeout_seconds: 180
+  
+  avalanche_mainnet:
+    enabled: true
+    testnet: false
+    confirmation_blocks: 3
+    timeout_seconds: 300
+  
+  mantle_testnet:
+    enabled: true
+    testnet: true
+    confirmation_blocks: 1
+    timeout_seconds: 120
+  
+  mantle_mainnet:
+    enabled: true
+    testnet: false
+    confirmation_blocks: 2
+    timeout_seconds: 240
+
+# Payment verification service
+verifier:
+  service_url_env: "X402_VERIFIER_URL"  # Read from env for flexibility
+  default_url: "http://localhost:3002"   # Local development default
+  timeout_seconds: 30
+  retry_attempts: 3
+  retry_delay_seconds: 5
+
+# Payment settlement configuration
+settlement:
+  # Auto-settlement settings
+  auto_settle: true
+  batch_settlements: true
+  batch_size: 10
+  batch_timeout_minutes: 15
+  
+  # Settlement thresholds
+  min_amount_usdc: 0.01
+  max_amount_usdc: 1000.0
+  
+  # Gas optimization
+  use_gas_optimization: true
+  max_gas_price_gwei: 50
+
+# Supported payment tokens
+payment_tokens:
+  usdc:
+    enabled: true
+    symbol: "USDC"
+    decimals: 6
+    # Addresses are in config/tokens.yaml
+    
+  # Future: Support for other stablecoins
+  usdt:
+    enabled: false
+    symbol: "USDT"
+    decimals: 6
+  
+  dai:
+    enabled: false
+    symbol: "DAI"
+    decimals: 18
+
+# Pricing tiers (USDC)
+# Note: Detailed pricing is in config/pricing.yaml
+# These are x402-specific payment amounts
+pricing:
+  contract_generation:
+    basic: 0.01        # Simple contracts (ERC20, ERC721)
+    advanced: 0.02     # Complex contracts (DEX, Lending)
+    enterprise: 0.05   # Custom audited contracts
+  
+  workflow:
+    basic: 0.02        # Generation only
+    standard: 0.05     # Generation + audit
+    premium: 0.10      # Full pipeline (gen + audit + test + deploy)
+  
+  deployment:
+    testnet: 0.05      # Deploy to testnet
+    mainnet: 0.10      # Deploy to mainnet
+    multi_chain: 0.15  # Deploy to multiple chains
+  
+  tasks:
+    audit: 0.02        # Security audit
+    testing: 0.01      # Test generation
+    optimization: 0.03 # Gas optimization
+
+# Payment flow configuration
+payment_flow:
+  # Pre-payment verification
+  verify_before_execution: true
+  require_confirmation: true
+  confirmation_blocks: 2
+  
+  # Payment methods
+  methods:
+    - "wallet_signature"     # User signs payment
+    - "erc4337_bundler"      # Account abstraction
+    - "thirdweb_facilitator" # Thirdweb payment gateway
+  
+  # Default method
+  default_method: "erc4337_bundler"
+
+# Refund policy
+refunds:
+  enabled: true
+  
+  # Automatic refunds
+  auto_refund_on_failure: true
+  refund_timeout_hours: 24
+  
+  # Refund conditions
+  conditions:
+    - workflow_failed_before_20_percent
+    - contract_compilation_failed
+    - deployment_failed_no_contract_generated
+    - audit_critical_issues_unfixable
+  
+  # Manual refund thresholds
+  manual_review_amount_usdc: 1.0
+
+# Fraud prevention
+fraud_prevention:
+  enabled: true
+  
+  # Rate limiting per wallet
+  rate_limits:
+    requests_per_hour: 10
+    requests_per_day: 50
+    max_amount_per_day_usdc: 10.0
+  
+  # Blacklist/whitelist
+  use_blacklist: true
+  use_whitelist: false
+  
+  # Verification requirements
+  require_wallet_age_days: 0      # 0 = no requirement
+  require_min_balance_usdc: 0.0   # 0 = no requirement
+
+# Webhooks for payment events
+webhooks:
+  enabled: true
+  
+  events:
+    - payment_received
+    - payment_verified
+    - payment_settled
+    - payment_failed
+    - refund_issued
+  
+  retry_policy:
+    max_retries: 5
+    backoff_multiplier: 2
+    max_delay_seconds: 300
+
+# Analytics and reporting
+analytics:
+  track_payments: true
+  track_conversions: true
+  track_refunds: true
+  
+  # Metrics to collect
+  metrics:
+    - total_payments_usdc
+    - successful_payments_count
+    - failed_payments_count
+    - refund_rate
+    - average_payment_amount
+    - revenue_by_network
+    - revenue_by_contract_type
+
+# Integration settings
+integrations:
+  # Thirdweb configuration
+  thirdweb:
+    use_facilitator: true
+    supported_chains:
+      - 43113  # Avalanche Fuji
+      - 43114  # Avalanche Mainnet
+      - 5003   # Mantle Testnet
+      - 5000   # Mantle Mainnet
+      - 8453   # Base Mainnet
+      - 84532  # Base Sepolia
+    
+    # Thirdweb-specific settings
+    use_gasless: true
+    sponsor_gas: false  # Set true to sponsor user gas fees
+  
+  # Future: Stripe/credit card integration
+  stripe:
+    enabled: false
+    convert_fiat_to_usdc: false
+
+# Testing and development
+development:
+  # Test mode (skip actual payments)
+  test_mode: false
+  
+  # Mock payments for testing
+  use_mock_payments: false
+  mock_payment_delay_seconds: 2
+  mock_payment_success_rate: 0.95  # 95% success rate
+  
+  # Test wallets (for development only)
+  test_wallets:
+    - "0xa43b752b6e941263eb5a7e3b96e2e0dea1a586ff"
+
+# Compliance and legal
+compliance:
+  # KYC/AML (if required)
+  require_kyc: false
+  kyc_provider: null
+  
+  # Terms of service
+  require_tos_acceptance: true
+  tos_version: "1.0"
+  
+  # Data retention
+  retain_payment_history_days: 365
+  anonymize_after_days: 730
+
+# Error handling
+error_handling:
+  # Retry logic
+  retry_on_network_error: true
+  retry_on_insufficient_funds: false
+  retry_on_gas_price_too_high: true
+  
+  # Fallback behavior
+  fallback_to_manual_payment: true
+  notify_on_payment_failure: true
+
+# Performance optimization
+performance:
+  # Caching
+  cache_payment_status: true
+  cache_ttl_seconds: 60
+  
+  # Batching
+  batch_verification_requests: true
+  batch_size: 50
+  
+  # Connection pooling
+  max_concurrent_verifications: 20
+
+# Monitoring and alerts
+monitoring:
+  enabled: true
+  
+  # Alert thresholds
+  alerts:
+    payment_failure_rate_threshold: 0.1  # Alert if >10% fail
+    refund_rate_threshold: 0.05           # Alert if >5% refunded
+    settlement_delay_minutes: 60          # Alert if settlement delayed
+  
+  # Logging
+  log_all_payments: true
+  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+
+# Backup and recovery
+backup:
+  # Payment record backup
+  backup_payment_records: true
+  backup_interval_hours: 24
+  
+  # Recovery
+  auto_retry_failed_settlements: true
+  recovery_window_hours: 48
+

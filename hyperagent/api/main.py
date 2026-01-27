@@ -155,6 +155,39 @@ async def startup_validation():
             logger.info("Redis connection successful")
         except Exception as e:
             warnings.append(f"Redis connection failed: {e} - using in-memory fallback")
+    
+    # Check database connectivity (with Supabase -> Docker Postgres fallback)
+    from hyperagent.db.session import engine
+    from sqlalchemy import text
+    try:
+        # Test database connection with timeout
+        logger.info("Testing database connection...")
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        logger.info("✓ Database connection successful")
+    except Exception as e:
+        # If primary connection fails, try Docker Postgres fallback
+        if "supabase.co" in settings.database_url:
+            logger.warning(f"✗ Primary database (Supabase) connection failed: {e}")
+            logger.info("Attempting fallback to Docker Postgres...")
+            
+            try:
+                # Import and reinitialize with Docker Postgres fallback
+                # In Docker, use service name 'postgres' instead of 'localhost'
+                from sqlalchemy.ext.asyncio import create_async_engine
+                fallback_url = "postgresql+asyncpg://hyperagent_user:secure_password@postgres:5432/hyperagent_db"
+                test_engine = create_async_engine(fallback_url, pool_pre_ping=True)
+                
+                async with test_engine.connect() as conn:
+                    await conn.execute(text("SELECT 1"))
+                
+                await test_engine.dispose()
+                logger.info("✓ Successfully connected to Docker Postgres (fallback)")
+                warnings.append("Using Docker Postgres fallback (Supabase unavailable)")
+            except Exception as fallback_error:
+                errors.append(f"Database connection failed (both primary and fallback): {fallback_error}")
+        else:
+            errors.append(f"Database connection failed: {e}")
 
     # Log warnings
     for warning in warnings:

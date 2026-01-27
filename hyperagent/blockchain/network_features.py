@@ -15,9 +15,6 @@ class NetworkFeature(Enum):
 
     HyperAgent is intentionally chain-agnostic. Features here represent optional
     capabilities that may be enabled per-network.
-
-    NOTE: Hyperion/Metis-specific features (PEF/MetisVM/FP/AI inference) were
-    removed as part of the multichain refocus.
     """
 
     EIGENDA = "eigenda"  # EigenDA data availability / metadata storage
@@ -167,25 +164,25 @@ class NetworkFeatureManager:
             return {}
 
         if load_usdc:
-            usdc_map = {
-                "avalanche_fuji": getattr(settings, "usdc_address_fuji", None),
-                "avalanche_mainnet": getattr(settings, "usdc_address_avalanche", None),
-                "mantle_testnet": getattr(settings, "usdc_address_mantle_sepolia", None),
-                "mantle_mainnet": getattr(settings, "usdc_address_mantle", None),
-                "ethereum_mainnet": getattr(settings, "usdc_address_ethereum", None),
-                "ethereum_sepolia": getattr(settings, "usdc_address_ethereum_sepolia", None),
-                "polygon_mainnet": getattr(settings, "usdc_address_polygon", None),
-                "polygon_amoy": getattr(settings, "usdc_address_polygon_amoy", None),
-                "base_mainnet": getattr(settings, "usdc_address_base", None),
-                "base_sepolia": getattr(settings, "usdc_address_base_sepolia", None),
-                "arbitrum_one": getattr(settings, "usdc_address_arbitrum", None),
-                "arbitrum_sepolia": getattr(settings, "usdc_address_arbitrum_sepolia", None),
-                "optimism_mainnet": getattr(settings, "usdc_address_optimism", None),
-                "optimism_sepolia": getattr(settings, "usdc_address_optimism_sepolia", None),
-            }
-            usdc_address = usdc_map.get(normalized)
-            if usdc_address:
-                config["usdc_address"] = usdc_address
+            # Load USDC address from config/tokens.yaml
+            try:
+                from hyperagent.core.config_loader import get_token_address
+                usdc_address = get_token_address("usdc", normalized)
+                if usdc_address:
+                    config["usdc_address"] = usdc_address
+            except Exception:
+                # Fallback: try loading from settings (legacy support during migration)
+                usdc_attr_map = {
+                    "avalanche_fuji": "usdc_address_fuji",
+                    "avalanche_mainnet": "usdc_address_avalanche",
+                    "mantle_testnet": "usdc_address_mantle_sepolia",
+                    "mantle_mainnet": "usdc_address_mantle",
+                }
+                attr_name = usdc_attr_map.get(normalized)
+                if attr_name:
+                    usdc_address = getattr(settings, attr_name, None)
+                    if usdc_address:
+                        config["usdc_address"] = usdc_address
 
         return config
 

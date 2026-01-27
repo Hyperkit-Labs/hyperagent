@@ -9,7 +9,6 @@ from eth_account import Account
 from sqlalchemy.ext.asyncio import AsyncSession
 from web3 import Web3
 
-from hyperagent.blockchain.alith_client import AlithClient
 from hyperagent.blockchain.eigenda_client import EigenDAClient
 from hyperagent.blockchain.networks import NetworkManager
 from hyperagent.core.agent_system import ServiceInterface
@@ -31,13 +30,11 @@ class DeploymentAgent(ServiceInterface):
     def __init__(
         self,
         network_manager: NetworkManager,
-        alith_client: AlithClient,
         eigenda_client: EigenDAClient,
         event_bus: EventBus,
         db: Optional[AsyncSession] = None,
     ):
         self.network_manager = network_manager
-        self.alith_client = alith_client
         self.eigenda_client = eigenda_client
         self.event_bus = event_bus
         self.db = db

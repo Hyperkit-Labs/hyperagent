@@ -11,9 +11,10 @@ When enabled, this will provide:
 - Usage analytics
 """
 
-# Feature flag check
-import os
-ENABLED = os.getenv("ENABLE_TELEMETRY", "false").lower() == "true"
+from hyperagent.core.feature_flags import is_telemetry_enabled
+
+# Runtime feature flag check
+ENABLED = is_telemetry_enabled()
 
 __all__ = ["ENABLED"]
 

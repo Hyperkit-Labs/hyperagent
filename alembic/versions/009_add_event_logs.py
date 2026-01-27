@@ -1,7 +1,7 @@
 """Add event_logs table for audit logging
 
 Revision ID: 009
-Revises: 008
+Revises: 007
 Create Date: 2025-01-02
 
 """
@@ -12,7 +12,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "009"
-down_revision = "008_add_template_engine_fields"
+down_revision = "007"
 branch_labels = None
 depends_on = None
 

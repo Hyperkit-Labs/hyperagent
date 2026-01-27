@@ -1,0 +1,181 @@
+# config/pricing.yaml
+# x402 payment and service pricing configuration
+# All prices in USD (paid in USDC on-chain)
+
+# Contract generation pricing by type
+contract_types:
+  ERC20: 0.01
+  ERC721: 0.02
+  ERC1155: 0.03
+  Custom: 0.15
+  DEX: 0.25
+  Lending: 0.30
+  Vault: 0.20
+  DAO: 0.35
+  Bridge: 0.50
+
+# Workflow pricing by complexity tier
+workflow_tiers:
+  basic: 0.01        # Simple contract generation only
+  advanced: 0.02     # Generation + audit + testing
+  deployment: 0.10   # Full deployment to blockchain
+  multi_chain: 0.25  # Cross-chain deployment (3+ chains)
+
+# Task-based pricing (granular)
+tasks:
+  generation: 0.01    # AI contract code generation
+  compilation: 0.005  # Solidity compilation
+  audit: 0.015        # Security audit (Slither + manual)
+  testing: 0.01       # Automated test generation
+  deployment: 0.08    # Single-chain deployment
+  verification: 0.02  # Contract verification on explorer
+  optimization: 0.03  # Gas optimization
+
+# Network-specific multipliers
+network_multipliers:
+  # Low-cost networks
+  mantle_testnet: 1.0
+  avalanche_fuji: 1.0
+  base_sepolia: 1.0
+  arbitrum_sepolia: 1.0
+  optimism_sepolia: 1.0
+  skale_chaos_testnet: 0.5  # Gasless chain bonus
+  
+  # Mainnet standard
+  mantle_mainnet: 1.5
+  avalanche_mainnet: 1.5
+  base_mainnet: 1.5
+  arbitrum_one: 1.5
+  optimism_mainnet: 1.5
+  bnb_mainnet: 1.3
+  
+  # High-cost networks
+  ethereum_mainnet: 3.0
+  polygon_mainnet: 1.2
+
+# Model-specific multipliers (LLM pricing)
+model_multipliers:
+  # Free/cheap models
+  gemini-flash: 0.5
+  gpt-3.5-turbo: 0.8
+  
+  # Standard models
+  gpt-4-turbo: 1.0
+  claude-sonnet: 1.0
+  gemini-pro: 1.0
+  
+  # Premium models
+  claude-opus: 2.0
+  gpt-4: 1.5
+  llama-3-405b: 1.2
+
+# Contract complexity multipliers
+complexity_multipliers:
+  simple: 1.0      # Under 100 lines, basic logic
+  moderate: 1.5    # 100-300 lines, moderate complexity
+  complex: 2.5     # 300+ lines, advanced patterns
+  enterprise: 5.0  # Custom audit + optimization required
+
+# Subscription tiers (monthly)
+subscriptions:
+  free:
+    price: 0
+    limits:
+      monthly_deployments: 3
+      monthly_workflows: 10
+      supported_networks: ["*_testnet"]
+      audit_included: false
+      
+  starter:
+    price: 29
+    limits:
+      monthly_deployments: 10
+      monthly_workflows: 50
+      supported_networks: ["*"]
+      audit_included: true
+      priority_support: false
+      
+  pro:
+    price: 99
+    limits:
+      monthly_deployments: 50
+      monthly_workflows: 200
+      supported_networks: ["*"]
+      audit_included: true
+      priority_support: true
+      custom_templates: true
+      
+  enterprise:
+    price: 499
+    limits:
+      monthly_deployments: -1  # Unlimited
+      monthly_workflows: -1    # Unlimited
+      supported_networks: ["*"]
+      audit_included: true
+      priority_support: true
+      custom_templates: true
+      dedicated_support: true
+      sla_guarantee: true
+
+# Discount rules
+discounts:
+  # Volume discounts
+  volume:
+    - threshold: 10   # 10+ deployments per month
+      discount: 0.10  # 10% off
+    - threshold: 50   # 50+ deployments per month
+      discount: 0.20  # 20% off
+    - threshold: 100  # 100+ deployments per month
+      discount: 0.30  # 30% off
+  
+  # Early adopter discount
+  early_adopter:
+    enabled: true
+    discount: 0.25  # 25% off for first 1000 users
+    expires: "2026-06-30"
+    
+  # Referral discount
+  referral:
+    enabled: true
+    referee_discount: 0.15  # 15% off for referred user
+    referrer_credit: 5.00   # $5 credit for referrer
+
+# Payment methods
+payment_methods:
+  x402:
+    enabled: true
+    supported_tokens: ["USDC", "USDT"]
+    min_payment: 0.01
+    max_payment: 1000.00
+    
+  stripe:
+    enabled: true  # For subscriptions
+    supported_currencies: ["USD", "EUR"]
+    
+  crypto_direct:
+    enabled: true
+    supported_tokens: ["USDC", "USDT", "ETH", "AVAX", "MNT"]
+
+# Rate limits (prevents abuse)
+rate_limits:
+  free_tier:
+    deployments_per_hour: 2
+    workflows_per_hour: 5
+    
+  paid_tier:
+    deployments_per_hour: 10
+    workflows_per_hour: 50
+    
+  enterprise:
+    deployments_per_hour: -1  # Unlimited
+    workflows_per_hour: -1    # Unlimited
+
+# Refund policy
+refunds:
+  enabled: true
+  window_hours: 24  # 24-hour refund window
+  conditions:
+    - "deployment_failed"
+    - "contract_not_deployed"
+    - "audit_critical_issues"
+

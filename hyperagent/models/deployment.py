@@ -54,7 +54,8 @@ class Deployment(Base):
     eigenda_commitment = Column(String(256))  # KZG commitment hash
     eigenda_batch_header = Column(JSONB)
 
-    meta_data = Column("metadata", JSONB, default={})
+    # Metadata storage - using 'meta_data' as both Python attribute and DB column name to avoid SQLAlchemy reserved 'metadata' conflict
+    meta_data = Column("meta_data", JSONB, default={})
 
     # Relationships
     contract = relationship("GeneratedContract", back_populates="deployments")

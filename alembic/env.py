@@ -1,14 +1,39 @@
 """Alembic environment configuration"""
+import socket
 from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool
+from urllib.parse import urlparse
+
 from alembic import context
+from sqlalchemy import engine_from_config, pool
+
 from hyperagent.core.config import settings
 
 # this is the Alembic Config object
 config = context.config
 
-# Set SQLAlchemy URL from settings
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# Apply database fallback logic (Supabase -> Docker Postgres)
+def get_database_url_with_fallback():
+    """Apply same fallback logic as async engine"""
+    primary_url = settings.database_url
+    fallback_url = "postgresql://hyperagent_user:secure_password@postgres:5432/hyperagent_db"
+    
+    if "supabase.co" in primary_url:
+        try:
+            # Test DNS resolution
+            parsed = urlparse(primary_url)
+            hostname = parsed.hostname
+            socket.setdefaulttimeout(2)
+            socket.gethostbyname(hostname)
+            print(f"✓ Supabase hostname resolved - using primary database for migrations")
+            return primary_url
+        except (socket.gaierror, socket.timeout):
+            print(f"✗ Supabase unreachable - using Docker Postgres for migrations")
+            return fallback_url
+    else:
+        return primary_url
+
+# Set SQLAlchemy URL from settings with fallback
+config.set_main_option("sqlalchemy.url", get_database_url_with_fallback())
 
 # Interpret the config file for Python logging
 if config.config_file_name is not None:

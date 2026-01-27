@@ -42,7 +42,7 @@ USDC_ADDRESS_FUJI=0x5425890298aed601595a70AB815c96711a31Bc65
 # Optional - Redis (leave empty for single instance)
 REDIS_URL=
 
-# Optional - PRIVATE_KEY (only for EigenDA/Alith)
+# Optional - PRIVATE_KEY (only for EigenDA)
 PRIVATE_KEY=
 ```
 
@@ -119,7 +119,6 @@ Add Redis when you need:
 
 Only add `PRIVATE_KEY` if you need:
 - EigenDA data availability (Mantle deployments)
-- Alith autonomous deployment
 - Legacy non-x402 network deployments
 
 **For x402 networks (Avalanche)**: Users sign in their wallets, no PRIVATE_KEY needed.

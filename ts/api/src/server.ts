@@ -40,14 +40,17 @@ async function buildServer() {
 
   // Routes
   await app.register(registerHealthRoutes);
-  let store: WorkflowStore | null = null;
-  if (env.DATABASE_URL) {
-    store = new WorkflowStore(env.DATABASE_URL);
-    await store.init();
-    app.log.info("WorkflowStore initialized");
-  } else {
-    app.log.warn("DATABASE_URL not set, workflow persistence disabled");
-  }
+  
+  // Database connection with automatic fallback: Supabase (primary) -> Local Postgres (fallback)
+  const localPostgresUrl = "postgresql://hyperagent_user:secure_password@postgres:5432/hyperagent_db";
+  const store = await WorkflowStore.createWithFallback({
+    supabaseUrl: env.DATABASE_URL,
+    localUrl: localPostgresUrl,
+    logger: app.log,
+  });
+  
+  await store.init();
+  app.log.info("WorkflowStore initialized successfully");
 
   await app.register(registerWorkflowRoutes, { store, env });
   await app.register(registerV1Routes, { store, env });

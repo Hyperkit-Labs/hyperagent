@@ -14,7 +14,6 @@ from hyperagent.api.models import (
     DeploymentRequest,
     DeploymentResponse,
 )
-from hyperagent.blockchain.alith_client import AlithClient
 from hyperagent.blockchain.eigenda_client import EigenDAClient
 from hyperagent.blockchain.networks import NetworkManager
 from hyperagent.cache.redis_manager import RedisManager
@@ -34,7 +33,6 @@ async def get_deployment_service() -> DeploymentService:
     server_private_key = await secrets_manager.get_server_wallet_key()
     
     network_manager = NetworkManager()
-    alith_client = AlithClient()
     eigenda_client = EigenDAClient(
         disperser_url=settings.eigenda_disperser_url,
         private_key=server_private_key,
@@ -42,9 +40,7 @@ async def get_deployment_service() -> DeploymentService:
     )
     return DeploymentService(
         network_manager=network_manager,
-        alith_client=alith_client,
         eigenda_client=eigenda_client,
-        use_alith_autonomous=False,
     )
 
 
@@ -65,7 +61,6 @@ async def deploy_contract(request: DeploymentRequest) -> DeploymentResponse:
     server_private_key = await secrets_manager.get_server_wallet_key()
     
     network_manager = NetworkManager()
-    alith_client = AlithClient()
     eigenda_client = EigenDAClient(
         disperser_url=settings.eigenda_disperser_url,
         private_key=server_private_key,
@@ -83,7 +78,6 @@ async def deploy_contract(request: DeploymentRequest) -> DeploymentResponse:
 
     deployment_agent = DeploymentAgent(
         network_manager=network_manager,
-        alith_client=alith_client,
         eigenda_client=eigenda_client,
         event_bus=event_bus,
     )

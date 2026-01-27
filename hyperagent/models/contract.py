@@ -47,7 +47,8 @@ class GeneratedContract(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    meta_data = Column("metadata", JSONB, default={})
+    # Metadata storage - using 'meta_data' as both Python attribute and DB column name to avoid SQLAlchemy reserved 'metadata' conflict
+    meta_data = Column("meta_data", JSONB, default={})
 
     # Relationships
     workflow = relationship("Workflow", back_populates="contracts")

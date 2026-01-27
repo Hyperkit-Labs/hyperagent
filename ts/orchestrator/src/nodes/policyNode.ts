@@ -1,5 +1,6 @@
 import { HyperAgentState, withUpdates } from "../core/spec/state";
 import { NodeDefinition, NodeImplementation, NodeType } from "../core/spec/nodes";
+import { NODE_TIMEOUTS, NODE_RETRIES, VALIDATION_LIMITS } from "../core/constants";
 
 /**
  * NODE SPECIFICATION: PolicyNode
@@ -9,8 +10,8 @@ import { NodeDefinition, NodeImplementation, NodeType } from "../core/spec/nodes
 // Validation function
 function validatePolicyInput(state: HyperAgentState): boolean {
   const checks = [
-    state.intent.length > 0,
-    state.intent.length < 500,
+    state.intent.length >= VALIDATION_LIMITS.MIN_INTENT_LENGTH,
+    state.intent.length <= VALIDATION_LIMITS.MAX_INTENT_LENGTH,
     /^[a-zA-Z0-9\s:,.\-()]*$/.test(state.intent), // ASCII only
   ];
   return checks.every((c) => c === true);
@@ -18,10 +19,10 @@ function validatePolicyInput(state: HyperAgentState): boolean {
 
 export const policyNode: NodeImplementation = {
   definition: {
-    input: "HyperAgentState" as any,
-    output: "HyperAgentState" as any,
-    maxRetries: 1,
-    timeoutMs: 5000,
+    input: "HyperAgentState",
+    output: "HyperAgentState",
+    maxRetries: NODE_RETRIES.POLICY,
+    timeoutMs: NODE_TIMEOUTS.POLICY,
     nextNode: "generate",
   },
   async execute(state: HyperAgentState): Promise<HyperAgentState> {

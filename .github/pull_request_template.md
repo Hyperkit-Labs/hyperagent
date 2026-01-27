@@ -2,29 +2,27 @@
 
 ## Description
 
-<!-- Provide a clear and concise description of what this PR does -->
+<!-- Provide a clear description of what this PR does -->
 
 ## Type of Change
 
-<!-- Check all that apply -->
-
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] Bug fix (non-breaking change fixing an issue)
+- [ ] New feature (non-breaking change adding functionality)
+- [ ] Breaking change (fix or feature causing existing functionality to change)
 - [ ] Documentation update
-- [ ] Code refactoring (no functional changes)
+- [ ] Code refactoring
 - [ ] Performance improvement
-- [ ] Test addition or update
-- [ ] CI/CD or DevOps changes
+- [ ] Test addition/update
 
 ## Related Issues
 
 <!-- Link to related issues using #issue-number -->
-<!-- Example: Fixes #123, Related to #456 -->
+Closes #
+Related to #
 
 ## Changes Made
 
-<!-- List the key changes in this PR -->
+<!-- List the main changes in this PR -->
 
 - 
 - 
@@ -32,51 +30,69 @@
 
 ## Testing
 
-<!-- Describe the tests you ran and provide instructions so reviewers can reproduce -->
+<!-- Describe the tests you ran and their results -->
 
 - [ ] Unit tests added/updated
 - [ ] Integration tests added/updated
-- [ ] Manual testing completed
+- [ ] Manual testing performed
 - [ ] All existing tests pass
 
 ### Test Coverage
 
-<!-- If applicable, note test coverage changes -->
-- Coverage: ___% (target: 80%+)
+<!-- If applicable, include test coverage information -->
+- Coverage: %
+- New tests: 
 
 ## Checklist
 
-<!-- Check all that apply -->
+### Code Quality
+- [ ] Code follows project style guidelines
+- [ ] Self-review completed
+- [ ] Comments added for complex logic
+- [ ] Documentation updated (if needed)
+- [ ] No console.log statements left
+- [ ] No TODO comments without issue tracking
 
-- [ ] My code follows the project's style guidelines (PEP 8, type hints, async/await)
-- [ ] I have performed a self-review of my own code
-- [ ] I have commented my code, particularly in hard-to-understand areas
-- [ ] I have made corresponding changes to the documentation
-- [ ] My changes generate no new warnings or errors
-- [ ] I have added tests that prove my fix is effective or that my feature works
-- [ ] New and existing unit tests pass locally with my changes
-- [ ] Any dependent changes have been merged and published
-- [ ] I have updated the CHANGELOG.md if applicable
-- [ ] I have checked for security vulnerabilities (no hardcoded secrets, proper input validation)
-- [ ] I have verified the changes work in both development and production environments
+### Type Safety
+- [ ] TypeScript types are correct
+- [ ] No `any` types used (unless justified)
+- [ ] Type definitions updated (if needed)
 
-## Screenshots/Demo
+### Security
+- [ ] No sensitive data exposed
+- [ ] Input validation implemented
+- [ ] Error handling implemented
+- [ ] Security considerations documented
 
-<!-- If applicable, add screenshots or a demo link to help reviewers understand the changes -->
+### Performance
+- [ ] No performance regressions
+- [ ] Database queries optimized (if applicable)
+- [ ] Caching considered (if applicable)
+
+### Dependencies
+- [ ] New dependencies are necessary and justified
+- [ ] Dependency versions are compatible
+- [ ] `package.json` updated (if needed)
+- [ ] `package-lock.json` updated (if needed)
+
+### Documentation
+- [ ] README updated (if needed)
+- [ ] API documentation updated (if needed)
+- [ ] Code comments added (if needed)
+- [ ] CHANGELOG updated (if needed)
+
+## Breaking Changes
+
+<!-- If this is a breaking change, describe the impact and migration path -->
+
+**Breaking**: 
+
+**Migration**: 
+
+## Screenshots (if applicable)
+
+<!-- Add screenshots for UI changes -->
 
 ## Additional Notes
 
-<!-- Any additional information that reviewers should know -->
-
-## Reviewers
-
-<!-- Tag specific reviewers if needed -->
-<!-- @username -->
-
----
-
-**By submitting this pull request, I confirm that:**
-- [ ] I have read and followed the [Contributing Guide](../CONTRIBUTING.md)
-- [ ] I have read and followed the [Code of Conduct](../CODE_OF_CONDUCT.md)
-- [ ] My code is ready for review and follows Microsoft Engineering Fundamentals standards
-
+<!-- Any additional information reviewers should know -->

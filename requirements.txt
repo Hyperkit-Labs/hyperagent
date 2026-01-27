@@ -5,6 +5,7 @@ uvicorn[standard]==0.32.0
 pydantic==2.10.0
 pydantic-settings==2.6.0
 email-validator==2.2.0
+PyYAML==6.0.2  # YAML config loading
 # Note: starlette vulnerabilities are fixed in FastAPI 0.115.0 (includes starlette 0.40.0+)
 
 # Async & Concurrency
@@ -26,10 +27,6 @@ web3==6.20.0
 eth-account==0.10.0
 eth-keys==0.5.0
 eth-typing==5.2.1
-
-# Alith SDK (Decentralized AI Agent Framework)
-# Install with: pip install alith -U
-alith>=0.1.0
 
 # EigenDA Python SDK (Optional - community SDK)
 # Install with: pip install git+https://github.com/powerloom/eigenda-py.git

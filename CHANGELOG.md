@@ -40,7 +40,7 @@ See [SECURITY.md](./SECURITY.md) for detailed information.
 
 - Initial release of HyperAgent
 - AI-powered smart contract generation and auditing
-- Multi-chain deployment support (Hyperion, Mantle, Avalanche)
+- Multi-chain deployment support (Mantle, Avalanche)
 - ERC4337 Smart Account deployment support
 - x402 payment gating middleware
 - RAG system for template retrieval

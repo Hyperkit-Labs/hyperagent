@@ -12,9 +12,91 @@ export interface WorkflowEvent {
 
 export class WorkflowStore {
   private readonly pool: Pool;
+  private readonly connectionUrl: string;
 
   constructor(databaseUrl: string) {
-    this.pool = new Pool({ connectionString: databaseUrl });
+    this.connectionUrl = databaseUrl;
+    
+    // Configure pool for Supabase compatibility
+    // Supabase uses pgbouncer for connection pooling
+    const isSupabase = databaseUrl.includes("supabase.com") || databaseUrl.includes("pooler.supabase.com");
+    
+    const poolConfig: ConstructorParameters<typeof Pool>[0] = {
+      connectionString: databaseUrl,
+    };
+
+    if (isSupabase) {
+      // For Supabase/pgbouncer: use transaction mode, disable statement pooling
+      // pgbouncer handles pooling, so we use minimal pooling at the application level
+      poolConfig.max = 5; // Lower max connections for pgbouncer
+      poolConfig.idleTimeoutMillis = 30000;
+      poolConfig.connectionTimeoutMillis = 10000;
+    } else {
+      // For direct PostgreSQL connections: standard pooling
+      poolConfig.max = 20;
+      poolConfig.idleTimeoutMillis = 30000;
+      poolConfig.connectionTimeoutMillis = 10000;
+    }
+
+    this.pool = new Pool(poolConfig);
+  }
+
+  /**
+   * Create WorkflowStore with automatic fallback from Supabase to local Postgres
+   * Strategy: Try Supabase first (primary), fallback to local Docker Postgres
+   */
+  static async createWithFallback(options: {
+    supabaseUrl?: string;
+    localUrl: string;
+    logger?: any;
+  }): Promise<WorkflowStore> {
+    const { supabaseUrl, localUrl, logger } = options;
+
+    // Try Supabase first if URL is provided
+    if (supabaseUrl && supabaseUrl.includes("supabase.co")) {
+      try {
+        logger?.info("Attempting connection to Supabase (primary)...");
+        const store = new WorkflowStore(supabaseUrl);
+        
+        // Test connection with timeout
+        await store.testConnection(5000);
+        
+        logger?.info("✓ Connected to Supabase successfully");
+        return store;
+      } catch (error: any) {
+        logger?.warn(
+          `✗ Supabase connection failed: ${error.message || error}. Falling back to local Postgres...`
+        );
+      }
+    }
+
+    // Fallback to local Postgres
+    try {
+      logger?.info("Connecting to local Postgres (fallback)...");
+      const store = new WorkflowStore(localUrl);
+      
+      // Test connection
+      await store.testConnection(5000);
+      
+      logger?.info("✓ Connected to local Postgres successfully");
+      return store;
+    } catch (error: any) {
+      const msg = `Failed to connect to both Supabase and local Postgres: ${error.message || error}`;
+      logger?.error(msg);
+      throw new Error(msg);
+    }
+  }
+
+  /**
+   * Test database connection with timeout
+   */
+  private async testConnection(timeoutMs: number): Promise<void> {
+    return Promise.race([
+      this.pool.query("SELECT 1"),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Connection timeout")), timeoutMs)
+      ),
+    ]).then(() => {});
   }
 
   // ---------------------------------------------------------------------------

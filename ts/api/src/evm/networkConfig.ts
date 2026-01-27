@@ -1,4 +1,5 @@
 import { Env } from "../config/env";
+import { getNetwork, getConfigLoader } from "../config/configLoader";
 
 export type NetworkConfig = {
   network: string;
@@ -20,7 +21,9 @@ export type StaticNetworkKey =
   | "filecoin_mainnet"
   | "filecoin_calibration";
 
-const STATIC: Record<StaticNetworkKey, { chainId: number; explorer: string | null }> = {
+// Network config is now loaded from config/networks.yaml via config loader
+// Legacy hardcoded config kept for fallback during migration
+const STATIC_FALLBACK: Record<StaticNetworkKey, { chainId: number; explorer: string | null }> = {
   avalanche_fuji: { chainId: 43113, explorer: "https://testnet.snowtrace.io" },
   avalanche_mainnet: { chainId: 43114, explorer: "https://snowtrace.io" },
   mantle_testnet: { chainId: 5003, explorer: "https://sepolia.mantlescan.xyz" },
@@ -56,10 +59,20 @@ export function parseEvmChainId(input: string): number | null {
     return Number.isFinite(id) ? id : null;
   }
 
-  // Known static network key
-  const norm = normalizeNetworkId(raw) as StaticNetworkKey;
-  if (Object.prototype.hasOwnProperty.call(STATIC, norm)) {
-    return STATIC[norm].chainId;
+  // Try loading from config/networks.yaml first
+  const norm = normalizeNetworkId(raw);
+  try {
+    const networkConfig = getNetwork(norm);
+    if (networkConfig) {
+      return networkConfig.chain_id;
+    }
+  } catch {
+    // Fall through to legacy fallback
+  }
+
+  // Fallback to legacy static config
+  if (Object.prototype.hasOwnProperty.call(STATIC_FALLBACK, norm)) {
+    return STATIC_FALLBACK[norm as StaticNetworkKey].chainId;
   }
 
   return null;
@@ -93,8 +106,33 @@ export function getNetworkConfig(env: Env, network: string): NetworkConfig {
   const rpcUrls = safeParseRpcUrls(env.RPC_URLS);
   const rpcOverride = rpcUrls[normalized];
 
-  // If the network key is known, prefer explicit env vars, then RPC_URLS, then Thirdweb.
-  if (Object.prototype.hasOwnProperty.call(STATIC, normalized)) {
+  // Try loading from config/networks.yaml first
+  try {
+    const yamlConfig = getNetwork(normalized);
+    if (yamlConfig) {
+      // Prefer: explicit env vars > RPC_URLS > YAML config > Thirdweb
+      const rpcUrl =
+        (normalized === "avalanche_fuji" && env.RPC_URL_AVALANCHE_FUJI) ||
+        (normalized === "avalanche_mainnet" && env.RPC_URL_AVALANCHE_MAINNET) ||
+        (normalized === "mantle_testnet" && env.RPC_URL_MANTLE_TESTNET) ||
+        (normalized === "mantle_mainnet" && env.RPC_URL_MANTLE_MAINNET) ||
+        rpcOverride ||
+        yamlConfig.rpc_urls[0] ||
+        buildThirdwebRpcUrl(yamlConfig.chain_id, env.THIRDWEB_CLIENT_ID);
+
+      return {
+        network: normalized,
+        chainId: yamlConfig.chain_id,
+        explorer: yamlConfig.explorer || null,
+        rpcUrl,
+      };
+    }
+  } catch {
+    // Fall through to legacy fallback
+  }
+
+  // Legacy fallback: If the network key is known, prefer explicit env vars, then RPC_URLS, then Thirdweb.
+  if (Object.prototype.hasOwnProperty.call(STATIC_FALLBACK, normalized)) {
     const key = normalized as StaticNetworkKey;
     const rpcUrl =
       (key === "avalanche_fuji" && env.RPC_URL_AVALANCHE_FUJI) ||
@@ -102,12 +140,12 @@ export function getNetworkConfig(env: Env, network: string): NetworkConfig {
       (key === "mantle_testnet" && env.RPC_URL_MANTLE_TESTNET) ||
       (key === "mantle_mainnet" && env.RPC_URL_MANTLE_MAINNET) ||
       rpcOverride ||
-      buildThirdwebRpcUrl(STATIC[key].chainId, env.THIRDWEB_CLIENT_ID);
+      buildThirdwebRpcUrl(STATIC_FALLBACK[key].chainId, env.THIRDWEB_CLIENT_ID);
 
     return {
       network: key,
-      chainId: STATIC[key].chainId,
-      explorer: STATIC[key].explorer,
+      chainId: STATIC_FALLBACK[key].chainId,
+      explorer: STATIC_FALLBACK[key].explorer,
       rpcUrl,
     };
   }

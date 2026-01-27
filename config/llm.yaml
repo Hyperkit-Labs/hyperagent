@@ -1,0 +1,198 @@
+# ============================================================================
+# LLM Provider Configuration
+# ============================================================================
+# This file contains LLM model settings, priorities, and routing logic.
+# API keys are stored in .env for security.
+#
+# Last updated: 2025-01-28
+
+providers:
+  gemini:
+    enabled: true
+    priority: 1  # Primary provider
+    models:
+      default: "gemini-2.5-flash"
+      # Available models:
+      # - gemini-2.5-flash (fastest, recommended)
+      # - gemini-2.5-flash-lite (lighter, faster)
+      # - gemini-2.0-flash (previous generation)
+      # - gemini-2.0-flash-lite (previous generation, lighter)
+    
+    generation:
+      temperature: 0.3
+      max_output_tokens: 8000
+      thinking_budget: null  # 1-1000 for Gemini 2.5 Flash models (optional)
+      timeout_seconds: 120
+    
+    embedding:
+      model: "text-embedding-004"
+      dimensions: 768
+      timeout_seconds: 30
+    
+    rate_limits:
+      requests_per_minute: 60
+      tokens_per_minute: 100000
+    
+    features:
+      multimodal: true
+      function_calling: true
+      streaming: true
+      json_mode: true
+
+  openai:
+    enabled: true
+    priority: 2  # Fallback provider
+    models:
+      default: "gpt-4o"
+      # Available models:
+      # - gpt-4o (recommended)
+      # - gpt-4-turbo
+      # - gpt-3.5-turbo
+    
+    generation:
+      temperature: 0.3
+      max_tokens: 8000
+      timeout_seconds: 120
+    
+    embedding:
+      model: "text-embedding-3-large"
+      dimensions: 3072
+      timeout_seconds: 30
+    
+    rate_limits:
+      requests_per_minute: 500
+      tokens_per_minute: 150000
+    
+    features:
+      multimodal: true
+      function_calling: true
+      streaming: true
+      json_mode: true
+
+  anthropic:
+    enabled: false
+    priority: 3  # Tertiary fallback
+    models:
+      default: "claude-3-5-sonnet-20241022"
+      # Available models:
+      # - claude-3-5-sonnet-20241022 (recommended)
+      # - claude-3-5-haiku-20241022
+      # - claude-3-opus-20240229
+    
+    generation:
+      temperature: 0.3
+      max_tokens: 8000
+      timeout_seconds: 120
+    
+    rate_limits:
+      requests_per_minute: 50
+      tokens_per_minute: 100000
+    
+    features:
+      multimodal: true
+      function_calling: true
+      streaming: true
+      json_mode: false
+
+  together:
+    enabled: false
+    priority: 4  # Budget fallback
+    models:
+      default: "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+      # Available models:
+      # - meta-llama/Llama-3.3-70B-Instruct-Turbo
+      # - meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo
+      # - Qwen/Qwen2.5-Coder-32B-Instruct
+    
+    generation:
+      temperature: 0.3
+      max_tokens: 8000
+      timeout_seconds: 120
+    
+    rate_limits:
+      requests_per_minute: 60
+      tokens_per_minute: 100000
+
+# Multi-Model Routing Configuration
+routing:
+  strategy: "priority"  # Options: priority, cost_optimized, latency_optimized, round_robin
+  
+  # Task-specific model routing
+  tasks:
+    solidity_codegen:
+      primary: "gemini"
+      fallback: ["openai", "anthropic"]
+      timeout: 120
+      retry_attempts: 2
+    
+    gas_optimization:
+      primary: "openai"
+      fallback: ["gemini"]
+      timeout: 60
+      retry_attempts: 1
+    
+    audit_analysis:
+      primary: "gemini"
+      fallback: ["openai"]
+      timeout: 90
+      retry_attempts: 2
+    
+    test_generation:
+      primary: "openai"
+      fallback: ["gemini"]
+      timeout: 60
+      retry_attempts: 1
+    
+    documentation:
+      primary: "gemini"
+      fallback: ["openai"]
+      timeout: 30
+      retry_attempts: 1
+
+  # Fallback behavior
+  fallback:
+    enabled: true
+    max_retries: 3
+    backoff_multiplier: 2
+    retry_on_errors:
+      - "rate_limit"
+      - "timeout"
+      - "server_error"
+      - "api_key_invalid"
+
+# Cost tracking (USD per 1M tokens)
+pricing:
+  gemini:
+    input: 0.075
+    output: 0.30
+  
+  openai:
+    input: 2.50
+    output: 10.00
+  
+  anthropic:
+    input: 3.00
+    output: 15.00
+  
+  together:
+    input: 0.60
+    output: 0.60
+
+# Feature flags
+features:
+  enable_acontext: false  # AI memory/RAG integration
+  enable_multi_model_router: true
+  enable_cost_tracking: true
+  enable_latency_monitoring: true
+  enable_automatic_fallback: true
+  prefer_streaming: false
+
+# Global settings
+global:
+  default_provider: "gemini"
+  embedding_provider: "gemini"
+  max_concurrent_requests: 10
+  request_queue_size: 100
+  cache_responses: true
+  cache_ttl_seconds: 3600
+

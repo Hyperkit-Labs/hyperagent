@@ -7,7 +7,6 @@ from hyperagent.cache.redis_manager import RedisManager
 from hyperagent.security.anomaly_detector import AnomalyDetector
 from hyperagent.security.input_validator import InputValidator
 from hyperagent.security.memory_isolation import MemoryIsolation
-from hyperagent.security.tee_audit import TEEAuditor
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +27,6 @@ class DefenseSystem:
         self.redis_manager = redis_manager
         self.input_validator = InputValidator(redis_manager=redis_manager)
         self.memory_isolation = MemoryIsolation(redis_manager=redis_manager)
-        self.tee_auditor = TEEAuditor()
         self.anomaly_detector = AnomalyDetector(redis_manager=redis_manager)
         self._circuit_breaker_failures = 0
         self._emergency_paused = False
@@ -59,16 +57,6 @@ class DefenseSystem:
 
         if await self._check_circuit_breaker():
             return False, "Circuit breaker activated due to consecutive failures"
-
-        contract_code = request.get("contract_code", "")
-        is_private = request.get("is_private", False)
-
-        if is_private and contract_code:
-            tee_result = await self.tee_auditor.audit_in_tee(
-                contract_code, is_private=True, network=request.get("network", "mantle_testnet")
-            )
-            if not tee_result.get("tee_audit"):
-                logger.warning(f"TEE audit failed: {tee_result.get('error')}")
 
         await self._reset_circuit_breaker()
         return True, ""

@@ -64,36 +64,31 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
       
-      # IPFS/Pinata
+      # IPFS/Pinata Storage
       - PINATA_JWT=${PINATA_JWT:-}
+      - PINATA_API_KEY=${PINATA_API_KEY:-}
+      - PINATA_API_SECRET=${PINATA_API_SECRET:-}
+      - PINATA_TEAM_ID=${PINATA_TEAM_ID:-}
+      - PINATA_COMMUNITY_ID=${PINATA_COMMUNITY_ID:-}
+      - PINATA_TEMPLATE_ID=${PINATA_TEMPLATE_ID:-}
       
-      # Blockchain Networks
-      - MANTLE_TESTNET_RPC=${MANTLE_TESTNET_RPC:-https://rpc.sepolia.mantle.xyz}
-      - MANTLE_TESTNET_CHAIN_ID=${MANTLE_TESTNET_CHAIN_ID:-5003}
-      - AVALANCHE_FUJI_RPC=${AVALANCHE_FUJI_RPC:-https://api.avax-test.network/ext/bc/C/rpc}
-      - AVALANCHE_FUJI_CHAIN_ID=${AVALANCHE_FUJI_CHAIN_ID:-43113}
-      - AVALANCHE_MAINNET_RPC=${AVALANCHE_MAINNET_RPC:-https://api.avax.network/ext/bc/C/rpc}
-      - AVALANCHE_MAINNET_CHAIN_ID=${AVALANCHE_MAINNET_CHAIN_ID:-43114}
+      # Network Configuration
+      # Note: Network RPC URLs, chain IDs, explorers are configured in config/networks.yaml
+      # Note: Token addresses (USDC, etc.) are configured in config/tokens.yaml
       
       # Thirdweb Configuration
       - THIRDWEB_CLIENT_ID=${THIRDWEB_CLIENT_ID:-}
       - THIRDWEB_SECRET_KEY=${THIRDWEB_SECRET_KEY:-}
-      - THIRDWEB_SERVER_WALLET_ADDRESS=${THIRDWEB_SERVER_WALLET_ADDRESS:-}
+      - THIRDWEB_SERVER_WALLET_ADDRESS=${THIRDWEB_SERVER_WALLET_ADDRESS:-0x0000000000000000000000000000000000000000}
       - THIRDWEB_SERVER_WALLET_PRIVATE_KEY=${THIRDWEB_SERVER_WALLET_PRIVATE_KEY:-}
       - MERCHANT_WALLET_ADDRESS=${MERCHANT_WALLET_ADDRESS:-}
       
       # x402 Configuration
+      # Note: Pricing configuration (contract types, tiers) is in config/pricing.yaml
       - X402_ENABLED=${X402_ENABLED:-false}
       - X402_ENABLED_NETWORKS=${X402_ENABLED_NETWORKS:-avalanche_fuji,avalanche_mainnet}
       - X402_SERVICE_URL=http://x402-verifier:3001
       - X402_SERVICE_PORT=${X402_SERVICE_PORT:-3002}
-      - USDC_ADDRESS_FUJI=${USDC_ADDRESS_FUJI:-}
-      - USDC_ADDRESS_AVALANCHE=${USDC_ADDRESS_AVALANCHE:-}
-      - USDC_ADDRESS_ETHEREUM=${USDC_ADDRESS_ETHEREUM:-}
-      - USDC_ADDRESS_POLYGON=${USDC_ADDRESS_POLYGON:-}
-      - USDC_ADDRESS_BASE=${USDC_ADDRESS_BASE:-}
-      - USDC_ADDRESS_OPTIMISM=${USDC_ADDRESS_OPTIMISM:-}
-      - USDC_ADDRESS_ARBITRUM=${USDC_ADDRESS_ARBITRUM:-}
       
       # Security & Wallet
       - PRIVATE_KEY=${PRIVATE_KEY:-}
@@ -113,8 +108,6 @@ services:
       # Security & TEE
       - GUARDIAN_MODEL_URL=${GUARDIAN_MODEL_URL:-}
       - GUARDIAN_MODEL_API_KEY=${GUARDIAN_MODEL_API_KEY:-}
-      - LAZAI_API_KEY=${LAZAI_API_KEY:-}
-      - LAZAI_URL=${LAZAI_URL:-https://api.lazai.com}
       - ATTESTATION_CONTRACT_ADDRESS=${ATTESTATION_CONTRACT_ADDRESS:-}
       
       # Monitoring & Analytics
@@ -155,6 +148,8 @@ services:
       - ./hyperagent:/app/hyperagent:ro
       - ./logs:/app/logs
       - ./alembic:/app/alembic:ro
+      # Mount YAML configuration files
+      - ./config:/app/config:ro
     networks:
       - hyperagent_network
     restart: unless-stopped
@@ -329,9 +324,8 @@ services:
       - X402_VERIFIER_URL=http://x402-verifier:3001
       - X402_ENABLED=${X402_ENABLED:-false}
       - MERCHANT_WALLET_ADDRESS=${MERCHANT_WALLET_ADDRESS:-}
-      - X402_CONTRACT_PRICE_USDC=${X402_CONTRACT_PRICE_USDC:-0.01}
-      - X402_WORKFLOW_PRICE_USDC=${X402_WORKFLOW_PRICE_USDC:-0.02}
-      - X402_DEPLOY_PRICE_USDC=${X402_DEPLOY_PRICE_USDC:-0.10}
+      # Note: Pricing (contract types, workflow tiers) is in config/pricing.yaml
+      # Note: Network RPC URLs and token addresses are in config/networks.yaml and config/tokens.yaml
       - DATABASE_URL=${DATABASE_URL:-postgresql://hyperagent_user:secure_password@postgres:5432/hyperagent_db}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
     networks:
@@ -343,6 +337,9 @@ services:
         condition: service_healthy
       hyperagent:
         condition: service_healthy
+    volumes:
+      # Mount YAML configuration files
+      - ./config:/app/config:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/healthz', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]

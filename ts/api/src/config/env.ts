@@ -1,8 +1,24 @@
-import { loadRootEnv } from "@hyperagent/env";
 import { z } from "zod";
+import { config as dotenvConfig } from "dotenv";
+import { resolve } from "path";
 
-// Load repo-root .env (single source of truth) before validating process.env.
-loadRootEnv();
+// Load root .env file - @hyperagent/env is optional and may not be available in Docker
+// Use dotenv directly to load from repo root
+const rootEnvPath = resolve(__dirname, "../../../../.env");
+dotenvConfig({ path: rootEnvPath });
+dotenvConfig(); // Also load local .env if exists
+
+// Try to use @hyperagent/env if available (optional)
+try {
+  // Use dynamic require to avoid module resolution errors
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const envModule = require("@hyperagent/env");
+  if (envModule && typeof envModule.loadRootEnv === "function") {
+    envModule.loadRootEnv();
+  }
+} catch {
+  // Module not available - dotenv already loaded above, continue
+}
 
 type JsonObject = Record<string, unknown>;
 
@@ -31,6 +47,27 @@ const tierBasic = typeof priceTiers?.basic === "number" ? priceTiers.basic : und
 const tierAdvanced = typeof priceTiers?.advanced === "number" ? priceTiers.advanced : undefined;
 const tierDeployment = typeof priceTiers?.deployment === "number" ? priceTiers.deployment : undefined;
 
+// Helper to construct Supabase DATABASE_URL if SUPABASE_URL and SUPABASE_PASSWORD are set
+function resolveDatabaseUrl(): string | undefined {
+  const explicitDbUrl = process.env.DATABASE_URL;
+  if (explicitDbUrl) {
+    return explicitDbUrl;
+  }
+
+  // Try Supabase credentials (production)
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.supabase_url;
+  const supabasePassword = process.env.SUPABASE_PASSWORD || process.env.supabase_password;
+
+  if (supabaseUrl && supabasePassword) {
+    // Construct Supabase connection string
+    // Format: postgresql://postgres:PASSWORD@db.PROJECT_REF.supabase.co:5432/postgres
+    const supabaseHost = supabaseUrl.replace("https://", "").replace("http://", "");
+    return `postgresql://postgres:${supabasePassword}@db.${supabaseHost}:5432/postgres`;
+  }
+
+  return undefined;
+}
+
 // Map legacy/root env names to the TS API-specific env schema.
 // This keeps .env.example stable while TS services can adopt a more explicit naming.
 const rawEnv: Record<string, string | undefined> = {
@@ -41,6 +78,9 @@ const rawEnv: Record<string, string | undefined> = {
 
   // TS-first API settings
   PORT: process.env.PORT ?? process.env.TS_API_PORT,
+
+  // Database - resolve from DATABASE_URL or Supabase credentials
+  DATABASE_URL: resolveDatabaseUrl(),
 
   // Service URLs
   PYTHON_BACKEND_URL: process.env.PYTHON_BACKEND_URL,
@@ -72,7 +112,7 @@ const envSchema = z.object({
   HOST: z.string().default("0.0.0.0"),
   PYTHON_BACKEND_URL: z.string().url().optional(),
   X402_VERIFIER_URL: z.string().url().optional(),
-  DATABASE_URL: z.string().url().optional(),
+  DATABASE_URL: z.string().url(), // Required - use Supabase or provide DATABASE_URL
   REDIS_URL: z.string().url().optional(),
 
   // Thirdweb

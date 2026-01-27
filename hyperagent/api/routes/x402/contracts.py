@@ -19,11 +19,24 @@ from hyperagent.db.session import get_db
 router = APIRouter(prefix="/api/v1/x402/contracts", tags=["x402-contracts"])
 x402_middleware = X402Middleware()
 
-PRICE_TIERS = {
-    "ERC20": {"tier": "basic", "price": 0.01},
-    "ERC721": {"tier": "basic", "price": 0.02},
-    "Custom": {"tier": "advanced", "price": 0.15},
-}
+# Price tiers are now loaded from config/pricing.yaml
+def get_price_tier_info(contract_type: str) -> dict:
+    """Get price tier info from config/pricing.yaml"""
+    try:
+        from hyperagent.core.config_loader import get_contract_price
+        price = get_contract_price(contract_type)
+        # Map contract types to tiers
+        tier_map = {"ERC20": "basic", "ERC721": "basic", "Custom": "advanced"}
+        tier = tier_map.get(contract_type, "advanced")
+        return {"tier": tier, "price": price}
+    except Exception:
+        # Fallback to legacy hardcoded values during migration
+        fallback = {
+            "ERC20": {"tier": "basic", "price": 0.01},
+            "ERC721": {"tier": "basic", "price": 0.02},
+            "Custom": {"tier": "advanced", "price": 0.15},
+        }
+        return fallback.get(contract_type, fallback["Custom"])
 
 
 @router.post("/generate", response_model=ContractGenerationResponse)
@@ -31,7 +44,7 @@ async def generate_contract_with_payment(
     request: ContractGenerationRequest, http_request: Request, db: AsyncSession = Depends(get_db)
 ):
     contract_type = request.contract_type or "Custom"
-    tier_info = PRICE_TIERS.get(contract_type, PRICE_TIERS["Custom"])
+    tier_info = get_price_tier_info(contract_type)
 
     # Extract wallet address from headers (case-insensitive) or request body
     wallet_address = (

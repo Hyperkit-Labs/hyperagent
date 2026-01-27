@@ -15,7 +15,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from hyperagent.agents.testing import TestingAgent
 from hyperagent.architecture.soa import ServiceRegistry
-from hyperagent.blockchain.alith_client import AlithClient
 from hyperagent.blockchain.eigenda_client import EigenDAClient
 from hyperagent.blockchain.networks import NetworkManager
 from hyperagent.core.config import settings
@@ -134,7 +133,6 @@ async def execute_workflow_background(
             template_retriever = TemplateRetriever(llm_provider, db)
 
             network_manager = NetworkManager()
-            alith_client = AlithClient()
             eigenda_client = EigenDAClient(
                 disperser_url=settings.eigenda_disperser_url,
                 private_key=settings.private_key,
@@ -164,7 +162,7 @@ async def execute_workflow_background(
                 "testing", TestingService(TestingAgent(event_bus, llm_provider))
             )
             service_registry.register(
-                "deployment", DeploymentService(network_manager, alith_client, eigenda_client)
+                "deployment", DeploymentService(network_manager, eigenda_client)
             )
 
             # Create progress callback

@@ -52,7 +52,6 @@ from typing import Any, Dict, Optional
 def __init__(
     self,
     network_manager: NetworkManager,
-    alith_client: AlithClient,
     eigenda_client: EigenDAClient,
     event_bus: EventBus,
     db: Optional[AsyncSession] = None,

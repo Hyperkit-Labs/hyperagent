@@ -39,7 +39,7 @@ class GenerationAgent(ServiceInterface):
             {
                 "nlp_description": "Create ERC20 token",
                 "contract_type": "ERC20",
-                "network": "hyperion_testnet",
+                "network": "mantle_testnet",
                 "workflow_id": "workflow-123"
             }
 

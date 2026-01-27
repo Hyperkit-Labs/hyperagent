@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
+import { motion } from 'framer-motion';
 import type { PaymentInfo } from '@/lib/x402Client';
 import { createPaymentWallet, createFetchWithPayment } from '@/lib/thirdwebClient';
 import type { TaskCostBreakdown } from '@/components/workflows/TaskSelector';
@@ -50,7 +51,7 @@ export function PaymentModal({
       const fetchWithPayment = createFetchWithPayment(wallet);
 
       // Build the resource URL for payment
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
       const resourceUrl = `${API_BASE_URL}${paymentInfo.endpoint}`;
 
       // Use wrapFetchWithPayment to make request
@@ -122,20 +123,25 @@ export function PaymentModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-        <h2 className="text-2xl font-bold mb-4">Payment Required</h2>
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-gray-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl"
+      >
+        <h2 className="text-2xl font-bold mb-4 text-white">Payment Required</h2>
         
         <div className="space-y-4 mb-6">
           <div>
-            <p className="text-sm text-gray-600">Endpoint</p>
-            <p className="font-mono text-sm">{paymentInfo.endpoint}</p>
+            <p className="text-sm text-gray-400 mb-1">Endpoint</p>
+            <p className="font-mono text-sm text-gray-300 bg-gray-800/50 px-3 py-2 rounded-lg border border-white/5">{paymentInfo.endpoint}</p>
           </div>
           
           {costBreakdown ? (
             <>
               <div>
-                <p className="text-sm text-gray-600 mb-2">Task Breakdown</p>
+                <p className="text-sm text-gray-400 mb-2">Task Breakdown</p>
                 <div className="space-y-2">
                   {costBreakdown.selected_tasks.map((task) => {
                     const taskBreakdown = costBreakdown.breakdown[task];
@@ -149,10 +155,10 @@ export function PaymentModal({
                     };
                     
                     return (
-                      <div key={task} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                        <span className="text-sm text-gray-700">{taskLabels[task] || task}</span>
+                      <div key={task} className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors">
+                        <span className="text-sm text-gray-300">{taskLabels[task] || task}</span>
                         <div className="text-right">
-                          <span className="text-sm font-medium text-gray-900">
+                          <span className="text-sm font-semibold text-white">
                             ${taskBreakdown.final.toFixed(4)}
                           </span>
                           {taskBreakdown.multiplier !== 1 && (
@@ -167,10 +173,10 @@ export function PaymentModal({
                 </div>
               </div>
               
-              <div className="pt-2 border-t">
+              <div className="pt-3 border-t border-white/10">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-gray-700">Total</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-sm font-semibold text-gray-300">Total</p>
+                  <p className="text-2xl font-bold text-white">
                     ${costBreakdown.total_usdc.toFixed(4)} {paymentInfo.currency}
                   </p>
                 </div>
@@ -178,35 +184,38 @@ export function PaymentModal({
             </>
           ) : (
             <div>
-              <p className="text-sm text-gray-600">Price</p>
-              <p className="text-2xl font-bold">${paymentInfo.price_usdc} {paymentInfo.currency}</p>
+              <p className="text-sm text-gray-400 mb-1">Price</p>
+              <p className="text-2xl font-bold text-white">${paymentInfo.price_usdc} {paymentInfo.currency}</p>
             </div>
           )}
           
           <div>
-            <p className="text-sm text-gray-600">Network</p>
-            <p className="font-medium">{paymentInfo.network}</p>
+            <p className="text-sm text-gray-400 mb-1">Network</p>
+            <p className="font-semibold text-gray-300">{paymentInfo.network}</p>
           </div>
         </div>
 
         {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="mb-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
             <div className="flex items-start gap-3">
               <div className="flex-shrink-0">
-                <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-5 h-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
               </div>
               <div className="flex-1">
-                <h4 className="font-semibold text-red-800 mb-1">Payment Error</h4>
-                <p className="text-red-700 text-sm whitespace-pre-line">{error}</p>
+                <h4 className="font-semibold text-red-400 mb-1">Payment Error</h4>
+                <p className="text-red-300 text-sm whitespace-pre-line">{error}</p>
               </div>
             </div>
           </div>
         )}
 
         {status === 'success' && (
-          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-green-700 text-sm">
+          <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-xl text-green-400 text-sm flex items-center gap-2">
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
             Payment successful!
           </div>
         )}
@@ -224,6 +233,7 @@ export function PaymentModal({
             variant="primary"
             onClick={handlePayment}
             disabled={status === 'pending' || status === 'success'}
+            loading={status === 'pending'}
             className="flex-1"
           >
             {status === 'pending' && 'Processing...'}
@@ -232,7 +242,7 @@ export function PaymentModal({
             {status === 'failed' && 'Retry'}
           </Button>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

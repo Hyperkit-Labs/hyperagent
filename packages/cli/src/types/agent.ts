@@ -33,7 +33,11 @@ export type HyperAgentState = {
     proofHash: string;
     status: AgentStatus;
     logs: string[];
+    retryCount: number;
 };
+
+export const MAX_RETRIES = 3;
+
 
 export const INITIAL_STATE: HyperAgentState = {
     intent: "",
@@ -43,5 +47,6 @@ export const INITIAL_STATE: HyperAgentState = {
     txHash: "",
     proofHash: "",
     status: "processing",
-    logs: []
+    logs: [],
+    retryCount: 0
 };

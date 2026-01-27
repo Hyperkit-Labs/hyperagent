@@ -56,7 +56,7 @@ def register_system_commands(system_group: click.Group) -> None:
         """[*] Display version information"""
         console.print(f"HyperAgent v1.0.0")
         console.print(f"Python: 3.10+")
-        console.print(f"Web3: Enabled (Hyperion + Mantle)")
+        console.print(f"Web3: Enabled (EVM multichain)")
         console.print(f"LLM: Gemini (OpenAI Fallback)")
 
     @system_group.command()

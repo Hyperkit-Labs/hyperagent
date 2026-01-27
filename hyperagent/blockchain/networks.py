@@ -1,102 +1,70 @@
 """Network configuration and Web3 instance management"""
 
+import logging
 from typing import Any, Dict, List, Optional
 
 from web3 import Web3
 
-from hyperagent.blockchain.network_features import (
-    NETWORK_FEATURES,
-    NetworkFeature,
-    NetworkFeatureManager,
-)
+from hyperagent.blockchain.network_features import NetworkFeature, NetworkFeatureManager
+from hyperagent.blockchain.network_resolver import normalize_network_id, resolve_network
+from hyperagent.core.config import settings
 
-# Merge NETWORKS dict with feature registry for backward compatibility
-NETWORKS = {}
-for network_name, config in NETWORK_FEATURES.items():
-    NETWORKS[network_name] = {
-        "chain_id": config.get("chain_id"),
-        "rpc_url": config.get("rpc_url"),
-        "explorer": config.get("explorer"),
-        "currency": config.get("currency"),
-    }
+logger = logging.getLogger(__name__)
 
 
 class NetworkManager:
-    """Manage Web3 connections to different networks"""
+    """Manage Web3 connections to different networks."""
 
     def __init__(self, use_mantle_sdk: bool = False):
-        """
-        Initialize NetworkManager
-
-        Args:
-            use_mantle_sdk: If True, use Mantle SDK for Mantle networks (when available)
-        """
         self._instances: Dict[str, Web3] = {}
+        self._configs: Dict[str, Dict[str, Any]] = {}
         self.use_mantle_sdk = use_mantle_sdk
         self.mantle_sdk_clients: Dict[str, Any] = {}
 
+    def get_network_config(self, network: str) -> Dict[str, Any]:
+        """Get a resolved network configuration.
+
+        Supports config-driven networks and dynamic chainId/CAIP-2 identifiers.
+        """
+        key = normalize_network_id(network)
+        if key not in self._configs:
+            resolved = resolve_network(network, thirdweb_client_id=settings.thirdweb_client_id)
+            # Keep the legacy key shape expected by call-sites.
+            self._configs[key] = {
+                "chain_id": resolved.chain_id,
+                "rpc_url": resolved.rpc_url,
+                "explorer": resolved.explorer,
+                "currency": resolved.currency,
+                "rpc_source": resolved.rpc_source,
+                "is_dynamic": resolved.is_dynamic,
+                "network": resolved.network,
+            }
+        return self._configs[key]
+
     def get_web3(self, network: str) -> Web3:
-        """
-        Get or create Web3 instance for network
+        """Get or create Web3 instance for network."""
+        key = normalize_network_id(network)
 
-        For Mantle networks, optionally use Mantle SDK if available and enabled.
-        Otherwise, use standard Web3.py.
-        """
-        if network not in NETWORKS:
-            raise ValueError(f"Unknown network: {network}")
-
-        # For Mantle networks, optionally use SDK
-        if network.startswith("mantle") and self.use_mantle_sdk:
+        # For Mantle networks, optionally use SDK (still returns Web3.py today).
+        if key.startswith("mantle") and self.use_mantle_sdk:
             from hyperagent.blockchain.mantle_sdk import MantleSDKClient
 
-            if network not in self.mantle_sdk_clients:
-                self.mantle_sdk_clients[network] = MantleSDKClient(network)
+            if key not in self.mantle_sdk_clients:
+                self.mantle_sdk_clients[key] = MantleSDKClient(key)
 
-            # Mantle SDK Integration Status:
-            # - MantleSDKClient is initialized and available for future use
-            # - Currently using Web3.py as the primary client for all networks
-            # - SDK wrapper implementation is planned for future enhancement
-            # - When SDK wrapper is available, it will implement Web3 interface for seamless integration
-            if self.mantle_sdk_clients[network].is_available():
-                logger.debug(f"Mantle SDK available for {network}, using Web3.py for now")
-                # Continue to Web3.py initialization below
+            if self.mantle_sdk_clients[key].is_available():
+                logger.debug(f"Mantle SDK available for {key}, using Web3.py for now")
 
-        # Standard Web3.py initialization
-        if network not in self._instances:
-            config = NETWORKS[network]
-            self._instances[network] = Web3(Web3.HTTPProvider(config["rpc_url"]))
+        if key not in self._instances:
+            config = self.get_network_config(network)
+            self._instances[key] = Web3(Web3.HTTPProvider(config["rpc_url"]))
 
-        return self._instances[network]
-
-    def get_network_config(self, network: str) -> Dict[str, Any]:
-        """Get network configuration"""
-        if network not in NETWORKS:
-            raise ValueError(f"Unknown network: {network}")
-        return NETWORKS[network]
+        return self._instances[key]
 
     def get_network_features(self, network: str) -> Dict[NetworkFeature, bool]:
-        """
-        Get feature map for network
-
-        Args:
-            network: Network name
-
-        Returns:
-            Dictionary mapping NetworkFeature to bool
-        """
         return NetworkFeatureManager.get_features(network)
 
     def supports_feature(self, network: str, feature: NetworkFeature) -> bool:
-        """
-        Check if network supports a specific feature
-
-        Args:
-            network: Network name
-            feature: NetworkFeature enum value
-
-        Returns:
-            True if feature is supported, False otherwise
-        """
         return NetworkFeatureManager.supports_feature(network, feature)
 
     def register_custom_network(
@@ -108,60 +76,28 @@ class NetworkManager:
         explorer: Optional[str] = None,
         currency: Optional[str] = None,
     ):
-        """
-        Register a custom network dynamically
-
-        Concept: Add new network at runtime
-        Logic:
-            1. Register network in feature registry
-            2. Add to NETWORKS dict for backward compatibility
-            3. Network becomes immediately available
-
-        Args:
-            network_name: Unique network identifier
-            chain_id: Blockchain chain ID
-            rpc_url: RPC endpoint URL
-            features: Dictionary mapping NetworkFeature to bool
-            explorer: Optional block explorer URL
-            currency: Optional native currency symbol
-        """
-        # Register in feature registry
+        """Register a custom network dynamically (backward compatible)."""
         NetworkFeatureManager.register_network(
             network_name, chain_id, rpc_url, features, explorer, currency
         )
 
-        # Add to NETWORKS dict for backward compatibility
-        NETWORKS[network_name] = {
-            "chain_id": chain_id,
-            "rpc_url": rpc_url,
-            "explorer": explorer,
-            "currency": currency,
-        }
+        # Invalidate local cache for this network.
+        key = normalize_network_id(network_name)
+        self._configs.pop(key, None)
+        self._instances.pop(key, None)
 
         logger.info(f"Registered custom network: {network_name}")
 
     def load_networks_from_config(self, config_path: str) -> List[str]:
-        """
-        Load and register networks from configuration file
-
-        Args:
-            config_path: Path to network configuration file (JSON or YAML)
-
-        Returns:
-            List of registered network names
-        """
+        """Load and register networks from configuration file."""
         from hyperagent.blockchain.network_config import register_networks_from_config
 
         registered = register_networks_from_config(config_path)
 
-        # Update NETWORKS dict for backward compatibility
-        for network_name in registered:
-            config = NetworkFeatureManager.get_network_config(network_name)
-            NETWORKS[network_name] = {
-                "chain_id": config.get("chain_id"),
-                "rpc_url": config.get("rpc_url"),
-                "explorer": config.get("explorer"),
-                "currency": config.get("currency"),
-            }
+        # Invalidate cache for any registered networks.
+        for name in registered:
+            key = normalize_network_id(name)
+            self._configs.pop(key, None)
+            self._instances.pop(key, None)
 
         return registered

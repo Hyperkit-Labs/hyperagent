@@ -101,7 +101,6 @@ async def _check_rpc_endpoints() -> Dict[str, Any]:
     import httpx
 
     endpoints = {
-        "hyperion_testnet": settings.hyperion_testnet_rpc,
         "mantle_testnet": settings.mantle_testnet_rpc,
         "avalanche_fuji": settings.avalanche_fuji_rpc,
     }

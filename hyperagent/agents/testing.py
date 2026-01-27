@@ -63,7 +63,7 @@ class TestingAgent(ServiceInterface):
         workflow_id = input_data.get("workflow_id", str(uuid.uuid4()))
         contract_code = input_data.get("contract_code")
         contract_name = input_data.get("contract_name", "GeneratedContract")
-        network = input_data.get("network", "hyperion_testnet")
+        network = input_data.get("network", "mantle_testnet")
 
         # Require compiled contract from CompilationService
         # TestingAgent does not handle compilation - that's CompilationService's responsibility

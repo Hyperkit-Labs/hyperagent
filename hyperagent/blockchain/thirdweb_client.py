@@ -77,20 +77,28 @@ class ThirdwebClient:
         elif payment_data is None:
             payment_data_str = None
 
-        # Format price as object (like x402-starter-kit)
-        # price can be a string like "0.05" or a number
-        # We need to convert to amount string with 6 decimals for USDC
+        # Thirdweb x402 supports price strings (e.g. "$0.10") and will return
+        # chain-specific payment requirements (including permit / ERC-3009 support).
         try:
-            price_float = float(price.replace("$", "").strip())
-            price_amount = str(int(price_float * 1_000_000))  # USDC has 6 decimals
-        except (ValueError, AttributeError):
-            # If price is already in correct format, use as-is
-            price_amount = str(price).replace("$", "").strip()
+            price_float = float(str(price).replace("$", "").strip())
+            price_str = f"${price_float}"
+        except Exception:
+            # Best-effort: pass through unchanged
+            price_str = str(price)
+            if not price_str.startswith("$"):
+                price_str = f"${price_str}"
 
-        # Get USDC address for network
-        from hyperagent.core.config import settings
+        # Resolve network into a chainId for the verifier (so we don't need a giant name map)
+        from hyperagent.blockchain.network_resolver import parse_evm_chain_id
+        from hyperagent.blockchain.network_features import NetworkFeatureManager
 
-        usdc_address = settings.usdc_address_fuji  # Default to Fuji for now
+        chain_id = None
+        cfg = NetworkFeatureManager.get_network_config(network, load_usdc=False) or {}
+        chain_id = cfg.get("chain_id") or parse_evm_chain_id(network)
+
+        network_for_verifier = network
+        if chain_id:
+            network_for_verifier = f"eip155:{int(chain_id)}"
 
         # Prepare request payload
         request_payload = {
@@ -98,8 +106,8 @@ class ThirdwebClient:
             "method": method,
             "paymentData": payment_data_str,
             "payTo": self.merchant_wallet_address,
-            "network": network,
-            "price": {"amount": price_amount, "asset": {"address": usdc_address}},
+            "network": network_for_verifier,
+            "price": price_str,
             "routeConfig": route_config
             or {
                 "description": "HyperAgent API endpoint",

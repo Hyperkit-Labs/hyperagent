@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/Card';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
 export interface TaskCostBreakdown {
   total_usdc: number;
@@ -146,10 +146,10 @@ export function TaskSelector({
   const allTasks = Object.keys(TASK_DESCRIPTIONS);
 
   return (
-    <Card>
+    <div className="bg-gray-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
       <div className="space-y-4">
         <div>
-          <label className="text-sm font-medium text-gray-700 mb-2 block">
+          <label className="text-sm font-semibold text-gray-300 mb-2 block">
             Select Tasks *
           </label>
           <p className="text-xs text-gray-500 mb-3">
@@ -164,12 +164,12 @@ export function TaskSelector({
               return (
                 <label
                   key={task}
-                  className={`flex items-start p-3 border rounded-lg cursor-pointer transition-colors ${
+                  className={`flex items-start p-3 border rounded-xl cursor-pointer transition-all duration-200 ${
                     isSelected
-                      ? 'border-blue-500 bg-blue-50'
+                      ? 'border-blue-500/50 bg-blue-500/10 hover:bg-blue-500/15'
                       : isDisabled
-                      ? 'border-gray-200 bg-gray-50 opacity-50'
-                      : 'border-gray-200 hover:border-gray-300'
+                      ? 'border-white/5 bg-white/5 opacity-50 cursor-not-allowed'
+                      : 'border-white/10 hover:border-white/20 hover:bg-white/5'
                   }`}
                 >
                   <input
@@ -177,22 +177,22 @@ export function TaskSelector({
                     checked={isSelected}
                     onChange={() => handleTaskToggle(task)}
                     disabled={isDisabled}
-                    className="mt-1 mr-3"
+                    className="mt-1 mr-3 rounded border-white/20 bg-white/5 text-blue-600 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900"
                   />
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-900">
+                      <span className="text-sm font-semibold text-white">
                         {taskInfo.label}
                       </span>
                       {costBreakdown && isSelected && (
-                        <span className="text-sm font-semibold text-blue-600">
+                        <span className="text-sm font-bold text-blue-400">
                           ${costBreakdown.breakdown[task]?.final.toFixed(4) || '0.0000'}
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">{taskInfo.description}</p>
+                    <p className="text-xs text-gray-400 mt-1">{taskInfo.description}</p>
                     {taskInfo.requires && taskInfo.requires.length > 0 && (
-                      <p className="text-xs text-gray-400 mt-1">
+                      <p className="text-xs text-gray-500 mt-1">
                         Requires: {taskInfo.requires.map((r) => TASK_DESCRIPTIONS[r].label).join(', ')}
                       </p>
                     )}
@@ -204,10 +204,10 @@ export function TaskSelector({
         </div>
 
         {costBreakdown && (
-          <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+          <div className="p-4 bg-white/5 border border-white/10 rounded-xl">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700">Total Cost</span>
-              <span className="text-lg font-bold text-gray-900">
+              <span className="text-sm font-semibold text-gray-300">Total Cost</span>
+              <span className="text-lg font-bold text-white">
                 ${costBreakdown.total_usdc.toFixed(4)} USDC
               </span>
             </div>
@@ -222,16 +222,19 @@ export function TaskSelector({
         )}
 
         {loading && (
-          <div className="text-sm text-gray-500 text-center py-2">Calculating cost...</div>
+          <div className="text-sm text-gray-400 text-center py-2 flex items-center justify-center gap-2">
+            <div className="w-4 h-4 border-2 border-gray-600 border-t-blue-500 rounded-full animate-spin" />
+            Calculating cost...
+          </div>
         )}
 
         {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-sm text-red-400">
             {error}
           </div>
         )}
       </div>
-    </Card>
+    </div>
   );
 }
 

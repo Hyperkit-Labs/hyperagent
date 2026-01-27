@@ -1,10 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import {
-  runGraph,
-  nodeRegistry,
-  initialState,
-  HyperAgentState,
-} from "@hyperagent/orchestrator";
+import { runGraph, initialState, HyperAgentState } from "@hyperagent/orchestrator";
+import { apiNodeRegistry } from "../orchestrator/apiNodeRegistry";
 import { z } from "zod";
 import { WorkflowStore } from "../storage/postgres";
 import { Env } from "../config/env";
@@ -45,7 +41,7 @@ export async function registerWorkflowRoutes(
         const finalState = await runGraph(
           "policy",
           initial,
-          nodeRegistry,
+          apiNodeRegistry,
           async ({ node, state }) => {
             if (!opts.store) {
               return;

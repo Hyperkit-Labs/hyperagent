@@ -132,15 +132,22 @@ export class CrossChainMessengerService {
   
   async estimateGas(from: string, to: string, data: string): Promise<any> {
     const feeData = await this.l2Provider.getFeeData();
-    
-    const tx = {
+
+    // ethers v5 TransactionRequest does not allow null values for fee fields
+    const tx: ethers.providers.TransactionRequest = {
       from,
       to,
       data,
-      maxFeePerGas: feeData.maxFeePerGas,
-      maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
     };
-    
+
+    if (feeData.maxFeePerGas) {
+      tx.maxFeePerGas = feeData.maxFeePerGas;
+    }
+
+    if (feeData.maxPriorityFeePerGas) {
+      tx.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas;
+    }
+
     const estimatedGas = await this.l2Provider.estimateGas(tx);
     const totalCost = estimatedGas.mul(feeData.maxFeePerGas || 0);
     

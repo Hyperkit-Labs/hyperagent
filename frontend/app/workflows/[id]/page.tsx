@@ -66,7 +66,7 @@ export default function WorkflowDetailPage() {
   if (!activeWorkflow) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-600">Workflow not found</p>
+        <p className="text-gray-400">Workflow not found</p>
       </div>
     );
   }
@@ -77,16 +77,16 @@ export default function WorkflowDetailPage() {
       
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-3xl font-bold text-white">
             {activeWorkflow.name || `Workflow ${activeWorkflow.workflow_id.slice(0, 8)}`}
           </h1>
-          <p className="mt-2 text-gray-600">
+          <p className="mt-2 text-gray-400">
             Created {formatDate(activeWorkflow.created_at)} • {activeWorkflow.network}
           </p>
         </div>
         <div className="flex items-center gap-2">
           {connected && (
-            <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+            <span className="text-xs text-green-400 bg-green-500/20 border border-green-500/30 px-2 py-1 rounded-full font-semibold">
               Live
             </span>
           )}
@@ -97,23 +97,23 @@ export default function WorkflowDetailPage() {
       <WorkflowProgress workflow={activeWorkflow} />
 
       {activeWorkflow.error_message && (
-        <Card>
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-            <h3 className="font-semibold text-red-900 mb-2">Error</h3>
-            <p className="text-red-700">{activeWorkflow.error_message}</p>
+        <div className="bg-gray-900/50 backdrop-blur-xl border border-red-500/20 rounded-2xl p-6">
+          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+            <h3 className="font-semibold text-red-400 mb-2">Error</h3>
+            <p className="text-red-300">{activeWorkflow.error_message}</p>
           </div>
-        </Card>
+        </div>
       )}
 
       {activeWorkflow.contracts && activeWorkflow.contracts.length > 0 && (
         <div className="space-y-4">
-          <h2 className="text-2xl font-semibold">Generated Contract</h2>
+          <h2 className="text-2xl font-bold text-white">Generated Contract</h2>
           {loadingContracts ? (
-            <Card>
+            <div className="bg-gray-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
               <div className="flex items-center justify-center py-8">
                 <LoadingSpinner size="md" text="Loading contract code..." />
               </div>
-            </Card>
+            </div>
           ) : contractsWithCode.length > 0 ? (
             contractsWithCode.map((contract) => (
               <ContractViewer
@@ -124,13 +124,13 @@ export default function WorkflowDetailPage() {
               />
             ))
           ) : (
-            <Card>
-              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-yellow-800">
+            <div className="bg-gray-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
+              <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+                <p className="text-yellow-400">
                   Contract code is being generated. Please refresh the page in a moment.
                 </p>
               </div>
-            </Card>
+            </div>
           )}
         </div>
       )}

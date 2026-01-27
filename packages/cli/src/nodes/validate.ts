@@ -9,10 +9,22 @@ export async function validateNode(state: HyperAgentState): Promise<Partial<Hype
     // This node decides the path: Success -> Deploy, Failure -> Generate (Retry) or Fail
 
     if (!auditResults.passed) {
-        console.log("  ❌ [ValidateNode] Validation Failed.");
+        const nextRetryCount = (state.retryCount || 0) + 1;
+        const { MAX_RETRIES } = await import("../types/agent");
+
+        if (nextRetryCount > MAX_RETRIES) {
+            console.log("  ❌ [ValidateNode] Max retries exceeded. Halting.");
+            return {
+                status: "failed",
+                logs: [...state.logs, `ValidateNode: Max retries (${MAX_RETRIES}) exceeded. Self-repair failed.`]
+            };
+        }
+
+        console.log(`  ❌ [ValidateNode] Validation Failed. Initiating self-repair loop (Attempt ${nextRetryCount}/${MAX_RETRIES})...`);
         return {
-            status: "failed", // OR loop back to generate in V2
-            logs: [...state.logs, "ValidateNode: Validation failed. Stopping execution."]
+            status: "validating",
+            retryCount: nextRetryCount,
+            logs: [...state.logs, `ValidateNode: Validation failed. Retrying generation (Attempt ${nextRetryCount}/${MAX_RETRIES}).`]
         };
     }
 

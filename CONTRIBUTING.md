@@ -148,8 +148,7 @@ git checkout -b fix/bug-description
    - Use dependency injection for external dependencies
 
 4. **Blockchain Integration**
-   - Always use Alith SDK for blockchain interactions
-   - Support both Hyperion and Mantle networks
+   - Support EVM multichain deployments (Mantle-first, then Base/Arbitrum/etc.)
    - Integrate EigenDA for data availability when needed
    - Never hardcode private keys (use environment variables)
 
@@ -191,7 +190,7 @@ async def test_generation_agent():
     agent = GenerationAgent(...)
     result = await agent.process({
         "nlp_description": "Create ERC20 token",
-        "network": "hyperion_testnet"
+        "network": "mantle_testnet"
     })
     assert result["status"] == "success"
     assert "contract_code" in result
@@ -231,7 +230,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/) format:
 feat(agent-generation): Add support for ERC1155 contract generation
 fix(agent-audit): Resolve Slither timeout issue
 refactor(soa): Improve service orchestration pattern
-test(agent-deployment): Add integration tests for Hyperion deployment
+test(agent-deployment): Add integration tests for Mantle deployment
 docs(readme): Update installation instructions
 ```
 
@@ -357,7 +356,7 @@ def generate_contract(
     
     Args:
         nlp_input: Natural language description of contract requirements
-        network: Target blockchain (e.g., "hyperion_testnet")
+        network: Target blockchain (e.g., "mantle_testnet")
         contract_type: Type of contract to generate (default: "ERC20")
         
     Returns:
@@ -400,7 +399,7 @@ def generate_contract(
 - **Bugs**: Open a GitHub Issue with `bug` label
 - **Feature Requests**: Open a GitHub Issue with `enhancement` label
 - **Documentation Issues**: Open a GitHub Issue with `docs` label
-- **Security Issues**: Email security@hyperionkit.xyz (do not open public issue)
+- **Security Issues**: Do not open a public issue. Contact the maintainers privately.
 
 ## Recognition
 

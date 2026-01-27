@@ -7,18 +7,22 @@ from hyperagent.monitoring.metrics import MetricsCollector, workflow_created, ag
 def test_workflow_created_counter():
     """Test workflow created counter initialization"""
     assert workflow_created is not None
-    assert workflow_created._name == "hyperagent_workflows_created_total"
+    # prometheus_client Counters expose the base name internally; the exported sample name
+    # gets a '_total' suffix.
+    assert workflow_created._name == "hyperagent_workflows_created"
 
 
 def test_agent_executions_counter():
     """Test agent executions counter initialization"""
     assert agent_executions is not None
-    assert agent_executions._name == "hyperagent_agent_executions_total"
+    # prometheus_client Counters expose the base name internally; the exported sample name
+    # gets a '_total' suffix.
+    assert agent_executions._name == "hyperagent_agent_executions"
 
 
 def test_metrics_collector_track_workflow():
     """Test MetricsCollector.track_workflow method"""
-    MetricsCollector.track_workflow("hyperion_testnet", "ERC20")
+    MetricsCollector.track_workflow("mantle_testnet", "ERC20")
     # Verify no exceptions raised
     assert True
 

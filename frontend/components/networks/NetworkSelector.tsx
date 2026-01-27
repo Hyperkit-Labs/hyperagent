@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
 export interface Network {
   network: string;
@@ -137,8 +137,6 @@ export function NetworkSelector({
     if (!showFeatures || !network.features) return null;
 
     const badges: Array<{ label: string; variant: 'default' | 'success' | 'warning' | 'error' | 'info' | 'gradient' }> = [];
-    if (network.features.pef) badges.push({ label: 'PEF', variant: 'info' });
-    if (network.features.metisvm) badges.push({ label: 'MetisVM', variant: 'gradient' });
     if (network.features.eigenda) badges.push({ label: 'EigenDA', variant: 'success' });
     if (network.supports_x402) badges.push({ label: 'x402', variant: 'warning' });
     if (network.features.batch_deployment) badges.push({ label: 'Batch', variant: 'default' });

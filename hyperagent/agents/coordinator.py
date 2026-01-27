@@ -39,12 +39,20 @@ class CoordinatorAgent(ServiceInterface):
         workflow_id = input_data["workflow_id"]
         nlp_input = input_data["nlp_input"]
         network = input_data["network"]
+        wallet_address = input_data.get("wallet_address")
+        use_gasless = bool(input_data.get("use_gasless", False))
+        signed_transaction = input_data.get("signed_transaction")
+        selected_tasks = input_data.get("selected_tasks")
 
         self.workflow_id = workflow_id
         self.state = {
             "workflow_id": workflow_id,
             "nlp_input": nlp_input,
             "network": network,
+            "wallet_address": wallet_address,
+            "use_gasless": use_gasless,
+            "signed_transaction": signed_transaction,
+            "selected_tasks": selected_tasks,
             "retry_count": 0,
             "current_stage": None,
         }
@@ -54,7 +62,15 @@ class CoordinatorAgent(ServiceInterface):
             return await self._handle_cancellation(workflow_id)
 
         try:
-            result = await self.coordinator.execute_workflow(workflow_id, nlp_input, network)
+            result = await self.coordinator.execute_workflow(
+                workflow_id=workflow_id,
+                nlp_input=nlp_input,
+                network=network,
+                wallet_address=wallet_address,
+                use_gasless=use_gasless,
+                signed_transaction=signed_transaction,
+                selected_tasks=selected_tasks,
+            )
 
             # Update state on success
             self.state["status"] = "completed"
@@ -131,7 +147,13 @@ class CoordinatorAgent(ServiceInterface):
             # Retry execution
             try:
                 result = await self.coordinator.execute_workflow(
-                    self.workflow_id, self.state["nlp_input"], self.state["network"]
+                    workflow_id=self.workflow_id,
+                    nlp_input=self.state["nlp_input"],
+                    network=self.state["network"],
+                    wallet_address=self.state.get("wallet_address"),
+                    use_gasless=bool(self.state.get("use_gasless", False)),
+                    signed_transaction=self.state.get("signed_transaction"),
+                    selected_tasks=self.state.get("selected_tasks"),
                 )
                 self.state["status"] = "completed"
                 await self._persist_state()

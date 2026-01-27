@@ -10,13 +10,8 @@ import { Card } from '@/components/ui/Card';
 import { handleX402FetchError, parseX402ErrorResponse, handleX402ResponseError, parseResponseData, MAX_PAYMENT_ALLOWED } from '@/lib/x402ErrorHandler';
 import type { TaskCostBreakdown } from '@/components/workflows/TaskSelector';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
-// Check if network supports x402
-function isX402Network(network: string): boolean {
-  const x402Networks = ['avalanche_fuji', 'avalanche_mainnet', 'avalanche'];
-  return x402Networks.some(n => network.toLowerCase().includes(n.toLowerCase()));
-}
 
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
@@ -36,13 +31,20 @@ function CreateWorkflowContent() {
     setError(null);
 
     try {
-      // Check if network requires x402 payment
-      const requiresPayment = isX402Network(data.network);
-      
-      if (requiresPayment) {
-        // Use x402 payment flow for Avalanche networks
+      // Check if v2 API is requested
+      if (data.use_v2_api) {
+        const { createWorkflowV2 } = await import('@/lib/api');
+        const response = await createWorkflowV2(data.intent || data.nlp_input);
+        router.push(`/workflows/${response.workflow_id || response.meta?.workflowId}`);
+        return;
+      }
+
+      // Use x402 flow whenever Thirdweb client + wallet are available.
+      const useX402Flow = Boolean(wallet && account && isThirdwebConfigured());
+
+      if (useX402Flow) {
         if (!wallet || !account) {
-          throw new Error('Please connect your wallet to create a workflow on Avalanche networks');
+          throw new Error('Please connect your wallet to continue');
         }
 
         if (!isThirdwebConfigured()) {
@@ -142,37 +144,37 @@ function CreateWorkflowContent() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Create New Workflow</h1>
-        <p className="mt-2 text-gray-600">
-          Describe the smart contract you want to create and we'll generate it for you
-        </p>
-        <p className="mt-2 text-sm text-blue-600">
-          Note: Avalanche networks require x402 payment. You&apos;ll be prompted to approve payments in your wallet.
-        </p>
-      </div>
+    <div className="relative w-full bg-[#030712] text-white min-h-screen">
+      <div className="max-w-4xl mx-auto px-6 py-12">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-white mb-2">Create New Workflow</h1>
+          <p className="text-gray-400">
+            Describe the smart contract you want to create and we'll generate it for you
+          </p>
+          <p className="mt-2 text-sm text-blue-400">
+            Note: Some actions may require x402 payment. You&apos;ll be prompted to approve payments in your wallet.
+          </p>
+        </div>
 
-      {error && (
-        <Card>
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-            <h3 className="font-semibold text-red-900 mb-2">Error</h3>
-            <p className="text-red-700 text-sm">{error}</p>
+        {error && (
+          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+            <h3 className="font-semibold text-red-400 mb-2">Error</h3>
+            <p className="text-red-300 text-sm">{error}</p>
             {error.includes('Payment required') && (
-              <p className="text-red-600 text-xs mt-2">
+              <p className="text-red-400 text-xs mt-2">
                 The payment transaction should appear in your wallet. Please approve it to continue.
               </p>
             )}
           </div>
-        </Card>
-      )}
+        )}
 
-      <WorkflowForm 
-        onSubmit={handleSubmit} 
-        loading={loading}
-        onCostUpdate={(cost) => setCostBreakdown(cost)}
-        initialPrompt={initialPrompt}
-      />
+        <WorkflowForm 
+          onSubmit={handleSubmit} 
+          loading={loading}
+          onCostUpdate={(cost) => setCostBreakdown(cost)}
+          initialPrompt={initialPrompt}
+        />
+      </div>
     </div>
   );
 }

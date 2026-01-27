@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { ConnectButton } from 'thirdweb/react';
 import { createWallet } from 'thirdweb/wallets';
-import { avalancheFuji, avalanche } from 'thirdweb/chains';
 import { getThirdwebClient } from '@/lib/thirdwebClient';
 
 /**
@@ -21,7 +20,7 @@ export function WalletConnect() {
   
   if (!client || !mounted) {
     return (
-      <div className="h-[40px] w-[165px] bg-gray-100 rounded-lg animate-pulse" />
+      <div className="h-[40px] w-[165px] bg-gray-800/50 rounded-lg animate-pulse border border-white/10" />
     );
   }
 
@@ -39,22 +38,17 @@ export function WalletConnect() {
     <ConnectButton
       client={client}
       wallets={wallets}
-      chains={[avalancheFuji, avalanche]}
-      theme="light"
+      theme="dark"
       connectButton={{
         label: 'Connect Wallet',
-        className: 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold px-6 py-2.5 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg',
+        className: 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold px-6 py-2.5 rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/30',
       }}
       detailsButton={{
-        className: 'bg-gray-100 hover:bg-gray-200 text-gray-900 font-medium px-4 py-2 rounded-lg transition-all duration-200',
-        displayBalanceToken: {
-          [avalancheFuji.id]: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E', // USDC on Fuji
-          [avalanche.id]: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E', // USDC on mainnet
-        },
+        className: 'bg-white/10 hover:bg-white/20 text-white font-medium px-4 py-2 rounded-xl transition-all duration-200 border border-white/10',
       }}
       switchButton={{
         label: 'Wrong Network',
-        className: 'bg-yellow-500 hover:bg-yellow-600 text-white font-medium px-4 py-2 rounded-lg',
+        className: 'bg-yellow-500 hover:bg-yellow-400 text-white font-medium px-4 py-2 rounded-xl shadow-lg',
       }}
     />
   );
@@ -73,7 +67,7 @@ export function CompactWalletButton() {
   
   if (!client || !mounted) {
     return (
-      <div className="h-[36px] w-[80px] bg-gray-100 rounded-md animate-pulse" />
+      <div className="h-[36px] w-[80px] bg-gray-800/50 rounded-md animate-pulse border border-white/10" />
     );
   }
 
@@ -88,14 +82,13 @@ export function CompactWalletButton() {
     <ConnectButton
       client={client}
       wallets={wallets}
-      chains={[avalancheFuji, avalanche]}
-      theme="light"
+      theme="dark"
       connectButton={{
         label: 'Connect',
-        className: 'bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-md transition-colors',
+        className: 'bg-blue-600 hover:bg-blue-500 text-white font-medium px-4 py-2 rounded-xl transition-all shadow-lg shadow-blue-500/20 hover:shadow-xl',
       }}
       detailsButton={{
-        className: 'bg-gray-100 hover:bg-gray-200 text-gray-900 px-3 py-1.5 rounded-md transition-colors text-sm',
+        className: 'bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-xl transition-all text-sm border border-white/10',
       }}
     />
   );

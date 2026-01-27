@@ -33,7 +33,7 @@
 /pyproject.toml @JustineDevs
 /setup.py @JustineDevs
 /alembic.ini @JustineDevs
-/env.example @JustineDevs
+/.env.example @JustineDevs
 
 # Database migrations
 /alembic/ @JustineDevs

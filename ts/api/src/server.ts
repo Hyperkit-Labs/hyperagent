@@ -3,6 +3,8 @@ import cors from "@fastify/cors";
 import { loadEnv } from "./config/env";
 import { registerWorkflowRoutes } from "./routes/workflows";
 import { registerHealthRoutes } from "./routes/health";
+import { registerV1Routes } from "./routes/v1";
+import { registerNetworkRoutes } from "./routes/networks";
 import { WorkflowStore } from "./storage/postgres";
 
 const env = loadEnv();
@@ -48,6 +50,8 @@ async function buildServer() {
   }
 
   await app.register(registerWorkflowRoutes, { store, env });
+  await app.register(registerV1Routes, { store, env });
+  await app.register(registerNetworkRoutes, { env });
 
   return app;
 }

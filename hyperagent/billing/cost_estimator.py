@@ -9,6 +9,7 @@ Credit System:
 """
 
 import logging
+import math
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -45,8 +46,10 @@ class CostEstimator:
         "avalanche_mainnet": 1.2,
         "mantle_testnet": 1.3,
         "mantle_mainnet": 1.4,
-        "hyperion_testnet": 1.5,
-        "hyperion_mainnet": 1.6,
+        "base_sepolia": 1.1,
+        "base_mainnet": 1.2,
+        "arbitrum_sepolia": 1.1,
+        "arbitrum_one": 1.2,
         "ethereum_sepolia": 1.1,
         "ethereum_mainnet": 1.5,
         "polygon_amoy": 1.0,
@@ -296,7 +299,8 @@ class CostEstimator:
         
         total_tokens = input_tokens + output_tokens
         cost_per_token = total_cost / total_tokens if total_tokens > 0 else 0
-        credits = int(total_cost / self.credit_rate)
+        # Ensure a non-zero credit charge when there is a non-zero cost.
+        credits = 0 if total_cost <= 0 else max(1, math.ceil(total_cost / self.credit_rate))
         
         return {
             "input_tokens": input_tokens,

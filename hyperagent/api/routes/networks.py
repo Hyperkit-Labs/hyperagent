@@ -61,12 +61,8 @@ class NetworkCompatibilityResponse(BaseModel):
     """Network compatibility report"""
 
     network: str
-    supports_pef: bool
-    supports_metisvm: bool
     supports_eigenda: bool
     supports_batch_deployment: bool
-    supports_floating_point: bool
-    supports_ai_inference: bool
     fallback_strategies: Dict[str, str]
     recommendations: List[str]
 
@@ -129,8 +125,20 @@ async def list_networks(
     if search:
         # Use search instead of pagination
         all_networks = await registry.search_networks(search)
+
+        # If search looks like a chain id / CAIP-2 id, include a synthetic resolved entry.
+        from hyperagent.blockchain.network_resolver import parse_evm_chain_id
+
+        if parse_evm_chain_id(search) is not None:
+            try:
+                resolved = await registry.get_network(search)
+                all_networks = [registry._format_network_response(search, resolved)] + all_networks
+            except Exception:
+                pass
+
         # Apply filters to search results
         filtered_networks = registry._apply_filters(all_networks, filters)
+
         # Manual pagination for search results
         total = len(filtered_networks)
         start = (page - 1) * limit
@@ -206,29 +214,17 @@ async def list_x402_networks():
 
 @router.get("/{network}/features", response_model=NetworkFeatureResponse)
 async def get_network_features(network: str) -> NetworkFeatureResponse:
-    """
-    Get features for a specific network
+    """Get features for a specific network.
 
-    Uses NetworkRegistry with fallback chain for dynamic network loading.
-
-    Args:
-        network: Network name (e.g., "hyperion_testnet")
-
-    Returns:
-        Network features and fallback strategies
+    Supports both config-driven networks (e.g. mantle_testnet) and dynamic networks
+    addressed by chainId / CAIP-2 (e.g. 56 or eip155:56).
     """
     registry = get_network_registry()
-    
+
     try:
         config = await registry.get_network(network)
     except Exception as e:
         logger.warning(f"Failed to load network {network} from registry: {e}")
-        # Fallback to NetworkFeatureManager
-    if network not in NETWORK_FEATURES:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Network '{network}' not found. Use /api/v1/networks to list available networks.",
-        )
         config = NetworkFeatureManager.get_network_config(network)
 
     features = NetworkFeatureManager.get_features(network)
@@ -288,34 +284,18 @@ async def get_network_compatibility(network: str) -> NetworkCompatibilityRespons
 
     # Generate recommendations
     recommendations = []
-    if not features.get(NetworkFeature.PEF, False):
-        recommendations.append("Use sequential deployment instead of PEF for batch operations")
-    if not features.get(NetworkFeature.METISVM, False):
-        recommendations.append(
-            "MetisVM optimizations not available - contracts will use standard compilation"
-        )
     if not features.get(NetworkFeature.EIGENDA, False):
         if network.endswith("_testnet"):
-            recommendations.append("EigenDA disabled on testnet for cost optimization")
+            recommendations.append("EigenDA disabled on testnet")
         else:
             recommendations.append(
-                "EigenDA not available - contract metadata will not be stored on data availability layer"
+                "EigenDA not available - contract metadata will not be stored on EigenDA"
             )
-    if not features.get(NetworkFeature.FLOATING_POINT, False):
-        recommendations.append(
-            "Floating-point operations not supported - use fixed-point math libraries"
-        )
-    if not features.get(NetworkFeature.AI_INFERENCE, False):
-        recommendations.append("On-chain AI inference not available")
 
     return NetworkCompatibilityResponse(
         network=network,
-        supports_pef=features.get(NetworkFeature.PEF, False),
-        supports_metisvm=features.get(NetworkFeature.METISVM, False),
         supports_eigenda=features.get(NetworkFeature.EIGENDA, False),
         supports_batch_deployment=features.get(NetworkFeature.BATCH_DEPLOYMENT, False),
-        supports_floating_point=features.get(NetworkFeature.FLOATING_POINT, False),
-        supports_ai_inference=features.get(NetworkFeature.AI_INFERENCE, False),
         fallback_strategies=fallback_strategies,
         recommendations=recommendations,
     )

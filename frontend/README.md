@@ -16,7 +16,8 @@ Next.js frontend application for HyperAgent - AI Agent Platform for On-Chain Sma
 ### Prerequisites
 
 - Node.js 18+ and npm
-- HyperAgent API running on `http://localhost:8000`
+- HyperAgent TS API running on `http://localhost:4000` (default)
+- Optional: Python backend on `http://localhost:8000` (some legacy endpoints / websockets)
 
 ### Installation
 
@@ -32,7 +33,10 @@ cp .env.local.example .env.local
 
 3. Update `.env.local` with your API URL:
 ```
-NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+# REST API (TS-first)
+NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1
+
+# WebSocket (currently served by the Python backend)
 NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws
 ```
 

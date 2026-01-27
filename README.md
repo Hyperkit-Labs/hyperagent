@@ -17,25 +17,9 @@
   <p><strong>AI-powered smart contract development platform</strong></p>
   <p>From natural language to production-ready, audited contracts in minutes</p>
   
-  <!-- Link Buttons -->
-   <p>
-    <a href="https://x.com/HyperionKit">
-      <img src="https://img.shields.io/twitter/follow/HyperionKit.svg?style=social" alt="Follow @HyperionKit" />
-    </a>
-    <a href="https://discord.gg/invite/hyperionkit">
-        <img src="https://img.shields.io/badge/Chat%20on-Discord-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Chat on Discord" />
-    </a>
-    <a href="https://hyperionkit.xyz">
-        <img src="https://img.shields.io/badge/Hyperkit%20Website-FF6B6B?style=flat-square&logo=discourse&logoColor=white" alt="Website" />
-    </a>
-    <a href="https://github.com/HyperionKit/Hyperkit/stargazers">
-      <img src="https://img.shields.io/github/stars/HyperionKit/Hyperkit" alt="stars" />
-    </a>
-    <a href="https://github.com/HyperionKit/Hyperkit/network/members">
-      <img src="https://img.shields.io/github/forks/HyperionKit/Hyperkit" alt="forks" />
-      <a href="https://github.com/HyperionKit/Hyperkit/blob/master/LICENSE.md" target="_blank" rel="noopener noreferrer">
-      <img src="https://img.shields.io/npm/l/hyperionkit?style=flat-square&color=0052FF" alt="MIT License" />
-    </a>
+  <p>
+    <a href="https://github.com/JustineDevs/HyperAgent">
+      <img src="https://img.shields.io/github/stars/JustineDevs/HyperAgent" alt="stars" />
     </a>
   </p>
 </div>
@@ -198,11 +182,10 @@ npm run dev
 
 ## Documentation
 
-- **[📖 Full Documentation](https://hyperionkit.xyz/docs)** - Complete guides and API reference
+- **[📖 Documentation](./docs)** - Architecture and API notes
 - **[🚀 Getting Started Guide](./GUIDE/GETTING_STARTED.md)** - Detailed setup and first contract
 - **[🏗️ Architecture Guide](./docs/ARCHITECTURE_GUIDE.md)** - System design and patterns
 - **[💳 x402 Payment Guide](./docs/X402_AVALANCHE_INTEGRATION.md)** - Pay-per-use setup
-- **[⚡ Hyperion PEF Guide](./docs/HYPERION_PEF_GUIDE.md)** - Parallel batch deployment
 - **[🔧 API Reference](./GUIDE/API.md)** - Complete API documentation
 
 ---
@@ -211,12 +194,9 @@ npm run dev
 
 - 🤖 **AI-Powered Generation** - Natural language → Solidity contracts
 - 🛡️ **Automated Auditing** - Security analysis with Slither, Mythril, Echidna
-- 🚀 **Multi-Chain Deployment** - Hyperion, Mantle, Avalanche
+- 🚀 **Multi-Chain Deployment** - Mantle, Avalanche, Base, Arbitrum (config-driven)
 - 💳 **x402 Payments** - Pay-per-use on Avalanche networks
-- ⚡ **Parallel Deployment** - 10-50x faster with Hyperion PEF
-- 🎯 **MetisVM Optimized** - Floating-point and AI inference support
 
-**[View all features →](https://hyperionkit.xyz/features)**
 
 ---
 
@@ -224,9 +204,6 @@ npm run dev
 
 We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
 
-<a href="https://github.com/HyperionKit/HyperAgent/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=HyperionKit/HyperAgent" />
-</a>
 
 ---
 
@@ -238,10 +215,7 @@ MIT License - see [LICENSE](./LICENSE) for details.
 
 ## Links
 
-- **Website**: [hyperionkit.xyz](https://hyperionkit.xyz/)
-- **GitHub**: [github.com/Hyperionkit/HyperAgent](https://github.com/Hyperionkit/HyperAgent)
-- **Organization**: [github.com/HyperionKit/Hyperkit](https://github.com/HyperionKit/Hyperkit)
-- **Linktree**: [linktr.ee/Hyperionkit](https://linktr.ee/Hyperionkit)
+- **GitHub**: [github.com/JustineDevs/HyperAgent](https://github.com/JustineDevs/HyperAgent)
 
 ---
 

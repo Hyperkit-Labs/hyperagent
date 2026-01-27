@@ -96,22 +96,29 @@ def register_networks_from_config(config_path: str) -> List[str]:
     for network_name, network_config in config_data["networks"].items():
         try:
             # Validate required fields
-            required_fields = ["chain_id", "rpc_url", "features"]
+            # Accept either rpc_url (string) or rpc_urls (list) for future-proofing.
+            required_fields = ["chain_id", "features"]
             for field in required_fields:
                 if field not in network_config:
                     raise ValueError(f"Network '{network_name}' missing required field: {field}")
+
+            rpc_url = network_config.get("rpc_url")
+            rpc_urls = network_config.get("rpc_urls")
+            if not rpc_url:
+                if isinstance(rpc_urls, list) and rpc_urls and isinstance(rpc_urls[0], str):
+                    rpc_url = rpc_urls[0]
+                else:
+                    raise ValueError(
+                        f"Network '{network_name}' missing required field: rpc_url (or rpc_urls list)"
+                    )
 
             # Convert feature flags from dict to NetworkFeature enum
             features_dict = network_config.get("features", {})
             features = {}
 
             feature_mapping = {
-                "pef": NetworkFeature.PEF,
-                "metisvm": NetworkFeature.METISVM,
                 "eigenda": NetworkFeature.EIGENDA,
                 "batch_deployment": NetworkFeature.BATCH_DEPLOYMENT,
-                "floating_point": NetworkFeature.FLOATING_POINT,
-                "ai_inference": NetworkFeature.AI_INFERENCE,
             }
 
             for feature_key, feature_enum in feature_mapping.items():
@@ -121,11 +128,20 @@ def register_networks_from_config(config_path: str) -> List[str]:
             NetworkFeatureManager.register_network(
                 network_name=network_name,
                 chain_id=network_config["chain_id"],
-                rpc_url=network_config["rpc_url"],
+                rpc_url=rpc_url,
                 features=features,
                 explorer=network_config.get("explorer"),
                 currency=network_config.get("currency"),
             )
+
+            # Persist rpc_urls (if provided) to enable fallback selection in NetworkManager.
+            try:
+                from hyperagent.blockchain.network_features import NETWORK_FEATURES
+
+                if isinstance(rpc_urls, list) and rpc_urls:
+                    NETWORK_FEATURES[network_name]["rpc_urls"] = rpc_urls
+            except Exception:
+                pass
 
             registered_networks.append(network_name)
             logger.info(f"Registered network from config: {network_name}")

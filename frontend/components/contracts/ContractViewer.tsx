@@ -39,25 +39,25 @@ export function ContractViewer({ contractCode, abi, contractName }: ContractView
   };
 
   return (
-    <Card>
+    <div className="bg-gray-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Contract Code</h3>
+          <h3 className="text-lg font-bold text-white">Contract Code</h3>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleCopy}>
-              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            <Button variant="outline" size="sm" onClick={handleCopy} className="border-white/20 hover:bg-white/10">
+              {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
             </Button>
-            <Button variant="outline" size="sm" onClick={handleDownload}>
+            <Button variant="outline" size="sm" onClick={handleDownload} className="border-white/20 hover:bg-white/10">
               <Download className="w-4 h-4" />
             </Button>
           </div>
         </div>
 
-        <div className="rounded-lg overflow-hidden border border-gray-200">
+        <div className="rounded-xl overflow-hidden border border-white/10 bg-gray-900/80">
           <SyntaxHighlighter
             language="solidity"
             style={vscDarkPlus}
-            customStyle={{ margin: 0, borderRadius: 0 }}
+            customStyle={{ margin: 0, borderRadius: 0, background: 'transparent' }}
             showLineNumbers
           >
             {contractCode}
@@ -66,15 +66,15 @@ export function ContractViewer({ contractCode, abi, contractName }: ContractView
 
         {abi && abi.length > 0 && (
           <div>
-            <Button variant="ghost" size="sm" onClick={() => setShowABI(!showABI)}>
+            <Button variant="ghost" size="sm" onClick={() => setShowABI(!showABI)} className="text-gray-400 hover:text-white">
               {showABI ? 'Hide' : 'Show'} ABI
             </Button>
             {showABI && (
-              <div className="mt-2 rounded-lg overflow-hidden border border-gray-200">
+              <div className="mt-2 rounded-xl overflow-hidden border border-white/10 bg-gray-900/80">
                 <SyntaxHighlighter
                   language="json"
                   style={vscDarkPlus}
-                  customStyle={{ margin: 0, borderRadius: 0 }}
+                  customStyle={{ margin: 0, borderRadius: 0, background: 'transparent' }}
                 >
                   {JSON.stringify(abi, null, 2)}
                 </SyntaxHighlighter>
@@ -83,7 +83,7 @@ export function ContractViewer({ contractCode, abi, contractName }: ContractView
           </div>
         )}
       </div>
-    </Card>
+    </div>
   );
 }
 

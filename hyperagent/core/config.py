@@ -139,8 +139,6 @@ class Settings(BaseSettings):
         return False
 
     # Blockchain Networks
-    hyperion_testnet_rpc: str = "https://hyperion-testnet.metisdevops.link"
-    hyperion_testnet_chain_id: int = 133717
     mantle_testnet_rpc: str = "https://rpc.sepolia.mantle.xyz"
     mantle_testnet_chain_id: int = 5003
 
@@ -174,6 +172,18 @@ class Settings(BaseSettings):
     # Network-specific USDC addresses (only for supported networks)
     usdc_address_fuji: Optional[str] = ""  # USDC on Avalanche Fuji
     usdc_address_avalanche: Optional[str] = ""  # USDC on Avalanche Mainnet
+    usdc_address_mantle: Optional[str] = ""  # USDC on Mantle mainnet
+    usdc_address_mantle_sepolia: Optional[str] = ""  # USDC on Mantle Sepolia
+    usdc_address_ethereum: Optional[str] = ""  # USDC on Ethereum mainnet
+    usdc_address_ethereum_sepolia: Optional[str] = ""  # USDC on Ethereum Sepolia
+    usdc_address_polygon: Optional[str] = ""  # USDC on Polygon mainnet
+    usdc_address_polygon_amoy: Optional[str] = ""  # USDC on Polygon Amoy
+    usdc_address_base: Optional[str] = ""  # USDC on Base mainnet
+    usdc_address_base_sepolia: Optional[str] = ""  # USDC on Base Sepolia
+    usdc_address_arbitrum: Optional[str] = ""  # USDC on Arbitrum One
+    usdc_address_arbitrum_sepolia: Optional[str] = ""  # USDC on Arbitrum Sepolia
+    usdc_address_optimism: Optional[str] = ""  # USDC on Optimism mainnet
+    usdc_address_optimism_sepolia: Optional[str] = ""  # USDC on Optimism Sepolia
 
     # x402 Price Tiers Configuration
     # JSON string with price tiers: {"ERC20": 0.01, "ERC721": 0.02, "Custom": 0.15, "basic": 0.01, "advanced": 0.02, "deployment": 0.10}

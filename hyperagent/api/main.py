@@ -29,6 +29,7 @@ from hyperagent.api.routes.x402 import workflows as x402_workflows
 from hyperagent.api.websocket import websocket_endpoint
 from hyperagent.cache.redis_manager import RedisManager
 from hyperagent.core.config import settings
+from hyperagent.api.routes import app_index
 
 app = FastAPI(
     title=settings.app_name,
@@ -95,6 +96,7 @@ app.include_router(x402_deployments.router)
 app.include_router(x402_workflows.router)
 app.include_router(x402_spending_controls.router)
 app.include_router(x402_analytics.router)
+app.include_router(app_index.router)
 
 
 # Health check routes are now in health.py router

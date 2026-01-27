@@ -22,11 +22,11 @@ export function LoadingSpinner({ size = 'md', className, text }: LoadingSpinnerP
         animate={{ rotate: 360 }}
         transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
         className={cn(
-          'border-2 border-gray-200 border-t-blue-600 rounded-full',
+          'border-2 border-gray-700 border-t-blue-500 rounded-full',
           sizes[size]
         )}
       />
-      {text && <span className="text-sm text-gray-600">{text}</span>}
+      {text && <span className="text-sm text-gray-400">{text}</span>}
     </div>
   );
 }

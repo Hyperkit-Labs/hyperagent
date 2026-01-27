@@ -263,7 +263,14 @@ class X402Middleware:
 
         base_url = str(request.base_url).rstrip("/")
         resource_url = f"{base_url}{endpoint}"
-        payment_data = request.headers.get("x-payment")
+
+        # x402 payment headers
+        # - v1: X-PAYMENT
+        # - v2: PAYMENT-SIGNATURE
+        payment_data = (
+            request.headers.get("payment-signature")
+            or request.headers.get("x-payment")
+        )
 
         thirdweb_client = get_thirdweb_client()
         if not thirdweb_client:

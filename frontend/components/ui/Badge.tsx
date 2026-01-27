@@ -20,12 +20,12 @@ export function Badge({
   pulse = false,
 }: BadgeProps) {
   const variants = {
-    default: 'bg-gray-100 text-gray-800 border-gray-200',
-    success: 'bg-green-100 text-green-800 border-green-200',
-    warning: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    error: 'bg-red-100 text-red-800 border-red-200',
-    info: 'bg-blue-100 text-blue-800 border-blue-200',
-    gradient: 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-transparent',
+    default: 'bg-white/10 text-gray-300 border-white/20',
+    success: 'bg-green-500/20 text-green-400 border-green-500/30',
+    warning: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+    error: 'bg-red-500/20 text-red-400 border-red-500/30',
+    info: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    gradient: 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-transparent shadow-lg shadow-blue-500/20',
   };
 
   const sizes_map = {

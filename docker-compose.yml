@@ -68,8 +68,6 @@ services:
       - PINATA_JWT=${PINATA_JWT:-}
       
       # Blockchain Networks
-      - HYPERION_TESTNET_RPC=${HYPERION_TESTNET_RPC:-https://hyperion-testnet.metisdevops.link}
-      - HYPERION_TESTNET_CHAIN_ID=${HYPERION_TESTNET_CHAIN_ID:-133717}
       - MANTLE_TESTNET_RPC=${MANTLE_TESTNET_RPC:-https://rpc.sepolia.mantle.xyz}
       - MANTLE_TESTNET_CHAIN_ID=${MANTLE_TESTNET_CHAIN_ID:-5003}
       - AVALANCHE_FUJI_RPC=${AVALANCHE_FUJI_RPC:-https://api.avax-test.network/ext/bc/C/rpc}
@@ -289,8 +287,8 @@ services:
   x402-verifier:
     image: hyperagent-x402-verifier:latest
     build:
-      context: ./services/x402-verifier
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/x402-verifier/Dockerfile
     container_name: hyperagent_x402_verifier
     ports:
       - "${X402_SERVICE_PORT:-3002}:3001"
@@ -305,7 +303,7 @@ services:
       - hyperagent_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/health"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -329,6 +327,11 @@ services:
       - HOST=0.0.0.0
       - PYTHON_BACKEND_URL=http://hyperagent:8000
       - X402_VERIFIER_URL=http://x402-verifier:3001
+      - X402_ENABLED=${X402_ENABLED:-false}
+      - MERCHANT_WALLET_ADDRESS=${MERCHANT_WALLET_ADDRESS:-}
+      - X402_CONTRACT_PRICE_USDC=${X402_CONTRACT_PRICE_USDC:-0.01}
+      - X402_WORKFLOW_PRICE_USDC=${X402_WORKFLOW_PRICE_USDC:-0.02}
+      - X402_DEPLOY_PRICE_USDC=${X402_DEPLOY_PRICE_USDC:-0.10}
       - DATABASE_URL=${DATABASE_URL:-postgresql://hyperagent_user:secure_password@postgres:5432/hyperagent_db}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
     networks:
@@ -342,7 +345,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4000/healthz"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/healthz', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
       interval: 30s
       timeout: 10s
       retries: 3

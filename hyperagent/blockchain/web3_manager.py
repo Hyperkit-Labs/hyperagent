@@ -65,7 +65,7 @@ class Web3Manager:
             5. Return transaction hash and receipt
 
         Args:
-            network: Network name (e.g., "hyperion_testnet")
+            network: Network name (e.g., "mantle_testnet")
             tx: Transaction dictionary (from, to, value, data, etc.)
             private_key: Private key for signing
             wait_for_confirmation: Whether to wait for confirmation

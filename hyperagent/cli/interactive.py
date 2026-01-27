@@ -55,19 +55,26 @@ def run_interactive_prompts():
 
     # Network selection with feature preview
     console.print(f"\n{CLIStyle.PROGRESS} Select Network:")
-    networks = [
-        "hyperion_testnet",
-        "hyperion_mainnet",
-        "mantle_testnet",
-        "mantle_mainnet",
-        "avalanche_fuji",
-        "avalanche_mainnet",
-    ]
+
+    # Load from config-driven registry
+    from hyperagent.blockchain.network_features import NetworkFeatureManager
+
+    networks = NetworkFeatureManager.list_networks()
+    if not networks:
+        raise click.ClickException("No networks configured. Check config/networks.yaml")
+
+    # Prefer mantle_testnet as default when present
+    default_index = 1
+    if "mantle_testnet" in networks:
+        default_index = networks.index("mantle_testnet") + 1
+
     for i, net in enumerate(networks, 1):
         features = get_network_features_preview(net)
         console.print(f"  {i}. {net} ({features})")
 
-    network_choice = click.prompt("Network", type=click.IntRange(1, len(networks)), default=1)
+    network_choice = click.prompt(
+        "Network", type=click.IntRange(1, len(networks)), default=default_index
+    )
     network = networks[network_choice - 1]
 
     # Contract type
@@ -82,9 +89,6 @@ def run_interactive_prompts():
     console.print(f"\n{CLIStyle.PROGRESS} Options:")
     skip_audit = not click.confirm("Run security audit?", default=True)
     skip_deploy = not click.confirm("Deploy to blockchain?", default=True)
-    optimize_metisvm = click.confirm("Optimize for MetisVM?", default=False)
-    enable_fp = click.confirm("Enable floating-point?", default=False)
-    enable_ai = click.confirm("Enable AI inference?", default=False)
 
     return (
         description,
@@ -94,8 +98,5 @@ def run_interactive_prompts():
         {
             "skip_audit": skip_audit,
             "skip_deployment": skip_deploy,
-            "optimize_metisvm": optimize_metisvm,
-            "enable_fp": enable_fp,
-            "enable_ai": enable_ai,
         },
     )

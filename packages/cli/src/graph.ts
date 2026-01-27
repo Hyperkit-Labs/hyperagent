@@ -5,6 +5,7 @@ import { auditNode } from "./nodes/audit";
 import { validateNode } from "./nodes/validate";
 import { deployNode } from "./nodes/deploy";
 import { eigendaNode } from "./nodes/eigenda";
+import { monitorNode } from "./nodes/monitor";
 
 // Define the State using Annotation (LangGraph 0.2+)
 export const GraphState = Annotation.Root({
@@ -42,6 +43,14 @@ export const GraphState = Annotation.Root({
     })
 });
 
+// Define conditional routing logic
+const routeAfterValidation = (state: any) => {
+    if (state.auditResults.passed) {
+        return "deploy";
+    }
+    return "generate"; // Loop back for repair if audit failed
+};
+
 // Create the workflow
 const workflow = new StateGraph(GraphState)
     .addNode("policy", policyNode)
@@ -50,13 +59,18 @@ const workflow = new StateGraph(GraphState)
     .addNode("validate", validateNode)
     .addNode("deploy", deployNode)
     .addNode("eigenda", eigendaNode)
+    .addNode("monitor", monitorNode)
     .addEdge(START, "policy")
     .addEdge("policy", "generate")
     .addEdge("generate", "audit")
     .addEdge("audit", "validate")
-    .addEdge("validate", "deploy")
+    .addConditionalEdges("validate", routeAfterValidation, {
+        "deploy": "deploy",
+        "generate": "generate"
+    })
     .addEdge("deploy", "eigenda")
-    .addEdge("eigenda", END);
+    .addEdge("eigenda", "monitor")
+    .addEdge("monitor", END);
 
 // Compile
 export const agentGraph = workflow.compile();

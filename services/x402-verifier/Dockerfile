@@ -1,40 +1,52 @@
 # Multi-stage build for x402 Verification Service
-# Updated to Node.js 22-alpine (latest LTS) for security patches
+# Note: this repo is a monorepo; @hyperagent/env is a local package under packages/env.
+# For Docker builds we use the repo root as the build context (see docker-compose.yml).
 FROM node:22-alpine AS builder
 
-WORKDIR /build
+WORKDIR /app
 
-# Copy package files
-COPY package.json package-lock.json* ./
+# Ensure tsc is available in the build stage
+# Also force npm to include devDependencies in this build stage.
+ENV NODE_ENV=development
+ENV NPM_CONFIG_PRODUCTION=false
+ENV NPM_CONFIG_OMIT=
+RUN npm install -g typescript
 
-# Install dependencies
-RUN npm ci
+# Copy local workspace package needed by this service
+COPY packages/env packages/env
+RUN cd packages/env && npm install
 
-# Copy source code
-COPY tsconfig.json ./
-COPY src ./src
+# Copy x402 verifier package files (do NOT copy package-lock to avoid npm trying to fetch @hyperagent/env from registry)
+COPY services/x402-verifier/package.json services/x402-verifier/tsconfig.json ./services/x402-verifier/
+COPY services/x402-verifier/src ./services/x402-verifier/src
 
-# Build TypeScript
+WORKDIR /app/services/x402-verifier
+
+# Install deps + build
+RUN npm install --production=false
 RUN npm run build
 
 # Runtime stage
-# Updated to Node.js 22-alpine (latest LTS) for security patches
 FROM node:22-alpine
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json package-lock.json* ./
+# Copy local package again for file: dependency resolution
+COPY packages/env packages/env
+RUN cd packages/env && npm install --omit=dev
 
-# Install production dependencies only
-RUN npm ci --only=production
+# Copy package files + built output
+COPY services/x402-verifier/package.json ./services/x402-verifier/package.json
+COPY --from=builder /app/services/x402-verifier/dist ./services/x402-verifier/dist
 
-# Copy built files from builder
-COPY --from=builder /build/dist ./dist
+WORKDIR /app/services/x402-verifier
+
+# Install production deps
+RUN npm install --omit=dev
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+  adduser -S nodejs -u 1001
 
 # Change ownership
 RUN chown -R nodejs:nodejs /app

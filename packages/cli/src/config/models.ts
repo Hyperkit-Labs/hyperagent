@@ -1,15 +1,16 @@
-export type ModelProvider = "anthropic" | "google" | "openai" | "xai";
+// Model Configuration v4.1
+export type ModelProvider = "google" | "openai" | "xai";
 
 export const APPROVED_MODELS = {
     "policy": {
         provider: "google",
-        model: "gemini-1.5-flash",
+        model: "gemini-2.5-flash-lite",
         maxTokens: 8192,
         temperature: 0.1
     },
     "generate": {
-        provider: "anthropic",
-        model: "claude-3-5-sonnet-20241022",
+        provider: "google",
+        model: "gemini-2.5-flash-lite",
         maxTokens: 8192,
         temperature: 0.2
     },

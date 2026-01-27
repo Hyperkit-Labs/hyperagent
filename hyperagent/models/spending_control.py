@@ -46,17 +46,30 @@ class SpendingControl(Base):
     def needs_reset(self) -> bool:
         """Check if spending counters need to be reset"""
         now = datetime.utcnow()
+
+        # SQLAlchemy column defaults are not applied until insert/flush, so these can be None
+        # on freshly constructed instances (e.g. in unit tests).
+        if self.daily_reset_at is None or self.monthly_reset_at is None:
+            return True
+
         return now >= self.daily_reset_at or now >= self.monthly_reset_at
 
     def reset_if_needed(self) -> None:
         """Reset spending counters if needed"""
         now = datetime.utcnow()
-        
-        if now >= self.daily_reset_at:
+
+        # Initialize missing reset timestamps without altering counters.
+        if self.daily_reset_at is None:
+            self.daily_reset_at = now + timedelta(days=1)
+        if self.monthly_reset_at is None:
+            next_month = now.replace(day=1) + timedelta(days=32)
+            self.monthly_reset_at = next_month.replace(day=1)
+
+        if self.daily_reset_at is not None and now >= self.daily_reset_at:
             self.daily_spent = 0.0
             self.daily_reset_at = now + timedelta(days=1)
-        
-        if now >= self.monthly_reset_at:
+
+        if self.monthly_reset_at is not None and now >= self.monthly_reset_at:
             self.monthly_spent = 0.0
             next_month = now.replace(day=1) + timedelta(days=32)
             self.monthly_reset_at = next_month.replace(day=1)

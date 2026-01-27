@@ -71,9 +71,6 @@ async def execute_workflow_background(
     workflow_id: str,
     nlp_input: str,
     network: str,
-    optimize_for_metisvm: bool,
-    enable_floating_point: bool,
-    enable_ai_inference: bool,
     skip_audit: bool,
     skip_deployment: bool,
     wallet_address: str,  # REQUIRED: User wallet address
@@ -228,9 +225,6 @@ async def execute_workflow_background(
                 workflow_id=workflow_id,
                 nlp_input=nlp_input,
                 network=network,
-                optimize_for_metisvm=optimize_for_metisvm,
-                enable_floating_point=enable_floating_point,
-                enable_ai_inference=enable_ai_inference,
                 wallet_address=wallet_address,  # REQUIRED: Pass wallet address
                 use_gasless=use_gasless,  # Pass gasless option
                 signed_transaction=signed_transaction,  # Pass signed transaction if provided
@@ -497,9 +491,6 @@ class WorkflowCreateRequest(BaseModel):
     name: Optional[str] = None
     skip_audit: bool = False
     skip_deployment: bool = False
-    optimize_for_metisvm: bool = False
-    enable_floating_point: bool = False
-    enable_ai_inference: bool = False
     # REQUIRED: User wallet information for deployment
     wallet_address: str  # User's wallet address (REQUIRED for all workflows)
     use_gasless: Optional[bool] = False  # Use facilitator for gasless deployment
@@ -645,16 +636,12 @@ async def create_workflow(request: WorkflowCreateRequest, db: AsyncSession = Dep
         )
         
         if is_x402_network:
-            # Create a mock request object for x402 middleware
-            # In actual implementation, this would come from the FastAPI request
-            x402_middleware = X402Middleware()
-            
-            # Note: We need the actual HTTP request object here
-            # For now, we'll handle payment verification in the x402 workflows endpoint
-            # This is a placeholder - actual implementation should use the request object
+            # x402 payment handling is done in the x402-specific workflow endpoints
+            # (see hyperagent/api/routes/x402/workflows.py)
+            # This endpoint calculates cost but payment verification happens at the x402 layer
             logger.info(
                 f"Cost calculated for workflow: ${cost_breakdown['total_usdc']:.4f} "
-                f"for tasks {selected_tasks}"
+                f"for tasks {selected_tasks} on x402-enabled network {request.network}"
             )
 
     try:
@@ -708,54 +695,6 @@ async def create_workflow(request: WorkflowCreateRequest, db: AsyncSession = Dep
 
         warnings = []
         features_used = {}
-
-        # Check PEF availability (for batch deployments - not in this endpoint but for future)
-        # Note: PEF is checked in deployment_service.deploy_batch()
-
-        # Check MetisVM availability
-        if request.optimize_for_metisvm:
-            if NetworkFeatureManager.supports_feature(request.network, NetworkFeature.METISVM):
-                features_used["metisvm"] = True
-            else:
-                warnings.append(
-                    f"MetisVM optimization not available for {request.network}, "
-                    f"continuing without optimization"
-                )
-                features_used["metisvm"] = False
-                # Auto-disable incompatible feature
-                request.optimize_for_metisvm = False
-        else:
-            features_used["metisvm"] = False
-
-        # Check floating-point availability
-        if request.enable_floating_point:
-            if NetworkFeatureManager.supports_feature(
-                request.network, NetworkFeature.FLOATING_POINT
-            ):
-                features_used["floating_point"] = True
-            else:
-                warnings.append(
-                    f"Floating-point operations not available for {request.network}, "
-                    f"continuing without floating-point support"
-                )
-                features_used["floating_point"] = False
-                request.enable_floating_point = False
-        else:
-            features_used["floating_point"] = False
-
-        # Check AI inference availability
-        if request.enable_ai_inference:
-            if NetworkFeatureManager.supports_feature(request.network, NetworkFeature.AI_INFERENCE):
-                features_used["ai_inference"] = True
-            else:
-                warnings.append(
-                    f"AI inference not available for {request.network}, "
-                    f"continuing without AI inference support"
-                )
-                features_used["ai_inference"] = False
-                request.enable_ai_inference = False
-        else:
-            features_used["ai_inference"] = False
 
         # Check EigenDA availability (for deployment - informational)
         features_used["eigenda"] = NetworkFeatureManager.supports_feature(
@@ -822,9 +761,6 @@ async def create_workflow(request: WorkflowCreateRequest, db: AsyncSession = Dep
                     "contract_type": request.contract_type,
                     "skip_audit": request.skip_audit,
                     "skip_deployment": request.skip_deployment,
-                    "optimize_for_metisvm": request.optimize_for_metisvm,
-                    "enable_floating_point": request.enable_floating_point,
-                    "enable_ai_inference": request.enable_ai_inference,
                 },
                 source_agent="api",
             )
@@ -836,9 +772,6 @@ async def create_workflow(request: WorkflowCreateRequest, db: AsyncSession = Dep
                 workflow_id=str(workflow_id),
                 nlp_input=request.nlp_input,
                 network=request.network,
-                optimize_for_metisvm=request.optimize_for_metisvm,
-                enable_floating_point=request.enable_floating_point,
-                enable_ai_inference=request.enable_ai_inference,
                 skip_audit=request.skip_audit,  # Keep for backward compatibility
                 skip_deployment=request.skip_deployment,  # Keep for backward compatibility
                 wallet_address=request.wallet_address,  # REQUIRED: Pass wallet address

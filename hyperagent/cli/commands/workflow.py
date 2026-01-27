@@ -33,23 +33,14 @@ def register_workflow_commands(workflow_group: click.Group) -> None:
         "--description", "-d", help="NLP description of contract (required if not interactive)"
     )
     @click.option("--interactive", "-i", is_flag=True, help="Interactive mode")
-    @click.option("--watch", "-w", is_flag=True, help="Watch progress in real-time")
+    @click.option("--watch", is_flag=True, help="Watch progress in real-time")
     @click.option("--follow", "-f", is_flag=True, help="Follow progress (alias for --watch)")
     @click.option(
         "--network",
         "-n",
-        type=click.Choice(
-            [
-                "hyperion_testnet",
-                "hyperion_mainnet",
-                "mantle_testnet",
-                "mantle_mainnet",
-                "avalanche_fuji",
-                "avalanche_mainnet",
-            ]
-        ),
-        default="hyperion_testnet",
-        help="Target blockchain",
+        type=str,
+        default="mantle_testnet",
+        help="Target network (use 'hyperagent network list' to see available networks)",
     )
     @click.option(
         "--wallet-address",
@@ -66,9 +57,6 @@ def register_workflow_commands(workflow_group: click.Group) -> None:
     @click.option("--name", help="Workflow name (optional)")
     @click.option("--no-audit", is_flag=True, help="Skip security audit")
     @click.option("--no-deploy", is_flag=True, help="Skip deployment")
-    @click.option("--optimize-metisvm", is_flag=True, help="Optimize for MetisVM (Hyperion only)")
-    @click.option("--enable-fp", is_flag=True, help="Enable floating-point operations")
-    @click.option("--enable-ai", is_flag=True, help="Enable AI inference support")
     @click.option("--confirm-steps", is_flag=True, help="Confirm each step")
     def create(
         description: Optional[str],
@@ -80,9 +68,6 @@ def register_workflow_commands(workflow_group: click.Group) -> None:
         name: Optional[str],
         no_audit: bool,
         no_deploy: bool,
-        optimize_metisvm: bool,
-        enable_fp: bool,
-        enable_ai: bool,
         confirm_steps: bool,
         wallet_address: Optional[str],
     ) -> None:
@@ -96,9 +81,6 @@ def register_workflow_commands(workflow_group: click.Group) -> None:
             description, network, type, wallet_address, options = run_interactive_prompts()
             no_audit = options.get("skip_audit", False)
             no_deploy = options.get("skip_deployment", False)
-            optimize_metisvm = options.get("optimize_metisvm", False)
-            enable_fp = options.get("enable_fp", False)
-            enable_ai = options.get("enable_ai", False)
         elif not description:
             format_error(
                 "Description required",
@@ -131,6 +113,22 @@ def register_workflow_commands(workflow_group: click.Group) -> None:
             )
             return
 
+        # Validate network exists
+        from hyperagent.blockchain.network_features import NetworkFeatureManager
+
+        try:
+            NetworkFeatureManager.get_network_config(network)
+        except Exception:
+            format_error(
+                "Invalid network",
+                f"Network '{network}' not found",
+                suggestions=[
+                    "Run: hyperagent network list",
+                    "Check config/networks.yaml",
+                ],
+            )
+            return
+
         console.print(f"\n{CLIStyle.INFO} Creating workflow...")
         console.print(f"{CLIStyle.INFO} Network: {network}")
         console.print(f"{CLIStyle.INFO} Contract Type: {type}")
@@ -153,9 +151,6 @@ def register_workflow_commands(workflow_group: click.Group) -> None:
                             "wallet_address": wallet_address,
                             "skip_audit": no_audit,
                             "skip_deployment": no_deploy,
-                            "optimize_for_metisvm": optimize_metisvm,
-                            "enable_floating_point": enable_fp,
-                            "enable_ai_inference": enable_ai,
                         },
                     )
                     response.raise_for_status()

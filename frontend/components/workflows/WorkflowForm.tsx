@@ -22,9 +22,6 @@ interface WorkflowFormProps {
     selected_tasks?: string[];  // NEW: Selected tasks
     skip_audit?: boolean;  // Deprecated: kept for backward compatibility
     skip_deployment?: boolean;  // Deprecated: kept for backward compatibility
-    optimize_for_metisvm?: boolean;
-    enable_floating_point?: boolean;
-    enable_ai_inference?: boolean;
     wallet_address: string;  // REQUIRED: User wallet address
     use_gasless?: boolean;  // Use facilitator for gasless deployment
     cost_breakdown?: TaskCostBreakdown;  // NEW: Cost breakdown for payment
@@ -45,14 +42,11 @@ export function WorkflowForm({ onSubmit, loading = false, onCostUpdate, initialP
   const [costBreakdown, setCostBreakdown] = useState<TaskCostBreakdown | null>(null);
   const [skipAudit, setSkipAudit] = useState(false);  // Deprecated: kept for backward compatibility
   const [skipDeployment, setSkipDeployment] = useState(false);  // Deprecated: kept for backward compatibility
-  const [optimizeForMetisVM, setOptimizeForMetisVM] = useState(false);
-  const [enableFloatingPoint, setEnableFloatingPoint] = useState(false);
-  const [enableAIInference, setEnableAIInference] = useState(false);
   const [useGasless, setUseGasless] = useState(false);
   const [networks, setNetworks] = useState<Network[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [thirdwebConfigured, setThirdwebConfigured] = useState(() => isThirdwebConfigured());
-  const [walletChainId, setWalletChainId] = useState<number | null>(null);
+  const [useV2API, setUseV2API] = useState(false); // NEW: v2 API toggle
 
   useEffect(() => {
     getNetworks()
@@ -60,38 +54,34 @@ export function WorkflowForm({ onSubmit, loading = false, onCostUpdate, initialP
       .catch((err) => setError(err.message));
   }, []);
 
-  useEffect(() => {
-    if (wallet) {
-      try {
-        const chain = wallet.getChain();
-        setWalletChainId(chain?.id || null);
-      } catch (err) {
-        setWalletChainId(null);
-      }
-    } else {
-      setWalletChainId(null);
-    }
-  }, [wallet]);
-
-  const isAvalancheFuji = walletChainId === 43113;
-  const isX402Network = network.toLowerCase().includes('avalanche') || network.toLowerCase().includes('fuji');
-  const needsNetworkSwitch = isX402Network && !isAvalancheFuji && walletChainId !== null;
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!nlpInput.trim() || !network) {
-      setError('Please fill in all required fields');
+    if (!nlpInput.trim()) {
+      setError('Please provide a contract description');
       return;
     }
 
-    // Require wallet connection
+    // For v2 API, only intent is required
+    if (useV2API) {
+      onSubmit({
+        nlp_input: nlpInput,
+        network: network || 'avalanche', // v2 defaults to avalanche
+        intent: nlpInput, // v2 uses 'intent'
+        wallet_address: account?.address || '', // Optional for v2
+        use_v2_api: true, // Flag to indicate v2 API
+      } as any);
+      return;
+    }
+
+    // For v1 API, require network and wallet
+    if (!network) {
+      setError('Please select a network');
+      return;
+    }
+
     if (!wallet || !account) {
       setError('Please connect your wallet to create a workflow');
-      return;
-    }
-
-    if (needsNetworkSwitch) {
-      setError('Please switch your wallet to Avalanche Fuji network to continue');
       return;
     }
 
@@ -100,16 +90,14 @@ export function WorkflowForm({ onSubmit, loading = false, onCostUpdate, initialP
       network,
       contract_type: contractType,
       name: name || undefined,
-      selected_tasks: selectedTasks,  // NEW: Pass selected tasks
-      skip_audit: skipAudit,  // Deprecated: kept for backward compatibility
-      skip_deployment: skipDeployment,  // Deprecated: kept for backward compatibility
-      optimize_for_metisvm: optimizeForMetisVM,
-      enable_floating_point: enableFloatingPoint,
-      enable_ai_inference: enableAIInference,
-      wallet_address: account.address,  // REQUIRED: Pass wallet address from connected account
-      use_gasless: useGasless,  // Pass gasless option
-      cost_breakdown: costBreakdown,  // NEW: Pass cost breakdown for payment
-    });
+      selected_tasks: selectedTasks,
+      skip_audit: skipAudit,
+      skip_deployment: skipDeployment,
+      wallet_address: account.address,
+      use_gasless: useGasless,
+      cost_breakdown: costBreakdown,
+      use_v2_api: false,
+    } as any);
   };
 
   // Filter supported networks (selectable)
@@ -128,39 +116,64 @@ export function WorkflowForm({ onSubmit, loading = false, onCostUpdate, initialP
   }));
 
   return (
-    <Card>
+    <div className="bg-gray-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Wallet Connection Section */}
-        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        {/* API Version Selector */}
+        <div className="p-4 bg-white/5 border border-white/10 rounded-xl">
           <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium text-gray-700">Wallet Connection *</label>
-            {thirdwebClient && <ConnectButton client={thirdwebClient} />}
+            <label className="text-sm font-semibold text-gray-300">API Version</label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setUseV2API(false)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                  !useV2API
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white/5 text-gray-400 hover:bg-white/10 border border-white/5'
+                }`}
+              >
+                v1 (Python)
+              </button>
+              <button
+                type="button"
+                onClick={() => setUseV2API(true)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                  useV2API
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white/5 text-gray-400 hover:bg-white/10 border border-white/5'
+                }`}
+              >
+                v2 (Spec-Locked)
+              </button>
+            </div>
           </div>
-          {!wallet || !account ? (
-              <p className="text-sm text-gray-600">
-                Please connect your wallet to create a workflow. All deployments require a connected wallet.
-              </p>
-            ) : (
-              <div className="space-y-1">
-                <p className="text-sm text-green-600">
-                  Connected: {account.address.slice(0, 6)}...{account.address.slice(-4)}
-                </p>
-                {isX402Network && !isAvalancheFuji && walletChainId && (
-                  <p className="text-sm text-amber-600 font-medium">
-                    ⚠️ Please switch to Avalanche Fuji (Chain ID: 43113) for x402 payments
-                  </p>
-                )}
-                {isX402Network && (
-                  <p className="text-xs text-gray-500">
-                    x402 payments require USDC on Avalanche Fuji. Get test USDC from{' '}
-                    <a href="https://core.app/tools/testnet-faucet/?subnet=c&token=usdc" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
-                      core.app faucet
-                    </a>
-                  </p>
-                )}
-              </div>
-            )}
+          <p className="text-xs text-gray-500 mt-1">
+            {useV2API 
+              ? 'Using spec-locked orchestrator with deterministic state machine'
+              : 'Using Python backend with full feature set'}
+          </p>
         </div>
+
+        {/* Wallet Connection Section */}
+        {!useV2API && (
+          <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-semibold text-gray-300">Wallet Connection *</label>
+              {thirdwebClient && <ConnectButton client={thirdwebClient} />}
+            </div>
+            {!wallet || !account ? (
+                <p className="text-sm text-gray-400">
+                  Please connect your wallet to create a workflow. All deployments require a connected wallet.
+                </p>
+              ) : (
+                <div className="space-y-1">
+                  <p className="text-sm text-green-400">
+                    Connected: {account.address.slice(0, 6)}...{account.address.slice(-4)}
+                  </p>
+                </div>
+              )}
+          </div>
+        )}
 
         <Textarea
           label="Contract Description *"
@@ -197,7 +210,7 @@ export function WorkflowForm({ onSubmit, loading = false, onCostUpdate, initialP
           placeholder="My Workflow"
         />
 
-        {network && (
+        {network && !useV2API && (
           <TaskSelector
             selectedTasks={selectedTasks}
             onTasksChange={setSelectedTasks}
@@ -212,86 +225,61 @@ export function WorkflowForm({ onSubmit, loading = false, onCostUpdate, initialP
           />
         )}
 
-        <div className="space-y-3">
-          <label className="text-sm font-medium text-gray-700">Advanced Options</label>
-          <div className="space-y-2">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={skipAudit}
-                onChange={(e) => setSkipAudit(e.target.checked)}
-                className="mr-2"
-              />
-              <span className="text-sm">Skip Security Audit</span>
-            </label>
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={skipDeployment}
-                onChange={(e) => setSkipDeployment(e.target.checked)}
-                className="mr-2"
-              />
-              <span className="text-sm">Skip Deployment (Generate Only)</span>
-            </label>
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={optimizeForMetisVM}
-                onChange={(e) => setOptimizeForMetisVM(e.target.checked)}
-                className="mr-2"
-              />
-              <span className="text-sm">Optimize for MetisVM</span>
-            </label>
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={enableFloatingPoint}
-                onChange={(e) => setEnableFloatingPoint(e.target.checked)}
-                className="mr-2"
-              />
-              <span className="text-sm">Enable Floating Point Operations</span>
-            </label>
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={enableAIInference}
-                onChange={(e) => setEnableAIInference(e.target.checked)}
-                className="mr-2"
-              />
-              <span className="text-sm">Enable AI Inference</span>
-            </label>
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={useGasless}
-                onChange={(e) => setUseGasless(e.target.checked)}
-                className="mr-2"
-              />
-              <span className="text-sm">Use Gasless Deployment (via facilitator)</span>
-            </label>
+        {!useV2API && (
+          <div className="space-y-3">
+            <label className="text-sm font-semibold text-gray-300">Advanced Options</label>
+            <div className="space-y-2">
+              <label className="flex items-center text-gray-400">
+                <input
+                  type="checkbox"
+                  checked={skipAudit}
+                  onChange={(e) => setSkipAudit(e.target.checked)}
+                  className="mr-2 rounded border-white/20 bg-white/5 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm">Skip Security Audit</span>
+              </label>
+              <label className="flex items-center text-gray-400">
+                <input
+                  type="checkbox"
+                  checked={skipDeployment}
+                  onChange={(e) => setSkipDeployment(e.target.checked)}
+                  className="mr-2 rounded border-white/20 bg-white/5 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm">Skip Deployment (Generate Only)</span>
+              </label>
+              <label className="flex items-center text-gray-400">
+                <input
+                  type="checkbox"
+                  checked={useGasless}
+                  onChange={(e) => setUseGasless(e.target.checked)}
+                  className="mr-2 rounded border-white/20 bg-white/5 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm">Use Gasless Deployment (via facilitator)</span>
+              </label>
+            </div>
           </div>
-        </div>
+        )}
 
         {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-sm text-red-400">
             {error}
           </div>
         )}
 
         <Button 
           type="submit" 
-          disabled={loading || !wallet || !account || !thirdwebConfigured} 
-          className="w-full"
+          disabled={loading || (!useV2API && (!wallet || !account || !thirdwebConfigured))} 
+          className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl h-11 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading 
             ? 'Creating Workflow...' 
-            : (!wallet || !account) 
+            : (!useV2API && (!wallet || !account)) 
               ? 'Connect Wallet to Continue' 
               : 'Create Workflow'
           }
         </Button>
       </form>
-    </Card>
+    </div>
   );
 }
 

@@ -10,8 +10,8 @@
     "lint": "eslint src/**/*.ts"
   },
   "dependencies": {
+    "@hyperagent/env": "file:../../packages/env",
     "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "thirdweb": "^5.114.1"
   },

@@ -85,37 +85,6 @@ class GenerationService(ServiceInterface):
                 enhanced_prompt, contract_type
             )
 
-        # Optimize for MetisVM if requested (with feature check and fallback)
-        metisvm_optimized = False
-        optimization_report = None
-        optimize_requested = input_data.get("optimize_for_metisvm")
-
-        if optimize_requested:
-            from hyperagent.blockchain.network_features import NetworkFeature, NetworkFeatureManager
-
-            if NetworkFeatureManager.supports_feature(network, NetworkFeature.METISVM):
-                # Apply optimization
-                from hyperagent.blockchain.metisvm_optimizer import MetisVMOptimizer
-
-                optimizer = MetisVMOptimizer()
-                contract_code = optimizer.optimize_for_metisvm(
-                    contract_code,
-                    enable_fp=input_data.get("enable_floating_point", False),
-                    enable_ai=input_data.get("enable_ai_inference", False),
-                )
-                metisvm_optimized = True
-                optimization_report = optimizer.get_optimization_report(
-                    contract_code,
-                    enable_fp=input_data.get("enable_floating_point", False),
-                    enable_ai=input_data.get("enable_ai_inference", False),
-                )
-            else:
-                # Log warning but continue without optimization
-                logger.warning(
-                    f"MetisVM optimization requested but not available for {network}. "
-                    f"Continuing without optimization."
-                )
-                # Continue with standard contract code
 
         # Store successful contract in Acontext memory (if enabled)
         if self.acontext and self.acontext.enabled:
@@ -125,7 +94,7 @@ class GenerationService(ServiceInterface):
                     contract_type=contract_type,
                     requirements=nlp_desc,
                     audit_issues=None,  # Will be populated after audit stage
-                    metadata={"network": network, "metisvm_optimized": metisvm_optimized},
+                    metadata={"network": network},
                 )
             except Exception as e:
                 logger.warning(f"Failed to store contract in Acontext: {e}")
@@ -134,8 +103,6 @@ class GenerationService(ServiceInterface):
             "status": "success",
             "contract_code": contract_code,
             "contract_type": contract_type,
-            "metisvm_optimized": metisvm_optimized,
-            "optimization_report": optimization_report,
         }
 
     async def validate(self, data: Dict[str, Any]) -> bool:

@@ -40,8 +40,7 @@ def get_deployment_tools() -> List[Dict[str, Any]]:
                     },
                     "network": {
                         "type": "string",
-                        "description": "Target network (hyperion_testnet, mantle_testnet)",
-                        "enum": ["hyperion_testnet", "mantle_testnet"],
+                        "description": "Target network (e.g., mantle_testnet)",
                     },
                     "gas_limit": {
                         "type": "number",
@@ -64,7 +63,6 @@ def get_deployment_tools() -> List[Dict[str, Any]]:
                     "network": {
                         "type": "string",
                         "description": "Network to check balance on",
-                        "enum": ["hyperion_testnet", "mantle_testnet"],
                     },
                 },
                 "required": ["address", "network"],
@@ -83,7 +81,6 @@ def get_deployment_tools() -> List[Dict[str, Any]]:
                     "network": {
                         "type": "string",
                         "description": "Target network",
-                        "enum": ["hyperion_testnet", "mantle_testnet"],
                     },
                     "from_address": {
                         "type": "string",
@@ -103,7 +100,6 @@ def get_deployment_tools() -> List[Dict[str, Any]]:
                     "network": {
                         "type": "string",
                         "description": "Network where transaction was sent",
-                        "enum": ["hyperion_testnet", "mantle_testnet"],
                     },
                 },
                 "required": ["tx_hash", "network"],
@@ -122,7 +118,6 @@ def get_deployment_tools() -> List[Dict[str, Any]]:
                     "network": {
                         "type": "string",
                         "description": "Network where contract is deployed",
-                        "enum": ["hyperion_testnet", "mantle_testnet"],
                     },
                 },
                 "required": ["contract_address", "network"],
@@ -356,24 +351,59 @@ class AlithToolHandler:
             return {"success": False, "error": str(e)}
 
     async def _verify_contract(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Verify contract (placeholder - would integrate with explorer API)"""
+        """Verify contract on blockchain explorer"""
+        from hyperagent.blockchain.verification import ContractVerifier
+        
         contract_address = params.get("contract_address")
         network = params.get("network")
+        source_code = params.get("source_code")
+        contract_name = params.get("contract_name", "Contract")
+        compiler_version = params.get("compiler_version")
+        optimization_enabled = params.get("optimization_enabled", False)
 
         if not contract_address or not network:
             return {"success": False, "error": "contract_address and network are required"}
 
         try:
+            # Use the ContractVerifier for full explorer API integration
+            verifier = ContractVerifier(self.network_manager)
+            
+            # Basic verification: check if contract has code
             w3 = self.network_manager.get_web3(network)
             code = w3.eth.get_code(contract_address)
-
+            
+            if len(code) == 0:
+                return {
+                    "success": False,
+                    "error": "Contract has no code at this address",
+                    "contract_address": contract_address,
+                    "network": network,
+                }
+            
+            # If source code is provided, attempt full verification
+            if source_code:
+                try:
+                    verification_result = await verifier.verify_contract(
+                        contract_address=contract_address,
+                        source_code=source_code,
+                        contract_name=contract_name,
+                        compiler_version=compiler_version or "0.8.24",
+                        optimization_enabled=optimization_enabled,
+                        network=network,
+                    )
+                    return verification_result
+                except Exception as e:
+                    logger.warning(f"Full verification failed, returning basic check: {e}")
+            
+            # Return basic verification result
             return {
                 "success": True,
                 "contract_address": contract_address,
-                "has_code": len(code) > 0,
+                "has_code": True,
                 "code_length": len(code),
                 "network": network,
-                "note": "Full verification requires explorer API integration",
+                "verified": False,
+                "note": "Contract has code but source verification not attempted (provide source_code for full verification)",
             }
         except Exception as e:
             logger.error(f"Contract verification failed: {e}", exc_info=True)

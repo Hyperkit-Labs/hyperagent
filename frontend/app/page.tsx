@@ -99,7 +99,7 @@ export default function Home() {
             className="text-xl md:text-2xl text-gray-400 max-w-3xl mb-12 font-medium"
           >
             Deploy cross-chain bridges, smart contracts, and full-stack dApps 
-            with AI-driven ROMA reasoning and x402 payment security.
+            with spec-locked orchestrator and x402 payment security.
           </motion.p>
 
           {/* Action Bar / Search Input */}
@@ -131,7 +131,7 @@ export default function Home() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="hidden md:block text-[12px] text-gray-600 font-medium px-3 italic">ROMA Reasoning Active</span>
+                  <span className="hidden md:block text-[12px] text-gray-500 font-medium px-3 italic">Spec-Locked Orchestrator</span>
                   <Button 
                     onClick={handleBuild}
                     className="h-10 px-6 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-bold shadow-lg shadow-blue-500/20 transition-all hover:scale-105 active:scale-95 gap-2"
@@ -212,8 +212,8 @@ export default function Home() {
               },
               { 
                 icon: Cpu, 
-                label: "ROMA Planner", 
-                desc: "Advanced multi-step reasoning that handles complex cross-chain logic automatically.",
+                label: "Spec-Locked Orchestrator", 
+                desc: "Deterministic state machine with 7-field core state ensuring consistent execution across all workflows.",
                 color: "text-emerald-400"
               },
               { 
@@ -241,16 +241,19 @@ export default function Home() {
       <section className="py-32 px-6">
         <div className="max-w-4xl mx-auto text-center bg-gradient-to-br from-blue-600 to-purple-700 p-16 rounded-[48px] shadow-2xl shadow-blue-500/20 relative overflow-hidden">
           <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay" />
-          <h2 className="text-4xl md:text-5xl font-bold mb-8 relative z-10">Ready to build the <br /> future of Web3?</h2>
+          <h2 className="text-4xl md:text-5xl font-bold mb-4 relative z-10">Ready to build the <br /> future of Web3?</h2>
+          <p className="text-lg text-blue-100 mb-8 relative z-10">Deploy production-ready smart contracts in minutes with our spec-locked orchestrator</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center relative z-10">
             <Link href="/workflows/create">
-              <Button size="lg" className="bg-white text-blue-600 hover:bg-blue-50 font-bold px-10 h-14 rounded-2xl shadow-xl">
+              <Button size="lg" className="bg-white text-blue-600 hover:bg-blue-50 font-bold px-10 h-14 rounded-2xl shadow-xl transition-all hover:scale-105 active:scale-95">
                 Start Building Now
+                <ArrowUp className="w-5 h-5 ml-2" />
               </Button>
             </Link>
             <Link href="/templates">
-              <Button size="lg" variant="ghost" className="text-white hover:bg-white/10 font-bold px-10 h-14 rounded-2xl border border-white/20">
+              <Button size="lg" variant="ghost" className="text-white hover:bg-white/10 font-bold px-10 h-14 rounded-2xl border border-white/20 transition-all hover:scale-105 active:scale-95">
                 Browse Templates
+                <ChevronRight className="w-5 h-5 ml-2" />
               </Button>
             </Link>
           </div>

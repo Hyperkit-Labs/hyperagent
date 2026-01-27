@@ -90,7 +90,7 @@ class TestX402PaymentFlows:
         cost_advanced = estimator.estimate_generation_cost(
             prompt_length=500,
             model="gemini-flash",
-            chain="hyperion_testnet"
+            chain="mantle_testnet"
         )
         
         assert cost_advanced > cost_standard

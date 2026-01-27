@@ -35,15 +35,15 @@ export function Card({
       className={cn(
         'rounded-2xl border transition-all duration-300',
         glassmorphism
-          ? 'bg-white/80 backdrop-blur-xl border-white/30 shadow-xl shadow-blue-500/10'
-          : 'bg-white border-gray-200/70 shadow-sm',
-        hover && !glassmorphism && 'hover:shadow-xl hover:shadow-blue-500/10',
-        gradient && !glassmorphism && 'bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/20',
+          ? 'bg-gray-900/50 backdrop-blur-xl border-white/10 shadow-xl shadow-blue-500/10'
+          : 'bg-gray-900/50 border-white/10 shadow-sm backdrop-blur-sm',
+        hover && !glassmorphism && 'hover:shadow-xl hover:shadow-blue-500/20 hover:border-white/20',
+        gradient && !glassmorphism && 'bg-gradient-to-br from-gray-900/60 via-blue-900/20 to-indigo-900/20',
         className
       )}
     >
       {header && (
-        <div className="px-6 py-4 border-b border-gray-200/50 bg-gradient-to-r from-gray-50/50 to-transparent rounded-t-2xl">
+        <div className="px-6 py-4 border-b border-white/10 bg-gradient-to-r from-white/5 to-transparent rounded-t-2xl">
           {header}
         </div>
       )}
@@ -51,7 +51,7 @@ export function Card({
         {children}
       </div>
       {footer && (
-        <div className="px-6 py-4 border-t border-gray-200/50 bg-gradient-to-r from-gray-50/50 to-transparent rounded-b-2xl">
+        <div className="px-6 py-4 border-t border-white/10 bg-gradient-to-r from-white/5 to-transparent rounded-b-2xl">
           {footer}
         </div>
       )}

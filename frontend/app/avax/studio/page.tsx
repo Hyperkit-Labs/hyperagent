@@ -95,7 +95,7 @@ export default function StudioPage() {
           </h1>
           <p className="text-gray-400 text-lg max-w-2xl mx-auto leading-relaxed">
             Architect, audit, and launch institutional-grade smart contracts on Avalanche Fuji. 
-            Powered by ROMA reasoning and x402 micropayments.
+            Powered by spec-locked orchestrator and x402 micropayments.
           </p>
         </div>
 
@@ -152,8 +152,8 @@ export default function StudioPage() {
             <div className="mt-6 p-6 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-start gap-4">
               <Loader2 className="w-6 h-6 text-blue-400 animate-spin flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-blue-100 font-bold">ROMA Intelligence is Architecting...</p>
-                <p className="text-blue-300/70 text-sm mt-1">Simulating contract state and auditing logic patterns (60-90s)</p>
+                <p className="text-blue-100 font-bold">Spec-Locked Orchestrator is Processing...</p>
+                <p className="text-blue-300/70 text-sm mt-1">Generating contract code and auditing logic patterns (60-90s)</p>
               </div>
             </div>
           )}
@@ -209,7 +209,7 @@ export default function StudioPage() {
             </span>
             <span className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 bg-purple-500 rounded-full" />
-              ROMA Planner v2.5
+              Spec-Locked v2
             </span>
           </div>
         </Card>

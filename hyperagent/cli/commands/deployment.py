@@ -30,11 +30,9 @@ def register_deployment_commands(deployment_group: click.Group) -> None:
     @click.option(
         "--network",
         "-n",
-        type=click.Choice(
-            ["hyperion_testnet", "hyperion_mainnet", "mantle_testnet", "mantle_mainnet"]
-        ),
+        type=str,
         required=True,
-        help="Target network",
+        help="Target network (use 'hyperagent network list' to see available networks)",
     )
     @click.option("--private-key", "-k", help="Private key for deployment (or use config)")
     @click.option(
@@ -53,6 +51,22 @@ def register_deployment_commands(deployment_group: click.Group) -> None:
         if not confirm:
             if not click.confirm(f"Deploy contract {contract_id} to {network}?"):
                 return
+
+        # Validate network exists
+        from hyperagent.blockchain.network_features import NetworkFeatureManager
+
+        try:
+            NetworkFeatureManager.get_network_config(network)
+        except Exception:
+            format_error(
+                "Invalid network",
+                f"Network '{network}' not found",
+                suggestions=[
+                    "Run: hyperagent network list",
+                    "Check config/networks.yaml",
+                ],
+            )
+            return
 
         console.print(f"{CLIStyle.INFO} Deploying contract to {network}...")
 
@@ -207,28 +221,25 @@ def register_deployment_commands(deployment_group: click.Group) -> None:
     @click.option(
         "--network",
         "-n",
-        type=click.Choice(
-            ["hyperion_testnet", "hyperion_mainnet", "mantle_testnet", "mantle_mainnet"]
-        ),
+        type=str,
         required=True,
-        help="Target network",
+        help="Target network (use 'hyperagent network list' to see available networks)",
     )
     @click.option(
-        "--use-pef",
-        is_flag=True,
+        "--parallel/--no-parallel",
         default=True,
-        help="Use Hyperion PEF for parallel deployment (Hyperion only)",
+        help="Deploy contracts in parallel (best-effort)",
     )
     @click.option("--max-parallel", type=int, default=10, help="Maximum parallel deployments")
     @click.option("--private-key", "-k", help="Private key for deployment (or use config)")
     def batch(
         contracts_file: click.File,
         network: str,
-        use_pef: bool,
+        parallel: bool,
         max_parallel: int,
         private_key: Optional[str],
     ) -> None:
-        """[>] Deploy multiple contracts in parallel using PEF"""
+        """[>] Deploy multiple contracts (best-effort parallelism)"""
         try:
             contracts_data = json.load(contracts_file)
             contracts = contracts_data.get("contracts", [])
@@ -237,13 +248,29 @@ def register_deployment_commands(deployment_group: click.Group) -> None:
                 format_error("No contracts found in file", "File must contain 'contracts' array")
                 return
 
+            # Validate network exists
+            from hyperagent.blockchain.network_features import NetworkFeatureManager
+
+            try:
+                NetworkFeatureManager.get_network_config(network)
+            except Exception:
+                format_error(
+                    "Invalid network",
+                    f"Network '{network}' not found",
+                    suggestions=[
+                        "Run: hyperagent network list",
+                        "Check config/networks.yaml",
+                    ],
+                )
+                return
+
             console.print(f"{CLIStyle.INFO} Deploying {len(contracts)} contracts to {network}...")
-            if use_pef and network.startswith("hyperion"):
+            if parallel:
                 console.print(
-                    f"{CLIStyle.INFO} Using PEF for parallel deployment (max: {max_parallel})"
+                    f"{CLIStyle.INFO} Parallel deployment enabled (max: {max_parallel})"
                 )
             else:
-                console.print(f"{CLIStyle.INFO} Using sequential deployment")
+                console.print(f"{CLIStyle.INFO} Parallel deployment disabled")
 
             api_url = get_api_url()
 
@@ -253,7 +280,7 @@ def register_deployment_commands(deployment_group: click.Group) -> None:
                         f"{api_url}/api/v1/deployments/batch",
                         json={
                             "contracts": contracts,
-                            "use_pef": use_pef,
+                            "parallel": parallel,
                             "max_parallel": max_parallel,
                             "private_key": private_key,
                         },
@@ -313,10 +340,8 @@ def register_deployment_commands(deployment_group: click.Group) -> None:
     @click.option(
         "--network",
         "-n",
-        type=click.Choice(
-            ["hyperion_testnet", "hyperion_mainnet", "mantle_testnet", "mantle_mainnet"]
-        ),
-        help="Network (if not using deployment-id)",
+        type=str,
+        help="Network (if not using deployment-id; use 'hyperagent network list')",
     )
     @click.option("--value", "-v", help="ETH value to send (for payable functions)")
     def interact(

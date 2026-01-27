@@ -1,0 +1,10 @@
+{
+  "name": "@hyperagent/env",
+  "version": "0.0.0",
+  "private": true,
+  "main": "index.js",
+  "types": "index.d.ts",
+  "dependencies": {
+    "dotenv": "^16.3.1"
+  }
+}

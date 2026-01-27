@@ -20,15 +20,15 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
     loading = false,
     ...props
   }: ButtonProps) {
-    const baseStyles = 'inline-flex items-center justify-center rounded-xl font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none disabled:cursor-not-allowed relative overflow-hidden';
+    const baseStyles = 'inline-flex items-center justify-center rounded-xl font-semibold transition-all duration-200 focus:outline-none focus:ring-2 disabled:opacity-50 disabled:pointer-events-none disabled:cursor-not-allowed relative overflow-hidden';
     
     const variants = {
-      primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 shadow-lg hover:shadow-xl active:scale-95',
-      secondary: 'bg-gray-100 text-gray-900 hover:bg-gray-200 focus:ring-gray-500 shadow-sm hover:shadow-md',
-      danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 shadow-lg hover:shadow-xl active:scale-95',
-      outline: 'border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 focus:ring-gray-500 bg-white',
-      ghost: 'text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
-      gradient: 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 focus:ring-blue-500 shadow-lg hover:shadow-xl active:scale-95',
+      primary: 'bg-blue-600 text-white hover:bg-blue-500 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/30 active:scale-95',
+      secondary: 'bg-white/10 text-white hover:bg-white/20 focus:ring-white/50 border border-white/10 shadow-sm hover:shadow-md backdrop-blur-sm',
+      danger: 'bg-red-600 text-white hover:bg-red-500 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-900 shadow-lg shadow-red-500/20 hover:shadow-xl hover:shadow-red-500/30 active:scale-95',
+      outline: 'border-2 border-white/20 text-white hover:bg-white/10 hover:border-white/30 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-gray-900 bg-transparent backdrop-blur-sm',
+      ghost: 'text-gray-400 hover:text-white hover:bg-white/5 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-gray-900',
+      gradient: 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/30 active:scale-95',
     };
   
     const sizes = {

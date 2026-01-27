@@ -23,9 +23,9 @@ class NetworkRegistry:
     Centralized network registry supporting 1000+ networks
     
     Sources (in priority order):
-    1. HyperionKit API (primary - external registry)
-    2. Database cache (secondary - cached configs)
-    3. Hardcoded NETWORK_FEATURES (fallback - local configs)
+    1. Redis cache (optional)
+    2. Local config-driven registry (config/networks.yaml)
+    3. Hardcoded NETWORK_FEATURES fallback
     
     Features:
     - Paginated network listing
@@ -43,30 +43,17 @@ class NetworkRegistry:
             redis_manager: Optional Redis manager for caching
         """
         self.redis_manager = redis_manager
-        self._hyperionkit_client = None
         self._cache: Dict[str, Dict[str, Any]] = {}
         self._all_networks_cache: Optional[List[Dict[str, Any]]] = None
 
-    def _get_hyperionkit_client(self):
-        """Get or create HyperionKit client (lazy initialization)"""
-        if self._hyperionkit_client is None:
-            try:
-                from hyperagent.integration.hyperionkit_client import HyperionKitClient
-
-                self._hyperionkit_client = HyperionKitClient()
-            except ImportError:
-                logger.warning("HyperionKit client not available - using hardcoded configs")
-                self._hyperionkit_client = None
-        return self._hyperionkit_client
 
     async def get_network(self, network_id: str) -> Dict[str, Any]:
         """
         Get single network config with fallback chain
         
         Priority:
-        1. HyperionKit API (if available)
-        2. Redis cache (if available)
-        3. Hardcoded NETWORK_FEATURES
+        1. Redis cache (if available)
+        2. Local config-driven registry (NETWORK_FEATURES / config/networks.yaml)
         
         Args:
             network_id: Network identifier (e.g., "avalanche_fuji")
@@ -92,27 +79,6 @@ class NetworkRegistry:
                     return config
             except Exception as e:
                 logger.debug(f"Redis cache miss for {network_id}: {e}")
-        
-        # Try HyperionKit API
-        client = self._get_hyperionkit_client()
-        if client:
-            try:
-                config = await client.get_network_config(network_id)
-                # Cache the result
-                self._cache[network_id] = config
-                if self.redis_manager:
-                    try:
-                        import json
-                        await self.redis_manager.set(
-                            f"network_config:{network_id}",
-                            json.dumps(config),
-                            ttl=3600  # Cache for 1 hour
-                        )
-                    except Exception as e:
-                        logger.debug(f"Failed to cache network config in Redis: {e}")
-                return config
-            except Exception as e:
-                logger.debug(f"HyperionKit API unavailable for {network_id}: {e}")
         
         # Fallback to hardcoded configs
         config = NetworkFeatureManager.get_network_config(network_id)
@@ -213,20 +179,6 @@ class NetworkRegistry:
             return self._all_networks_cache
         
         networks = []
-        
-        # Try HyperionKit API first
-        client = self._get_hyperionkit_client()
-        if client:
-            try:
-                hyperionkit_networks = await client.get_supported_networks()
-                for network_id in hyperionkit_networks:
-                    try:
-                        config = await self.get_network(network_id)
-                        networks.append(self._format_network_response(network_id, config))
-                    except Exception as e:
-                        logger.debug(f"Failed to load network {network_id} from HyperionKit: {e}")
-            except Exception as e:
-                logger.debug(f"HyperionKit get_supported_networks failed: {e}")
         
         # Add hardcoded networks (merge, avoid duplicates)
         existing_ids = {net["network"] for net in networks}

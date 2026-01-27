@@ -2,14 +2,8 @@
  * Thin wrapper for orchestrator
  * In-process call, no HTTP needed
  */
-import {
-  runGraph,
-  runGraphWithRetry,
-  nodeRegistry,
-  initialState,
-  HyperAgentState,
-  NodeType,
-} from "@hyperagent/orchestrator";
+import { runGraph, runGraphWithRetry, initialState, HyperAgentState, NodeType } from "@hyperagent/orchestrator";
+import { apiNodeRegistry } from "../orchestrator/apiNodeRegistry";
 
 export interface WorkflowRequest {
   intent: string;
@@ -32,7 +26,7 @@ export async function createWorkflow(
   const initial = initialState(request.intent);
   const startNode = request.startNode || "policy";
 
-  const finalState = await runGraphWithRetry(startNode, initial, nodeRegistry);
+  const finalState = await runGraphWithRetry(startNode, initial, apiNodeRegistry);
 
   return {
     intent: finalState.intent,

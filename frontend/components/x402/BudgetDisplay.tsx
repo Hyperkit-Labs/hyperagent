@@ -46,44 +46,44 @@ export function BudgetDisplay({ walletAddress, className }: BudgetDisplayProps) 
 
   if (!walletAddress) {
     return (
-      <Card className={className}>
-        <div className="text-center text-gray-500 py-8">
-          <Wallet className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+      <div className={`bg-gray-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 ${className}`}>
+        <div className="text-center text-gray-400 py-8">
+          <Wallet className="w-12 h-12 mx-auto mb-4 text-gray-500" />
           <p>Connect your wallet to view spending budget</p>
         </div>
-      </Card>
+      </div>
     );
   }
 
   if (loading) {
     return (
-      <Card className={className}>
+      <div className={`bg-gray-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 ${className}`}>
         <div className="flex items-center justify-center py-8">
           <LoadingSpinner size="md" text="Loading budget..." />
         </div>
-      </Card>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Card className={className}>
-        <div className="text-center text-red-600 py-8">
+      <div className={`bg-gray-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 ${className}`}>
+        <div className="text-center text-red-400 py-8">
           <p className="font-semibold">Error loading budget</p>
           <p className="text-sm mt-2">{error}</p>
         </div>
-      </Card>
+      </div>
     );
   }
 
   if (!budget) {
     return (
-      <Card className={className}>
-        <div className="text-center text-gray-500 py-8">
+      <div className={`bg-gray-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 ${className}`}>
+        <div className="text-center text-gray-400 py-8">
           <p>No spending limits configured</p>
           <p className="text-sm mt-2">Set limits to track your spending</p>
         </div>
-      </Card>
+      </div>
     );
   }
 
@@ -98,11 +98,11 @@ export function BudgetDisplay({ walletAddress, className }: BudgetDisplayProps) 
   const isMonthlyWarning = budget.monthly_remaining !== null && budget.monthly_remaining < budget.monthly_limit! * 0.2;
 
   return (
-    <Card hover className={className}>
+    <div className={`bg-gray-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:border-white/20 transition-all duration-200 ${className}`}>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Wallet className="w-5 h-5 text-blue-600" />
+          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <Wallet className="w-5 h-5 text-blue-400" />
             Spending Budget
           </h3>
           <Badge variant={budget.daily_remaining !== null && budget.daily_remaining > 0 ? 'success' : 'warning'}>
@@ -119,28 +119,28 @@ export function BudgetDisplay({ walletAddress, className }: BudgetDisplayProps) 
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-gray-600" />
-                <span className="text-sm font-semibold text-gray-700">Daily Limit</span>
+                <Calendar className="w-4 h-4 text-gray-400" />
+                <span className="text-sm font-semibold text-gray-300">Daily Limit</span>
               </div>
-              <span className="text-sm font-bold text-gray-900">
+              <span className="text-sm font-bold text-white">
                 ${budget.daily_spent.toFixed(2)} / ${budget.daily_limit.toFixed(2)}
               </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+            <div className="w-full bg-gray-800/50 rounded-full h-2.5 overflow-hidden border border-white/5">
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${dailyPercentage}%` }}
                 transition={{ duration: 0.8 }}
                 className={`h-full rounded-full ${
                   isDailyWarning
-                    ? 'bg-gradient-to-r from-yellow-500 to-orange-500'
-                    : 'bg-gradient-to-r from-blue-500 to-indigo-500'
+                    ? 'bg-gradient-to-r from-yellow-500 to-orange-500 shadow-lg shadow-yellow-500/20'
+                    : 'bg-gradient-to-r from-blue-500 to-indigo-500 shadow-lg shadow-blue-500/20'
                 }`}
               />
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-600">
-                Remaining: <span className="font-bold text-gray-900">${budget.daily_remaining?.toFixed(2) || '0.00'}</span>
+              <span className="text-gray-400">
+                Remaining: <span className="font-bold text-white">${budget.daily_remaining?.toFixed(2) || '0.00'}</span>
               </span>
               {budget.daily_remaining !== null && budget.daily_remaining <= 0 && (
                 <Badge variant="error" size="sm">
@@ -161,28 +161,28 @@ export function BudgetDisplay({ walletAddress, className }: BudgetDisplayProps) 
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <TrendingDown className="w-4 h-4 text-gray-600" />
-                <span className="text-sm font-semibold text-gray-700">Monthly Limit</span>
+                <TrendingDown className="w-4 h-4 text-gray-400" />
+                <span className="text-sm font-semibold text-gray-300">Monthly Limit</span>
               </div>
-              <span className="text-sm font-bold text-gray-900">
+              <span className="text-sm font-bold text-white">
                 ${budget.monthly_spent.toFixed(2)} / ${budget.monthly_limit.toFixed(2)}
               </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+            <div className="w-full bg-gray-800/50 rounded-full h-2.5 overflow-hidden border border-white/5">
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${monthlyPercentage}%` }}
                 transition={{ duration: 0.8, delay: 0.1 }}
                 className={`h-full rounded-full ${
                   isMonthlyWarning
-                    ? 'bg-gradient-to-r from-yellow-500 to-orange-500'
-                    : 'bg-gradient-to-r from-indigo-500 to-purple-500'
+                    ? 'bg-gradient-to-r from-yellow-500 to-orange-500 shadow-lg shadow-yellow-500/20'
+                    : 'bg-gradient-to-r from-indigo-500 to-purple-500 shadow-lg shadow-indigo-500/20'
                 }`}
               />
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-600">
-                Remaining: <span className="font-bold text-gray-900">${budget.monthly_remaining?.toFixed(2) || '0.00'}</span>
+              <span className="text-gray-400">
+                Remaining: <span className="font-bold text-white">${budget.monthly_remaining?.toFixed(2) || '0.00'}</span>
               </span>
               {budget.monthly_remaining !== null && budget.monthly_remaining <= 0 && (
                 <Badge variant="error" size="sm">
@@ -194,14 +194,14 @@ export function BudgetDisplay({ walletAddress, className }: BudgetDisplayProps) 
         )}
 
         {!budget.daily_limit && !budget.monthly_limit && (
-          <div className="text-center py-4 text-gray-500 text-sm">
-            <DollarSign className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+          <div className="text-center py-4 text-gray-400 text-sm">
+            <DollarSign className="w-8 h-8 mx-auto mb-2 text-gray-500" />
             <p>No spending limits configured</p>
             <p className="text-xs mt-1">Configure limits to track your spending</p>
           </div>
         )}
       </div>
-    </Card>
+    </div>
   );
 }
 

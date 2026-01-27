@@ -78,9 +78,26 @@ class HealthMonitor:
 
     async def _check_error_rate(self) -> Dict[str, Any]:
         """Check error rate from metrics"""
-        # This would query Prometheus metrics
-        # For now, return placeholder
-        return {"value": 0.5, "threshold": self.alert_thresholds["error_rate"], "status": "healthy"}
+        try:
+            # Attempt to query Prometheus metrics if available
+            # In production, this would query Prometheus API endpoint
+            # For now, use placeholder with note about future integration
+            threshold = self.alert_thresholds["error_rate"]
+            
+            # TODO: Integrate with Prometheus API to get actual error rate
+            # Example: query = 'rate(hyperagent_agent_errors_total[5m]) / rate(hyperagent_agent_executions_total[5m]) * 100'
+            # This requires Prometheus client library and API endpoint
+            
+            return {
+                "value": 0.5,
+                "threshold": threshold,
+                "status": "healthy",
+                "note": "Using placeholder - Prometheus integration pending"
+            }
+        except Exception as e:
+            logger.warning(f"Could not calculate error rate from metrics: {e}")
+            # Fallback to placeholder
+            return {"value": 0.5, "threshold": self.alert_thresholds["error_rate"], "status": "healthy"}
 
     async def _check_response_times(self) -> Dict[str, Any]:
         """Check response time percentiles"""

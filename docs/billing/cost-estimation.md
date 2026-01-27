@@ -32,8 +32,7 @@ Deployment complexity varies by network:
 |---------|-----------|----------|
 | avalanche_fuji | 1.0x | Standard testnet |
 | avalanche_mainnet | 1.2x | Production network |
-| mantle_testnet | 1.3x | EigenDA integration |
-| hyperion_testnet | 1.5x | PEF + advanced features |
+| mantle_testnet | 1.3x | Mantle testnet |
 
 ### Size Multipliers
 
@@ -62,10 +61,10 @@ cost = 11 * 1.0 (model) * 1.0 (chain) * 0.001 = $0.011
 ```python
 prompt_length = 1000
 model = "claude-opus-4.5"
-chain = "hyperion_testnet"
+chain = "mantle_testnet"
 
 credits = 10 (base) + 10 (size) = 20
-cost = 20 * 2.5 (model) * 1.5 (chain) * 0.001 = $0.075
+cost = 20 * 2.5 (model) * 1.3 (chain) * 0.001 = $0.065
 ```
 
 ## Token Cost Tracking

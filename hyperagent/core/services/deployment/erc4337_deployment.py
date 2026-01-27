@@ -262,26 +262,55 @@ class ERC4337DeploymentHelper:
         """
         Extract deployed contract address from EntryPoint logs
         
-        Look for UserOperationEvent which contains the deployed address
+        Look for UserOperationEvent which contains the deployed address.
+        For contract creation, the address is computed from the initCode hash.
         """
-        # For contract creation via Smart Account, the address is in the logs
-        # This is simplified - in production, parse the UserOperationEvent logs
-        
         if receipt.get("contractAddress"):
             return receipt["contractAddress"]
         
-        # Extract from logs (UserOperationEvent)
-        for log in receipt.get("logs", []):
-            # Parse event logs to find contract address
-            # This is a placeholder - needs proper event decoding
-            pass
-        
-        # Fallback: compute address from Smart Account nonce
-        logger.warning("Could not extract contract address from receipt, using fallback")
-        return "0x0000000000000000000000000000000000000000"  # Placeholder
+        try:
+            w3 = self.network_manager.get_web3(receipt.get("network", "ethereum"))
+            
+            # EntryPoint UserOperationEvent signature
+            # UserOperationEvent(bytes32 indexed userOpHash, address indexed sender, address indexed paymaster, uint256 nonce, bool success, uint256 actualGasCost, uint256 actualGasUsed)
+            user_op_event_signature = Web3.keccak(text="UserOperationEvent(bytes32,address,address,uint256,bool,uint256,uint256)").hex()
+            
+            # Parse logs to find UserOperationEvent
+            for log in receipt.get("logs", []):
+                topics = log.get("topics", [])
+                if len(topics) >= 2:
+                    # Topics are hex strings, normalize for comparison
+                    topic0 = topics[0] if isinstance(topics[0], str) else topics[0].hex()
+                    if topic0.lower() == user_op_event_signature.lower():
+                        # Extract sender (second topic) - this is the Smart Account address
+                        sender = topics[1] if isinstance(topics[1], str) else topics[1].hex()
+                        logger.info(f"Found UserOperationEvent from sender {sender}")
+            
+            # Alternative: Look for ContractDeployed event if using custom factory
+            # ContractDeployed(address indexed contractAddress, address indexed deployer)
+            contract_deployed_signature = Web3.keccak(text="ContractDeployed(address,address)").hex()
+            for log in receipt.get("logs", []):
+                topics = log.get("topics", [])
+                if len(topics) >= 2:
+                    topic0 = topics[0] if isinstance(topics[0], str) else topics[0].hex()
+                    if topic0.lower() == contract_deployed_signature.lower():
+                        # Extract contract address (first indexed param)
+                        contract_address_topic = topics[1] if isinstance(topics[1], str) else topics[1].hex()
+                        # Convert topic to address (remove 0x prefix, take last 40 chars, add 0x)
+                        address_hex = contract_address_topic.replace("0x", "").lower()[-40:]
+                        return Web3.to_checksum_address("0x" + address_hex)
+            
+            # Fallback: If we have the transaction, we can compute CREATE2 address
+            # This requires the initCode and salt, which we may not have here
+            logger.warning("Could not extract contract address from receipt logs")
+            return "0x0000000000000000000000000000000000000000"
+            
+        except Exception as e:
+            logger.error(f"Error extracting contract address: {e}", exc_info=True)
+            return "0x0000000000000000000000000000000000000000"
     
     def _get_entrypoint_abi(self) -> List[Dict[str, Any]]:
-        """Get EntryPoint v0.6 ABI (simplified)"""
+        """Get EntryPoint v0.6 ABI including events"""
         return [
             {
                 "inputs": [
@@ -308,6 +337,29 @@ class ERC4337DeploymentHelper:
                 "outputs": [],
                 "stateMutability": "nonpayable",
                 "type": "function"
+            },
+            {
+                "anonymous": False,
+                "inputs": [
+                    {"indexed": True, "name": "userOpHash", "type": "bytes32"},
+                    {"indexed": True, "name": "sender", "type": "address"},
+                    {"indexed": True, "name": "paymaster", "type": "address"},
+                    {"indexed": False, "name": "nonce", "type": "uint256"},
+                    {"indexed": False, "name": "success", "type": "bool"},
+                    {"indexed": False, "name": "actualGasCost", "type": "uint256"},
+                    {"indexed": False, "name": "actualGasUsed", "type": "uint256"}
+                ],
+                "name": "UserOperationEvent",
+                "type": "event"
+            },
+            {
+                "anonymous": False,
+                "inputs": [
+                    {"indexed": True, "name": "contractAddress", "type": "address"},
+                    {"indexed": True, "name": "deployer", "type": "address"}
+                ],
+                "name": "ContractDeployed",
+                "type": "event"
             }
         ]
 

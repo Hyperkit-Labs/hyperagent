@@ -273,7 +273,7 @@ class BatchDeploymentRequest(BaseModel):
     """Batch deployment request"""
 
     contracts: List[BatchDeploymentContract]
-    use_pef: Optional[bool] = True
+    parallel: Optional[bool] = True
     max_parallel: Optional[int] = 10
     private_key: Optional[str] = None
 

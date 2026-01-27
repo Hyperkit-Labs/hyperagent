@@ -320,26 +320,25 @@ def list() -> None:
 @click.option(
     "--network",
     "-n",
-    type=click.Choice(["hyperion_testnet", "hyperion_mainnet", "mantle_testnet", "mantle_mainnet"]),
+    type=str,
     required=True,
-    help="Target network",
+    help="Target network (use 'hyperagent network list' to see available networks)",
 )
 @click.option(
-    "--use-pef",
-    is_flag=True,
+    "--parallel/--no-parallel",
     default=True,
-    help="Use Hyperion PEF for parallel deployment (Hyperion only)",
+    help="Deploy contracts in parallel (best-effort)",
 )
 @click.option("--max-parallel", type=int, default=10, help="Maximum parallel deployments")
 @click.option("--private-key", "-k", help="Private key for deployment (or use config)")
 def batch(
     contracts_file: click.File,
     network: str,
-    use_pef: bool,
+    parallel: bool,
     max_parallel: int,
     private_key: Optional[str],
 ) -> None:
-    """[>] Deploy multiple contracts in parallel using PEF"""
+    """[>] Deploy multiple contracts (best-effort parallelism)"""
     import json
 
     try:
@@ -351,12 +350,10 @@ def batch(
             return
 
         console.print(f"{CLIStyle.INFO} Deploying {len(contracts)} contracts to {network}...")
-        if use_pef and network.startswith("hyperion"):
-            console.print(
-                f"{CLIStyle.INFO} Using PEF for parallel deployment (max: {max_parallel})"
-            )
+        if parallel:
+            console.print(f"{CLIStyle.INFO} Parallel deployment enabled (max: {max_parallel})")
         else:
-            console.print(f"{CLIStyle.INFO} Using sequential deployment")
+            console.print(f"{CLIStyle.INFO} Parallel deployment disabled")
 
         api_url = get_api_url()
 
@@ -366,7 +363,7 @@ def batch(
                     f"{api_url}/api/v1/deployments/batch",
                     json={
                         "contracts": contracts,
-                        "use_pef": use_pef,
+                        "parallel": parallel,
                         "max_parallel": max_parallel,
                         "private_key": private_key,
                     },
@@ -538,12 +535,8 @@ def info(network_name: str) -> None:
 
     console.print(f"\n{CLIStyle.INFO} Available Features:")
     feature_names = {
-        NetworkFeature.PEF: "PEF (Parallel Execution Framework)",
-        NetworkFeature.METISVM: "MetisVM Optimizations",
         NetworkFeature.EIGENDA: "EigenDA",
         NetworkFeature.BATCH_DEPLOYMENT: "Batch Deployment",
-        NetworkFeature.FLOATING_POINT: "Floating-Point Operations",
-        NetworkFeature.AI_INFERENCE: "AI Inference",
     }
 
     for feature, supported in features.items():
@@ -578,12 +571,8 @@ def features(network_name: str) -> None:
     console.print(f"\n{CLIStyle.INFO} Features for {network_name}:\n")
 
     feature_descriptions = {
-        NetworkFeature.PEF: "Parallel Execution Framework - 10-50x faster batch deployments",
-        NetworkFeature.METISVM: "MetisVM optimizations - floating-point, AI inference, GPU acceleration",
         NetworkFeature.EIGENDA: "EigenDA data availability - cost-efficient metadata storage",
         NetworkFeature.BATCH_DEPLOYMENT: "Batch deployment support - deploy multiple contracts",
-        NetworkFeature.FLOATING_POINT: "Floating-point operations - native decimal support",
-        NetworkFeature.AI_INFERENCE: "On-chain AI inference - run ML models on-chain",
     }
 
     for feature, supported in features.items():
@@ -815,9 +804,10 @@ def quick() -> None:
 
 @quick.command()
 @click.argument("description")
-@click.option("--network", "-n", default="hyperion_testnet", help="Network")
+@click.option("--network", "-n", default="mantle_testnet", help="Network")
+@click.option("--wallet-address", "-a", required=True, help="Wallet address (0x...)")
 @click.option("--watch", "-w", is_flag=True, help="Watch progress")
-def create(description: str, network: str, watch: bool) -> None:
+def create(description: str, network: str, wallet_address: str, watch: bool) -> None:
     """[>] Quick workflow creation with defaults"""
     # Quick workflow creation - reuse the workflow create logic
     print_banner()
@@ -839,9 +829,7 @@ def create(description: str, network: str, watch: bool) -> None:
                         "contract_type": "Custom",
                         "skip_audit": False,
                         "skip_deployment": False,
-                        "optimize_for_metisvm": False,
-                        "enable_floating_point": False,
-                        "enable_ai_inference": False,
+                        "wallet_address": wallet_address,
                     },
                 )
                 response.raise_for_status()

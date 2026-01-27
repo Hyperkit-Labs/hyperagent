@@ -219,17 +219,62 @@ class GasEstimator:
                 "confidence": "low",
             }
 
-    def _encode_constructor_args(self, args: List[Any]) -> str:
+    def _encode_constructor_args(self, args: List[Any], abi: Optional[List[Dict[str, Any]]] = None) -> str:
         """
-        Encode constructor arguments
+        Encode constructor arguments using contract ABI
         
-        Note: This is a simplified implementation.
-        In production, you should use the contract ABI to properly encode arguments.
+        Args:
+            args: Constructor arguments
+            abi: Contract ABI (optional, if not provided, attempts basic encoding)
+        
+        Returns:
+            Hex-encoded constructor arguments
         """
-        from eth_abi import encode
-        from eth_utils import to_hex
+        if not args:
+            return ""
         
-        # This is a placeholder - proper implementation would use ABI
-        # For now, return empty string (constructor args should be handled by caller)
-        return ""
+        try:
+            from eth_abi import encode
+            from eth_utils import to_hex
+            
+            # If ABI is provided, find constructor and use its input types
+            if abi:
+                constructor_abi = next(
+                    (item for item in abi if item.get("type") == "constructor"),
+                    None
+                )
+                if constructor_abi and constructor_abi.get("inputs"):
+                    input_types = [inp["type"] for inp in constructor_abi["inputs"]]
+                    if len(input_types) == len(args):
+                        encoded = encode(input_types, args)
+                        return to_hex(encoded)
+            
+            # Fallback: attempt to infer types from argument values
+            # This is a best-effort approach
+            inferred_types = []
+            for arg in args:
+                if isinstance(arg, bool):
+                    inferred_types.append("bool")
+                elif isinstance(arg, int):
+                    inferred_types.append("uint256")
+                elif isinstance(arg, str) and arg.startswith("0x"):
+                    inferred_types.append("address")
+                elif isinstance(arg, str):
+                    inferred_types.append("string")
+                elif isinstance(arg, bytes):
+                    inferred_types.append("bytes")
+                else:
+                    # Default to uint256 for unknown types
+                    inferred_types.append("uint256")
+            
+            if len(inferred_types) == len(args):
+                encoded = encode(inferred_types, args)
+                return to_hex(encoded)
+            
+            logger.warning("Could not encode constructor args, returning empty string")
+            return ""
+            
+        except Exception as e:
+            logger.warning(f"Error encoding constructor args: {e}")
+            return ""
 

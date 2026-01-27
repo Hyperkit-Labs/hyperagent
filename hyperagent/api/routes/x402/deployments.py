@@ -179,118 +179,22 @@ async def prepare_deployment(
 
 @router.post("/prepare-user-op", response_model=UserOpDeploymentPrepareResponse)
 async def prepare_user_operation_deployment(
-    request: UserOpDeploymentPrepareRequest,
-    http_request: Request,
-    db: AsyncSession = Depends(get_db)
+    _request: UserOpDeploymentPrepareRequest,
+    _http_request: Request,
+    _db: AsyncSession = Depends(get_db),
 ):
-    """
-    Prepare UserOperation for user-signed ERC-4337 deployment
-    
-    Flow:
-    1. Verify x402 payment
-    2. Check if user address is Smart Account
-    3. Prepare UserOperation with paymaster sponsorship
-    4. Return for user to sign
-    """
-    if not is_x402_network(request.network):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Network {request.network} does not support ERC-4337 deployments"
-        )
-    
-    # Extract wallet address from headers or request
-    wallet_address = (
-        request.wallet_address
-        or http_request.headers.get("x-wallet-address")
-        or http_request.headers.get("X-Wallet-Address")
+    """ERC-4337 paymaster deployments are not supported in this release."""
+    raise HTTPException(
+        status_code=501,
+        detail="ERC-4337/paymaster deployments are not supported in this release. Use signed_transaction deployment instead.",
     )
-    
-    if not wallet_address:
-        raise HTTPException(status_code=400, detail="Wallet address required")
-    
-    # Verify payment first
-    payment_response = await x402_middleware.verify_and_handle_payment(
-        request=http_request,
-        endpoint="/api/v1/x402/deployments/prepare-user-op",
-        price_tier="deployment",
-        price_usdc=0.10,
-        network=request.network,
-        db=db,
-        wallet_address=wallet_address,
-        merchant="deployment-user-op",
-    )
-    
-    if payment_response is not None:
-        return payment_response
-    
-    # Check if address is Smart Account
-    is_smart = await _erc4337.is_smart_account(
-        request.user_smart_account, request.network
-    )
-    
-    if not is_smart:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Address {request.user_smart_account} is not a Smart Account. Use /deploy endpoint for EOA deployments."
-        )
-    
-    # Prepare UserOperation with paymaster sponsorship
-    try:
-        result = await _erc4337_helper.prepare_deployment_user_operation(
-            request.user_smart_account,
-            request.compiled_contract.model_dump(),
-            request.network
-        )
-        
-        logger.info(
-            f"UserOperation prepared for Smart Account {request.user_smart_account} on {request.network}"
-        )
-        
-        return UserOpDeploymentPrepareResponse(**result)
-        
-    except Exception as e:
-        logger.error(f"Failed to prepare UserOperation: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to prepare UserOperation: {str(e)}"
-        )
 
 
 @router.post("/submit-user-op", response_model=DeploymentResponse)
-async def submit_user_operation_deployment(
-    request: UserOpDeploymentSubmitRequest
-):
-    """
-    Submit user-signed UserOperation to EntryPoint
-    
-    Flow:
-    1. Validate signature
-    2. Submit to EntryPoint
-    3. Wait for confirmation
-    4. Return contract address
-    """
-    if not is_x402_network(request.network):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Network {request.network} does not support ERC-4337 deployments"
-        )
-    
-    try:
-        result = await _erc4337_helper.submit_signed_user_operation(
-            request.signed_user_op,
-            request.network
-        )
-        
-        logger.info(
-            f"UserOperation submitted successfully. Contract: {result['contract_address']}"
-        )
-        
-        return DeploymentResponse(**result)
-        
-    except Exception as e:
-        logger.error(f"Failed to submit UserOperation: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to submit UserOperation: {str(e)}"
-        )
+async def submit_user_operation_deployment(_request: UserOpDeploymentSubmitRequest):
+    """ERC-4337 paymaster deployments are not supported in this release."""
+    raise HTTPException(
+        status_code=501,
+        detail="ERC-4337/paymaster deployments are not supported in this release.",
+    )
 

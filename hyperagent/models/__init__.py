@@ -10,6 +10,7 @@ from hyperagent.models.deployment import Deployment
 from hyperagent.models.payment_history import PaymentHistory
 from hyperagent.models.spending_control import SpendingControl
 from hyperagent.models.template import ContractTemplate
+from hyperagent.models.app_document import AppDocument
 
 # Import all models here for Alembic autogenerate
 from hyperagent.models.user import User

@@ -24,13 +24,13 @@ export function ProgressBar({
     <div className={cn('w-full', className)}>
       {label && (
         <div className="flex justify-between items-center mb-2">
-          <span className="text-sm font-semibold text-gray-700">{label}</span>
+          <span className="text-sm font-semibold text-gray-300">{label}</span>
           {showPercentage && (
-            <span className="text-sm font-bold text-gray-900">{Math.round(clampedProgress)}%</span>
+            <span className="text-sm font-bold text-white">{Math.round(clampedProgress)}%</span>
           )}
         </div>
       )}
-      <div className="w-full bg-gray-200/50 rounded-full h-3 overflow-hidden shadow-inner">
+      <div className="w-full bg-gray-800/50 rounded-full h-2.5 overflow-hidden shadow-inner border border-white/5">
         <motion.div
           initial={animated ? { width: 0 } : false}
           animate={{ width: `${clampedProgress}%` }}

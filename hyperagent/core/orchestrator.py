@@ -123,9 +123,6 @@ class WorkflowCoordinator:
         nlp_input: str,
         network: str,
         workflow_id: str,
-        optimize_for_metisvm: bool,
-        enable_floating_point: bool,
-        enable_ai_inference: bool,
         wallet_address: Optional[str],
         use_gasless: bool,
         signed_transaction: Optional[str],
@@ -173,10 +170,6 @@ class WorkflowCoordinator:
                 "input_mapping": {
                     "nlp_description": "nlp_input",
                     "network": "network",
-                    "optimize_for_metisvm": "optimize_for_metisvm",
-                    "enable_floating_point": "enable_floating_point",
-                    "enable_ai_inference": "enable_ai_inference",
-                    "wallet_address": "wallet_address",
                     "rag_context": "rag_context",
                 },
             })
@@ -258,9 +251,6 @@ class WorkflowCoordinator:
         workflow_id: str,
         nlp_input: str,
         network: str,
-        optimize_for_metisvm: bool = False,
-        enable_floating_point: bool = False,
-        enable_ai_inference: bool = False,
         wallet_address: Optional[str] = None,  # REQUIRED: User wallet address
         use_gasless: bool = False,  # Use facilitator for gasless deployment
         signed_transaction: Optional[str] = None,  # Pre-signed transaction (optional)
@@ -361,9 +351,6 @@ class WorkflowCoordinator:
             "nlp_input": nlp_input,
             "network": network,
             "stages_completed": [],
-            "optimize_for_metisvm": optimize_for_metisvm,
-            "enable_floating_point": enable_floating_point,
-            "enable_ai_inference": enable_ai_inference,
             "roma_plan": plan.to_dict() if hasattr(plan, "to_dict") else plan if plan else None,
             "rag_context": rag_context,
             "plan_timeouts": plan_timeouts,
@@ -390,9 +377,6 @@ class WorkflowCoordinator:
                 nlp_input=nlp_input,
                 network=network,
                 workflow_id=workflow_id,
-                optimize_for_metisvm=optimize_for_metisvm,
-                enable_floating_point=enable_floating_point,
-                enable_ai_inference=enable_ai_inference,
                 wallet_address=wallet_address,
                 use_gasless=use_gasless,
                 signed_transaction=signed_transaction,
@@ -407,9 +391,6 @@ class WorkflowCoordinator:
                     "nlp_input": nlp_input,
                     "network": network,
                     "workflow_id": workflow_id,
-                    "optimize_for_metisvm": optimize_for_metisvm,
-                    "enable_floating_point": enable_floating_point,
-                    "enable_ai_inference": enable_ai_inference,
                     "wallet_address": wallet_address,
                     "use_gasless": use_gasless,
                     "signed_transaction": signed_transaction,
@@ -456,9 +437,6 @@ class WorkflowCoordinator:
         contract_type: str,
         network: str,
         constructor_args: Optional[List[Any]] = None,
-        optimize_for_metisvm: bool = False,
-        enable_floating_point: bool = False,
-        enable_ai_inference: bool = False,
         wallet_address: Optional[str] = None,
         use_gasless: bool = True,
         selected_tasks: Optional[List[str]] = None,  # NEW: Selected tasks to execute
@@ -504,9 +482,6 @@ class WorkflowCoordinator:
             "contract_type": contract_type,
             "network": network,
             "stages_completed": ["generation"],  # Mark generation as already done
-            "optimize_for_metisvm": optimize_for_metisvm,
-            "enable_floating_point": enable_floating_point,
-            "enable_ai_inference": enable_ai_inference,
             "selected_tasks": selected_tasks,  # Store selected tasks
         }
 
@@ -537,9 +512,6 @@ class WorkflowCoordinator:
                 nlp_input="",  # Not used for contract-based workflow
                 network=network,
                 workflow_id=workflow_id,
-                optimize_for_metisvm=optimize_for_metisvm,
-                enable_floating_point=enable_floating_point,
-                enable_ai_inference=enable_ai_inference,
                 wallet_address=wallet_address,
                 use_gasless=use_gasless,
                 signed_transaction=None,
@@ -570,9 +542,6 @@ class WorkflowCoordinator:
                     "signed_transaction": None,  # Can be provided later via frontend
                     "workflow_id": workflow_id,
                     "constructor_args": constructor_args or [],
-                    "optimize_for_metisvm": optimize_for_metisvm,
-                    "enable_floating_point": enable_floating_point,
-                    "enable_ai_inference": enable_ai_inference,
                     "wallet_address": wallet_address,
                     "use_gasless": use_gasless,
                 },

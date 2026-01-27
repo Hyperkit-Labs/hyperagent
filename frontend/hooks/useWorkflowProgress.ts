@@ -93,28 +93,50 @@ export function useWorkflowProgress(workflowId: string, enabled: boolean = true)
     status: 'pending'
   });
   
+  // WebSocket is disabled by default since TS API doesn't implement WS endpoints yet.
+  // Enable this when using Python backend by setting NEXT_PUBLIC_WS_ENABLED=true
+  const wsEnabled = process.env.NEXT_PUBLIC_WS_ENABLED === 'true';
+  
   const wsUrl = workflowId 
     ? `${process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000'}/ws/workflow/${workflowId}`
     : '';
   
-  const { lastMessage, isConnected } = useWebSocket(wsUrl, enabled && !!workflowId);
+  const { lastMessage, isConnected } = useWebSocket(wsUrl, wsEnabled && enabled && !!workflowId);
   
   useEffect(() => {
-    if (lastMessage) {
-      try {
-        const event = JSON.parse(lastMessage);
-        
-        if (event.type === 'WORKFLOW_PROGRESSED') {
-          setProgress({
-            progress: event.data.progress_percentage || 0,
-            stage: event.data.stage || event.data.current_stage || 'planning',
-            status: event.data.status || 'pending',
-            details: event.data.details
-          });
-        }
-      } catch (error) {
-        console.error('Failed to parse WebSocket message:', error);
+    if (!lastMessage) {
+      return;
+    }
+
+    try {
+      const event = JSON.parse(lastMessage);
+      const type = String(event?.type ?? '').toLowerCase();
+
+      // Python backend emits EventType values like "workflow.progressed".
+      if (type === 'workflow.progressed') {
+        const stageRaw = String(event?.data?.stage ?? event?.data?.current_stage ?? 'planning').toLowerCase();
+        const stage = stageRaw === 'compilation' ? 'generation' : stageRaw;
+
+        setProgress({
+          progress: Number(event?.data?.progress_percentage ?? 0),
+          stage,
+          status: 'running',
+          details: event?.data?.details,
+        });
+        return;
       }
+
+      if (type === 'workflow.completed') {
+        setProgress((prev) => ({ ...prev, progress: 100, status: 'completed' }));
+        return;
+      }
+
+      if (type === 'workflow.failed') {
+        setProgress((prev) => ({ ...prev, status: 'failed' }));
+        return;
+      }
+    } catch (error) {
+      console.error('Failed to parse WebSocket message:', error);
     }
   }, [lastMessage]);
   

@@ -4,7 +4,6 @@ import express, { Request, Response } from "express";
 import cors from "cors";
 import { settlePayment } from "thirdweb/x402";
 import { thirdwebFacilitator, getChain } from "./facilitator";
-import { PaymasterService } from "./paymaster";
 
 const app = express();
 // Default to 3002 to match X402_SERVICE_URL in env.example
@@ -14,7 +13,6 @@ const PORT = process.env.PORT || 3002;
 app.use(cors());
 app.use(express.json());
 
-const paymasterService = new PaymasterService();
 
 app.get("/health", (req: Request, res: Response) => {
   res.json({ status: "healthy", service: "x402-verifier" });
@@ -47,16 +45,10 @@ app.post("/settle-payment", async (req: Request, res: Response) => {
       }
     }
 
-    let parsedPrice: { amount: string; asset: { address: string } };
-    if (typeof price === "object" && price !== null && "amount" in price && "asset" in price) {
-      parsedPrice = price;
-    } else {
-      const USDC_FUJI = "0x5425890298aed601595a70AB815c96711a31Bc65";
-      parsedPrice = {
-        amount: typeof price === "string" ? price.replace("$", "").trim() : String(price),
-        asset: { address: USDC_FUJI },
-      };
-    }
+    // Thirdweb x402 supports:
+    // - string price: "$0.10"
+    // - object price: { amount: "100000", asset: { address: "0x...", decimals?: 6 } }
+    const parsedPrice: any = price;
 
     let result;
     try {
@@ -123,45 +115,45 @@ app.post("/settle-payment", async (req: Request, res: Response) => {
       });
     }
 
+    const responseHeaders = (result as any).responseHeaders || {};
+    // Always forward x402 headers (PAYMENT-REQUIRED / PAYMENT-RESPONSE, etc.)
+    Object.entries(responseHeaders).forEach(([key, value]) => {
+      res.setHeader(key, value as string);
+    });
+
     if (result.status === 200) {
       // Payment verified successfully
-      res.json({ status: 200, verified: true, message: "Payment verified and settled" });
+      res.json({
+        status: 200,
+        verified: true,
+        message: "Payment verified and settled",
+        responseHeaders,
+      });
     } else {
       // For non-200 responses (including 402), return the responseBody directly
-      // This matches the x402-starter-kit pattern
       const responseBody = (result as any).responseBody;
-      const responseHeaders = (result as any).responseHeaders || {};
       const statusCode = result.status || 500;
-      
-      // Set response headers from settlePayment result
-      Object.entries(responseHeaders).forEach(([key, value]) => {
-        res.setHeader(key, value as string);
-      });
-      
-      // Return responseBody directly (could be JWT token string or object)
-      // Wrap in structured format for backend compatibility
+
       if (statusCode === 402) {
-        // For 402, return in format backend expects
         res.status(402).json({
           status: 402,
           verified: false,
-          responseBody: responseBody, // Could be JWT token string or object
-          responseHeaders: responseHeaders,
+          responseBody,
+          responseHeaders,
         });
       } else {
-        // For other errors (including 502), return error format
-        const errorMsg = typeof responseBody === 'string' 
-          ? responseBody 
+        const errorMsg = typeof responseBody === "string"
+          ? responseBody
           : (responseBody?.error || responseBody?.errorMessage || "Payment verification failed");
-        
+
         res.status(statusCode).json({
           status: statusCode,
           verified: false,
           error: statusCode === 502 ? "Settlement error" : errorMsg,
-          errorMessage: statusCode === 502 
+          errorMessage: statusCode === 502
             ? "Failed to settle payment: 502 Bad Gateway. The settlement service is temporarily unavailable."
             : errorMsg,
-          responseHeaders: responseHeaders,
+          responseHeaders,
         });
       }
     }

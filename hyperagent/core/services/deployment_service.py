@@ -35,7 +35,6 @@ class DeploymentService(ServiceInterface):
         alith_client: Optional[AlithClient] = None,
         eigenda_client: Optional[EigenDAClient] = None,
         use_alith_autonomous: bool = False,
-        use_pef: bool = False,
     ):
         """
         Initialize deployment service
@@ -45,13 +44,11 @@ class DeploymentService(ServiceInterface):
             alith_client: Alith client for optional autonomous deployment
             eigenda_client: EigenDA client for Mantle deployments
             use_alith_autonomous: If True, use Alith tool calling for autonomous deployment
-            use_pef: If True, use Hyperion PEF for parallel batch deployments
         """
         self.network_manager = network_manager or NetworkManager()
         self.alith_client = alith_client
         self.eigenda_client = eigenda_client
         self.use_alith_autonomous = use_alith_autonomous
-        self.use_pef = use_pef
 
         # Initialize deployment helpers
         self.base_helper = BaseDeploymentHelper(self.network_manager)
@@ -66,32 +63,10 @@ class DeploymentService(ServiceInterface):
         network = input_data.get("network")
         signed_transaction = input_data.get("signed_transaction")
         wallet_address = input_data.get("wallet_address")
+        private_key = input_data.get("private_key") or settings.private_key
+        constructor_args = input_data.get("constructor_args", [])
+        source_code = input_data.get("source_code")
         use_gasless = input_data.get("use_gasless", False)
-
-        if not wallet_address:
-            raise WalletError(
-                "wallet_address is required for all deployments. "
-                "Please provide the user's wallet address. "
-                "No PRIVATE_KEY is needed - deployments are user-controlled.",
-                details={"field": "wallet_address", "required": True},
-            )
-
-        from hyperagent.utils.helpers import normalize_wallet_address, validate_wallet_address
-
-        is_valid, error_msg = validate_wallet_address(wallet_address)
-        if not is_valid:
-            raise WalletError(
-                f"Invalid wallet address: {error_msg}",
-                details={"field": "wallet_address", "value": wallet_address},
-            )
-
-        wallet_address = normalize_wallet_address(wallet_address)
-
-        logger.info(
-            f"Deployment service received - network: {network}, "
-            f"wallet_address: {wallet_address}, use_gasless: {use_gasless}, "
-            f"signed_transaction: {bool(signed_transaction)}"
-        )
 
         from hyperagent.blockchain.network_features import NetworkFeatureManager
 
@@ -99,9 +74,31 @@ class DeploymentService(ServiceInterface):
             network, settings.x402_enabled, settings.x402_enabled_networks
         )
 
-        logger.info(f"Network check - network: {network}, is_x402_network: {is_x402_network}")
+        logger.info(
+            f"Deployment service received - network: {network}, "
+            f"wallet_address: {wallet_address}, use_gasless: {use_gasless}, "
+            f"signed_transaction: {bool(signed_transaction)}, has_private_key: {bool(private_key)}"
+        )
 
-        if signed_transaction and wallet_address:
+        # User wallet deployment (works on x402 and non-x402 networks)
+        if signed_transaction:
+            if not wallet_address:
+                raise WalletError(
+                    "wallet_address is required when signed_transaction is provided.",
+                    details={"field": "wallet_address", "required": True},
+                )
+
+            from hyperagent.utils.helpers import normalize_wallet_address, validate_wallet_address
+
+            is_valid, error_msg = validate_wallet_address(wallet_address)
+            if not is_valid:
+                raise WalletError(
+                    f"Invalid wallet address: {error_msg}",
+                    details={"field": "wallet_address", "value": wallet_address},
+                )
+
+            wallet_address = normalize_wallet_address(wallet_address)
+
             logger.info(f"Using user wallet deployment: {wallet_address} on {network}")
             result = await self.x402_helper.deploy_with_signed_transaction(
                 signed_transaction, network, wallet_address
@@ -111,6 +108,16 @@ class DeploymentService(ServiceInterface):
             return result
 
         if use_gasless and wallet_address and settings.thirdweb_server_wallet_address:
+            from hyperagent.utils.helpers import normalize_wallet_address, validate_wallet_address
+
+            is_valid, error_msg = validate_wallet_address(wallet_address)
+            if not is_valid:
+                raise WalletError(
+                    f"Invalid wallet address: {error_msg}",
+                    details={"field": "wallet_address", "value": wallet_address},
+                )
+
+            wallet_address = normalize_wallet_address(wallet_address)
             facilitator_address = settings.thirdweb_server_wallet_address
 
             # Check if this is an x402 network (Avalanche)
@@ -187,6 +194,7 @@ class DeploymentService(ServiceInterface):
         )
         is_x402_network = network in enabled_networks and settings.x402_enabled
 
+        # x402 networks currently require user wallet signature for deployment
         if is_x402_network and not signed_transaction:
             logger.info(
                 f"Deployment skipped for x402 network ({network}). "
@@ -205,31 +213,38 @@ class DeploymentService(ServiceInterface):
                 "wallet_address": wallet_address,
             }
 
-        if is_x402_network:
-            error_message = (
-                f"Deployment on x402 network ({network}) requires user wallet signature. "
-                f"x402 networks use ERC-4337 Smart Accounts (not EOA), so gasless deployment via facilitator "
-                f"requires Thirdweb SDK integration (not available in Python backend). "
-                f"Please sign the deployment transaction in your wallet. "
-                f"The frontend should prepare and sign the transaction before sending to the backend. "
-                f"No PRIVATE_KEY is required - deployments are user-controlled."
-            )
-        else:
-            error_message = (
-                f"Deployment requires user wallet signature. "
-                f"Please sign the deployment transaction in your wallet. "
-                f"The frontend should prepare and sign the transaction before sending to the backend. "
-                f"No PRIVATE_KEY is required - deployments are user-controlled. "
-                f"Alternatively, set use_gasless=true to use facilitator (if configured for non-x402 networks)."
+        # Non-x402: allow server-side deployment via PRIVATE_KEY
+        if private_key:
+            if settings.enable_deployment_validation:
+                try:
+                    await self.validate_deployment_requirements(network, private_key)
+                except Exception as e:
+                    raise WalletError(
+                        f"Deployment validation failed: {e}",
+                        details={"network": network},
+                    )
+
+            if self.use_alith_autonomous and self.alith_client:
+                return await self._deploy_via_alith(compiled, network, private_key)
+
+            return await self._deploy_manual_with_retry(
+                compiled=compiled,
+                network=network,
+                private_key=private_key,
+                source_code=source_code,
+                constructor_args=constructor_args,
             )
 
+        # Otherwise, require user signature or gasless facilitator
         raise WalletError(
-            error_message,
+            "Deployment requires either a signed transaction (signed_transaction + wallet_address), "
+            "use_gasless=true (with THIRDWEB_SERVER_WALLET_PRIVATE_KEY configured), or a server-side PRIVATE_KEY.",
             details={
                 "has_signed_transaction": bool(signed_transaction),
                 "has_wallet_address": bool(wallet_address),
                 "use_gasless": use_gasless,
                 "facilitator_configured": bool(settings.thirdweb_server_wallet_address),
+                "has_private_key": bool(private_key),
                 "is_x402_network": is_x402_network,
                 "network": network,
             },
@@ -690,59 +705,52 @@ class DeploymentService(ServiceInterface):
         self,
         contracts: List[Dict[str, Any]],
         network: str,
-        use_pef: Optional[bool] = None,
+        parallel: Optional[bool] = True,
         max_parallel: int = 10,
         private_key: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        Deploy multiple contracts in parallel using PEF
+        """Deploy multiple contracts with best-effort parallelism"""
 
-        Concept: Use Hyperion PEF for parallel batch deployment
-        Logic:
-            1. Initialize PEF manager if use_pef=True and network is Hyperion
-            2. Analyze dependencies
-            3. Deploy independent contracts in parallel
-            4. Return batch results
+        if not contracts:
+            return {
+                "success": False,
+                "deployments": [],
+                "total_time": 0.0,
+                "parallel_count": 0,
+                "success_count": 0,
+                "failed_count": 0,
+                "batches_deployed": 0,
+            }
 
-        Args:
-            contracts: List of contract dictionaries with compiled_contract
-            network: Target network
-            use_pef: Override instance use_pef setting (defaults to self.use_pef)
-            max_parallel: Maximum parallel deployments per batch
-            private_key: Private key for deployment
+        pk = private_key or settings.private_key
+        if not pk:
+            raise WalletError(
+                "Batch deployment requires PRIVATE_KEY (server-side deployment).",
+                details={"network": network},
+            )
 
-        Returns:
-            Batch deployment results with success/failure status for each contract
-        """
-        use_pef_flag = use_pef if use_pef is not None else self.use_pef
+        async def deploy_single(contract_config: Dict[str, Any]) -> Dict[str, Any]:
+            return await self._deploy_manual_with_retry(
+                compiled=contract_config.get("compiled_contract"),
+                network=network,
+                private_key=pk,
+                source_code=contract_config.get("source_code"),
+                constructor_args=contract_config.get("constructor_args", []),
+            )
 
-        # Check if PEF is available (with graceful fallback)
-        from hyperagent.blockchain.network_features import NetworkFeature, NetworkFeatureManager
+        if parallel:
+            return await self.batch_helper.deploy_parallel_batch(
+                contracts=contracts,
+                deploy_single_contract=deploy_single,
+                max_parallel=max_parallel,
+            )
 
-        if use_pef_flag:
-            if NetworkFeatureManager.supports_feature(network, NetworkFeature.PEF):
-                from hyperagent.blockchain.hyperion_pef import HyperionPEFManager
-
-                pef_manager = HyperionPEFManager(self.network_manager)
-                return await pef_manager.deploy_batch(
-                    contracts=contracts,
-                    network=network,
-                    max_parallel=max_parallel,
-                    private_key=private_key or settings.private_key,
-                )
-            else:
-                logger.warning(
-                    f"PEF requested but not available for {network}. "
-                    f"Falling back to sequential batch deployment."
-                )
-                return await self._deploy_sequential_batch(contracts, network, private_key)
-        else:
-            return await self._deploy_sequential_batch(contracts, network, private_key)
+        return await self.batch_helper.deploy_sequential_batch(contracts, deploy_single)
 
     async def _deploy_sequential_batch(
         self, contracts: List[Dict[str, Any]], network: str, private_key: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Deploy contracts sequentially (fallback when PEF not available)"""
+        """Deploy contracts sequentially (fallback when parallelism is disabled)"""
         async def deploy_single(contract_config: Dict[str, Any]) -> Dict[str, Any]:
             """Helper to deploy a single contract"""
             result = await self.process(

@@ -1,33 +1,74 @@
+import { execSync } from "child_process";
+import * as fs from "fs";
+import * as path from "path";
 import { HyperAgentState } from "../types/agent";
-import { APPROVED_MODELS } from "../config/models";
 
-// Mock audit tool wrapper
+// Slither tool wrapper
 export class SlitherAdapter {
     static async runAudit(contractCode: string): Promise<{ passed: boolean; findings: string[] }> {
-        console.log("  🔍 [AuditNode] Running Slither (and semantic checks)...");
+        console.log("  🔍 [AuditNode] Running Slither (via Docker wrapper)...");
 
-        // MVP: Regex based basic checks to simulate "Audit"
         const findings: string[] = [];
+        const tempFile = path.join(process.cwd(), "contracts", `TempAudit_${Date.now()}.sol`);
 
-        // Check 1: SPMX License Identifier
-        if (!contractCode.includes("SPDX-License-Identifier")) {
-            findings.push("CRITICAL: Missing SPDX-License-Identifier");
-        }
+        try {
+            // Write contract to temp file for Slither
+            if (!fs.existsSync(path.join(process.cwd(), "contracts"))) {
+                fs.mkdirSync(path.join(process.cwd(), "contracts"));
+            }
+            fs.writeFileSync(tempFile, contractCode);
 
-        // Check 2: Solidity Version
-        if (!contractCode.includes("pragma solidity")) {
-            findings.push("CRITICAL: Missing pragma solidity version");
-        }
+            // Invoke slither wrapper
+            const scriptPath = path.join(process.cwd(), "scripts", "slither.sh");
 
-        // Check 3: Constructor
-        if (!contractCode.includes("constructor")) {
-            findings.push("WARNING: Contract missing constructor (might be intended)");
+            if (fs.existsSync(scriptPath)) {
+                console.log(`  🛠 [AuditNode] Executing: ${scriptPath}`);
+                const output = execSync(`bash ${scriptPath} ${tempFile}`, { encoding: "utf8", stdio: "pipe" });
+                // Note: Real Slither output parsing would go here.
+                // For MVP, we check if the command succeeded and look for "CRITICAL" in text
+                if (output.toLowerCase().includes("critical")) {
+                    findings.push("Slither detected CRITICAL vulnerabilities.");
+                }
+            } else {
+                console.warn("  ⚠️ [AuditNode] Slither script not found. Using semantic fallback.");
+                this.runSemanticChecks(contractCode, findings);
+            }
+        } catch (error: any) {
+            console.warn("  ⚠️ [AuditNode] Slither execution failed (likely Docker missing). Using semantic fallback.");
+            this.runSemanticChecks(contractCode, findings);
+        } finally {
+            if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
         }
 
         return {
             passed: findings.filter(f => f.startsWith("CRITICAL")).length === 0,
             findings
         };
+    }
+
+    private static runSemanticChecks(contractCode: string, findings: string[]) {
+        if (!contractCode.includes("SPDX-License-Identifier")) {
+            findings.push("CRITICAL: Missing SPDX-License-Identifier");
+        }
+        if (!contractCode.includes("pragma solidity")) {
+            findings.push("CRITICAL: Missing pragma solidity version");
+        }
+        
+        // Basic Reentrancy check
+        if (contractCode.includes(".call{") && !contractCode.toLowerCase().includes("reentrancyguard") && !contractCode.toLowerCase().includes("nonreentrant")) {
+            findings.push("CRITICAL: Potential Reentrancy vulnerability. Low-level call used without ReentrancyGuard.");
+        }
+
+        // Access Control check
+        const hasSensitiveKeywords = contractCode.includes("selfdestruct") || contractCode.includes("delegatecall") || contractCode.includes("setOwner");
+        if (hasSensitiveKeywords && !contractCode.includes("onlyOwner") && !contractCode.includes("AccessControl")) {
+            findings.push("CRITICAL: Sensitive operations found without visible Access Control (onlyOwner/AccessControl).");
+        }
+
+        // Visibility check
+        if (contractCode.includes("mapping") && !contractCode.includes("public") && !contractCode.includes("private") && !contractCode.includes("internal")) {
+            findings.push("WARNING: State variables found with default visibility. Explicitly set library/public/private.");
+        }
     }
 }
 

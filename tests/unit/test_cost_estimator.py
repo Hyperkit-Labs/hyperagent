@@ -33,7 +33,7 @@ class TestCostEstimator:
         cost_expensive = estimator.estimate_generation_cost(
             prompt_length=100,
             model="claude-opus-4.5",
-            chain="hyperion_testnet"
+            chain="mantle_testnet"
         )
         
         assert cost_expensive > cost_cheap

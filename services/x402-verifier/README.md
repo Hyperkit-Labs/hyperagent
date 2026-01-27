@@ -9,15 +9,21 @@ TypeScript service that wraps Thirdweb's x402 facilitator for payment verificati
 npm install
 ```
 
-2. Copy environment file:
+2. Configure environment (single root .env)
+
+This repo uses a single root `.env` shared across services.
+
 ```bash
+# From repo root
 cp .env.example .env
 ```
 
-3. Configure `.env`:
-- `THIRDWEB_SECRET_KEY`: Your Thirdweb secret key
-- `THIRDWEB_SERVER_WALLET_ADDRESS`: Your ERC-4337 server wallet address
-- `PORT`: Service port (default: 3002, matches X402_SERVICE_URL)
+Set at minimum:
+- `THIRDWEB_SECRET_KEY`
+- `THIRDWEB_SERVER_WALLET_ADDRESS`
+- `MERCHANT_WALLET_ADDRESS`
+
+The verifier service loads the repo-root `.env` automatically via `@hyperagent/env`.
 
 ## Development
 

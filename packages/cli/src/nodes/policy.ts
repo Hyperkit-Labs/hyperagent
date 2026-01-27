@@ -25,12 +25,13 @@ export async function policyNode(state: HyperAgentState): Promise<Partial<HyperA
     let refinedIntent = "";
 
     if (model) {
-        console.log("  🧠 [PolicyNode] Invoking Claude 3.5 Sonnet...");
+        console.log(`  🧠 [PolicyNode] Invoking ${APPROVED_MODELS.policy.provider} (${APPROVED_MODELS.policy.model})...`);
         try {
+            // Using raw message objects to satisfy Gemini's strict role checks
             const response = await (model as any).invoke([
-                new HumanMessage(`You are a Web3 System Architect. Analyze the user's request and output a STRICT, clear, technical intent summary. Do not output code. \n\nUser Request: "${state.intent}"`)
+                { role: "user", content: `You are a Web3 System Architect. Analyze the user's request and output a STRICT, clear, technical intent summary. Do not output code. \n\nUser Request: "${state.intent}"` }
             ]);
-            refinedIntent = response.content as string;
+            refinedIntent = (response.content as string) || `Refined Intent: ${state.intent}`;
         } catch (error) {
             console.error("  ❌ [PolicyNode] LLM Error:", error);
             refinedIntent = `Intent (Fallback): ${state.intent}`;

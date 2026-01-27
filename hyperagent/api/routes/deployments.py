@@ -45,7 +45,6 @@ async def get_deployment_service() -> DeploymentService:
         alith_client=alith_client,
         eigenda_client=eigenda_client,
         use_alith_autonomous=False,
-        use_pef=True,  # Enable PEF by default for batch operations
     )
 
 
@@ -141,27 +140,26 @@ async def deploy_batch(
     deployment_service: DeploymentService = Depends(get_deployment_service),
 ):
     """
-    Deploy multiple contracts in parallel using Hyperion PEF
+    Deploy multiple contracts with best-effort parallelism
 
-    Concept: Batch deployment with parallel execution
+    Concept: Batch deployment with optional parallel execution
     Logic:
         1. Validate all contracts
-        2. Use PEF for Hyperion networks (parallel execution)
-        3. Fallback to sequential for other networks
-        4. Return batch results
+        2. Deploy in parallel if requested (best-effort)
+        3. Return batch results
 
     Request:
     {
         "contracts": [
             {
                 "compiled_contract": {...},
-                "network": "hyperion_testnet",
+                "network": "mantle_testnet",
                 "contract_name": "Contract1",
                 "source_code": "..." (optional, for dependency analysis)
             },
             ...
         ],
-        "use_pef": true,
+        "parallel": true,
         "max_parallel": 10,
         "private_key": "..." (optional, uses settings if not provided)
     }
@@ -201,7 +199,7 @@ async def deploy_batch(
         result = await deployment_service.deploy_batch(
             contracts=contracts,
             network=network,
-            use_pef=request.use_pef,
+            parallel=request.parallel,
             max_parallel=request.max_parallel or 10,
             private_key=request.private_key or server_private_key,
         )

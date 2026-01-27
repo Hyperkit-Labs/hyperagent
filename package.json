@@ -4,8 +4,13 @@
   "description": "AI Agent Platform for On-Chain Smart Contract Generation",
   "private": true,
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "frontend",
+    "packages/cli",
+    "packages/env",
+    "ts/api",
+    "ts/orchestrator",
+    "services/x402-verifier",
+    "services/mantle-bridge"
   ],
   "scripts": {
     "commit": "node scripts/version/parallel-commit.js",
@@ -16,7 +21,10 @@
     "commit:auto": "bash scripts/version/parallel-commit.sh --max 3",
     "status": "git status",
     "changes": "git status --porcelain",
-    "staged": "git diff --cached --name-only"
+    "staged": "git diff --cached --name-only",
+    "hyperagent": "node packages/cli/dist/index.js",
+    "hyperagent:build": "npm -w packages/cli run build",
+    "hyperagent:dev": "npm -w packages/cli run dev --"
   },
   "keywords": [
     "smart-contracts",

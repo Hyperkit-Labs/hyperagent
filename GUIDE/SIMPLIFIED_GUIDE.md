@@ -23,7 +23,7 @@ postgresql://postgres:YOUR_PASSWORD@db.xxxxx.supabase.co:5432/postgres
 
 ### 3. Configure Environment
 
-Copy `env.example` to `.env` and fill in:
+Copy `.env.example` to `.env` and fill in:
 
 ```bash
 # Required - Database (Supabase)

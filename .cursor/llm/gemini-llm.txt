@@ -1,0 +1,84 @@
+# Google Gemini Documentation for HyperAgent
+
+## Overview
+
+Google Gemini is an LLM used by HyperAgent for fast, cost-effective code generation and quick edits. HyperAgent uses Gemini for tasks that don't require the highest reasoning capability but benefit from speed and lower cost.
+
+## Key Use Cases in HyperAgent
+
+- **Quick Edits**: Fast code modifications and iterations
+- **Cost-Effective Generation**: Lower-cost alternative for simple tasks
+- **Rapid Prototyping**: Quick contract generation for testing
+- **Batch Operations**: Process multiple simple tasks efficiently
+
+## Documentation Links
+
+### Official Documentation
+- **Main Docs**: https://ai.google.dev/docs
+- **API Reference**: https://ai.google.dev/api
+- **Python SDK**: https://github.com/google/generative-ai-python
+- **Quickstart**: https://ai.google.dev/tutorials/python_quickstart
+
+### Key Concepts
+- **Model Variants**: Different model sizes for different needs
+- **Prompt Design**: Effective prompt engineering
+- **Safety Settings**: Content filtering and safety
+- **Streaming**: Real-time response streaming
+- **Multimodal**: Support for text and code
+
+## Implementation in HyperAgent
+
+### Gemini Client
+- Location: `hyperagent/llm/provider.py`
+- Used for quick edit operations
+- Lower cost alternative to Claude/GPT
+
+### Routing Strategy
+- Simple tasks → Gemini (fast, cheap)
+- Complex tasks → Claude/GPT (high quality)
+- Automatic routing based on task complexity
+
+## Code Examples
+
+### Basic Usage
+```python
+import google.generativeai as genai
+
+genai.configure(api_key="your-api-key")
+
+model = genai.GenerativeModel('gemini-pro')
+
+response = model.generate_content(
+    prompt,
+    generation_config={
+        "temperature": 0.7,
+        "max_output_tokens": 2048,
+    }
+)
+```
+
+### Streaming
+```python
+response = model.generate_content(
+    prompt,
+    stream=True
+)
+
+for chunk in response:
+    print(chunk.text)
+```
+
+## Best Practices
+
+1. **Task Selection**: Use for simple, well-defined tasks
+2. **Prompt Clarity**: Clear prompts work best
+3. **Cost Optimization**: Leverage for high-volume operations
+4. **Error Handling**: Handle API errors gracefully
+5. **Rate Limiting**: Respect API limits
+
+## Related Resources
+
+- Gemini GitHub: https://github.com/google/generative-ai-python
+- AI Studio: https://aistudio.google.com/
+- Gemini API: https://ai.google.dev/api
+

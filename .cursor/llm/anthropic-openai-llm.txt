@@ -1,0 +1,91 @@
+# Anthropic & OpenAI LLM Documentation for HyperAgent
+
+## Overview
+
+Anthropic (Claude) and OpenAI (GPT) are LLM providers used by HyperAgent for code generation, reasoning, and agent operations. HyperAgent uses a multi-model routing strategy, using different models for different tasks based on complexity, cost, and quality requirements.
+
+## Key Use Cases in HyperAgent
+
+- **Code Generation**: Generate Solidity contracts from natural language
+- **Complex Reasoning**: Architecture design and planning
+- **Quick Edits**: Fast iterations and code modifications
+- **Model Routing**: Route tasks to appropriate models
+- **Cost Optimization**: Balance quality and cost
+
+## Documentation Links
+
+### Anthropic (Claude)
+- **Main Docs**: https://docs.anthropic.com/
+- **API Reference**: https://docs.anthropic.com/claude/reference
+- **Python SDK**: https://github.com/anthropics/anthropic-sdk-python
+- **Best Practices**: https://docs.anthropic.com/claude/docs
+
+### OpenAI (GPT)
+- **Main Docs**: https://platform.openai.com/docs
+- **API Reference**: https://platform.openai.com/docs/api-reference
+- **Python SDK**: https://github.com/openai/openai-python
+- **Best Practices**: https://platform.openai.com/docs/guides
+
+### Key Concepts
+- **Prompt Engineering**: Effective prompt design
+- **Token Management**: Token limits and costs
+- **Streaming**: Real-time response streaming
+- **Function Calling**: Tool use and function calling
+- **Rate Limiting**: API rate limits and handling
+
+## Implementation in HyperAgent
+
+### Multi-Model Router
+- Location: `hyperagent/core/routing/multi_model_router.py`
+- Routes tasks to appropriate models
+- Fallback logic for failures
+- Cost and latency optimization
+
+### Model Configuration
+- Location: `config/llm.yaml`
+- Model selection per task type
+- Timeout and retry configuration
+- Cost tracking
+
+## Code Examples
+
+### Anthropic Client
+```python
+from anthropic import Anthropic
+
+client = Anthropic(api_key="your-api-key")
+
+response = client.messages.create(
+    model="claude-3-5-sonnet-20241022",
+    max_tokens=4096,
+    messages=[{"role": "user", "content": prompt}]
+)
+```
+
+### OpenAI Client
+```python
+from openai import OpenAI
+
+client = OpenAI(api_key="your-api-key")
+
+response = client.chat.completions.create(
+    model="gpt-4-turbo-preview",
+    messages=[{"role": "user", "content": prompt}],
+    temperature=0.7
+)
+```
+
+## Best Practices
+
+1. **Model Selection**: Use appropriate model for task complexity
+2. **Prompt Design**: Write clear, specific prompts
+3. **Error Handling**: Implement retry logic for API failures
+4. **Cost Management**: Monitor token usage and costs
+5. **Rate Limiting**: Respect API rate limits
+
+## Related Resources
+
+- Anthropic GitHub: https://github.com/anthropics
+- OpenAI GitHub: https://github.com/openai
+- Prompt Engineering Guide: https://www.promptingguide.ai/
+

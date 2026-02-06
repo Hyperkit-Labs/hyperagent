@@ -1,0 +1,82 @@
+# HyperAgent LLM Documentation Index
+
+This is the main index file for HyperAgent's LLM documentation resources. Each major dependency, library, and service has its own dedicated `llm.txt` file following the [llms.txt standard](https://llmstxt.org/).
+
+## Purpose
+
+These files help AI systems understand external dependencies and their integration with HyperAgent. Each file contains:
+- Technology overview and HyperAgent-specific use cases
+- Links to official documentation
+- Implementation details and code examples
+- Best practices for integration
+
+## Available Documentation Files
+
+### Core Frameworks & Languages
+- **[thirdweb-llm.txt](thirdweb-llm.txt)** - Thirdweb SDK for wallets, ERC-4337, EIP-7702, and multi-chain deployment
+- **[langgraph-llm.txt](langgraph-llm.txt)** - LangGraph for agent orchestration and workflow management
+- **[fastapi-llm.txt](fastapi-llm.txt)** - FastAPI for backend API gateway and REST endpoints
+- **[nextjs-react-llm.txt](nextjs-react-llm.txt)** - Next.js 14+ and React for frontend UI
+
+### Infrastructure & Data
+- **[supabase-llm.txt](supabase-llm.txt)** - Supabase (PostgreSQL) for database, multi-tenant workspaces, and RLS
+- **[redis-llm.txt](redis-llm.txt)** - Redis for caching, message queuing, and session management
+- **[pinecone-llm.txt](pinecone-llm.txt)** - Pinecone vector database for RAG and semantic search
+- **[acontext-llm.txt](acontext-llm.txt)** - Acontext for agent long-term memory and context management
+
+### Smart Contract Development
+- **[hardhat-foundry-llm.txt](hardhat-foundry-llm.txt)** - Hardhat and Foundry for Solidity compilation, testing, and deployment
+- **[openzeppelin-llm.txt](openzeppelin-llm.txt)** - OpenZeppelin Contracts library for secure contract templates
+- **[slither-mythril-llm.txt](slither-mythril-llm.txt)** - Slither, Mythril, MythX, and Echidna for security auditing
+
+### Blockchain Standards
+- **[erc-4337-llm.txt](erc-4337-llm.txt)** - ERC-4337 Account Abstraction for gasless transactions and smart wallets
+- **[erc-8004-llm.txt](erc-8004-llm.txt)** - ERC-8004 Trustless Agents for agent identity and reputation
+- **[x402-llm.txt](x402-llm.txt)** - x402 payment protocol for pay-per-use services on SKALE
+- **[erc1066-x402-llm.txt](erc1066-x402-llm.txt)** - ERC-1066-x402 SDKs (npm: hyperkit-erc1066, PyPI: hyperkitlabs-erc1066-x402)
+
+### Storage & Data Availability
+- **[ipfs-pinata-llm.txt](ipfs-pinata-llm.txt)** - IPFS and Pinata for decentralized artifact storage and RAG
+- **[eigenda-llm.txt](eigenda-llm.txt)** - EigenDA for verifiable data availability and agent traces
+
+### Observability & Monitoring
+- **[opentelemetry-llm.txt](opentelemetry-llm.txt)** - OpenTelemetry for distributed tracing and metrics
+- **[mlflow-llm.txt](mlflow-llm.txt)** - MLflow for LLM experiment tracking and model routing
+- **[tenderly-llm.txt](tenderly-llm.txt)** - Tenderly for contract simulation, debugging, and monitoring
+- **[dune-analytics-llm.txt](dune-analytics-llm.txt)** - Dune Analytics for on-chain analytics and dashboards
+
+### LLM Providers
+- **[anthropic-openai-llm.txt](anthropic-openai-llm.txt)** - Anthropic (Claude) and OpenAI (GPT) for code generation and reasoning
+- **[gemini-llm.txt](gemini-llm.txt)** - Google Gemini for fast, cost-effective code generation
+
+### DevOps & Deployment
+- **[docker-llm.txt](docker-llm.txt)** - Docker and Docker Compose for containerization and deployment
+
+## How to Use
+
+1. **Before implementing a feature** involving an external dependency, read the relevant `llm.txt` file
+2. **Reference official docs** using the provided links for detailed information
+3. **Follow best practices** outlined in each file
+4. **Use code examples** as starting points for implementation
+
+## File Naming Convention
+
+Files follow the pattern: `{dependency}-llm.txt`
+
+Examples:
+- `thirdweb-llm.txt` - Thirdweb documentation
+- `langgraph-llm.txt` - LangGraph documentation
+- `erc-4337-llm.txt` - ERC-4337 standard documentation
+
+## Maintenance
+
+- Files are updated when dependencies change
+- New dependencies get their own `llm.txt` file
+- Documentation links are kept current
+- Code examples reflect current implementation
+
+## Related Resources
+
+- Main HyperAgent Spec: `docs/HyperAgent Spec.md`
+- Project Naming Conventions: `.cursor/llm/llm.txt` (original file)
+- Skills Directory: `.cursor/skills/`

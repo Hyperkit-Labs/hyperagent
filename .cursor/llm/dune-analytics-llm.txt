@@ -1,0 +1,80 @@
+# Dune Analytics Documentation for HyperAgent
+
+## Overview
+
+Dune Analytics is a Web3 analytics platform for exploring, querying, and visualizing on-chain data from various blockchains. HyperAgent uses Dune Analytics for tracking deployed contract metrics, TVL, transaction volumes, and other on-chain analytics.
+
+## Key Use Cases in HyperAgent
+
+- **Contract Analytics**: Track deployed contract metrics
+- **TVL Tracking**: Monitor total value locked
+- **Transaction Analysis**: Analyze contract interactions
+- **Dashboard Creation**: Build analytics dashboards
+- **Performance Monitoring**: Monitor contract performance
+
+## Documentation Links
+
+### Official Documentation
+- **Main Docs**: https://docs.dune.com/
+- **Query Editor**: https://docs.dune.com/queries
+- **API Reference**: https://docs.dune.com/api-reference
+- **SQL Guide**: https://docs.dune.com/sql
+
+### Key Concepts
+- **Queries**: SQL queries over blockchain data
+- **Dashboards**: Visualizations of query results
+- **API**: Programmatic access to queries
+- **Spells**: Community-maintained data models
+
+## Implementation in HyperAgent
+
+### Analytics Integration
+- Location: `hyperagent/monitoring/dune_integration.py`
+- Tracks deployed contracts
+- Monitors TVL and metrics
+
+### Metrics Tracked
+- Contract deployments per chain
+- Total value locked (TVL)
+- Transaction volumes
+- User activity
+- Gas costs
+
+## Code Examples
+
+### Query Execution
+```python
+from dune_client import DuneClient
+
+client = DuneClient(api_key="your-api-key")
+
+result = client.execute_query(
+    query_id=123456,
+    parameters={"contract_address": "0x..."}
+)
+
+data = result.get_rows()
+```
+
+### Creating Dashboard
+```python
+dashboard = client.create_dashboard(
+    name="HyperAgent Metrics",
+    queries=[query_id_1, query_id_2]
+)
+```
+
+## Best Practices
+
+1. **Query Optimization**: Optimize SQL queries for performance
+2. **Caching**: Use query caching for frequently accessed data
+3. **Error Handling**: Handle API rate limits
+4. **Data Freshness**: Consider query execution time
+5. **Visualization**: Create clear, actionable dashboards
+
+## Related Resources
+
+- Dune Analytics: https://dune.com/
+- Dune API: https://docs.dune.com/api-reference
+- SQL Reference: https://docs.dune.com/sql
+

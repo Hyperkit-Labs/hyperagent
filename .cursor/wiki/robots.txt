@@ -1,0 +1,34 @@
+# HyperAgent AI Crawler Rules
+# This file defines what AI agents can and cannot access
+
+# Allow access to documentation and code
+Allow: /docs/
+Allow: /scripts/
+Allow: /hyperagent/
+Allow: /frontend/
+Allow: /packages/
+Allow: /contracts/
+Allow: /.cursor/skills/
+Allow: /.cursor/llm/
+Allow: /.cursor/rules/
+
+# Block access to sensitive files
+Disallow: /.env
+Disallow: /.env.*
+Disallow: /secrets/
+Disallow: /node_modules/
+Disallow: /.git/
+Disallow: /dist/
+Disallow: /build/
+
+# Block access to temporary files
+Disallow: /tmp/
+Disallow: /temp/
+Disallow: /__pycache__/
+Disallow: /.pytest_cache/
+
+# Allow root level project files
+Allow: /README.md
+Allow: /CLAUDE.md
+Allow: /.cursorrules
+Allow: /llms.txt

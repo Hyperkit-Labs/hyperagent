@@ -1,0 +1,85 @@
+# Core Framework
+# Updated to latest patched versions for security fixes
+fastapi==0.115.0  # Note: CVE-2024-24762 requires 0.109.1+, but 0.115.0 is newer and should include fixes
+uvicorn[standard]==0.32.0
+pydantic==2.10.0
+pydantic-settings==2.6.0
+email-validator==2.2.0
+PyYAML==6.0.2  # YAML config loading
+# Note: starlette vulnerabilities are fixed in FastAPI 0.115.0 (includes starlette 0.40.0+)
+
+# Async & Concurrency
+aiohttp==3.12.14  # Fixed: CVE-2024-23334, CVE-2024-30251, CVE-2024-23829, CVE-2024-52304, CVE-2024-27306, CVE-2024-42367, CVE-2025-53643
+httpx==0.27.2
+redis[async]==5.2.0
+aioredis==2.0.1  # Legacy support
+
+# Database
+sqlalchemy==2.0.36
+alembic==1.14.0
+asyncpg==0.30.0
+psycopg[binary]>=3.1.0  # psycopg3 for async support with pgbouncer compatibility
+psycopg2-binary==2.9.10  # Legacy sync support
+pgvector==0.3.0
+
+# Blockchain
+web3==6.20.0
+eth-account==0.10.0
+eth-keys==0.5.0
+eth-typing==5.2.1
+
+# EigenDA Python SDK (Optional - community SDK)
+# Install with: pip install git+https://github.com/powerloom/eigenda-py.git
+# Note: Official EigenDA uses REST API (implemented in eigenda_client.py)
+
+# LLM Providers
+google-generativeai==0.8.3
+openai==1.54.0
+anthropic==0.39.0
+langchain==0.3.27  # Fixed: CVE-2025-2828, CVE-2024-5998, CVE-2025-6984, CVE-2024-3095, CVE-2024-2965 (requires >=0.3.26 for langchain-community compatibility)
+langchain-community==0.3.27  # Fixed: CVE-2025-2828, CVE-2024-5998, CVE-2025-6984, CVE-2024-3095, CVE-2024-2965
+
+requests==2.32.4  # Fixed: CVE-2024-35195, CVE-2024-47081
+firecrawl-py>=0.0.16
+pinecone-client>=3.0.0
+
+# Security Tools
+# Updated to latest versions with security patches
+slither-analyzer==0.10.2
+PyJWT==2.9.0
+cryptography==43.0.1  # Fixed: GHSA-h4gh-qq45-vh27 (requires 43.0.1+)
+bcrypt==4.2.0
+passlib[bcrypt]==1.7.4
+
+# Solidity Compilation
+py-solc-x==2.0.4
+solc-select>=1.1.0  # Solidity compiler version manager
+
+# CLI
+click==8.1.8
+rich==13.8.0
+
+# Testing
+pytest==8.3.3
+pytest-asyncio==0.24.0
+pytest-cov==6.0.0
+pytest-mock==3.14.0
+
+# Code Quality Tools
+black==24.1.1
+isort==5.13.2
+mypy==1.8.0
+pre-commit==3.6.0
+bandit==1.7.6
+datamodel-code-generator==0.28.4
+
+# Math & Vector Operations
+numpy>=1.26.0  # Python 3.12 compatible
+
+# Monitoring
+prometheus-client==0.21.0
+opentelemetry-api==1.28.0
+opentelemetry-sdk==1.28.0
+mlflow==2.14.0
+dune-client>=1.5.0
+

@@ -1,0 +1,105 @@
+# FastAPI Documentation for HyperAgent
+
+## Overview
+
+FastAPI is a modern, fast web framework for building APIs with Python. HyperAgent uses FastAPI for the backend API gateway, providing REST endpoints for agent orchestration, project management, and deployment operations.
+
+## Key Use Cases in HyperAgent
+
+- **API Gateway**: Main entry point for all client requests
+- **Multi-tenant Routing**: Route requests to appropriate workspaces
+- **Authentication**: JWT-based auth with Auth0 integration
+- **Rate Limiting**: Per-workspace rate limiting
+- **WebSocket Support**: Real-time updates for workflow progress
+- **OpenAPI Documentation**: Auto-generated API docs
+
+## Documentation Links
+
+### Official Documentation
+- **Main Docs**: https://fastapi.tiangolo.com/
+- **Tutorial**: https://fastapi.tiangolo.com/tutorial/
+- **Advanced Usage**: https://fastapi.tiangolo.com/advanced/
+- **Deployment**: https://fastapi.tiangolo.com/deployment/
+
+### Key Concepts
+- **Dependency Injection**: For auth, database sessions, rate limiting
+- **Pydantic Models**: Request/response validation
+- **Background Tasks**: For async operations
+- **WebSockets**: Real-time communication
+- **Middleware**: For CORS, logging, error handling
+
+## Implementation in HyperAgent
+
+### API Structure
+- Main app: `hyperagent/api/main.py`
+- Routes organized by domain: `hyperagent/api/routes/`
+- Middleware: `hyperagent/api/middleware/`
+
+### Key Endpoints
+- `/api/v1/workflows` - Create and manage workflows
+- `/api/v1/contracts` - Contract generation and management
+- `/api/v1/deployments` - Deployment operations
+- `/api/v1/templates` - Contract templates
+- `/api/v1/x402/` - Payment and billing endpoints
+
+### Authentication
+- JWT token validation via Auth0
+- Workspace-scoped access control
+- Session management for agent operations
+
+## Code Examples
+
+### Basic Endpoint
+```python
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel
+
+router = APIRouter(prefix="/api/v1/workflows")
+
+class WorkflowRequest(BaseModel):
+    prompt: str
+    chains: list[str]
+
+@router.post("/")
+async def create_workflow(
+    request: WorkflowRequest,
+    user: User = Depends(get_current_user)
+):
+    workflow = await orchestrator.create_workflow(
+        prompt=request.prompt,
+        chains=request.chains,
+        workspace_id=user.workspace_id
+    )
+    return workflow
+```
+
+### Dependency Injection
+```python
+from fastapi import Depends
+from hyperagent.api.middleware.auth import get_current_user
+from hyperagent.db.session import get_db
+
+@router.get("/")
+async def list_workflows(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return await db.query(Workflow).filter(
+        Workflow.workspace_id == user.workspace_id
+    ).all()
+```
+
+## Best Practices
+
+1. **Type Safety**: Use Pydantic models for all request/response
+2. **Error Handling**: Use HTTPException with appropriate status codes
+3. **Async Operations**: Use async/await for I/O-bound operations
+4. **Dependency Injection**: Leverage FastAPI's DI for reusable logic
+5. **Documentation**: Use docstrings and response models for OpenAPI
+
+## Related Resources
+
+- FastAPI GitHub: https://github.com/tiangolo/fastapi
+- Pydantic Documentation: https://docs.pydantic.dev/
+- Uvicorn (ASGI server): https://www.uvicorn.org/
+

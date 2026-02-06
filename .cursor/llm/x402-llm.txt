@@ -1,0 +1,80 @@
+# x402 Payment Protocol Documentation for HyperAgent
+
+## Overview
+
+x402 is a payment protocol for pay-per-use services on blockchain networks, particularly optimized for SKALE. HyperAgent uses x402 for payment processing, spending controls, and billing for agent operations and deployments.
+
+## Key Use Cases in HyperAgent
+
+- **Pay-per-Use**: Users pay for agent operations as they use them
+- **Spending Controls**: Set limits on spending per workspace
+- **Payment Analytics**: Track spending and usage
+- **SKALE Integration**: Optimized for SKALE network
+- **Billing Management**: Automated billing and invoicing
+
+## Documentation Links
+
+### Official Documentation
+- **x402 Protocol**: https://docs.x402.io/
+- **SKALE Integration**: https://docs.skale.network/x402
+- **API Reference**: https://docs.x402.io/api
+
+### Key Concepts
+- **Payment Facilitation**: Automated payment processing
+- **Spending Limits**: Per-workspace spending controls
+- **Payment History**: Track all payments
+- **Analytics**: Spending and usage analytics
+
+## Implementation in HyperAgent
+
+### Payment Service
+- Location: `hyperagent/billing/`
+- x402 client integration
+- Spending controls
+- Payment history tracking
+
+### API Endpoints
+- `/api/v1/x402/analytics` - Payment analytics
+- `/api/v1/x402/spending-controls` - Manage spending limits
+- `/api/v1/x402/workflows` - Workflow payment tracking
+
+## Code Examples
+
+### Payment Processing
+```typescript
+import { x402Client } from "@hyperagent/sdk";
+
+const client = new x402Client({
+  network: "skale",
+  facilitatorAddress: "0x..."
+});
+
+await client.processPayment({
+  amount: ethers.parseEther("0.1"),
+  recipient: "0x...",
+  metadata: { workflowId: "wf-123" }
+});
+```
+
+### Spending Controls
+```typescript
+await client.setSpendingLimit({
+  workspaceId: "ws-123",
+  dailyLimit: ethers.parseEther("10"),
+  monthlyLimit: ethers.parseEther("100")
+});
+```
+
+## Best Practices
+
+1. **Spending Limits**: Always set spending limits
+2. **Payment Tracking**: Track all payments
+3. **Error Handling**: Handle payment failures gracefully
+4. **Analytics**: Monitor spending patterns
+5. **Security**: Secure payment processing
+
+## Related Resources
+
+- x402 Documentation: https://docs.x402.io/
+- SKALE x402: https://docs.skale.network/x402
+

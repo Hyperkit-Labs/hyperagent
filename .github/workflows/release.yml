@@ -1,277 +1,305 @@
-# Semantic Versioning Release Workflow
-name: Release
+name: Create Release
 
 on:
   push:
     tags:
-      - 'v*.*.*'  # Trigger on semantic version tags (e.g., v1.0.0, v1.2.3)
+      - 'v*'
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-  PYTHON_VERSION: '3.10'
+permissions:
+  contents: write
+  packages: write
 
 jobs:
-  # ============================================================================
-  # STAGE 1: VALIDATE TAG
-  # ============================================================================
-  
   validate-tag:
-    name: '[*] Validate Release Tag'
+    name: Validate Tag Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Fetch all history for changelog generation
-      
-      - name: Extract version from tag
-        id: version
+      - name: Validate semver tag
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Version: $VERSION"
-      
-      - name: Validate semantic version format
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Error: Invalid semantic version format: $VERSION"
-            echo "Expected format: MAJOR.MINOR.PATCH (e.g., 1.0.0)"
+          if [[ ! "${{ github.ref_name }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "Invalid tag format. Must be vX.Y.Z or vX.Y.Z-prerelease"
             exit 1
           fi
-          echo "✓ Valid semantic version: $VERSION"
 
-  # ============================================================================
-  # STAGE 2: BUILD AND TEST
-  # ============================================================================
-  
-  build-and-test:
-    name: '[BUILD] Build and Test Release'
+  build-and-push-release:
+    name: Build and Push Release Images
     runs-on: ubuntu-latest
     needs: validate-tag
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_DB: hyperagent_test
-          POSTGRES_USER: test_user
-          POSTGRES_PASSWORD: test_password
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-      
-      redis:
-        image: redis:7-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
+    outputs:
+      backend_image: ${{ steps.backend-meta.outputs.tags }}
+      frontend_image: ${{ steps.frontend-meta.outputs.tags }}
     
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-      
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-      
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-asyncio pytest-cov
-      
-      - name: Install frontend dependencies
-        working-directory: ./frontend
-        run: npm ci
-      
-      - name: Set up database
-        run: |
-          PGPASSWORD=test_password psql -h localhost -U test_user -d hyperagent_test -c "CREATE EXTENSION IF NOT EXISTS vector;"
-        env:
-          PGHOST: localhost
-          PGPORT: 5432
-          PGUSER: test_user
-          PGDATABASE: hyperagent_test
-      
-      - name: Run Python tests
-        run: |
-          pytest tests/ -v --cov=hyperagent --cov-report=xml --cov-report=term
-        env:
-          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/hyperagent_test
-          REDIS_URL: redis://localhost:6379/0
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      
-      - name: Check test coverage
-        run: |
-          coverage report --fail-under=80
-      
-      - name: Run frontend tests
-        working-directory: ./frontend
-        run: npm test
-      
-      - name: Run frontend lint
-        working-directory: ./frontend
-        run: npm run lint
-
-  # ============================================================================
-  # STAGE 3: BUILD DOCKER IMAGE
-  # ============================================================================
-  
-  build-docker:
-    name: '[BUILD] Docker Image'
-    runs-on: ubuntu-latest
-    needs: [validate-tag, build-and-test]
-    permissions:
-      contents: read
-      packages: write
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Extract version from tag
-        id: version
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       
-      - name: Log in to Container Registry
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v4
+      - name: Backend metadata
+        id: backend-meta
+        uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ghcr.io/${{ github.repository }}/backend
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-            type=raw,value=latest
       
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v4
+      - name: Frontend metadata
+        id: frontend-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/frontend
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+      
+      - name: Build and push backend
+        uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
+          file: ./docker/Dockerfile.backend
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.backend-meta.outputs.tags }}
+          labels: ${{ steps.backend-meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          platforms: linux/amd64,linux/arm64
           build-args: |
-            BUILDKIT_INLINE_CACHE=1
-            VERSION=${{ steps.version.outputs.version }}
+            VERSION=${{ github.ref_name }}
+            COMMIT_SHA=${{ github.sha }}
+      
+      - name: Build and push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/web
+          file: ./apps/web/Dockerfile
+          push: true
+          tags: ${{ steps.frontend-meta.outputs.tags }}
+          labels: ${{ steps.frontend-meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ github.ref_name }}
 
-  # ============================================================================
-  # STAGE 4: CREATE GITHUB RELEASE
-  # ============================================================================
-  
-  create-release:
-    name: '[RELEASE] Create GitHub Release'
+  generate-changelog:
+    name: Generate Changelog
     runs-on: ubuntu-latest
-    needs: [validate-tag, build-docker]
-    permissions:
-      contents: write
+    needs: validate-tag
+    outputs:
+      changelog: ${{ steps.changelog.outputs.content }}
     
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       
-      - name: Extract version from tag
-        id: version
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
-      
       - name: Generate changelog
         id: changelog
         run: |
-          TAG="${{ steps.version.outputs.tag }}"
-          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          # Get previous tag
+          previous_tag=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
           
-          if [ -z "$PREVIOUS_TAG" ]; then
-            echo "No previous tag found, generating full changelog"
-            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges)
-          else
-            echo "Generating changelog from $PREVIOUS_TAG to $TAG"
-            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges ${PREVIOUS_TAG}..${TAG})
+          echo "Previous tag: $previous_tag"
+          echo "Current tag: ${{ github.ref_name }}"
+          
+          # Generate changelog sections
+          changelog="## What's Changed\n\n"
+          
+          # Features
+          features=$(git log --pretty=format:"* %s (%h)" $previous_tag..HEAD --grep="^feat" || echo "")
+          if [ -n "$features" ]; then
+            changelog+="### ✨ Features\n\n$features\n\n"
           fi
           
-          # Escape newlines for GitHub output
-          CHANGELOG="${CHANGELOG//$'\n'/'%0A'}"
-          echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          # Fixes
+          fixes=$(git log --pretty=format:"* %s (%h)" $previous_tag..HEAD --grep="^fix" || echo "")
+          if [ -n "$fixes" ]; then
+            changelog+="### 🐛 Bug Fixes\n\n$fixes\n\n"
+          fi
+          
+          # Breaking changes
+          breaking=$(git log --pretty=format:"* %s (%h)" $previous_tag..HEAD --grep="BREAKING" || echo "")
+          if [ -n "$breaking" ]; then
+            changelog+="### ⚠️ BREAKING CHANGES\n\n$breaking\n\n"
+          fi
+          
+          # Other changes
+          others=$(git log --pretty=format:"* %s (%h)" $previous_tag..HEAD --grep="^chore\|^docs\|^refactor" || echo "")
+          if [ -n "$others" ]; then
+            changelog+="### 🔧 Other Changes\n\n$others\n\n"
+          fi
+          
+          # Save to output
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$changelog" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+
+  create-github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-and-push-release, generate-changelog]
+    
+    steps:
+      - uses: actions/checkout@v4
       
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: Release ${{ steps.version.outputs.tag }}
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
           body: |
-            ## Release ${{ steps.version.outputs.tag }}
+            # HyperAgent ${{ github.ref_name }}
             
-            ### Changes
-            ${{ steps.changelog.outputs.changelog }}
+            ${{ needs.generate-changelog.outputs.changelog }}
             
-            ### Docker Image
-            ```bash
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            ```
+            ## 🚀 Deployment
             
-            ### Installation
-            See [Installation Guide](./GUIDE/GETTING_STARTED.md) for setup instructions.
+            This release is ready for production deployment.
+            
+            **Docker Images:**
+            - Backend: `${{ needs.build-and-push-release.outputs.backend_image }}`
+            - Frontend: `${{ needs.build-and-push-release.outputs.frontend_image }}`
+            
+            **Deployment Steps:**
+            1. Update ArgoCD Application to target revision `${{ github.ref_name }}`
+            2. Manually sync in ArgoCD dashboard
+            3. Monitor deployment health
+            
+            **Approval Required:** @JustineDevs or @ArhonJay
+            
+            ## 📝 Documentation
+            
+            - [Release Notes](https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }})
+            - [Deployment Guide](https://github.com/${{ github.repository }}/blob/main/docs/DEPLOYMENT.md)
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+
+  update-argocd-production:
+    name: Update ArgoCD Production Target
+    runs-on: ubuntu-latest
+    needs: create-github-release
+    environment:
+      name: production
+      url: https://hyperagent.io
+    
+    steps:
+      - uses: actions/checkout@v4
       
-      - name: Update CHANGELOG.md
+      - name: Update production manifests
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          TAG="${{ steps.version.outputs.tag }}"
-          DATE=$(date +"%Y-%m-%d")
+          # Update k8s production overlay to point to new tag
+          cd k8s/overlays/production
           
-          # Create or update CHANGELOG.md
-          if [ ! -f CHANGELOG.md ]; then
-            echo "# Changelog" > CHANGELOG.md
-            echo "" >> CHANGELOG.md
-            echo "All notable changes to this project will be documented in this file." >> CHANGELOG.md
-            echo "" >> CHANGELOG.md
-          fi
+          kustomize edit set image \
+            hyperagent-backend=${{ needs.build-and-push-release.outputs.backend_image }}
           
-          # Add new release section at the top
-          sed -i "1i\\\n## [$TAG] - $DATE\n\n### Added\n- Release $TAG\n\n### Changed\n\n### Fixed\n\n" CHANGELOG.md
-          
-          # Commit and push CHANGELOG.md update
+          kustomize edit set image \
+            hyperagent-frontend=${{ needs.build-and-push-release.outputs.frontend_image }}
+      
+      - name: Create PR to main with manifest updates
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add CHANGELOG.md
-          git commit -m "chore: update CHANGELOG.md for $TAG" || echo "No changes to commit"
-          git push || echo "Nothing to push"
-        continue-on-error: true
+          
+          git checkout -b release/deploy-${{ github.ref_name }}
+          git add k8s/overlays/production/
+          git commit -m "chore(release): update production images to ${{ github.ref_name }}"
+          git push origin release/deploy-${{ github.ref_name }}
+          
+          gh pr create \
+            --base main \
+            --title "Deploy ${{ github.ref_name }} to Production" \
+            --body "Automated PR to update production manifests for release ${{ github.ref_name }}" \
+            --label "deployment,production"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Install ArgoCD CLI
+        run: |
+          curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+          chmod +x /usr/local/bin/argocd
+      
+      - name: Update ArgoCD app (manual sync required)
+        run: |
+          argocd login ${{ secrets.ARGOCD_SERVER }} \
+            --username admin \
+            --password ${{ secrets.ARGOCD_PASSWORD }} \
+            --grpc-web
+          
+          # Update target revision (but don't auto-sync)
+          argocd app set hyperagent-production --revision ${{ github.ref_name }}
+          
+          echo "Production app updated to track ${{ github.ref_name }}"
+          echo "Manual sync required in ArgoCD dashboard"
+
+  notify-release:
+    name: Notify Team
+    runs-on: ubuntu-latest
+    needs: [create-github-release, update-argocd-production]
+    if: always()
+    
+    steps:
+      - name: Notify Slack
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "🎉 New release ${{ github.ref_name }} is ready for production deployment",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "🚀 Release ${{ github.ref_name }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Status:* Ready for Production Deployment\n*Release:* <https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}|${{ github.ref_name }}>\n*ArgoCD:* <https://argocd.hyperagent.io/applications/hyperagent-production|Manual sync required>"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "⚠️ *Approval Required:* @JustineDevs or @ArhonJay must approve production deployment in ArgoCD"
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Release"
+                      },
+                      "url": "https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+                    },
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "ArgoCD Dashboard"
+                      },
+                      "url": "https://argocd.hyperagent.io/applications/hyperagent-production",
+                      "style": "primary"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}

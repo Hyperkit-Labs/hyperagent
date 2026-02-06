@@ -1,0 +1,138 @@
+# config/networks.yaml
+# Canonical network registry for HyperAgent (config-driven, EVM-first).
+# Add more networks by appending entries below.
+
+networks:
+  mantle_testnet:
+    chain_id: 5003
+    rpc_urls:
+      - https://rpc.sepolia.mantle.xyz
+    explorer: https://sepolia.mantlescan.xyz
+    currency: MNT
+    features:
+      batch_deployment: true
+      eigenda: false
+
+  mantle_mainnet:
+    chain_id: 5000
+    rpc_urls:
+      - https://rpc.mantle.xyz
+    explorer: https://mantlescan.xyz
+    currency: MNT
+    features:
+      batch_deployment: true
+      eigenda: true
+
+  avalanche_fuji:
+    chain_id: 43113
+    rpc_urls:
+      - https://api.avax-test.network/ext/bc/C/rpc
+    explorer: https://testnet.snowtrace.io
+    currency: AVAX
+    features:
+      batch_deployment: true
+      eigenda: false
+
+  avalanche_mainnet:
+    chain_id: 43114
+    rpc_urls:
+      - https://api.avax.network/ext/bc/C/rpc
+      - https://rpc.ankr.com/avalanche
+    explorer: https://snowtrace.io
+    currency: AVAX
+    features:
+      batch_deployment: true
+      eigenda: false
+
+  base_sepolia:
+    chain_id: 84532
+    rpc_urls:
+      - https://sepolia.base.org
+    explorer: https://sepolia.basescan.org
+    currency: ETH
+    features:
+      batch_deployment: true
+      eigenda: false
+
+  base_mainnet:
+    chain_id: 8453
+    rpc_urls:
+      - https://mainnet.base.org
+    explorer: https://basescan.org
+    currency: ETH
+    features:
+      batch_deployment: true
+      eigenda: false
+
+  arbitrum_sepolia:
+    chain_id: 421614
+    rpc_urls:
+      - https://sepolia-rollup.arbitrum.io/rpc
+    explorer: https://sepolia.arbiscan.io
+    currency: ETH
+    features:
+      batch_deployment: true
+      eigenda: false
+
+  arbitrum_one:
+    chain_id: 42161
+    rpc_urls:
+      - https://arb1.arbitrum.io/rpc
+    explorer: https://arbiscan.io
+    currency: ETH
+    features:
+      batch_deployment: true
+      eigenda: false
+
+  bnb_mainnet:
+    chain_id: 56
+    rpc_urls:
+      - https://bsc-dataseed.binance.org
+      - https://rpc.ankr.com/bsc
+    explorer: https://bscscan.com
+    currency: BNB
+    features:
+      batch_deployment: true
+      eigenda: false
+
+  bnb_testnet:
+    chain_id: 97
+    rpc_urls:
+      - https://data-seed-prebsc-1-s1.binance.org:8545
+      - https://rpc.ankr.com/bsc_testnet_chapel
+    explorer: https://testnet.bscscan.com
+    currency: tBNB
+    features:
+      batch_deployment: true
+      eigenda: false
+
+  skale_chaos_testnet:
+    chain_id: 1444673419
+    # Prefer Thirdweb RPC for broad compatibility; you can override with a dedicated SKALE RPC.
+    rpc_urls:
+      - https://1444673419.rpc.thirdweb.com
+    explorer: https://testnet-chaos.explorer.skale.network
+    currency: SKL
+    features:
+      batch_deployment: true
+      eigenda: false
+
+  filecoin_mainnet:
+    chain_id: 314
+    rpc_urls:
+      - https://api.node.glif.io/rpc/v1
+    explorer: https://filfox.info/en
+    currency: FIL
+    features:
+      batch_deployment: true
+      eigenda: false
+
+  filecoin_calibration:
+    chain_id: 314159
+    rpc_urls:
+      - https://api.calibration.node.glif.io/rpc/v1
+    explorer: https://calibration.filfox.info/en
+    currency: tFIL
+    features:
+      batch_deployment: true
+      eigenda: false

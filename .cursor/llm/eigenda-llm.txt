@@ -1,0 +1,74 @@
+# EigenDA Documentation for HyperAgent
+
+## Overview
+
+EigenDA (EigenLayer Data Availability) is a data availability layer that provides verifiable data storage for blockchain applications. HyperAgent uses EigenDA for storing verifiable agent traces, audit reports, and contract metadata, enabling cryptographic proof of agent actions.
+
+## Key Use Cases in HyperAgent
+
+- **Verifiable Traces**: Store agent execution traces with proofs
+- **Audit Provenance**: Anchor audit reports to EigenDA
+- **Contract Metadata**: Store deployment metadata verifiably
+- **Agent Accountability**: Enable verification of agent decisions
+- **Protocol Labs Integration**: Part of Verifiable Factory preset
+
+## Documentation Links
+
+### Official Documentation
+- **Main Docs**: https://docs.eigenlayer.xyz/eigenda/
+- **EigenLayer**: https://docs.eigenlayer.xyz/
+- **Data Availability**: https://docs.eigenlayer.xyz/eigenda/overview
+- **Integration Guide**: https://docs.eigenlayer.xyz/eigenda/integration
+
+### Key Concepts
+- **Data Availability**: Ensuring data is available for verification
+- **Blob Storage**: Efficient storage for large data
+- **Verification**: Cryptographic proofs of data availability
+- **EigenLayer**: Restaking and security model
+
+## Implementation in HyperAgent
+
+### Verifiable Factory Preset
+- Location: Protocol Labs preset implementation
+- Stores agent traces and audit reports
+- Enables verification of agent decisions
+
+### Integration Points
+- Agent trace storage
+- Audit report anchoring
+- Contract metadata storage
+- Proof generation for agent actions
+
+## Code Examples
+
+### Storing Data
+```python
+from eigenda_client import EigenDAClient
+
+client = EigenDAClient()
+blob_id = await client.store_blob(
+    data=agent_trace_json,
+    namespace="hyperagent-traces"
+)
+```
+
+### Verification
+```python
+proof = await client.get_availability_proof(blob_id)
+is_available = await client.verify_proof(proof)
+```
+
+## Best Practices
+
+1. **Data Format**: Use structured formats (JSON) for traces
+2. **Namespace Organization**: Organize by workspace/project
+3. **Verification**: Always verify proofs before trusting data
+4. **Cost Management**: Monitor storage costs
+5. **Retention**: Define data retention policies
+
+## Related Resources
+
+- EigenLayer GitHub: https://github.com/Layr-Labs/eigenlayer-contracts
+- EigenDA Specification: https://docs.eigenlayer.xyz/eigenda/
+- Protocol Labs: https://protocol.ai/
+

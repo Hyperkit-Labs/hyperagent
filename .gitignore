@@ -427,6 +427,8 @@ local/
 *.backup
 *.old
 *.orig
+backup-before-env-removal-*/
+backup-*/
 
 # System files
 .directory

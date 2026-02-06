@@ -1,5 +1,6 @@
-# HyperAgent
-
+<div align="center">
+  <img src="/public/ascii-art-doh-HyperAgent.png" alt="HyperAgent ASCII Art" width="800">
+  
 <!-- Badges: start -->
 ![Version](https://img.shields.io/badge/version-1.0.0-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
@@ -10,6 +11,8 @@
 <!-- Badges: end -->
 
 HyperAgent is an AI-powered smart contract development platform that transforms natural language specifications into production-ready, audited contracts deployed across multiple EVM chains in minutes.
+
+</div>
 
 ## Table of Contents
 

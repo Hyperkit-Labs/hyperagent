@@ -33,6 +33,7 @@ These files help AI systems understand external dependencies and their integrati
 - **[erc-4337-llm.txt](erc-4337-llm.txt)** - ERC-4337 Account Abstraction for gasless transactions and smart wallets
 - **[erc-8004-llm.txt](erc-8004-llm.txt)** - ERC-8004 Trustless Agents for agent identity and reputation
 - **[x402-llm.txt](x402-llm.txt)** - x402 payment protocol for pay-per-use services on SKALE
+- **[erc1066-x402-llm.txt](erc1066-x402-llm.txt)** - ERC-1066-x402 SDKs (npm: hyperkit-erc1066, PyPI: hyperkitlabs-erc1066-x402)
 
 ### Storage & Data Availability
 - **[ipfs-pinata-llm.txt](ipfs-pinata-llm.txt)** - IPFS and Pinata for decentralized artifact storage and RAG

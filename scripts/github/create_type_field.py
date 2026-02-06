@@ -55,7 +55,7 @@ mutation CreateProjectField($projectId: ID!, $name: String!, $options: [ProjectV
 
 variables = {
     "projectId": project_id,
-    "name": "Type",
+    "name": "Issue Type",  # Use "Issue Type" as GitHub Projects standard name
     "options": [
         {"name": "Epic", "color": "BLUE", "description": "Large feature or initiative"},
         {"name": "Feature", "color": "GREEN", "description": "New functionality"},
@@ -80,13 +80,17 @@ query GetFields($projectId: ID!) {
     ... on ProjectV2 {
       fields(first: 50) {
         nodes {
-          id
-          name
           ... on ProjectV2SingleSelectField {
+            id
+            name
             options {
               id
               name
             }
+          }
+          ... on ProjectV2Field {
+            id
+            name
           }
         }
       }
@@ -105,9 +109,15 @@ if check_response.status_code == 200:
     check_result = check_response.json()
     if "data" in check_result and check_result["data"]["node"]:
         fields = check_result["data"]["node"]["fields"]["nodes"]
-        type_field = next((f for f in fields if f["name"] == "Type"), None)
+        # Debug: show all field names
+        print(f"Found {len(fields)} fields in project:")
+        for f in fields:
+            print(f"  - {f.get('name', 'Unknown')} (ID: {f.get('id', 'N/A')})")
+        
+        # Check for both "Type" and "Issue Type" (GitHub Projects may use either)
+        type_field = next((f for f in fields if f["name"] in ["Type", "Issue Type"]), None)
         if type_field:
-            print(f"[OK] Type field already exists!")
+            print(f"\n[OK] Type/Issue Type field already exists!")
             print(f"  Field ID: {type_field['id']}")
             print(f"  Field Name: {type_field['name']}")
             if "options" in type_field:
@@ -115,6 +125,8 @@ if check_response.status_code == 200:
             print(f"\nAdd this to .env.issue:")
             print(f"TYPE_FIELD_ID={type_field['id']}")
             sys.exit(0)
+        else:
+            print(f"\n[INFO] No 'Type' or 'Issue Type' field found. Will attempt to create 'Issue Type' field.")
 
 print(f"Creating Type field...")
 
@@ -128,8 +140,8 @@ if response.status_code == 200:
     result = response.json()
     if "errors" in result:
         error_msg = result["errors"][0].get("message", "Unknown error")
-        if "already exists" in error_msg.lower() or "duplicate" in error_msg.lower():
-            print("[OK] Type field already exists")
+        if "already exists" in error_msg.lower() or "duplicate" in error_msg.lower() or "already been taken" in error_msg.lower():
+            print("[OK] Issue Type field already exists")
             # Try to get the existing field ID
             query = """
             query GetField($projectId: ID!) {
@@ -137,13 +149,17 @@ if response.status_code == 200:
                 ... on ProjectV2 {
                   fields(first: 50) {
                     nodes {
-                      id
-                      name
                       ... on ProjectV2SingleSelectField {
+                        id
+                        name
                         options {
                           id
                           name
                         }
+                      }
+                      ... on ProjectV2Field {
+                        id
+                        name
                       }
                     }
                   }
@@ -158,13 +174,27 @@ if response.status_code == 200:
             )
             if response2.status_code == 200:
                 result2 = response2.json()
-                if "data" in result2:
+                if "data" in result2 and result2["data"]["node"]:
                     fields = result2["data"]["node"]["fields"]["nodes"]
-                    type_field = next((f for f in fields if f["name"] == "Type"), None)
+                    print(f"\n[DEBUG] Found {len(fields)} fields in project:")
+                    for f in fields:
+                        print(f"  - {f.get('name', 'Unknown')} (ID: {f.get('id', 'N/A')})")
+                    
+                    # Check for both "Type" and "Issue Type"
+                    type_field = next((f for f in fields if f["name"] in ["Type", "Issue Type"]), None)
                     if type_field:
-                        print(f"[OK] Type field ID: {type_field['id']}")
+                        print(f"\n[OK] Found field: {type_field['name']}")
+                        print(f"  Field ID: {type_field['id']}")
+                        if "options" in type_field and type_field["options"]:
+                            print(f"  Options: {', '.join([opt['name'] for opt in type_field['options']])}")
                         print(f"\nAdd this to .env.issue:")
                         print(f"TYPE_FIELD_ID={type_field['id']}")
+                    else:
+                        print("\n[WARNING] Field exists but could not retrieve ID. Check Project 9 manually.")
+                else:
+                    print(f"\n[WARNING] Could not parse field data from response: {result2}")
+            else:
+                print(f"\n[WARNING] Failed to query fields: {response2.status_code} - {response2.text}")
         else:
             print(f"[ERROR] Error: {error_msg}")
             print(json.dumps(result, indent=2))

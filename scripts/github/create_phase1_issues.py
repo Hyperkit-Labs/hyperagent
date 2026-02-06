@@ -175,6 +175,7 @@ class GitHubProjectAutomation:
         }
         self.milestone_cache: Dict[str, Optional[int]] = {}
         self.codeowners = self._parse_codeowners(codeowners_path)
+        self.existing_issues_cache: Optional[Dict[str, Dict[str, Any]]] = None
 
     def _parse_codeowners(self, codeowners_path: str) -> Dict[str, str]:
         """Parse CODEOWNERS file to extract owners and their roles."""
@@ -272,6 +273,64 @@ class GitHubProjectAutomation:
             # JustineDevs issues reviewed by ArhonJay (technical review)
             return "ArhonJay"
 
+    def get_existing_issues(self, milestone_title: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
+        """Fetch existing issues and cache them. Returns dict mapping title -> issue data."""
+        if self.existing_issues_cache is not None:
+            return self.existing_issues_cache
+        
+        logger.info("Fetching existing issues to check for duplicates...")
+        url = f"https://api.github.com/repos/{self.owner}/{self.repo}/issues"
+        params = {"state": "all", "per_page": 100}
+        all_issues = {}
+        page = 1
+        
+        while True:
+            params["page"] = page
+            response = requests.get(url, headers=self.headers, params=params)
+            
+            if response.status_code != 200:
+                logger.warning(f"Could not fetch issues: {response.status_code}")
+                break
+            
+            issues = response.json()
+            if not issues:
+                break
+            
+            for issue in issues:
+                # Skip pull requests
+                if "pull_request" in issue:
+                    continue
+                
+                # Filter by milestone if provided
+                if milestone_title and issue.get("milestone"):
+                    if issue["milestone"]["title"] != milestone_title:
+                        continue
+                elif milestone_title and not issue.get("milestone"):
+                    continue
+                
+                title = issue["title"]
+                all_issues[title] = {
+                    "number": issue["number"],
+                    "title": title,
+                    "url": issue["html_url"],
+                    "state": issue["state"],
+                    "milestone": issue.get("milestone", {}).get("title") if issue.get("milestone") else None,
+                }
+            
+            # Check if there are more pages
+            if len(issues) < 100:
+                break
+            page += 1
+        
+        self.existing_issues_cache = all_issues
+        logger.info(f"Found {len(all_issues)} existing issues")
+        return all_issues
+    
+    def check_duplicate(self, title: str, milestone_title: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Check if an issue with the same title already exists."""
+        existing = self.get_existing_issues(milestone_title)
+        return existing.get(title)
+    
     def get_milestone_number(self, milestone_title: str) -> Optional[int]:
         """Get milestone number by title, with caching."""
         if milestone_title in self.milestone_cache:
@@ -1615,8 +1674,16 @@ const run = await client.runPipeline({
         sprint: str,
         chain: Optional[str] = None,
         preset: Optional[str] = None,
+        skip_duplicates: bool = True,
     ) -> bool:
         """Create an issue and configure it in the project."""
+        # Check for duplicates
+        if skip_duplicates:
+            duplicate = self.check_duplicate(title, milestone)
+            if duplicate:
+                logger.info(f"Skipping duplicate issue: '{title}' (already exists as #{duplicate['number']}: {duplicate['url']})")
+                return True  # Return True because we successfully handled it (by skipping)
+        
         # Generate comprehensive body
         body = self.generate_issue_body(title, labels, milestone, sprint, chain, preset)
         
@@ -1717,6 +1784,8 @@ def main():
     parser.add_argument("--csv", help="Path to CSV file")
     parser.add_argument("--yaml", help="Path to YAML file")
     parser.add_argument("--dry-run", action="store_true", help="Validate without creating issues")
+    parser.add_argument("--skip-duplicates", action="store_true", default=True, help="Skip issues that already exist (default: True)")
+    parser.add_argument("--no-skip-duplicates", dest="skip_duplicates", action="store_false", help="Create issues even if duplicates exist")
 
     args = parser.parse_args()
 
@@ -1769,38 +1838,63 @@ def main():
         sys.exit(1)
 
     if args.dry_run:
-        logger.info(f"Dry run: Would create {len(issues)} issues")
-        logger.info("")
-        
         # Initialize automation for assignment testing
         codeowners_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "CODEOWNERS")
         automation = GitHubProjectAutomation(token, owner, repo, project_id, field_ids, codeowners_path)
         
-        # Count assignments by owner
+        # Check for duplicates
+        logger.info("Checking for existing issues...")
+        existing_issues = automation.get_existing_issues()
+        duplicates = []
+        new_issues = []
+        
+        for issue in issues:
+            duplicate = automation.check_duplicate(issue["title"], issue["milestone"])
+            if duplicate:
+                duplicates.append((issue["title"], duplicate))
+            else:
+                new_issues.append(issue)
+        
+        logger.info(f"Dry run: {len(issues)} issues in CSV")
+        logger.info(f"  - {len(duplicates)} duplicates found (would be skipped)")
+        logger.info(f"  - {len(new_issues)} new issues (would be created)")
+        logger.info("")
+        
+        if duplicates:
+            logger.info("Duplicate issues (would be skipped):")
+            for title, dup_info in duplicates[:10]:
+                logger.info(f"  - '{title[:60]}' → Already exists as #{dup_info['number']}: {dup_info['url']}")
+            if len(duplicates) > 10:
+                logger.info(f"  ... and {len(duplicates) - 10} more duplicates")
+            logger.info("")
+        
+        # Count assignments by owner for NEW issues only
         assignment_counts = {"JustineDevs": 0, "ArhonJay": 0, "Tristan-T-Dev": 0}
         
-        # Show first 10 issues with assignment details
-        logger.info("Sample issues (first 10):")
-        for i, issue in enumerate(issues[:10], 1):
+        # Count all assignments for NEW issues first
+        for issue in new_issues:
             area = next((l.split(":")[1] for l in issue["labels"] if l.startswith("area:")), None)
             issue_type = next((l.split(":")[1] for l in issue["labels"] if l.startswith("type:")), "feature")
             assigned_owner = automation._assign_owner(area, issue_type, issue.get("sprint"))
             assignment_counts[assigned_owner] = assignment_counts.get(assigned_owner, 0) + 1
-            logger.info(f"  {i}. {issue['title'][:60]}")
-            logger.info(f"     → Assigned to: {assigned_owner} (Area: {area}, Type: {issue_type})")
         
-        if len(issues) > 10:
-            logger.info(f"  ... and {len(issues) - 10} more")
-        
-        # Count all assignments
-        for issue in issues:
-            area = next((l.split(":")[1] for l in issue["labels"] if l.startswith("area:")), None)
-            issue_type = next((l.split(":")[1] for l in issue["labels"] if l.startswith("type:")), "feature")
-            assigned_owner = automation._assign_owner(area, issue_type, issue.get("sprint"))
-            assignment_counts[assigned_owner] = assignment_counts.get(assigned_owner, 0) + 1
+        # Show first 10 NEW issues with assignment details
+        if new_issues:
+            logger.info("Sample NEW issues (first 10):")
+            for i, issue in enumerate(new_issues[:10], 1):
+                area = next((l.split(":")[1] for l in issue["labels"] if l.startswith("area:")), None)
+                issue_type = next((l.split(":")[1] for l in issue["labels"] if l.startswith("type:")), "feature")
+                assigned_owner = automation._assign_owner(area, issue_type, issue.get("sprint"))
+                logger.info(f"  {i}. {issue['title'][:60]}")
+                logger.info(f"     → Assigned to: {assigned_owner} (Area: {area}, Type: {issue_type})")
+            
+            if len(new_issues) > 10:
+                logger.info(f"  ... and {len(new_issues) - 10} more new issues")
+        else:
+            logger.info("No new issues to create - all issues already exist!")
         
         logger.info("")
-        logger.info("Assignment Distribution:")
+        logger.info("Assignment Distribution (for NEW issues only):")
         logger.info(f"  JustineDevs: {assignment_counts.get('JustineDevs', 0)} issues")
         logger.info(f"  ArhonJay: {assignment_counts.get('ArhonJay', 0)} issues")
         logger.info(f"  Tristan-T-Dev: {assignment_counts.get('Tristan-T-Dev', 0)} issues")
@@ -1814,27 +1908,42 @@ def main():
     automation = GitHubProjectAutomation(token, owner, repo, project_id, field_ids, codeowners_path)
 
     # Process issues with progress tracking
-    logger.info(f"Creating {len(issues)} issues...")
+    logger.info(f"Processing {len(issues)} issues...")
+    if args.skip_duplicates:
+        logger.info("Duplicate detection enabled - existing issues will be skipped")
+    
     success_count = 0
     failed_count = 0
+    skipped_count = 0
     
     for i, issue in enumerate(issues, 1):
         logger.info(f"[{i}/{len(issues)}] Processing: {issue['title'][:60]}...")
-        if automation.process_issue(
+        result = automation.process_issue(
             issue["title"],
             issue["labels"],
             issue["milestone"],
             issue["sprint"],
             issue.get("chain"),
             issue.get("preset"),
-        ):
-            success_count += 1
+            skip_duplicates=args.skip_duplicates,
+        )
+        if result:
+            # Check if it was skipped (duplicate) or created
+            duplicate = automation.check_duplicate(issue["title"], issue["milestone"])
+            if duplicate and args.skip_duplicates:
+                skipped_count += 1
+            else:
+                success_count += 1
         else:
             failed_count += 1
 
-    logger.info(f"Successfully created {success_count}/{len(issues)} issues")
-    if failed_count > 0:
-        logger.warning(f"Failed to create {failed_count} issues")
+    logger.info(f"\n{'='*60}")
+    logger.info(f"Summary:")
+    logger.info(f"  Created: {success_count} issues")
+    logger.info(f"  Skipped (duplicates): {skipped_count} issues")
+    logger.info(f"  Failed: {failed_count} issues")
+    logger.info(f"  Total processed: {len(issues)} issues")
+    logger.info(f"{'='*60}")
 
 
 if __name__ == "__main__":

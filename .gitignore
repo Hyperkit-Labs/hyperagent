@@ -433,3 +433,18 @@ local/
 .railway
 .now
 .turbo
+
+# ============================================================
+# AUTOMATION & DATA FILES
+# ============================================================
+# GitHub automation scripts and data
+scripts/data/
+scripts/docs/
+scripts/github/
+
+# Planning and migration documentation
+docs/plan/
+
+# Environment files (keep examples)
+.env.issue
+!.env.issue.example

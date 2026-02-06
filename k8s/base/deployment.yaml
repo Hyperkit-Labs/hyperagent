@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hyperagent-api
+  labels:
+    app: hyperagent
+    component: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hyperagent
+      component: api
+  template:
+    metadata:
+      labels:
+        app: hyperagent
+        component: api
+    spec:
+      containers:
+      - name: api
+        image: ghcr.io/hyperkit-labs/hyperkit_agent/backend:latest
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: hyperagent-secrets
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: hyperagent-secrets
+              key: redis-url
+        - name: ENVIRONMENT
+          value: production
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+

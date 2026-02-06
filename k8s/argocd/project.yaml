@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: hyperagent
+  namespace: argocd
+spec:
+  description: HyperAgent Platform Applications
+  sourceRepos:
+    - 'https://github.com/hyperkit-labs/Hyperkit_agent.git'
+  destinations:
+    - namespace: hyperagent-staging
+      server: https://kubernetes.default.svc
+    - namespace: hyperagent-production
+      server: https://kubernetes.default.svc
+    - namespace: hyperagent-dev
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+  roles:
+    - name: hyperagent-admin
+      description: HyperAgent Admin Role
+      policies:
+        - p, proj:hyperagent:hyperagent-admin, applications, *, hyperagent/*, allow
+        - p, proj:hyperagent:hyperagent-admin, repositories, get, *, allow
+      groups:
+        - hyperagent-admins
+    - name: hyperagent-developer
+      description: HyperAgent Developer Role
+      policies:
+        - p, proj:hyperagent:hyperagent-developer, applications, get, hyperagent/*, allow
+        - p, proj:hyperagent:hyperagent-developer, repositories, get, *, allow
+      groups:
+        - hyperagent-developers
+

@@ -1,0 +1,86 @@
+# Tenderly Documentation for HyperAgent
+
+## Overview
+
+Tenderly is a blockchain development platform providing simulation, debugging, and monitoring tools for smart contracts. HyperAgent uses Tenderly for contract simulation, gas estimation, transaction debugging, and post-deployment monitoring.
+
+## Key Use Cases in HyperAgent
+
+- **Contract Simulation**: Simulate contract interactions before deployment
+- **Gas Estimation**: Accurate gas cost calculations
+- **Transaction Debugging**: Debug failed transactions
+- **Monitoring**: Monitor deployed contracts
+- **Alerting**: Set up alerts for contract events
+
+## Documentation Links
+
+### Official Documentation
+- **Main Docs**: https://docs.tenderly.co/
+- **Simulations**: https://docs.tenderly.co/simulations-and-forks
+- **Debugger**: https://docs.tenderly.co/debugger
+- **Monitoring**: https://docs.tenderly.co/monitoring
+- **API Reference**: https://docs.tenderly.co/api
+
+### Key Concepts
+- **Simulations**: Test transactions before execution
+- **Forks**: Local blockchain forks for testing
+- **Debugger**: Step-through transaction execution
+- **Monitoring**: Track contract state and events
+- **Alerts**: Notifications for contract events
+
+## Implementation in HyperAgent
+
+### MonitorAgent Integration
+- Location: `hyperagent/agents/monitoring.py`
+- Simulates contracts before deployment
+- Monitors deployed contracts
+- Provides gas estimates
+
+### Simulation Service
+- Pre-deployment validation
+- Gas optimization analysis
+- Transaction failure detection
+
+## Code Examples
+
+### Simulation
+```python
+from tenderly_sdk import Tenderly
+
+tenderly = Tenderly(api_key="your-api-key")
+
+simulation = tenderly.simulate_transaction(
+    network_id=1,
+    from_address="0x...",
+    to_address="0x...",
+    input="0x...",
+    value=0
+)
+
+print(f"Gas used: {simulation.gas_used}")
+print(f"Status: {simulation.status}")
+```
+
+### Monitoring
+```python
+tenderly.monitor_contract(
+    network_id=1,
+    address="0x...",
+    name="MyContract"
+)
+```
+
+## Best Practices
+
+1. **Pre-deployment Simulation**: Always simulate before deploying
+2. **Gas Optimization**: Use simulations to optimize gas
+3. **Error Detection**: Catch errors in simulation
+4. **Monitoring**: Set up monitoring for production contracts
+5. **Alerts**: Configure alerts for critical events
+
+## Related Resources
+
+- Tenderly GitHub: https://github.com/Tenderly
+- Tenderly Dashboard: https://dashboard.tenderly.co/
+- API Documentation: https://docs.tenderly.co/api
+

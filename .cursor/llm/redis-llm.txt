@@ -1,0 +1,85 @@
+# Redis Documentation for HyperAgent
+
+## Overview
+
+Redis is an in-memory data structure store used as a database, cache, and message broker. HyperAgent uses Redis for caching, session management, message queuing for agent execution, and real-time data storage.
+
+## Key Use Cases in HyperAgent
+
+- **Caching**: Cache LLM responses and compiled contracts
+- **Message Queue**: Queue agent tasks for background processing
+- **Session Management**: Store user sessions and workspace state
+- **Rate Limiting**: Track API rate limits per workspace
+- **Real-time Data**: Store temporary workflow state
+
+## Documentation Links
+
+### Official Documentation
+- **Main Docs**: https://redis.io/docs/
+- **Python Client**: https://redis.readthedocs.io/
+- **Commands**: https://redis.io/commands/
+- **Data Types**: https://redis.io/docs/data-types/
+
+### Key Concepts
+- **Strings**: Simple key-value storage
+- **Hashes**: Field-value maps
+- **Lists**: Ordered collections
+- **Sets**: Unordered unique collections
+- **Pub/Sub**: Publish-subscribe messaging
+
+## Implementation in HyperAgent
+
+### Caching
+- Location: `hyperagent/cache/`
+- Cache LLM responses
+- Cache compiled contract bytecode
+- TTL-based expiration
+
+### Message Queue
+- Agent task queuing
+- Background job processing
+- Worker pool management
+
+## Code Examples
+
+### Basic Operations
+```python
+import redis
+
+r = redis.Redis(host='localhost', port=6379, db=0)
+
+# Set/get
+r.set("key", "value", ex=3600)  # Expire in 1 hour
+value = r.get("key")
+
+# Hash operations
+r.hset("workflow:123", "status", "running")
+status = r.hget("workflow:123", "status")
+```
+
+### Pub/Sub
+```python
+# Publisher
+r.publish("workflow:updates", json.dumps({"id": 123, "status": "done"}))
+
+# Subscriber
+pubsub = r.pubsub()
+pubsub.subscribe("workflow:updates")
+for message in pubsub.listen():
+    data = json.loads(message["data"])
+```
+
+## Best Practices
+
+1. **Connection Pooling**: Use connection pools for production
+2. **TTL**: Set appropriate expiration times
+3. **Memory Management**: Monitor memory usage
+4. **Persistence**: Configure RDB or AOF for durability
+5. **Security**: Use authentication and TLS in production
+
+## Related Resources
+
+- Redis GitHub: https://github.com/redis/redis
+- Python Client: https://github.com/redis/redis-py
+- Redis Cloud: https://redis.com/cloud/
+

@@ -1,251 +1,11 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-
-# C extensions
-*.so
-
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# PyInstaller
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-.python-version
-
-# pipenv
-Pipfile.lock
-
-# PEP 582
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# MCP
-.mcp/
-mcp.json
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-
-# Project specific
-logs/
-*.log
-.env.local
-.env.*.local
-.env.production
-.env.development
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
-# Docker
-.dockerignore
-
-# Secrets
-secrets/
-*.pem
-*.key
-*.crt
-
-# Temporary files
-tmp/
-temp/
-*.tmp
-
-# Coverage reports
-.coverage
-htmlcov/
-coverage.xml
-
-# Build artifacts
-build/
-dist/
-*.whl
-
-# Alembic
-alembic/versions/*.pyc
-
-# Redis dumps
-dump.rdb
-
-# Node modules (if any)
-node_modules/
-
-# Contract artifacts
-artifacts/
-contracts/artifacts/
-contracts/cache/
-
-# Hardhat/Foundry
-cache/
-out/
-broadcast/
-
-# Additional generated files
-*.pyc
-*.pyo
-*.pyd
-hyperagent.egg-info/
-
-# Test artifacts
-.pytest_cache/
-test_output/
-test_results/
-*.test.log
-
-# Workflow reports (if auto-generated)
-# examples/report.md
-# examples/*_workflow.json
-
-# Version files (if auto-generated)
-# VERSION
-
-# Cursor/IDE specific
-.cursor/
-.cursorrules
-
-# OS-specific
-Thumbs.db
-.AppleDouble
-.LSOverride
-
-# Virtual environment (should not be committed)
-venv/
-env/
-ENV/
-.venv/
-
-# Frontend (Next.js)
-frontend/.next/
-frontend/out/
-frontend/node_modules/
-frontend/.env.local
-frontend/.env*.local
-frontend/.vercel
-frontend/.swc/
-
-reference/
-.cursor/
-.cursor/rules
+# ============================================================
+# AI Agent Directories
+# ============================================================
+.agent/
 .agents/
-.agent/*
-.gemini/*
-!packages/env/
-
-# AI Agent directories (consolidated into .cursor)
 .claude/
 .cline/
 .codebuddy/
-.codex/
 .commandcode/
 .continue/
 .crush/
@@ -256,12 +16,420 @@ reference/
 .mcpjam/
 .mux/
 .neovate/
-.opencode/
 .openhands/
 .pi/
 .qoder/
 .qwen/
 .roo/
 .trae/
+.windsurf/
 .zencoder/
-planning-with-files/
+skills/
+!.cursor/skills/
+
+# ============================================================
+# SECURITY & CREDENTIALS (CRITICAL - Never commit these!)
+# ============================================================
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+!.env.template
+.env.local
+.env.development
+.env.production
+.env.staging
+.env.test
+*.env
+secrets/
+secrets.yaml
+secrets.yml
+*.secret
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.crt
+*.cer
+*.p7b
+*.p7c
+*.p7m
+*.p7s
+*.p8
+*.p8e
+*.p10
+*.p12
+*.pfx
+*.keytab
+*.kdb
+*.kdbx
+*.kwallet
+*.kwallet5
+*.kwallet6
+credentials/
+credentials.json
+credentials.yaml
+credentials.yml
+*.credentials
+*.token
+*.tokens
+*.auth
+*.authz
+*.passwd
+*.password
+*.pwd
+*.priv
+*.private
+*.privkey
+*.secretkey
+*.apikey
+*.api_key
+*.api-key
+*.access_token
+*.access-token
+*.refresh_token
+*.refresh-token
+*.session
+*.sessions
+*.cookie
+*.cookies
+*.jwt
+*.jwks
+config/secrets.*
+config/*.secret
+config/*.key
+config/*.token
+
+# GitHub tokens and keys
+*.gh_token
+*.github_token
+*.ghp_*
+gh_token.txt
+github_token.txt
+
+# AWS credentials
+.aws/
+aws-credentials
+*.aws
+*.awscredentials
+
+# Google Cloud credentials
+.gcloud/
+*.gcp
+*.gcloud
+gcp-key.json
+service-account*.json
+
+# Azure credentials
+.azure/
+*.azure
+azure-credentials
+
+# Database credentials
+*.db.password
+*.db.pass
+database.credentials
+db.secret
+
+# API keys and tokens
+api_keys.txt
+api-keys.txt
+*.apikey
+*.api_key
+tokens.txt
+*.token.txt
+
+# ============================================================
+# BUILD ARTIFACTS & COMPILED FILES
+# ============================================================
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+*.whl
+.eggs/
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+*.cover
+.hypothesis/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+cython_debug/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+.npm
+.eslintcache
+.node_repl_history
+*.tgz
+.yarn-integrity
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+.next/
+out/
+.nuxt/
+.cache/
+.parcel-cache/
+.vuepress/dist/
+.serverless/
+.fusebox/
+.dynamodb/
+.tern-port
+*.tsbuildinfo
+
+# TypeScript
+*.tsbuildinfo
+.tsbuildinfo
+
+# Rust
+target/
+Cargo.lock
+**/*.rs.bk
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+replay_pid*
+
+# ============================================================
+# IDE & EDITOR FILES
+# ============================================================
+# VSCode
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+.vim/
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# ============================================================
+# OS FILES
+# ============================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ============================================================
+# LOGS & TEMPORARY FILES
+# ============================================================
+*.log
+*.log.*
+logs/
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+*.tmp
+*.temp
+*.bak
+*.backup
+*.swp
+*.swo
+*.orig
+*.save
+*.old
+*.cache
+.cache/
+tmp/
+temp/
+.tmp/
+.temp/
+
+# ============================================================
+# TESTING & COVERAGE
+# ============================================================
+# Coverage reports
+coverage/
+.nyc_output/
+.coverage
+*.cover
+.hypothesis/
+.pytest_cache/
+htmlcov/
+.tox/
+.coverage.*
+coverage.xml
+*.lcov
+.coveragerc
+
+# Test results
+test-results/
+test-results.xml
+junit.xml
+*.test.xml
+
+# ============================================================
+# DOCKER & CONTAINERS
+# ============================================================
+.dockerignore
+docker-compose.override.yml
+*.dockerignore
+
+# ============================================================
+# DATABASES
+# ============================================================
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+*.db-journal
+*.s3db
+*.sl3
+*.db3
+
+# ============================================================
+# DOCUMENTATION BUILDS
+# ============================================================
+docs/_build/
+docs/.doctrees/
+site/
+_site/
+.jekyll-cache/
+.jekyll-metadata
+
+# ============================================================
+# MISC
+# ============================================================
+# Archives
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+*.gz
+*.bz2
+*.xz
+
+# Lock files (keep package-lock.json but ignore others)
+yarn.lock
+pnpm-lock.yaml
+poetry.lock
+Pipfile.lock
+Gemfile.lock
+
+# Local configuration
+local/
+.local/
+*.local
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# System files
+.directory
+.Trash-*
+.nfs*
+
+# Project specific
+.vercel
+.netlify
+.railway
+.now
+.turbo

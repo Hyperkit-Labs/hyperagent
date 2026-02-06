@@ -1,0 +1,305 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  validate-tag:
+    name: Validate Tag Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate semver tag
+        run: |
+          if [[ ! "${{ github.ref_name }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "Invalid tag format. Must be vX.Y.Z or vX.Y.Z-prerelease"
+            exit 1
+          fi
+
+  build-and-push-release:
+    name: Build and Push Release Images
+    runs-on: ubuntu-latest
+    needs: validate-tag
+    outputs:
+      backend_image: ${{ steps.backend-meta.outputs.tags }}
+      frontend_image: ${{ steps.frontend-meta.outputs.tags }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Backend metadata
+        id: backend-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/backend
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+      
+      - name: Frontend metadata
+        id: frontend-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/frontend
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+      
+      - name: Build and push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.backend
+          push: true
+          tags: ${{ steps.backend-meta.outputs.tags }}
+          labels: ${{ steps.backend-meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            COMMIT_SHA=${{ github.sha }}
+      
+      - name: Build and push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/web
+          file: ./apps/web/Dockerfile
+          push: true
+          tags: ${{ steps.frontend-meta.outputs.tags }}
+          labels: ${{ steps.frontend-meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ github.ref_name }}
+
+  generate-changelog:
+    name: Generate Changelog
+    runs-on: ubuntu-latest
+    needs: validate-tag
+    outputs:
+      changelog: ${{ steps.changelog.outputs.content }}
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get previous tag
+          previous_tag=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          echo "Previous tag: $previous_tag"
+          echo "Current tag: ${{ github.ref_name }}"
+          
+          # Generate changelog sections
+          changelog="## What's Changed\n\n"
+          
+          # Features
+          features=$(git log --pretty=format:"* %s (%h)" $previous_tag..HEAD --grep="^feat" || echo "")
+          if [ -n "$features" ]; then
+            changelog+="### ✨ Features\n\n$features\n\n"
+          fi
+          
+          # Fixes
+          fixes=$(git log --pretty=format:"* %s (%h)" $previous_tag..HEAD --grep="^fix" || echo "")
+          if [ -n "$fixes" ]; then
+            changelog+="### 🐛 Bug Fixes\n\n$fixes\n\n"
+          fi
+          
+          # Breaking changes
+          breaking=$(git log --pretty=format:"* %s (%h)" $previous_tag..HEAD --grep="BREAKING" || echo "")
+          if [ -n "$breaking" ]; then
+            changelog+="### ⚠️ BREAKING CHANGES\n\n$breaking\n\n"
+          fi
+          
+          # Other changes
+          others=$(git log --pretty=format:"* %s (%h)" $previous_tag..HEAD --grep="^chore\|^docs\|^refactor" || echo "")
+          if [ -n "$others" ]; then
+            changelog+="### 🔧 Other Changes\n\n$others\n\n"
+          fi
+          
+          # Save to output
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$changelog" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  create-github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-and-push-release, generate-changelog]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          body: |
+            # HyperAgent ${{ github.ref_name }}
+            
+            ${{ needs.generate-changelog.outputs.changelog }}
+            
+            ## 🚀 Deployment
+            
+            This release is ready for production deployment.
+            
+            **Docker Images:**
+            - Backend: `${{ needs.build-and-push-release.outputs.backend_image }}`
+            - Frontend: `${{ needs.build-and-push-release.outputs.frontend_image }}`
+            
+            **Deployment Steps:**
+            1. Update ArgoCD Application to target revision `${{ github.ref_name }}`
+            2. Manually sync in ArgoCD dashboard
+            3. Monitor deployment health
+            
+            **Approval Required:** @JustineDevs or @ArhonJay
+            
+            ## 📝 Documentation
+            
+            - [Release Notes](https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }})
+            - [Deployment Guide](https://github.com/${{ github.repository }}/blob/main/docs/DEPLOYMENT.md)
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+
+  update-argocd-production:
+    name: Update ArgoCD Production Target
+    runs-on: ubuntu-latest
+    needs: create-github-release
+    environment:
+      name: production
+      url: https://hyperagent.io
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Update production manifests
+        run: |
+          # Update k8s production overlay to point to new tag
+          cd k8s/overlays/production
+          
+          kustomize edit set image \
+            hyperagent-backend=${{ needs.build-and-push-release.outputs.backend_image }}
+          
+          kustomize edit set image \
+            hyperagent-frontend=${{ needs.build-and-push-release.outputs.frontend_image }}
+      
+      - name: Create PR to main with manifest updates
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git checkout -b release/deploy-${{ github.ref_name }}
+          git add k8s/overlays/production/
+          git commit -m "chore(release): update production images to ${{ github.ref_name }}"
+          git push origin release/deploy-${{ github.ref_name }}
+          
+          gh pr create \
+            --base main \
+            --title "Deploy ${{ github.ref_name }} to Production" \
+            --body "Automated PR to update production manifests for release ${{ github.ref_name }}" \
+            --label "deployment,production"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Install ArgoCD CLI
+        run: |
+          curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+          chmod +x /usr/local/bin/argocd
+      
+      - name: Update ArgoCD app (manual sync required)
+        run: |
+          argocd login ${{ secrets.ARGOCD_SERVER }} \
+            --username admin \
+            --password ${{ secrets.ARGOCD_PASSWORD }} \
+            --grpc-web
+          
+          # Update target revision (but don't auto-sync)
+          argocd app set hyperagent-production --revision ${{ github.ref_name }}
+          
+          echo "Production app updated to track ${{ github.ref_name }}"
+          echo "Manual sync required in ArgoCD dashboard"
+
+  notify-release:
+    name: Notify Team
+    runs-on: ubuntu-latest
+    needs: [create-github-release, update-argocd-production]
+    if: always()
+    
+    steps:
+      - name: Notify Slack
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "🎉 New release ${{ github.ref_name }} is ready for production deployment",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "🚀 Release ${{ github.ref_name }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Status:* Ready for Production Deployment\n*Release:* <https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}|${{ github.ref_name }}>\n*ArgoCD:* <https://argocd.hyperagent.io/applications/hyperagent-production|Manual sync required>"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "⚠️ *Approval Required:* @JustineDevs or @ArhonJay must approve production deployment in ArgoCD"
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Release"
+                      },
+                      "url": "https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+                    },
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "ArgoCD Dashboard"
+                      },
+                      "url": "https://argocd.hyperagent.io/applications/hyperagent-production",
+                      "style": "primary"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}

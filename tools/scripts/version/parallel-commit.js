@@ -20,8 +20,21 @@ function log(message) {
 }
 
 function execCommand(command, options = {}) {
+  // Always execute read-only git commands (status, diff, etc.) even in dry-run
+  // to get actual file information for planning
+  const readOnlyCommands = [
+    'git status',
+    'git diff',
+    'git rev-parse',
+    'git log',
+    'git show',
+    'git ls-files'
+  ];
+  const isReadOnly = readOnlyCommands.some(cmd => command.startsWith(cmd));
+  const shouldSimulate = isDryRun && !isReadOnly;
+  
   try {
-    if (isDryRun) {
+    if (shouldSimulate) {
       log(`[DRY RUN] Would execute: ${command}`);
       return { stdout: '', stderr: '', success: true };
     }
@@ -56,7 +69,21 @@ function getUnstagedFiles() {
   return result.stdout
     .trim()
     .split('\n')
-    .filter(line => line.startsWith('??') || line.startsWith(' M') || line.startsWith(' M'))
+    .filter(line => {
+      // Untracked files: ??
+      // Modified unstaged:  M (space before M)
+      // Deleted unstaged:  D (space before D)
+      // Renamed unstaged:  R (space before R)
+      // Copied unstaged:  C (space before C)
+      const status = line.substring(0, 2);
+      return status === '??' || 
+             status === ' M' || 
+             status === ' D' || 
+             status === ' R' || 
+             status === ' C' ||
+             status === 'AM' || // Added and modified
+             status === 'AD';   // Added and deleted
+    })
     .map(line => line.substring(3).trim());
 }
 
@@ -70,13 +97,25 @@ function groupFilesByType(files) {
   };
 
   files.forEach(file => {
-    if (file.startsWith('apps/web/')) {
+    // Normalize path separators for Windows compatibility
+    const normalizedFile = file.replace(/\\/g, '/');
+    
+    if (normalizedFile.startsWith('apps/hyperagent-web/') || normalizedFile.startsWith('apps/web/')) {
       groups.frontend.push(file);
-    } else if (file.startsWith('apps/api/') || file.startsWith('services/') || file.startsWith('agents/')) {
+    } else if (normalizedFile.startsWith('apps/hyperagent-api/') || 
+               normalizedFile.startsWith('apps/api/') || 
+               normalizedFile.startsWith('services/') || 
+               normalizedFile.startsWith('agents/')) {
       groups.backend.push(file);
-    } else if (file.startsWith('docs/') || file.endsWith('.md')) {
+    } else if (normalizedFile.startsWith('docs/') || normalizedFile.endsWith('.md')) {
       groups.docs.push(file);
-    } else if (file.startsWith('.') || file.includes('config') || file.includes('package.json') || file.includes('.json')) {
+    } else if (normalizedFile.startsWith('.') || 
+               normalizedFile.includes('config') || 
+               normalizedFile.includes('package.json') || 
+               normalizedFile.includes('.json') ||
+               normalizedFile.includes('tsconfig.json') ||
+               normalizedFile.includes('turbo.json') ||
+               normalizedFile.includes('pnpm-workspace.yaml')) {
       groups.config.push(file);
     } else {
       groups.other.push(file);
@@ -114,22 +153,35 @@ function main() {
   }
 
   // Get staged files
-  const stagedFiles = getStagedFiles();
+  let stagedFiles = getStagedFiles();
   
+  // If no staged files, check for unstaged changes
   if (stagedFiles.length === 0) {
-    log('No staged files found. Staging all changes...');
+    const unstagedFiles = getUnstagedFiles();
+    if (unstagedFiles.length === 0) {
+      log('No changes to commit');
+      process.exit(0);
+    }
+    
+    log(`Found ${unstagedFiles.length} unstaged file(s). Staging all changes...`);
     const stageResult = execCommand('git add -A');
     if (!stageResult.success) {
       log(`Error staging files: ${stageResult.stderr}`);
       process.exit(1);
     }
-    // Re-fetch staged files
-    const newStagedFiles = getStagedFiles();
-    if (newStagedFiles.length === 0) {
-      log('No changes to commit');
-      process.exit(0);
+    
+    // In dry-run mode, simulate what would be staged
+    if (isDryRun) {
+      // Use the unstaged files we found as what would be staged
+      stagedFiles = unstagedFiles;
+    } else {
+      // Re-fetch staged files after actual staging
+      stagedFiles = getStagedFiles();
+      if (stagedFiles.length === 0) {
+        log('No changes to commit after staging');
+        process.exit(0);
+      }
     }
-    stagedFiles.push(...newStagedFiles);
   }
 
   log(`Found ${stagedFiles.length} staged file(s)`);

@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: hyperagent-production
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: hyperagent
+  source:
+    repoURL: https://github.com/hyperkit-labs/Hyperkit_agent.git
+    targetRevision: v0.1.0  # Track specific tags (GitFlow releases)
+    path: k8s/overlays/production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: hyperagent-production
+  syncPolicy:
+    automated: null    # Manual sync only (requires approval)
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+  revisionHistoryLimit: 20  # Keep more history for production
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+

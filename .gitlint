@@ -1,0 +1,37 @@
+# gitlint configuration
+# https://jorisroovers.com/gitlint/
+
+[general]
+# Enable all default rules
+ignore=
+# Ignore merge commits, fixup commits, squash commits
+ignore-merge-commits=true
+ignore-fixup-commits=true
+ignore-squash-commits=true
+# Use Python regex
+regex-style-search=true
+
+[title-max-length]
+line-length=72
+
+[title-must-not-contain-word]
+# Words that should not appear in title
+words=wip,WIP,fixup,squash
+
+[title-match-regex]
+# Conventional Commits format
+regex=^(feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(\([\w-]+\))?!?: .+
+
+[body-max-line-length]
+line-length=100
+
+[body-min-length]
+min-length=0
+
+[body-is-missing]
+# Allow commits without body
+ignore-merge-commits=true
+
+[body-changed-file-mention]
+# Don't require file mentions in body
+enabled=false

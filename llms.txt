@@ -1,0 +1,38 @@
+# HyperAgent Documentation Manifest for AI Systems
+# This file guides AI crawlers to the most important documentation
+
+# Project Overview
+/docs/spec/HyperAgent Spec.txt - Complete project specification
+/README.md - Project overview and quick start
+
+# Architecture & Design
+/docs/BRANCHING_STRATEGY.md - Git branching strategy
+/docs/GITOPS_SETUP.md - GitOps configuration
+/docs/BRANCH_PROTECTION_SETUP.md - Branch protection rules
+
+# Development Guides
+/docs/DEVELOP_BRANCH_REFACTOR_PLAN.md - Development branch refactoring plan
+/docs/PROJECT9_ISSUES_ANALYSIS.md - GitHub Project 9 issues analysis
+
+# Skills & Resources
+/.cursor/skills/ - Modular AI capabilities
+/.cursor/llm/ - LLM documentation resources
+/.cursor/rules/ - Project rules and guidelines
+
+# API Documentation
+/docs/api/ - API documentation
+
+# Frontend Documentation
+/docs/frontend/ - Frontend development guides
+
+# Security
+/docs/security/ - Security guidelines
+/SECURITY.md - Security policy
+
+# Contributing
+/CONTRIBUTING.md - Contribution guidelines
+/CODE_OF_CONDUCT.md - Code of conduct
+
+# Full Documentation (if available)
+# /llms-full.txt - Complete documentation in single file
+

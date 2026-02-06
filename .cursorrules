@@ -1,0 +1,191 @@
+# HyperAgent Cursor Editor Rules
+
+## Project Context
+
+HyperAgent is an AI-powered smart contract development platform that transforms natural language specifications into production-ready, audited contracts deployed across multiple EVM chains.
+
+## Code Style
+
+### Python
+- Use Python 3.11+ features
+- Follow PEP 8 style guide
+- Use type hints for all function parameters and return types
+- Use Black for code formatting
+- Use isort for import sorting
+- Maximum line length: 100 characters
+
+### TypeScript/JavaScript
+- Use TypeScript 5.x with strict mode
+- Follow ESLint and Prettier configurations
+- Use async/await instead of promises
+- Prefer const over let, avoid var
+- Use meaningful variable and function names
+
+### Solidity
+- Use Solidity 0.8.24+
+- Follow OpenZeppelin patterns
+- Use NatSpec comments for all public functions
+- Implement access control patterns
+- Use events for important state changes
+
+## File Organization
+
+### Directory Structure
+- Follow the monorepo structure defined in the spec
+- Keep related files together
+- Use clear, descriptive directory names
+- Separate concerns (API, agents, contracts, etc.)
+
+### Naming Conventions
+- Files: kebab-case for Python, camelCase for TypeScript
+- Classes: PascalCase
+- Functions: snake_case for Python, camelCase for TypeScript
+- Constants: UPPER_SNAKE_CASE
+- Private members: prefix with underscore
+
+## Development Workflow
+
+### Before Making Changes
+1. Check `.cursor/skills/` for relevant skills
+2. Check `.cursor/llm/` for LLM resources
+3. Review existing code patterns
+4. Check related documentation
+
+### When Writing Code
+- Write self-documenting code
+- Add comments for complex logic
+- Include type hints/annotations
+- Follow existing patterns in the codebase
+- Keep functions focused and small
+
+### When Creating Files
+- Include appropriate imports
+- Add docstrings/header comments
+- Follow project structure conventions
+- Update relevant documentation
+
+## Testing Requirements
+
+### Unit Tests
+- Write tests for all business logic
+- Use descriptive test names
+- Test edge cases and error conditions
+- Aim for 80%+ code coverage
+
+### Integration Tests
+- Test API endpoints
+- Test database interactions
+- Test external service integrations
+- Use test fixtures and mocks
+
+## Documentation
+
+### Code Comments
+- Use docstrings for all public functions
+- Explain "why" not "what"
+- Include parameter and return type descriptions
+- Add examples for complex functions
+
+### README Files
+- Include project overview
+- Provide quick start guide
+- Document dependencies
+- Include usage examples
+
+## Git Practices
+
+### Branch Naming
+- `feature/description` - New features
+- `fix/description` - Bug fixes
+- `docs/description` - Documentation updates
+- `chore/description` - Maintenance tasks
+
+### Commit Messages
+- Use conventional commits format
+- Start with type: `feat:`, `fix:`, `docs:`, `chore:`, etc.
+- Include issue number if applicable
+- Keep first line under 72 characters
+
+## Security
+
+### Never Commit
+- API keys or tokens
+- Private keys
+- Passwords
+- `.env` files (except `.env.example`)
+- Secrets of any kind
+
+### Always Validate
+- User inputs
+- API responses
+- File uploads
+- External data sources
+
+## Performance
+
+### Best Practices
+- Use async/await for I/O operations
+- Implement caching where appropriate
+- Optimize database queries
+- Use connection pooling
+- Monitor resource usage
+
+## Error Handling
+
+### Patterns
+- Use specific exception types
+- Include context in error messages
+- Log errors with appropriate levels
+- Return meaningful error responses
+- Handle edge cases gracefully
+
+## AI Agent Guidelines
+
+### Resource Compliance
+- Always check `.cursor/skills/` before implementing
+- Review `.cursor/llm/` for LLM-related tasks
+- Follow patterns from existing code
+- Reference documentation when available
+
+### Code Generation
+- Generate code that follows project patterns
+- Include proper error handling
+- Add appropriate type hints
+- Include docstrings for public APIs
+- Write tests for new functionality
+
+## Project-Specific Rules
+
+### Smart Contracts
+- Always use OpenZeppelin contracts when possible
+- Implement proper access control
+- Add events for important state changes
+- Write comprehensive tests
+- Run security audits before deployment
+
+### API Endpoints
+- Use FastAPI dependency injection
+- Implement rate limiting
+- Add authentication/authorization
+- Validate all inputs
+- Return consistent error formats
+
+### Frontend Components
+- Use TypeScript with strict mode
+- Follow shadcn/ui patterns
+- Implement proper error boundaries
+- Add loading states
+- Optimize for performance
+
+## Quality Checklist
+
+Before submitting code:
+- [ ] Code follows style guidelines
+- [ ] All tests pass
+- [ ] Documentation updated
+- [ ] No security issues
+- [ ] Performance acceptable
+- [ ] Error handling implemented
+- [ ] Type hints/annotations added
+- [ ] Reviewed for best practices
+

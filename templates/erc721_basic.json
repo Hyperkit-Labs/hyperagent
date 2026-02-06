@@ -1,9 +1,0 @@
-{
-  "name": "ERC721 NFT Basic",
-  "description": "Standard ERC721 non-fungible token implementation for NFTs",
-  "contract_type": "ERC721",
-  "template_code": "pragma solidity ^0.8.30;\n\nimport \"@openzeppelin/contracts/token/ERC721/ERC721.sol\";\nimport \"@openzeppelin/contracts/access/Ownable.sol\";\n\ncontract BasicNFT is ERC721, Ownable {\n    uint256 private _tokenIdCounter;\n    \n    constructor(\n        string memory name,\n        string memory symbol\n    ) ERC721(name, symbol) Ownable(msg.sender) {\n        _tokenIdCounter = 0;\n    }\n    \n    function mint(address to) public onlyOwner {\n        uint256 tokenId = _tokenIdCounter;\n        _tokenIdCounter++;\n        _safeMint(to, tokenId);\n    }\n    \n    function totalSupply() public view returns (uint256) {\n        return _tokenIdCounter;\n    }\n}",
-  "version": "1.0.0",
-  "tags": ["nft", "erc721", "standard", "openzeppelin"]
-}
-

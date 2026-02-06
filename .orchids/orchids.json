@@ -1,8 +1,0 @@
-{
-  "projectId": "75d5f1c3-7deb-445b-945c-b5d11cb72e00",
-  "createdAt": 1735430400000,
-  "startupCommands": [
-    "uvicorn hyperagent.api.main:app --host 0.0.0.0 --port 8000",
-    "cd frontend; bun run dev"
-  ]
-}

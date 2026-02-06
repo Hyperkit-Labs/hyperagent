@@ -1,9 +1,0 @@
-{
-  "name": "ERC20 Token Basic",
-  "description": "Standard ERC20 token implementation with transfer, approve, and allowance functions",
-  "contract_type": "ERC20",
-  "template_code": "pragma solidity ^0.8.30;\n\nimport \"@openzeppelin/contracts/token/ERC20/ERC20.sol\";\n\ncontract BasicToken is ERC20 {\n    constructor(\n        string memory name,\n        string memory symbol,\n        uint256 initialSupply\n    ) ERC20(name, symbol) {\n        _mint(msg.sender, initialSupply);\n    }\n}",
-  "version": "1.0.0",
-  "tags": ["token", "erc20", "standard", "openzeppelin"]
-}
-

@@ -1,2 +1,0 @@
-"""HyperAgent test suite"""
-

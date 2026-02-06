@@ -105,7 +105,19 @@ function getAllChangedFiles() {
     .split('\n')
     .filter(line => line.trim())
     .map(line => {
-      const filename = line.substring(3).trim();
+      // Git status porcelain format: XY filename
+      // For staged deletions: "D " (no space before D), filename starts at position 2
+      // For unstaged: " D" (space before D), filename starts at position 3
+      // For untracked: "??", filename starts at position 3
+      // For modified: " M" or "M ", filename starts at position 3
+      let filename;
+      if (line[0] !== ' ' && line[1] === ' ') {
+        // Staged (first char is status, second is space): "D ", "M ", "A ", etc.
+        filename = line.substring(2).trim();
+      } else {
+        // Unstaged or untracked: " D", " M", "??", etc.
+        filename = line.substring(3).trim();
+      }
       // Handle renamed files (old -> new)
       return filename.split(' -> ').pop();
     })

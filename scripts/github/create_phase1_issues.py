@@ -211,110 +211,66 @@ class GitHubProjectAutomation:
         return owners
 
     def _assign_owner(self, area: Optional[str], issue_type: str, sprint: Optional[str] = None) -> str:
-        """Determine the appropriate owner based on area, issue type, and sprint."""
-        # Default owners from CODEOWNERS
-        justine = "JustineDevs"
-        arhon = "ArhonJay"
-        tristan = "Tristan-T-Dev"
+        """Assign issues based on area and team roles.
         
-        # Tristan-T-Dev (Frontend Developer) - UI/UX, Frontend
-        tristan_areas = {
-            "frontend",  # UI/UX, Frontend development
-        }
+        Distribution:
+        - JustineDevs: Orchestration, GitOps, DevOps, Documentation, Backend
+        - ArhonJay: SDKs related
+        - Tristan-T-Dev: Frontend Side
+        """
+        # Tristan-T-Dev: Frontend only
+        tristan_areas = {"frontend"}
         
-        # JustineDevs (CPOO/Product Lead) - Primary AI Augmented Builder and Reviewer
+        # ArhonJay: SDKs only
+        arhon_areas = {"sdk-cli"}
+        
+        # JustineDevs: Everything else (Orchestration, GitOps, DevOps, Docs, Backend)
         justine_areas = {
-            "orchestration",  # Product operations
+            "orchestration",  # Core orchestration
+            "infra",  # Infrastructure, DevOps, GitOps
+            "docs",  # Documentation
+            "backend",  # Backend services
+            "api",  # API layer
+            "storage-rag",  # Backend data systems
+            "security",  # Backend security
+            "observability",  # Backend monitoring
+            "agents",  # Backend agents
+            "chain-adapter",  # Backend chain adapters
+            "contracts",  # Backend contract templates
         }
-        
-        # ArhonJay (CTO/Project Architect) - Technical architecture
-        arhon_areas = {
-            "agents",  # Technical implementation
-            "chain-adapter",  # Smart contracts, deployment
-            "contracts",  # Solidity contracts
-            "infra",  # Infrastructure, DevOps
-            "storage-rag",  # Technical data systems
-            "security",  # Security architecture
-            "observability",  # Technical monitoring
-            "sdk-cli",  # Technical SDK
-        }
-        
-        # Sprint-based distribution strategy
-        # Sprint 1: JustineDevs focuses on orchestration/frontend, ArhonJay on agents/chain
-        # Sprint 2: Balanced distribution
-        # Sprint 3: ArhonJay focuses on infra/CI-CD, JustineDevs on multi-tenant/registry
         
         # Epics always go to JustineDevs (primary owner)
         if issue_type == "epic":
-            return justine
+            return "JustineDevs"
         
-        # Sprint-specific assignment overrides
-        if sprint:
-            sprint_num = sprint.replace("Sprint ", "").strip()
-            
-            if sprint_num == "1":
-                # Sprint 1: Tristan = frontend, JustineDevs = orchestration, ArhonJay = agents/chain/technical
-                if area in tristan_areas:
-                    return tristan
-                elif area in justine_areas:
-                    return justine
-                elif area in arhon_areas:
-                    return arhon
-                # For mixed areas in Sprint 1, prioritize based on primary area
-                elif area == "storage-rag" and issue_type == "feature":
-                    # Storage-RAG in Sprint 1 goes to ArhonJay (technical)
-                    return arhon
-                else:
-                    return justine  # Default
-                    
-            elif sprint_num == "2":
-                # Sprint 2: More balanced - alternate based on area
-                if area in tristan_areas:
-                    return tristan
-                elif area in justine_areas:
-                    return justine
-                elif area in arhon_areas:
-                    return arhon
-                # For mixed areas, assign based on primary focus
-                elif area == "storage-rag":
-                    return arhon  # Technical
-                else:
-                    return justine  # Default
-                    
-            elif sprint_num == "3":
-                # Sprint 3: ArhonJay = infra/CI-CD, JustineDevs = multi-tenant/registry, Tristan = frontend
-                if area == "infra":
-                    return arhon  # CI/CD focus
-                elif area in tristan_areas:
-                    return tristan
-                elif area in justine_areas:
-                    return justine
-                elif area in arhon_areas:
-                    return arhon
-                else:
-                    return justine  # Default
-        
-        # Fallback: Area-based assignment (if no sprint specified)
+        # Area-based assignment
         if area in tristan_areas:
-            return tristan
-        elif area in justine_areas:
-            return justine
+            return "Tristan-T-Dev"
         elif area in arhon_areas:
-            return arhon
+            return "ArhonJay"
+        elif area in justine_areas:
+            return "JustineDevs"
         else:
             # Default to JustineDevs for unassigned areas
-            return justine
+            return "JustineDevs"
 
     def _get_reviewer(self, assigned_owner: str) -> str:
-        """Get the reviewer (opposite of owner for cross-review)."""
+        """Get the reviewer for cross-review.
+        
+        Review assignments:
+        - Frontend issues (Tristan-T-Dev) reviewed by JustineDevs (product lead)
+        - SDK issues (ArhonJay) reviewed by JustineDevs (product lead)
+        - JustineDevs issues reviewed by ArhonJay (technical review)
+        """
         if assigned_owner == "Tristan-T-Dev":
             # Frontend issues reviewed by JustineDevs (product lead)
             return "JustineDevs"
-        elif assigned_owner == "JustineDevs":
-            return "ArhonJay"
-        else:
-            # ArhonJay issues reviewed by JustineDevs
+        elif assigned_owner == "ArhonJay":
+            # SDK issues reviewed by JustineDevs (product lead)
             return "JustineDevs"
+        else:
+            # JustineDevs issues reviewed by ArhonJay (technical review)
+            return "ArhonJay"
 
     def get_milestone_number(self, milestone_title: str) -> Optional[int]:
         """Get milestone number by title, with caching."""
@@ -1691,6 +1647,7 @@ const run = await client.runPipeline({
         issue_type = next((l.split(":")[1] for l in labels if l.startswith("type:")), None)
         issue_area = next((l.split(":")[1] for l in labels if l.startswith("area:")), None)
 
+        # Use "Issue Type" field (GitHub Projects uses "Issue Type" not "Type")
         if "type" in self.field_ids and issue_type:
             self.update_project_field(
                 item_id, self.field_ids["type"], issue_type, field_type="single_select"
@@ -1813,10 +1770,42 @@ def main():
 
     if args.dry_run:
         logger.info(f"Dry run: Would create {len(issues)} issues")
-        for issue in issues[:5]:  # Show first 5
-            logger.info(f"  - {issue['title']}")
-        if len(issues) > 5:
-            logger.info(f"  ... and {len(issues) - 5} more")
+        logger.info("")
+        
+        # Initialize automation for assignment testing
+        codeowners_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "CODEOWNERS")
+        automation = GitHubProjectAutomation(token, owner, repo, project_id, field_ids, codeowners_path)
+        
+        # Count assignments by owner
+        assignment_counts = {"JustineDevs": 0, "ArhonJay": 0, "Tristan-T-Dev": 0}
+        
+        # Show first 10 issues with assignment details
+        logger.info("Sample issues (first 10):")
+        for i, issue in enumerate(issues[:10], 1):
+            area = next((l.split(":")[1] for l in issue["labels"] if l.startswith("area:")), None)
+            issue_type = next((l.split(":")[1] for l in issue["labels"] if l.startswith("type:")), "feature")
+            assigned_owner = automation._assign_owner(area, issue_type, issue.get("sprint"))
+            assignment_counts[assigned_owner] = assignment_counts.get(assigned_owner, 0) + 1
+            logger.info(f"  {i}. {issue['title'][:60]}")
+            logger.info(f"     → Assigned to: {assigned_owner} (Area: {area}, Type: {issue_type})")
+        
+        if len(issues) > 10:
+            logger.info(f"  ... and {len(issues) - 10} more")
+        
+        # Count all assignments
+        for issue in issues:
+            area = next((l.split(":")[1] for l in issue["labels"] if l.startswith("area:")), None)
+            issue_type = next((l.split(":")[1] for l in issue["labels"] if l.startswith("type:")), "feature")
+            assigned_owner = automation._assign_owner(area, issue_type, issue.get("sprint"))
+            assignment_counts[assigned_owner] = assignment_counts.get(assigned_owner, 0) + 1
+        
+        logger.info("")
+        logger.info("Assignment Distribution:")
+        logger.info(f"  JustineDevs: {assignment_counts.get('JustineDevs', 0)} issues")
+        logger.info(f"  ArhonJay: {assignment_counts.get('ArhonJay', 0)} issues")
+        logger.info(f"  Tristan-T-Dev: {assignment_counts.get('Tristan-T-Dev', 0)} issues")
+        logger.info("")
+        logger.info("Dry run complete. No issues were created.")
         return
 
     # Initialize automation (reads CODEOWNERS from repo root)

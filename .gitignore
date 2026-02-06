@@ -34,6 +34,7 @@ skills/
 .env.*
 !.env.example
 !.env.template
+!.env.issue.example
 .env.local
 .env.development
 .env.production

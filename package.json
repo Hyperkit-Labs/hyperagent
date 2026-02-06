@@ -4,7 +4,6 @@
   "description": "AI-powered smart contract development platform",
   "private": true,
   "scripts": {
-<<<<<<< HEAD
     "dev": "pnpm turbo dev",
     "build": "pnpm turbo build",
     "lint": "pnpm turbo lint",
@@ -20,28 +19,6 @@
     "status": "git status",
     "changes": "git status --porcelain",
     "staged": "git diff --cached --name-only"
-=======
-    "commit": "node scripts/git/version/scripts/parallel-commit.js",
-    "commit:dry": "node scripts/git/version/scripts/parallel-commit.js --dry-run",
-    "commit:sh": "bash scripts/git/version/scripts/parallel-commit.sh",
-    "commit:sh:dry": "bash scripts/git/version/scripts/parallel-commit.sh --dry-run",
-    "commit:all": "git add -A && git commit -m \"chore: update project files\"",
-    "commit:auto": "bash scripts/git/version/scripts/parallel-commit.sh --max 3",
-    "status": "git status",
-    "changes": "git status --porcelain",
-    "staged": "git diff --cached --name-only",
-    "add": "git add",
-    "push": "git push",
-    "pull": "git pull",
-    "branch": "git branch",
-    "checkout": "git checkout",
-    "merge": "git merge",
-    "rebase": "git rebase",
-    "log": "git log --oneline --graph --decorate",
-    "diff": "git diff",
-    "reset": "git reset",
-    "clean": "git clean -fd"
->>>>>>> origin/projects
   },
   "keywords": [
     "smart-contracts",
@@ -50,12 +27,11 @@
     "blockchain",
     "hyperagent"
   ],
-<<<<<<< HEAD
-  "author": "HyperAgent Team",
+  "author": "HyperKit Labs",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/JustineDevs/HyperAgent.git"
+    "url": "https://github.com/Hyperkit-Labs/hyperagent.git"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -71,9 +47,3 @@
     "@emotion/use-insertion-effect-with-fallbacks": "^1.2.0"
   }
 }
-=======
-  "author": "HyperKit Labs",
-  "license": "MIT"
-}
-
->>>>>>> origin/projects

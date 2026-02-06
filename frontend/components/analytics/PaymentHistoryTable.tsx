@@ -1,7 +1,7 @@
 "use client";
 
 import { getExplorerUrl } from '@/lib/utils';
-import { ExternalLink } from 'lucide-react';
+import ExternalLink from 'lucide-react/dist/esm/icons/external-link'
 
 interface PaymentHistoryItem {
   id: string;

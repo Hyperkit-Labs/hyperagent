@@ -2,7 +2,9 @@
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { Github, ExternalLink, Sparkles } from 'lucide-react';
+import Github from 'lucide-react/dist/esm/icons/github'
+import ExternalLink from 'lucide-react/dist/esm/icons/external-link'
+import Sparkles from 'lucide-react/dist/esm/icons/sparkles'
 
 export function Footer() {
   const footerLinks = {

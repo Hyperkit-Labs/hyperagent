@@ -7,13 +7,14 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import redis.asyncio as redis
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hyperagent.agents.testing import TestingAgent
+# DEPRECATED: Use TestingService directly instead
+# from hyperagent.agents.testing import TestingAgent
 from hyperagent.architecture.soa import ServiceRegistry
 from hyperagent.blockchain.eigenda_client import EigenDAClient
 from hyperagent.blockchain.networks import NetworkManager
@@ -37,6 +38,7 @@ from hyperagent.billing.cost_estimator import CostEstimator
 from hyperagent.models.user import User
 from hyperagent.models.workflow import Workflow, WorkflowStatus
 from hyperagent.rag.template_retriever import TemplateRetriever
+from hyperagent.rag.vector_store import VectorStore
 from hyperagent.security.audit import SecurityAuditor
 
 logger = logging.getLogger(__name__)
@@ -46,24 +48,168 @@ DEFAULT_PAGE_LIMIT = 100
 
 
 async def get_or_create_default_user(db: AsyncSession) -> uuid.UUID:
-    """Get or create default user for workflows"""
+    """
+    Get or create default user for workflows
+    
+    WARNING: This creates a shared default user account for all requests.
+    This is suitable for:
+    - Development/demo environments
+    - Single-user deployments
+    - Testing purposes
+    
+    For production with multiple users:
+    - Enable authentication (set ENABLE_AUTHENTICATION=true)
+    - Use proper user authentication via /api/v1/auth/login
+    - Pass user_id from authenticated request context
+    
+    See: hyperagent/api/middleware/auth.py for auth implementation
+    """
+    # Check if authentication is enabled
+    if settings.enable_authentication:
+        logger.warning(
+            "Default user creation called but authentication is enabled. "
+            "This should not happen in production. Use authenticated user context instead."
+        )
+    
     result = await db.execute(select(User).where(User.email == "default@hyperagent.local"))
     user = result.scalar_one_or_none()
 
     if not user:
         user = User(
             email="default@hyperagent.local",
-            username=None,
+            username="Demo User",
             is_active=True,
         )
         db.add(user)
         await db.commit()
         await db.refresh(user)
-        logger.info(f"Created default user: {user.id}")
+        logger.info(
+            f"Created default user: {user.id} "
+            "(Authentication disabled - development mode)"
+        )
     else:
         logger.debug(f"Using existing default user: {user.id}")
 
     return user.id
+
+
+async def safe_execute_workflow_background(
+    workflow_id: str,
+    nlp_input: str,
+    network: str,
+    skip_audit: bool,
+    skip_deployment: bool,
+    wallet_address: Optional[str] = None,
+    use_gasless: Optional[bool] = None,
+    signed_transaction: Optional[str] = None,
+    selected_tasks: Optional[List[str]] = None,
+    db_session = None,  # Database session for learning system
+):
+    """
+    Safety wrapper for workflow execution with overall timeout and comprehensive error handling
+    
+    This wrapper ensures:
+    1. Overall workflow timeout (5 minutes max)
+    2. Workflow status is always updated even if task crashes
+    3. All exceptions are caught and logged
+    """
+    from hyperagent.db.session import AsyncSessionLocal
+    
+    async with AsyncSessionLocal() as db:
+        try:
+            # Wrap entire execution in timeout
+            result = await asyncio.wait_for(
+                execute_workflow_background(
+                    workflow_id=workflow_id,
+                    nlp_input=nlp_input,
+                    network=network,
+                    skip_audit=skip_audit,
+                    skip_deployment=skip_deployment,
+                    wallet_address=wallet_address,
+                    use_gasless=use_gasless,
+                    signed_transaction=signed_transaction,
+                    selected_tasks=selected_tasks,
+                    db_session=db,  # Pass db session for learning
+                ),
+                timeout=settings.workflow_execution_timeout_seconds,
+            )
+            return result
+        except asyncio.TimeoutError:
+            logger.error(
+                f"Workflow {workflow_id} timed out after {settings.workflow_execution_timeout_seconds} seconds"
+            )
+            # Mark workflow as failed due to timeout (use existing db session)
+            try:
+                workflow_result = await db.execute(
+                    select(Workflow).where(Workflow.id == uuid.UUID(workflow_id))
+                )
+                workflow = workflow_result.scalar_one_or_none()
+                if workflow:
+                    workflow.status = WorkflowStatus.FAILED.value
+                    workflow.error_message = (
+                        f"Workflow execution timed out after {settings.workflow_execution_timeout_seconds} seconds. "
+                        "This may indicate a network issue or service unavailability."
+                    )
+                    workflow.updated_at = datetime.now()
+                    await db.commit()
+                    logger.info(f"Marked workflow {workflow_id} as failed due to timeout")
+                    
+                    # Learn from timeout failure
+                    try:
+                        from hyperagent.core.learning.workflow_learner import WorkflowLearner
+                        workflow_learner = WorkflowLearner(db)
+                        meta_data = workflow.meta_data or {}
+                        contract_type = meta_data.get("contract_type", "Custom")
+                        await workflow_learner.learn_from_workflow(
+                            workflow_id=workflow_id,
+                            success=False,
+                            execution_time=settings.workflow_execution_timeout_seconds,
+                            stages_completed=meta_data.get("stages_completed", []),
+                            error_message=workflow.error_message,
+                            contract_type=contract_type,
+                            network=network,
+                        )
+                    except Exception as learn_error:
+                        logger.warning(f"Failed to learn from timeout: {learn_error}")
+            except Exception as db_error:
+                logger.error(f"Failed to update workflow status after timeout: {db_error}")
+        except Exception as e:
+            logger.error(f"Workflow background task failed with unhandled exception: {e}", exc_info=True)
+            # Update workflow status even if task crashes (use existing db session)
+            try:
+                workflow_result = await db.execute(
+                    select(Workflow).where(Workflow.id == uuid.UUID(workflow_id))
+                )
+                workflow = workflow_result.scalar_one_or_none()
+                if workflow:
+                    workflow.status = WorkflowStatus.FAILED.value
+                    error_msg = str(e)
+                    if hasattr(e, 'message'):
+                        error_msg = e.message
+                    workflow.error_message = f"Background task failed: {error_msg}"
+                    workflow.updated_at = datetime.now()
+                    await db.commit()
+                    logger.info(f"Marked workflow {workflow_id} as failed after background task crash")
+                    
+                    # Learn from failure
+                    try:
+                        from hyperagent.core.learning.workflow_learner import WorkflowLearner
+                        workflow_learner = WorkflowLearner(db)
+                        meta_data = workflow.meta_data or {}
+                        contract_type = meta_data.get("contract_type", "Custom")
+                        await workflow_learner.learn_from_workflow(
+                            workflow_id=workflow_id,
+                            success=False,
+                            execution_time=0.0,
+                            stages_completed=meta_data.get("stages_completed", []),
+                            error_message=workflow.error_message,
+                            contract_type=contract_type,
+                            network=network,
+                        )
+                    except Exception as learn_error:
+                        logger.warning(f"Failed to learn from failure: {learn_error}")
+            except Exception as db_error:
+                logger.error(f"Failed to update workflow after background task crash: {db_error}")
 
 
 async def execute_workflow_background(
@@ -72,10 +218,11 @@ async def execute_workflow_background(
     network: str,
     skip_audit: bool,
     skip_deployment: bool,
-    wallet_address: str,  # REQUIRED: User wallet address
-    use_gasless: bool = False,  # Use facilitator for gasless deployment
+    wallet_address: Optional[str] = None,  # User wallet address (required for deployment)
+    use_gasless: Optional[bool] = None,  # Auto-determined based on x402 network if None
     signed_transaction: Optional[str] = None,  # Pre-signed transaction (optional)
     selected_tasks: Optional[List[str]] = None,  # NEW: Selected tasks to execute
+    db_session = None,  # Database session for learning system
 ):
     """
     Execute workflow in background task
@@ -95,7 +242,7 @@ async def execute_workflow_background(
     # Create new database session for background task
     async with AsyncSessionLocal() as db:
         try:
-            # Update workflow status to generating
+            # Update workflow status to generating (with timestamp for timeout detection)
             workflow_result = await db.execute(
                 select(Workflow).where(Workflow.id == uuid.UUID(workflow_id))
             )
@@ -103,6 +250,7 @@ async def execute_workflow_background(
             if workflow:
                 workflow.status = WorkflowStatus.GENERATING.value
                 workflow.progress_percentage = 10
+                workflow.updated_at = datetime.now()  # Update timestamp for timeout detection
                 await db.commit()
 
             # Initialize services
@@ -130,7 +278,13 @@ async def execute_workflow_background(
                     "No LLM API key configured (GEMINI_API_KEY or OPENAI_API_KEY required)"
                 )
 
-            template_retriever = TemplateRetriever(llm_provider, db)
+            # Re-enable template retriever with error handling for embedding failures
+            try:
+                template_retriever = TemplateRetriever(llm_provider, db)
+                logger.info("Template retriever enabled for RAG")
+            except Exception as e:
+                logger.warning(f"Failed to initialize template retriever: {e}. Continuing without RAG.")
+                template_retriever = None
 
             network_manager = NetworkManager()
             eigenda_client = EigenDAClient(
@@ -159,7 +313,7 @@ async def execute_workflow_background(
             service_registry.register("compilation", CompilationService())
             service_registry.register("audit", AuditService(SecurityAuditor()))
             service_registry.register(
-                "testing", TestingService(TestingAgent(event_bus, llm_provider))
+                "testing", TestingService(event_bus=event_bus, llm_provider=llm_provider)
             )
             service_registry.register(
                 "deployment", DeploymentService(network_manager, eigenda_client)
@@ -204,34 +358,88 @@ async def execute_workflow_background(
                 roma_planner=roma_planner,
                 firecrawl_rag=firecrawl_rag,
                 multi_model_router=multi_model_router,
+                llm_provider=llm_provider,
             )
 
             # Convert skip flags to selected_tasks if selected_tasks not provided (backward compatibility)
+            # Deployment is now MANDATORY - all workflows must complete deployment
             workflow_selected_tasks = selected_tasks
             if workflow_selected_tasks is None:
-                workflow_selected_tasks = ["generation", "compilation"]
-                if not skip_audit:
-                    workflow_selected_tasks.append("audit")
-                if not getattr(settings, "skip_testing", False):
-                    workflow_selected_tasks.append("testing")
-                if not skip_deployment:
-                    workflow_selected_tasks.append("deployment")
-                logger.info(f"Converted skip flags to selected_tasks in background: {workflow_selected_tasks}")
+                workflow_selected_tasks = ["generation", "compilation", "audit", "testing", "deployment"]
+                logger.info(f"Using default mandatory tasks: {workflow_selected_tasks}")
+            else:
+                # Ensure deployment is always included if other tasks are selected
+                if any(task in workflow_selected_tasks for task in ["generation", "compilation", "audit", "testing"]):
+                    if "deployment" not in workflow_selected_tasks:
+                        workflow_selected_tasks.append("deployment")
+                        logger.info(f"Added mandatory deployment task: {workflow_selected_tasks}")
+            
+            # Validate wallet_address is provided for deployment
+            if "deployment" in workflow_selected_tasks and not wallet_address:
+                raise ValueError(
+                    "wallet_address is required for deployment. Please connect your wallet in the frontend."
+                )
 
-            # Execute workflow with wallet information
+            # Automatically determine gasless deployment if not explicitly set
+            # Gasless is automatically enabled for x402 networks (sponsored by paymaster)
+            final_use_gasless = use_gasless
+            if final_use_gasless is None or final_use_gasless is False:
+                if "deployment" in workflow_selected_tasks:
+                    from hyperagent.blockchain.network_features import NetworkFeatureManager
+                    
+                    is_x402_network = NetworkFeatureManager.is_x402_network(
+                        network, settings.x402_enabled, settings.x402_enabled_networks
+                    )
+                    if is_x402_network:
+                        final_use_gasless = True
+                        logger.info(
+                            f"Automatically enabling gasless deployment for x402 network {network}. "
+                            f"Gas fees will be sponsored by paymaster."
+                        )
+
+            # Execute workflow with wallet information and db session for learning
             result = await coordinator.execute_workflow(
                 workflow_id=workflow_id,
                 nlp_input=nlp_input,
                 network=network,
                 wallet_address=wallet_address,  # REQUIRED: Pass wallet address
-                use_gasless=use_gasless,  # Pass gasless option
+                use_gasless=final_use_gasless or False,  # Auto-determined or explicit
                 signed_transaction=signed_transaction,  # Pass signed transaction if provided
                 selected_tasks=workflow_selected_tasks,  # NEW: Pass selected tasks
+                db_session=db,  # Pass db session for learning system
             )
+
+            # Handle clarification needed status
+            if result.get("status") == "clarification_needed":
+                # Update workflow status to clarification_needed
+                workflow_result = await db.execute(
+                    select(Workflow).where(Workflow.id == uuid.UUID(workflow_id))
+                )
+                workflow = workflow_result.scalar_one_or_none()
+                if workflow:
+                    workflow.status = "clarification_needed"
+                    if workflow.meta_data is None:
+                        workflow.meta_data = {}
+                    workflow.meta_data["clarification_questions"] = result.get("questions", [])
+                    workflow.meta_data["original_prompt"] = result.get("original_prompt", nlp_input)
+                    await db.commit()
+                logger.info(f"Workflow {workflow_id} requires clarification")
+                return  # Exit early, don't persist contracts
+
+            # Get workflow object for learning loop (needed for nlp_input and network)
+            workflow_result = await db.execute(
+                select(Workflow).where(Workflow.id == uuid.UUID(workflow_id))
+            )
+            workflow = workflow_result.scalar_one_or_none()
 
             # Update workflow status and persist contracts
             await update_workflow_and_persist_contracts(
-                workflow_id=workflow_id, result=result, db=db
+                workflow_id=workflow_id,
+                result=result,
+                db=db,
+                vector_store=vector_store,
+                generation_service=service_registry.get_service("generation"),
+                workflow=workflow,
             )
 
         except Exception as e:
@@ -244,7 +452,22 @@ async def execute_workflow_background(
                 workflow = workflow_result.scalar_one_or_none()
                 if workflow:
                     workflow.status = WorkflowStatus.FAILED.value
-                    workflow.error_message = str(e)
+                    # Preserve full error message for HyperAgentError exceptions
+                    if hasattr(e, 'message'):
+                        error_msg = e.message
+                    else:
+                        error_msg = str(e)
+                    
+                    # If error message contains "failed:" prefix, extract the actual error message
+                    # This handles cases where SOA orchestrator wraps errors: "deployment failed: <actual error>"
+                    if " failed: " in error_msg:
+                        # Split on " failed: " and take everything after it
+                        parts = error_msg.split(" failed: ", 1)
+                        if len(parts) > 1:
+                            # Use the actual error message (part after "failed: ")
+                            error_msg = parts[1]
+                    
+                    workflow.error_message = error_msg
                     await db.commit()
             except Exception as db_error:
                 logger.error(f"Failed to update workflow error status: {db_error}")
@@ -271,7 +494,12 @@ async def update_workflow_progress(workflow_id: str, stage: str, progress: int, 
 
 
 async def update_workflow_and_persist_contracts(
-    workflow_id: str, result: Dict[str, Any], db: AsyncSession
+    workflow_id: str,
+    result: Dict[str, Any],
+    db: AsyncSession,
+    vector_store: Optional[VectorStore] = None,
+    generation_service: Optional[GenerationService] = None,
+    workflow: Optional[Workflow] = None,
 ):
     """
     Update workflow status and persist contracts to database
@@ -288,10 +516,12 @@ async def update_workflow_and_persist_contracts(
     from hyperagent.models.contract import GeneratedContract
 
     try:
-        workflow_result = await db.execute(
-            select(Workflow).where(Workflow.id == uuid.UUID(workflow_id))
-        )
-        workflow = workflow_result.scalar_one_or_none()
+        # Use passed workflow object or retrieve if not provided (backward compatibility)
+        if not workflow:
+            workflow_result = await db.execute(
+                select(Workflow).where(Workflow.id == uuid.UUID(workflow_id))
+            )
+            workflow = workflow_result.scalar_one_or_none()
 
         if not workflow:
             logger.warning(f"Workflow {workflow_id} not found for persistence")
@@ -335,6 +565,82 @@ async def update_workflow_and_persist_contracts(
             db.add(generated_contract)
             logger.info(f"Persisted contract {contract_name} for workflow {workflow_id}")
 
+            # Initialize meta_data if not exists (will be set in learning loop)
+            if generated_contract.meta_data is None:
+                generated_contract.meta_data = {}
+
+            # Learning Loop: Store successful contracts for future RAG
+            try:
+                contract_type = workflow_result_data.get("contract_type", "Custom")
+                
+                # 1. Store to IPFS (Pinata)
+                if settings.pinata_jwt and settings.enable_ipfs_upload:
+                    try:
+                        from hyperagent.rag.pinata_manager import PinataManager
+                        pinata = PinataManager(settings.pinata_jwt, settings.pinata_gateway)
+                        ipfs_result = await pinata.upload_template_with_metadata(
+                            name=f"{contract_name}.sol",
+                            content=contract_code,
+                            metadata={
+                                "workflow_id": str(workflow_id),
+                                "contract_type": contract_type,
+                                "network": workflow.network if workflow else "",
+                                "audit_passed": workflow_result_data.get("audit", {}).get("passed", False),
+                                "contract_name": contract_name,
+                            }
+                        )
+                        # Store IPFS hash in contract metadata
+                        generated_contract.meta_data["ipfs_hash"] = ipfs_result["ipfs_hash"]
+                        generated_contract.meta_data["ipfs_url"] = ipfs_result["pinata_url"]
+                        logger.info(f"Stored contract to IPFS: {ipfs_result['ipfs_hash']}")
+                    except Exception as e:
+                        logger.warning(f"IPFS storage failed (non-critical): {e}")
+                
+                # 2. Store to VectorStore (for RAG retrieval)
+                if vector_store:
+                    try:
+                        await vector_store.store_contract(
+                            contract_code=contract_code,
+                            contract_type=contract_type,
+                            metadata={
+                                "workflow_id": str(workflow_id),
+                                "contract_name": contract_name,
+                                "network": workflow.network if workflow else "",
+                                "nlp_input": (workflow.nlp_input[:200] if workflow and workflow.nlp_input else ""),
+                            }
+                        )
+                        logger.info(f"Stored contract to VectorStore for RAG")
+                    except Exception as e:
+                        logger.warning(f"VectorStore storage failed (non-critical): {e}")
+                
+                # 3. Store to Acontext (if enabled)
+                if generation_service and generation_service.acontext and generation_service.acontext.enabled:
+                    try:
+                        audit_issues = workflow_result_data.get("audit", {}).get("findings", [])
+                        nlp_input = workflow.nlp_input if workflow else ""
+                        await generation_service.acontext.store_contract(
+                            contract_code=contract_code,
+                            contract_type=contract_type,
+                            requirements=nlp_input,
+                            audit_issues=audit_issues,
+                            metadata={
+                                "network": workflow.network if workflow else "",
+                                "workflow_id": str(workflow_id),
+                                "contract_name": contract_name,
+                            }
+                        )
+                        logger.info(f"Stored contract to Acontext for learning")
+                    except Exception as e:
+                        logger.warning(f"Acontext storage failed (non-critical): {e}")
+                        
+            except Exception as e:
+                logger.warning(f"Learning loop storage failed (non-critical): {e}")
+                # Don't fail workflow if storage fails
+
+            # Commit database after learning loop updates meta_data
+            await db.commit()
+            await db.refresh(generated_contract)
+
         # Update workflow status
         # Check deployment status - can be "success", "skipped", or missing
         deployment_result_data = (
@@ -351,48 +657,188 @@ async def update_workflow_and_persist_contracts(
             or deployment_status == "success"
             or result.get("status") == "success"
         )
-        deployment_skipped = deployment_status == "skipped"
+        deployment_pending = deployment_status == "pending_signature" or deployment_status == "pending"
 
         if deployment_successful or result.get("status") == "success":
             workflow.status = WorkflowStatus.COMPLETED.value
             workflow.progress_percentage = 100
             logger.info(f"Workflow {workflow_id} marked as completed (deployment successful)")
-        elif deployment_skipped:
-            # Deployment was skipped (requires user signature for x402 networks)
-            # Mark workflow as completed but note deployment is pending
-            workflow.status = WorkflowStatus.COMPLETED.value
-            workflow.progress_percentage = 100
+        elif deployment_pending:
+            # Deployment is pending user signature - workflow is NOT complete until deployment succeeds
+            # Keep workflow in processing state until user signs and deployment completes
+            workflow.status = WorkflowStatus.DEPLOYING.value if hasattr(WorkflowStatus, "DEPLOYING") else WorkflowStatus.PROCESSING.value
+            workflow.progress_percentage = 90  # Almost done, waiting for signature
 
             # Store deployment status in metadata
             if workflow.meta_data is None:
                 workflow.meta_data = {}
-            workflow.meta_data["deployment_status"] = "pending"
-            workflow.meta_data["deployment_skipped"] = True
+            workflow.meta_data["deployment_status"] = "pending_signature"
             workflow.meta_data["requires_user_signature"] = True
             workflow.meta_data["deployment_message"] = deployment_result_data.get(
-                "message", "Deployment requires user signature"
+                "message", "Deployment requires user wallet signature. Please sign the transaction in your wallet."
             )
+            workflow.meta_data["wallet_address"] = deployment_result_data.get("wallet_address")
 
             logger.info(
-                f"Workflow {workflow_id} marked as completed with skipped deployment "
-                f"(requires user signature for x402 network)"
+                f"Workflow {workflow_id} waiting for user signature - deployment pending for {deployment_result_data.get('wallet_address')}"
             )
         else:
-            workflow.status = WorkflowStatus.FAILED.value
-            workflow.error_message = result.get("error", "Unknown error")
-            # Set progress based on which stage failed
-            if compiled_contract:
-                workflow.progress_percentage = 80  # Compilation succeeded
+            # Check if deployment is pending signature (not a failure, just waiting for user)
+            deployment_result_data = (
+                workflow_result_data.get("deployment")
+                or workflow_result_data.get("deployment_result")
+                or {}
+            )
+            deployment_status = deployment_result_data.get("status")
+            
+            if deployment_status == "pending_signature" or deployment_status == "pending":
+                # Deployment is pending user signature - not a failure
+                workflow.status = WorkflowStatus.DEPLOYING.value if hasattr(WorkflowStatus, "DEPLOYING") else WorkflowStatus.PROCESSING.value
+                workflow.progress_percentage = 90
+                
+                # Store deployment status in metadata
+                if workflow.meta_data is None:
+                    workflow.meta_data = {}
+                workflow.meta_data["deployment_status"] = "pending_signature"
+                workflow.meta_data["requires_user_signature"] = True
+                workflow.meta_data["deployment_message"] = deployment_result_data.get(
+                    "message", "Deployment requires user wallet signature. Please sign the transaction in your wallet."
+                )
+                workflow.meta_data["wallet_address"] = deployment_result_data.get("wallet_address")
+                
+                logger.info(
+                    f"Workflow {workflow_id} waiting for user signature - deployment pending"
+                )
             else:
-                workflow.progress_percentage = 20  # Failed early
+                # Actual failure
+                workflow.status = WorkflowStatus.FAILED.value
+                # Extract detailed error message from result
+                error_message = result.get("error") or result.get("error_message") or "Unknown error"
+                
+                # Determine which stage failed based on progress and available results
+                # This ensures we extract the correct error from the right stage
+                progress = workflow.progress_percentage or 0
+                
+                # If error message contains "Cannot proceed with deployment" but progress is low,
+                # this is a validation error from DeploymentService prerequisites check
+                # Don't check deployment_result - the error is already in error_message
+                is_validation_error = "Cannot proceed with deployment" in error_message and progress <= 80
+                
+                # Try to extract error from stage results based on progress
+                # Skip if we already have a validation error (it's already the correct error)
+                if (not error_message or error_message == "Unknown error") and not is_validation_error:
+                    # Check generation result for errors (0-20% progress)
+                    if progress <= 20:
+                        generation_result = workflow_result_data.get("generation_result")
+                        if generation_result and isinstance(generation_result, dict):
+                            gen_error = generation_result.get("error")
+                            if gen_error:
+                                error_message = f"Generation failed: {gen_error}"
+                    
+                    # Check compilation result for errors (20-40% progress)
+                    elif progress <= 40:
+                        compilation_result = workflow_result_data.get("compilation_result")
+                        if compilation_result and isinstance(compilation_result, dict):
+                            comp_error = compilation_result.get("error")
+                            if comp_error:
+                                error_message = f"Compilation failed: {comp_error}"
+                            else:
+                                error_message = compilation_result.get("error") or error_message
+                    
+                    # Check audit result for errors (40-60% progress)
+                    elif progress <= 60:
+                        audit_result = workflow_result_data.get("audit_result")
+                        if audit_result and isinstance(audit_result, dict):
+                            audit_error = audit_result.get("error")
+                            if audit_error:
+                                error_message = f"Audit failed: {audit_error}"
+                    
+                    # Check testing result for errors (60-80% progress)
+                    elif progress <= 80:
+                        test_result = workflow_result_data.get("test_result")
+                        if test_result and isinstance(test_result, dict):
+                            test_error = test_result.get("error")
+                            if test_error:
+                                error_message = f"Testing failed: {test_error}"
+                    
+                    # Check deployment result for errors (80-100% progress)
+                    else:
+                        deployment_result = workflow_result_data.get("deployment_result")
+                        if deployment_result and isinstance(deployment_result, dict):
+                            deploy_error = deployment_result.get("error")
+                            if deploy_error:
+                                # Don't prefix if error already contains "Deployment failed" or "Cannot proceed"
+                                if "Deployment failed" in deploy_error or "Cannot proceed" in deploy_error:
+                                    error_message = deploy_error
+                                else:
+                                    error_message = f"Deployment failed: {deploy_error}"
+                
+                # If error message contains "Cannot proceed with deployment" but progress is low,
+                # this is a validation error from DeploymentService prerequisites check, not an actual deployment failure
+                # The error should be attributed to the stage that's actually missing (generation/compilation/audit/testing)
+                if "Cannot proceed with deployment" in error_message and progress <= 80:
+                    # Remove "Deployment failed:" prefix if present (it's misleading for validation errors)
+                    if error_message.startswith("Deployment failed: "):
+                        error_message = error_message.replace("Deployment failed: ", "", 1)
+                    
+                    # Extract which stage is actually missing from the error message
+                    # This helps with stage status calculation
+                    if "Generation stage not completed" in error_message or "Contract code is missing" in error_message:
+                        # Error is about missing generation, ensure progress reflects this
+                        if progress == 0 or progress is None:
+                            progress = 20
+                    elif "Compilation stage not completed" in error_message or "bytecode" in error_message.lower() or "abi" in error_message.lower():
+                        # Error is about missing compilation, ensure progress reflects this
+                        if progress <= 20:
+                            progress = 40
+                    elif "Audit stage" in error_message:
+                        # Error is about missing audit, ensure progress reflects this
+                        if progress <= 40:
+                            progress = 60
+                    elif "Testing stage" in error_message:
+                        # Error is about missing testing, ensure progress reflects this
+                        if progress <= 60:
+                            progress = 80
+                    elif "Wallet address is required" in error_message:
+                        # This is a deployment prerequisite, but workflow failed before deployment
+                        # Keep the error as-is, but don't mark deployment as failed
+                        # Progress should be at least 80% if we got to deployment validation
+                        if progress < 80:
+                            progress = 80
+                
+                # Ensure error message is not truncated (Text field supports unlimited length)
+                workflow.error_message = error_message
+                
+                # Update progress if we adjusted it based on error analysis
+                if progress != (workflow.progress_percentage or 0):
+                    workflow.progress_percentage = progress
+                
+                # Set progress based on which stage failed (if not already set)
+                if workflow.progress_percentage == 0 or workflow.progress_percentage is None:
+                    if compiled_contract:
+                        workflow.progress_percentage = 80  # Compilation succeeded
+                    elif workflow_result_data.get("compilation_result"):
+                        workflow.progress_percentage = 40  # Failed during compilation
+                    else:
+                        workflow.progress_percentage = 20  # Failed early (generation)
 
         # Store test results in workflow metadata if available
-        test_results = workflow_result_data.get("test_results")
-        if test_results:
+        # Check for test_result (from orchestrator) or testing_result (from service)
+        test_result = (
+            workflow_result_data.get("test_result")
+            or workflow_result_data.get("testing_result")
+            or workflow_result_data.get("test_results")
+        )
+        if test_result:
             if workflow.meta_data is None:
                 workflow.meta_data = {}
-            workflow.meta_data["test_results"] = test_results
-            logger.info(f"Stored test results for workflow {workflow_id}")
+            # Store both test_result (for deployment validation) and test_results (for display)
+            workflow.meta_data["test_result"] = test_result
+            if isinstance(test_result, dict) and "test_results" in test_result:
+                workflow.meta_data["test_results"] = test_result["test_results"]
+            elif isinstance(test_result, dict):
+                workflow.meta_data["test_results"] = test_result
+            logger.info(f"Stored test results for workflow {workflow_id}: status={test_result.get('status') if isinstance(test_result, dict) else 'unknown'}")
 
         # Persist deployment if available
         # Check multiple possible keys for deployment results
@@ -454,7 +900,7 @@ async def update_workflow_and_persist_contracts(
                     confirmation_blocks=1,  # Default to 1 confirmation
                     eigenda_commitment=deployment_result.get("eigenda_commitment"),
                     eigenda_batch_header=deployment_result.get("eigenda_batch_header"),
-                    metadata={
+                    meta_data={
                         "deployment_method": deployment_result.get("deployment_method", "manual"),
                         "eigenda_metadata_stored": deployment_result.get(
                             "eigenda_metadata_stored", False
@@ -489,8 +935,8 @@ class WorkflowCreateRequest(BaseModel):
     name: Optional[str] = None
     skip_audit: bool = False
     skip_deployment: bool = False
-    # REQUIRED: User wallet information for deployment
-    wallet_address: str  # User's wallet address (REQUIRED for all workflows)
+    # OPTIONAL: User wallet information for deployment (required only if deployment task is selected)
+    wallet_address: Optional[str] = None  # User's wallet address (optional for generation-only workflows)
     use_gasless: Optional[bool] = False  # Use facilitator for gasless deployment
     signed_transaction: Optional[str] = None  # Pre-signed deployment transaction (optional)
     # Task selection (new modular approach)
@@ -566,45 +1012,40 @@ async def create_workflow(request: WorkflowCreateRequest, db: AsyncSession = Dep
     Returns:
         Workflow response with ID and status
     """
-    # Validate wallet_address is provided and valid
-    if not request.wallet_address:
-        raise HTTPException(
-            status_code=400,
-            detail="wallet_address is required for all workflows. "
-            "Please provide the user's wallet address for deployment.",
-        )
+    # Validate wallet_address if provided
+    if request.wallet_address:
+        # Validate wallet address format (checksum, non-zero, etc.)
+        from hyperagent.utils.helpers import normalize_wallet_address, validate_wallet_address
 
-    # Validate wallet address format (checksum, non-zero, etc.)
-    from hyperagent.utils.helpers import normalize_wallet_address, validate_wallet_address
+        is_valid, error_msg = validate_wallet_address(request.wallet_address)
+        if not is_valid:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid wallet address: {error_msg}. "
+                "Please provide a valid Ethereum address (0x followed by 40 hexadecimal characters).",
+            )
 
-    is_valid, error_msg = validate_wallet_address(request.wallet_address)
-    if not is_valid:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid wallet address: {error_msg}. "
-            "Please provide a valid Ethereum address (0x followed by 40 hexadecimal characters).",
-        )
+        # Normalize to checksum format
+        try:
+            normalized_address = normalize_wallet_address(request.wallet_address)
+            # Update request with normalized address
+            request.wallet_address = normalized_address
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=f"Wallet address validation failed: {str(e)}")
 
-    # Normalize to checksum format
-    try:
-        normalized_address = normalize_wallet_address(request.wallet_address)
-        # Update request with normalized address
-        request.wallet_address = normalized_address
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Wallet address validation failed: {str(e)}")
-
+    # Deployment is MANDATORY - all workflows must complete deployment
     # Convert skip_* flags to selected_tasks for backward compatibility
     selected_tasks = request.selected_tasks
     if selected_tasks is None:
-        # Build selected_tasks from skip flags
+        # Build selected_tasks from skip flags - deployment is always included
         selected_tasks = ["generation", "compilation"]
         if not request.skip_audit:
             selected_tasks.append("audit")
         if not getattr(request, "skip_testing", False):
             selected_tasks.append("testing")
-        if not request.skip_deployment:
+        # Deployment is mandatory - always include
             selected_tasks.append("deployment")
-        logger.info(f"Converted skip flags to selected_tasks: {selected_tasks}")
+        logger.info(f"Converted skip flags to selected_tasks (deployment mandatory): {selected_tasks}")
     else:
         # Normalize selected_tasks
         selected_tasks = [task.lower() for task in selected_tasks]
@@ -612,6 +1053,37 @@ async def create_workflow(request: WorkflowCreateRequest, db: AsyncSession = Dep
         if any(task in selected_tasks for task in ["audit", "testing", "deployment"]):
             if "compilation" not in selected_tasks:
                 selected_tasks.insert(1, "compilation") if "generation" in selected_tasks else selected_tasks.insert(0, "compilation")
+        # Deployment is mandatory - always include if generation/compilation are present
+        if any(task in selected_tasks for task in ["generation", "compilation"]) and "deployment" not in selected_tasks:
+            selected_tasks.append("deployment")
+            logger.info(f"Added mandatory deployment task: {selected_tasks}")
+    
+    # Validate wallet_address is required for deployment
+    if "deployment" in selected_tasks and not request.wallet_address:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="wallet_address is required for deployment. Please connect your wallet in the frontend.",
+        )
+
+    # Automatically determine gasless deployment based on x402 network status
+    # Gasless is automatically enabled for x402 networks (sponsored by paymaster)
+    from hyperagent.blockchain.network_features import NetworkFeatureManager
+    
+    use_gasless = False
+    if "deployment" in selected_tasks:
+        is_x402_network = NetworkFeatureManager.is_x402_network(
+            request.network, settings.x402_enabled, settings.x402_enabled_networks
+        )
+        if is_x402_network:
+            use_gasless = True
+            logger.info(
+                f"Automatically enabling gasless deployment for x402 network {request.network}. "
+                f"Gas fees will be sponsored by paymaster."
+            )
+        elif request.use_gasless:
+            # Allow explicit gasless for non-x402 networks if facilitator is configured
+            use_gasless = True
+            logger.info(f"Gasless deployment enabled for non-x402 network {request.network}")
 
     # Calculate cost for selected tasks
     estimator = CostEstimator()
@@ -720,12 +1192,15 @@ async def create_workflow(request: WorkflowCreateRequest, db: AsyncSession = Dep
             progress_percentage=0,
         )
         
-        # Store selected_tasks and cost_breakdown in workflow metadata if available
+        # Store selected_tasks, cost_breakdown, and wallet_address in workflow metadata
         if hasattr(workflow, "meta_data"):
             if workflow.meta_data is None:
                 workflow.meta_data = {}
             workflow.meta_data["selected_tasks"] = selected_tasks
             workflow.meta_data["cost_breakdown"] = cost_breakdown
+            # Store wallet_address for deployment ownership validation
+            if request.wallet_address:
+                workflow.meta_data["wallet_address"] = normalize_wallet_address(request.wallet_address)
 
         db.add(workflow)
         await db.commit()  # Commit both user and workflow together
@@ -764,16 +1239,16 @@ async def create_workflow(request: WorkflowCreateRequest, db: AsyncSession = Dep
             )
         )
 
-        # Execute workflow in background task (create new DB session)
+        # Execute workflow in background task with safety wrapper and timeout
         asyncio.create_task(
-            execute_workflow_background(
+            safe_execute_workflow_background(
                 workflow_id=str(workflow_id),
                 nlp_input=request.nlp_input,
                 network=request.network,
                 skip_audit=request.skip_audit,  # Keep for backward compatibility
                 skip_deployment=request.skip_deployment,  # Keep for backward compatibility
                 wallet_address=request.wallet_address,  # REQUIRED: Pass wallet address
-                use_gasless=request.use_gasless or False,  # Pass gasless option
+                use_gasless=None,  # Auto-determined based on x402 network status (sponsored by paymaster)
                 signed_transaction=request.signed_transaction,  # Pass signed transaction if provided
                 selected_tasks=selected_tasks,  # NEW: Pass selected tasks
             )
@@ -922,14 +1397,19 @@ async def get_workflow_status(workflow_id: str, db: AsyncSession = Depends(get_d
         )
         contracts = contracts_result.scalars().all()
 
-        # Get deployments through contracts
+        # Get deployments through contracts, ordered by most recent first
         deployments = []
         for contract in contracts:
             deployments_result = await db.execute(
-                select(Deployment).where(Deployment.contract_id == contract.id)
+                select(Deployment)
+                .where(Deployment.contract_id == contract.id)
+                .order_by(Deployment.deployed_at.desc() if Deployment.deployed_at else Deployment.id.desc())
             )
             contract_deployments = deployments_result.scalars().all()
             deployments.extend(contract_deployments)
+        
+        # Sort all deployments by deployed_at desc (most recent first)
+        deployments.sort(key=lambda d: d.deployed_at if d.deployed_at else d.id, reverse=True)
 
         # Extract contract_type from first contract or use default
         contract_type = "Custom"
@@ -937,6 +1417,142 @@ async def get_workflow_status(workflow_id: str, db: AsyncSession = Depends(get_d
             contract_type = contracts[0].contract_type or "Custom"
         elif workflow.meta_data and isinstance(workflow.meta_data, dict):
             contract_type = workflow.meta_data.get("contract_type", "Custom")
+
+        # Calculate stage statuses based on workflow progress and results
+        meta_data = dict(workflow.meta_data) if workflow.meta_data else {}
+        
+        # Clean error message if it has misleading "Deployment failed:" prefix for validation errors
+        error_message = workflow.error_message or ""
+        if "Cannot proceed with deployment" in error_message and workflow.progress_percentage <= 80:
+            if error_message.startswith("Deployment failed: "):
+                error_message = error_message.replace("Deployment failed: ", "", 1)
+        
+        # Determine stage statuses from workflow state
+        stages = []
+        
+        # Get selected tasks to determine which stages were actually executed
+        selected_tasks = meta_data.get("selected_tasks", ["generation", "compilation", "audit", "testing", "deployment"])
+        
+        # Generation stage
+        generation_status = "pending"
+        error_msg = workflow.error_message or ""
+        # Check if error is about missing generation (validation error from deployment prerequisites)
+        is_generation_error = (
+            (workflow.status == WorkflowStatus.FAILED.value and workflow.progress_percentage <= 20) or
+            ("Generation stage not completed" in error_msg or "Contract code is missing" in error_msg)
+        )
+        if is_generation_error:
+            generation_status = "failed"
+        elif workflow.status in [WorkflowStatus.GENERATING.value, WorkflowStatus.NLP_PARSING.value]:
+            generation_status = "processing"
+        elif contracts and contracts[0].source_code:
+            generation_status = "completed"
+        
+        stages.append({
+            "name": "generation",
+            "status": generation_status,
+            "label": "Code Generation",
+        })
+        
+        # Compilation stage
+        compilation_status = "pending"
+        error_msg = workflow.error_message or ""
+        # Check if error is about missing compilation (validation error from deployment prerequisites)
+        is_compilation_error = (
+            (workflow.status == WorkflowStatus.FAILED.value and 20 < workflow.progress_percentage <= 40) or
+            ("Compilation stage not completed" in error_msg or 
+             ("bytecode" in error_msg.lower() and "missing" in error_msg.lower()) or
+             ("abi" in error_msg.lower() and "missing" in error_msg.lower()))
+        )
+        if is_compilation_error:
+            compilation_status = "failed"
+        elif workflow.status == WorkflowStatus.GENERATING.value and workflow.progress_percentage > 20:
+            compilation_status = "processing"
+        elif contracts and contracts[0].bytecode:
+            compilation_status = "completed"
+        
+        stages.append({
+            "name": "compilation",
+            "status": compilation_status,
+            "label": "Compilation",
+        })
+        
+        # Audit stage
+        audit_status = "pending"
+        if "audit" not in selected_tasks:
+            audit_status = "skipped"
+        else:
+            audit_result = meta_data.get("audit_result")
+        if workflow.status == WorkflowStatus.FAILED.value and 40 < workflow.progress_percentage <= 60:
+            audit_status = "failed"
+        elif workflow.status == WorkflowStatus.AUDITING.value:
+            audit_status = "processing"
+        elif audit_result:
+            audit_status = "completed" if audit_result.get("status") != "failed" else "failed"
+        
+        stages.append({
+            "name": "audit",
+            "status": audit_status,
+            "label": "Security Audit",
+        })
+        
+        # Testing stage
+        testing_status = "pending"
+        if "testing" not in selected_tasks:
+            testing_status = "skipped"
+        else:
+            test_result = meta_data.get("test_result")
+        if workflow.status == WorkflowStatus.FAILED.value and 60 < workflow.progress_percentage <= 80:
+            testing_status = "failed"
+        elif workflow.status == WorkflowStatus.TESTING.value:
+            testing_status = "processing"
+        elif test_result:
+            testing_status = "completed" if test_result.get("status") != "failed" else "failed"
+        
+        stages.append({
+            "name": "testing",
+            "status": testing_status,
+            "label": "Testing",
+        })
+        
+        # Deployment stage
+        deployment_status = "pending"
+        # Only mark deployment as failed if workflow failed AND progress > 80% AND error mentions deployment
+        if workflow.status == WorkflowStatus.FAILED.value:
+            # Check if error is actually deployment-related
+            # Use cleaned error_message from above
+            is_deployment_error = (
+                workflow.progress_percentage > 80 or
+                ("deployment" in error_message.lower() and "Cannot proceed with deployment" not in error_message) or
+                ("deployment failed" in error_message.lower() and workflow.progress_percentage > 80)
+            )
+            # If error says "Cannot proceed with deployment" but progress is low, it's a validation error, not deployment failure
+            if "Cannot proceed with deployment" in error_message and workflow.progress_percentage <= 80:
+                # This is a prerequisite validation error, deployment never started
+                deployment_status = "pending"
+            elif is_deployment_error:
+                deployment_status = "failed"
+            else:
+                # Error is from earlier stage, deployment never started
+                deployment_status = "pending"
+        elif workflow.status == WorkflowStatus.DEPLOYING.value:
+            deployment_status = "processing"
+        elif meta_data.get("deployment_status") == "pending_signature":
+            deployment_status = "pending"  # Waiting for user signature
+        elif deployments and deployments[0].contract_address:
+            deployment_status = "completed"
+        elif workflow.status == WorkflowStatus.COMPLETED.value and not deployments:
+            # Workflow completed but no deployment - might be pending signature
+            if meta_data.get("requires_user_signature") or meta_data.get("deployment_status") == "pending_signature":
+                deployment_status = "pending"
+            else:
+                deployment_status = "pending"  # Ready to deploy
+        
+        stages.append({
+            "name": "deployment",
+            "status": deployment_status,
+            "label": "Deployment",
+        })
 
         return {
             "workflow_id": str(workflow.id),
@@ -948,9 +1564,11 @@ async def get_workflow_status(workflow_id: str, db: AsyncSession = Depends(get_d
             "created_at": workflow.created_at.isoformat() if workflow.created_at else None,
             "updated_at": workflow.updated_at.isoformat() if workflow.updated_at else None,
             "completed_at": workflow.completed_at.isoformat() if workflow.completed_at else None,
-            "error_message": workflow.error_message,
+            "error_message": error_message,  # Use cleaned error message (removes misleading "Deployment failed:" prefix for validation errors)
             "retry_count": workflow.retry_count,
-            "metadata": dict(workflow.meta_data) if workflow.meta_data else {},
+            "metadata": meta_data,
+            "meta_data": meta_data,  # Also include meta_data for compatibility
+            "stages": stages,  # Include calculated stages
             "contracts": [
                 {
                     "id": str(c.id),
@@ -972,6 +1590,15 @@ async def get_workflow_status(workflow_id: str, db: AsyncSession = Depends(get_d
                 }
                 for d in deployments
             ],
+            # Include deployment_result for frontend compatibility
+            # Use the most recent deployment (first in sorted list)
+            "deployment_result": {
+                "contract_address": deployments[0].contract_address if deployments else None,
+                "transaction_hash": deployments[0].transaction_hash if deployments else None,
+                "block_number": deployments[0].block_number if deployments else None,
+                "gas_used": deployments[0].gas_used if deployments else None,
+                "deployed_at": deployments[0].deployed_at.isoformat() if deployments and deployments[0].deployed_at else None,
+            } if deployments else None,
         }
 
     except ValueError:
@@ -1202,6 +1829,314 @@ async def get_workflow_test_results(workflow_id: str, db: AsyncSession = Depends
         )
 
 
+class CompleteDeploymentRequest(BaseModel):
+    """Request model for completing workflow deployment"""
+    signed_transaction: Optional[str] = None
+    transaction_hash: Optional[str] = None
+    contract_address: Optional[str] = None  # For Smart Wallet deployments where contract is already deployed
+    wallet_address: str
+
+
+@router.post("/{workflow_id}/complete-deployment")
+async def complete_workflow_deployment(
+    workflow_id: str,
+    request: CompleteDeploymentRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Complete workflow deployment with user-signed transaction or transaction hash
+    
+    This endpoint is called after the user signs the deployment transaction in their wallet.
+    Can accept either:
+    - signed_transaction: Raw hex-encoded signed transaction (backend broadcasts it)
+    - transaction_hash: Transaction hash from already-broadcast transaction (backend polls for receipt)
+    
+    Args:
+        workflow_id: Workflow identifier
+        signed_transaction: Hex-encoded signed transaction from user's wallet (optional)
+        transaction_hash: Transaction hash if transaction already broadcast (optional)
+        wallet_address: User's wallet address (required)
+        db: Database session
+    
+    Returns:
+        Deployment result with contract address and transaction hash
+    """
+    from hyperagent.models.contract import GeneratedContract
+    from hyperagent.models.deployment import Deployment
+    from hyperagent.utils.helpers import normalize_wallet_address, validate_wallet_address
+    
+    try:
+        # Validate inputs
+        # Accept contract_address for Smart Wallet deployments (Thirdweb handles tx internally)
+        if not request.signed_transaction and not request.transaction_hash and not request.contract_address:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Either signed_transaction, transaction_hash, or contract_address must be provided",
+            )
+        
+        # Validate wallet address
+        is_valid, error_msg = validate_wallet_address(request.wallet_address)
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid wallet address: {error_msg}",
+            )
+        wallet_address = normalize_wallet_address(request.wallet_address)
+        
+        # Get workflow
+        workflow_result = await db.execute(
+            select(Workflow).where(Workflow.id == uuid.UUID(workflow_id))
+        )
+        workflow = workflow_result.scalar_one_or_none()
+        
+        if not workflow:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Workflow {workflow_id} not found",
+            )
+        
+        # Validate wallet ownership: Only the wallet that created the workflow can deploy
+        workflow_wallet_address = None
+        if workflow.meta_data and isinstance(workflow.meta_data, dict):
+            workflow_wallet_address = workflow.meta_data.get("wallet_address")
+        
+        if workflow_wallet_address:
+            # Normalize both addresses for comparison (case-insensitive)
+            normalized_workflow_wallet = normalize_wallet_address(workflow_wallet_address)
+            if normalized_workflow_wallet != wallet_address:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=(
+                        f"Smart Wallet ownership mismatch. "
+                        f"This workflow belongs to Smart Wallet {workflow_wallet_address[:10]}...{workflow_wallet_address[-8:]}, "
+                        f"but you are connected with Smart Wallet {wallet_address[:10]}...{wallet_address[-8:]}. "
+                        f"Please connect the Smart Wallet (ERC-4337) that created this workflow to deploy."
+                    ),
+                )
+        else:
+            # If workflow doesn't have wallet_address stored, allow deployment but log warning
+            logger.warning(
+                f"Workflow {workflow_id} does not have wallet_address stored in meta_data. "
+                f"Allowing deployment but this should be set during workflow creation."
+            )
+        
+        # Get contract
+        contract_result = await db.execute(
+            select(GeneratedContract)
+            .where(GeneratedContract.workflow_id == uuid.UUID(workflow_id))
+            .order_by(GeneratedContract.created_at.desc())
+        )
+        contract = contract_result.scalar_one_or_none()
+        
+        if not contract:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No contract found for workflow",
+            )
+        
+        # Initialize deployment service
+        network_manager = NetworkManager()
+        eigenda_client = EigenDAClient(
+            disperser_url=settings.eigenda_disperser_url,
+            private_key=settings.private_key,
+            use_authenticated=settings.eigenda_use_authenticated,
+        )
+        deployment_service = DeploymentService(network_manager, eigenda_client)
+        
+        # Handle deployment based on input type
+        if request.contract_address:
+            # Contract already deployed via Smart Wallet or EOA (Thirdweb handles deployment internally)
+            # Use the provided contract address directly
+            from hyperagent.utils.helpers import validate_wallet_address
+            is_valid_addr, error_msg_addr = validate_wallet_address(request.contract_address)
+            if not is_valid_addr:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid contract address: {error_msg_addr}",
+                )
+            
+            # Try to get receipt details if transaction_hash is provided
+            block_number = None
+            gas_used = None
+            if request.transaction_hash:
+                try:
+                    w3 = network_manager.get_web3(workflow.network)
+                    # Ensure tx_hash has 0x prefix
+                    tx_hash = request.transaction_hash
+                    if not tx_hash.startswith('0x'):
+                        tx_hash = f'0x{tx_hash}'
+                    
+                    receipt = w3.eth.get_transaction_receipt(tx_hash)
+                    if receipt:
+                        block_number = receipt.blockNumber
+                        gas_used = receipt.gasUsed
+                        logger.info(f"Retrieved receipt for tx {tx_hash}: block={block_number}, gas={gas_used}")
+                except Exception as receipt_error:
+                    # Log but don't fail - receipt might not be available yet or tx might be pending
+                    logger.warning(f"Could not get receipt for transaction {request.transaction_hash}: {receipt_error}")
+            
+            # Ensure transaction_hash is not empty - use a placeholder if not provided
+            # (Some deployments via Smart Wallet may not have a transaction hash immediately)
+            tx_hash = request.transaction_hash.strip() if request.transaction_hash and request.transaction_hash.strip() else None
+            
+            deployment_result = {
+                "status": "success",
+                "contract_address": request.contract_address,
+                "transaction_hash": tx_hash,
+                "tx_hash": tx_hash,
+                "block_number": block_number,
+                "gas_used": gas_used,
+                "deployment_method": "user_wallet" if tx_hash else "smart_wallet",
+            }
+        elif request.signed_transaction:
+            # Deploy with signed transaction (backend broadcasts it)
+            deployment_result = await deployment_service.process({
+                "compiled_contract": {
+                    "bytecode": contract.bytecode,
+                    "abi": contract.abi,
+                },
+                "network": workflow.network,
+                "signed_transaction": request.signed_transaction,
+                "wallet_address": wallet_address,
+                "source_code": contract.source_code,
+            })
+        elif request.transaction_hash:
+            # Transaction already broadcast - poll for receipt and extract contract address
+            contract_address = await deployment_service.get_contract_address_from_tx(
+                request.transaction_hash, workflow.network
+            )
+            
+            if not contract_address:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Contract address not found. Transaction may still be pending.",
+                )
+            
+            # Get transaction receipt for additional details
+            block_number = None
+            gas_used = None
+            try:
+                w3 = network_manager.get_web3(workflow.network)
+                # Ensure tx_hash has 0x prefix
+                tx_hash = request.transaction_hash
+                if not tx_hash.startswith('0x'):
+                    tx_hash = f'0x{tx_hash}'
+                
+                receipt = w3.eth.get_transaction_receipt(tx_hash)
+                if receipt:
+                    block_number = receipt.blockNumber
+                    gas_used = receipt.gasUsed
+                    logger.info(f"Retrieved receipt for tx {tx_hash}: block={block_number}, gas={gas_used}")
+            except Exception as receipt_error:
+                # Log but don't fail - receipt might not be available yet
+                logger.warning(f"Could not get receipt for transaction {request.transaction_hash}: {receipt_error}")
+                # Contract address was already extracted, so we can continue
+            
+            # Use the transaction hash from the request (user-provided)
+            # This ensures consistency with what the user sees in their wallet/explorer
+            tx_hash = request.transaction_hash.strip() if request.transaction_hash else None
+            if tx_hash and not tx_hash.startswith('0x'):
+                tx_hash = f'0x{tx_hash}'
+            
+            deployment_result = {
+                "status": "success",
+                "contract_address": contract_address,
+                "transaction_hash": tx_hash,
+                "tx_hash": tx_hash,
+                "block_number": block_number,
+                "gas_used": gas_used,
+                "deployment_method": "user_wallet",
+            }
+        
+        # Validate required fields before creating deployment record
+        contract_address = deployment_result.get("contract_address")
+        transaction_hash = deployment_result.get("transaction_hash") or deployment_result.get("tx_hash")
+        
+        if not contract_address or not contract_address.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Contract address is required for deployment completion",
+            )
+        
+        # Transaction hash is required by the database schema (nullable=False, unique=True)
+        # If not provided, we need to generate a unique placeholder
+        if not transaction_hash or not transaction_hash.strip():
+            # For Smart Wallet deployments, transaction hash might not be available immediately
+            # Generate a unique placeholder based on contract address and workflow ID to avoid conflicts
+            import hashlib
+            unique_string = f"{contract_address}{workflow_id}{contract.id}"
+            placeholder_hash = f"0x{hashlib.sha256(unique_string.encode()).hexdigest()[:64]}"
+            logger.warning(
+                f"No transaction hash provided for deployment. Using unique placeholder: {placeholder_hash}. "
+                f"Contract address: {contract_address}"
+            )
+            transaction_hash = placeholder_hash
+        
+        # Create deployment record
+        is_testnet = workflow.network.endswith("_testnet")
+        from datetime import datetime
+        deployment = Deployment(
+            contract_id=contract.id,
+            deployment_network=workflow.network,
+            is_testnet=is_testnet,
+            contract_address=contract_address.strip(),
+            deployer_address=wallet_address or "",
+            transaction_hash=transaction_hash.strip(),
+            gas_used=deployment_result.get("gas_used"),
+            gas_price=deployment_result.get("gas_price"),
+            total_cost_wei=deployment_result.get("total_cost_wei"),
+            deployment_status="confirmed" if deployment_result.get("block_number") else "pending",
+            block_number=deployment_result.get("block_number"),
+            confirmation_blocks=1,
+            eigenda_commitment=deployment_result.get("eigenda_commitment"),
+            eigenda_batch_header=deployment_result.get("eigenda_batch_header"),
+            deployed_at=datetime.now(),  # Explicitly set deployed_at timestamp
+            meta_data={
+                "deployment_method": "user_signed",
+                "eigenda_metadata_stored": deployment_result.get("eigenda_metadata_stored", False),
+            },
+        )
+        db.add(deployment)
+        
+        # Update workflow status to completed
+        workflow.status = WorkflowStatus.COMPLETED.value
+        workflow.progress_percentage = 100
+        workflow.completed_at = datetime.now()
+        
+        # Update metadata
+        if workflow.meta_data is None:
+            workflow.meta_data = {}
+        workflow.meta_data["deployment_status"] = "completed"
+        workflow.meta_data["requires_user_signature"] = False
+        
+        await db.commit()
+        
+        logger.info(
+            f"Completed deployment for workflow {workflow_id}: {deployment_result.get('contract_address')}"
+        )
+        
+        return {
+            "contract_address": deployment_result.get("contract_address"),
+            "transaction_hash": deployment_result.get("transaction_hash") or deployment_result.get("tx_hash"),
+            "block_number": deployment_result.get("block_number"),
+            "gas_used": deployment_result.get("gas_used"),
+            "eigenda_commitment": deployment_result.get("eigenda_commitment"),
+        }
+        
+    except ValueError as e:
+        logger.error(f"Deployment validation error: {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to complete deployment: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to complete deployment: {str(e)}",
+        )
+
+
 @router.post("/{workflow_id}/cancel")
 async def cancel_workflow(workflow_id: str, db: AsyncSession = Depends(get_db)):
     """
@@ -1266,4 +2201,102 @@ async def cancel_workflow(workflow_id: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to cancel workflow: {str(e)}",
+        )
+
+
+class ClarificationResponseRequest(BaseModel):
+    """Request model for submitting clarification responses"""
+
+    clarified_prompt: str
+
+
+@router.post("/{workflow_id}/clarify", response_model=WorkflowResponse)
+async def submit_clarification(
+    workflow_id: str,
+    request: ClarificationResponseRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Submit clarification responses and continue workflow
+
+    When a workflow requires clarification, use this endpoint to submit
+    the clarified prompt and continue the workflow execution.
+    """
+    try:
+        workflow_id_uuid = uuid.UUID(workflow_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid workflow ID format"
+        )
+
+    try:
+        # Get workflow
+        workflow_result = await db.execute(
+            select(Workflow).where(Workflow.id == workflow_id_uuid)
+        )
+        workflow = workflow_result.scalar_one_or_none()
+
+        if not workflow:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Workflow not found"
+            )
+
+        if workflow.status != "clarification_needed":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Workflow is not in clarification_needed status. Current status: {workflow.status}",
+            )
+
+        # Get clarification questions from metadata
+        clarification_questions = workflow.meta_data.get("clarification_questions", [])
+        original_prompt = workflow.meta_data.get("original_prompt", workflow.nlp_input)
+
+        # Update workflow with clarified prompt
+        workflow.nlp_input = request.clarified_prompt
+        workflow.status = WorkflowStatus.GENERATING.value
+        workflow.progress_percentage = 10
+
+        # Update metadata
+        if workflow.meta_data is None:
+            workflow.meta_data = {}
+        workflow.meta_data["clarified_prompt"] = request.clarified_prompt
+        workflow.meta_data["clarification_provided"] = True
+
+        await db.commit()
+        await db.refresh(workflow)
+
+        # Continue workflow execution with clarified prompt
+        # Get workflow parameters from metadata
+        selected_tasks = workflow.meta_data.get("selected_tasks")
+        wallet_address = workflow.meta_data.get("wallet_address")
+        use_gasless = workflow.meta_data.get("use_gasless", False)
+
+        # Execute workflow in background with clarified prompt
+        background_tasks.add_task(
+            safe_execute_workflow_background,
+            workflow_id=str(workflow_id),
+            nlp_input=request.clarified_prompt,
+            network=workflow.network,
+            skip_audit=False,  # Use selected_tasks instead
+            skip_deployment=False,  # Use selected_tasks instead
+            wallet_address=wallet_address,
+            use_gasless=use_gasless,
+            selected_tasks=selected_tasks,
+        )
+
+        return {
+            "workflow_id": str(workflow_id),
+            "status": "generating",
+            "message": "Workflow continued with clarified prompt",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to submit clarification: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to submit clarification: {str(e)}",
         )

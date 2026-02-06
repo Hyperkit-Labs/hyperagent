@@ -9,7 +9,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hyperagent.agents.testing import TestingAgent
+# DEPRECATED: Use TestingService directly instead
+# from hyperagent.agents.testing import TestingAgent
 from hyperagent.api.middleware.x402 import X402Middleware
 from hyperagent.api.models import DeploymentResponse, WorkflowResponse
 from hyperagent.billing.cost_estimator import CostEstimator
@@ -104,7 +105,7 @@ async def _create_services_and_coordinator(
     )
     service_registry.register("compilation", CompilationService())
     service_registry.register("audit", AuditService(SecurityAuditor()))
-    service_registry.register("testing", TestingService(TestingAgent(event_bus, llm_provider)))
+    service_registry.register("testing", TestingService(event_bus=event_bus, llm_provider=llm_provider))
     service_registry.register(
         "deployment", DeploymentService(network_manager, eigenda_client)
     )
@@ -120,6 +121,7 @@ async def _create_services_and_coordinator(
         roma_planner=roma_planner,
         firecrawl_rag=firecrawl_rag,
         multi_model_router=multi_model_router,
+        llm_provider=llm_provider,
     )
     return coordinator, service_registry
 

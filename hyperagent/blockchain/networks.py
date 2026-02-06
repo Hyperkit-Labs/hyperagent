@@ -13,6 +13,19 @@ logger = logging.getLogger(__name__)
 
 
 class NetworkManager:
+    """
+    NetworkManager: Web3 connection management and RPC handling
+    
+    Responsibilities:
+    - Manage Web3 connections to blockchain networks
+    - Handle RPC provider pooling and failover
+    - Provide Web3 instances for contract interactions
+    - Manage connection lifecycle and health checks
+    
+    Note: This class handles low-level Web3 connections.
+    For network configuration, use NetworkRegistry.
+    For feature flags, use NetworkFeatureManager.
+    """
     """Manage Web3 connections to different networks."""
 
     def __init__(self, use_mantle_sdk: bool = False):
@@ -46,14 +59,18 @@ class NetworkManager:
         key = normalize_network_id(network)
 
         # For Mantle networks, optionally use SDK (still returns Web3.py today).
+        # Note: Mantle SDK bridge service is optional - falls back to Web3.py if unavailable
         if key.startswith("mantle") and self.use_mantle_sdk:
-            from hyperagent.blockchain.mantle_sdk import MantleSDKClient
+            try:
+                from hyperagent.blockchain.mantle_sdk import MantleSDKClient
 
-            if key not in self.mantle_sdk_clients:
-                self.mantle_sdk_clients[key] = MantleSDKClient(key)
+                if key not in self.mantle_sdk_clients:
+                    self.mantle_sdk_clients[key] = MantleSDKClient(key)
 
-            if self.mantle_sdk_clients[key].is_available():
-                logger.debug(f"Mantle SDK available for {key}, using Web3.py for now")
+                if self.mantle_sdk_clients[key].is_available():
+                    logger.debug(f"Mantle SDK available for {key}, using Web3.py for now")
+            except (ImportError, Exception) as e:
+                logger.debug(f"Mantle SDK not available for {key}, using Web3.py: {e}")
 
         if key not in self._instances:
             config = self.get_network_config(network)

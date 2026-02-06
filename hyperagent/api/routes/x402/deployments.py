@@ -152,10 +152,10 @@ async def prepare_deployment(
 
     try:
         transaction_data = await _deployment_service.prepare_deployment_transaction(
-            compiled_contract=request.compiled_contract,
+            compiled=request.compiled_contract,  # Parameter name is 'compiled', not 'compiled_contract'
             network=request.network,
             wallet_address=request.wallet_address,
-            constructor_args=request.constructor_args,
+            constructor_args=request.constructor_args or [],
         )
 
         logger.info(
@@ -168,10 +168,21 @@ async def prepare_deployment(
             wallet_address=request.wallet_address,
             message="Sign this transaction in your wallet, then send the signed transaction to /api/v1/x402/deployments/deploy endpoint with signed_transaction field.",
         )
-    except Exception as e:
-        logger.error(f"Failed to prepare deployment transaction: {e}")
+    except ValueError as e:
+        # Validation errors (gas estimation, network config, etc.)
+        logger.error(f"Failed to prepare deployment transaction (validation): {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to prepare deployment transaction: {str(e)}"
+            status_code=400, detail=f"Failed to prepare deployment transaction: {str(e)}"
+        )
+    except Exception as e:
+        # Other errors (network errors, etc.)
+        logger.error(f"Failed to prepare deployment transaction: {e}", exc_info=True)
+        error_detail = str(e)
+        # Provide more context for common errors
+        if "network" in error_detail.lower() or "rpc" in error_detail.lower():
+            error_detail = f"Network error: {error_detail}. Please check network configuration and RPC endpoint."
+        raise HTTPException(
+            status_code=500, detail=f"Failed to prepare deployment transaction: {error_detail}"
         )
 
 

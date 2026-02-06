@@ -266,19 +266,6 @@ class PinataManager:
         response.raise_for_status()
         return response.content
 
-    async def retrieve_template(self, ipfs_hash: str) -> str:
-        """
-        Retrieve template from IPFS
-
-        Args:
-            ipfs_hash: IPFS hash (CID) of the template
-
-        Returns:
-            Template content as string
-        """
-        content = await self.retrieve_file(ipfs_hash)
-        return content.decode("utf-8")
-
     async def pin_by_hash(self, ipfs_hash: str, name: Optional[str] = None) -> Dict[str, Any]:
         """
         Pin existing IPFS content to Pinata

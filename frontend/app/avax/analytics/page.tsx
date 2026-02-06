@@ -8,7 +8,8 @@ import { PaymentHistoryTable } from "@/components/analytics/PaymentHistoryTable"
 import { PaymentSummary as PaymentSummaryComponent } from "@/components/analytics/PaymentSummary";
 import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import { RefreshCw, TrendingUp } from "lucide-react";
+import RefreshCw from 'lucide-react/dist/esm/icons/refresh-cw';
+import TrendingUp from 'lucide-react/dist/esm/icons/trending-up';
 import { getPaymentHistory, getPaymentSummary, type PaymentHistoryItem, type PaymentHistoryResponse, type PaymentSummary } from "@/lib/api";
 
 const REFRESH_INTERVAL = 10000; // 10 seconds

@@ -14,7 +14,9 @@
 # Global x402 settings
 enabled: false  # Set to true to enable x402 payments
 version: "1.0"
-protocol_standard: "ERC-4337"  # Or "EIP-7702" when supported
+protocol_standard: "ERC-4337"  # Smart contract wallets with account abstraction
+# ERC-4337: Smart contract wallets (currently implemented)
+# EIP-7702: Native account abstraction for EOAs (not implemented)
 
 # Supported networks for x402 payments
 # These networks have USDC deployed and support payment verification
@@ -134,8 +136,8 @@ payment_flow:
   
   # Payment methods
   methods:
-    - "wallet_signature"     # User signs payment
-    - "erc4337_bundler"      # Account abstraction
+    - "erc4337_bundler"      # ERC-4337 smart contract wallets (implemented)
+    - "wallet_signature"     # Direct wallet signature payment
     - "thirdweb_facilitator" # Thirdweb payment gateway
   
   # Default method
@@ -214,6 +216,13 @@ integrations:
   # Thirdweb configuration
   thirdweb:
     use_facilitator: true
+    
+    # Gas sponsorship configuration
+    gas_sponsorship:
+      enabled: true
+      protocol: "ERC-4337"
+      sponsor_user_transactions: true
+    
     supported_chains:
       - 43113  # Avalanche Fuji
       - 43114  # Avalanche Mainnet
@@ -221,10 +230,12 @@ integrations:
       - 5000   # Mantle Mainnet
       - 8453   # Base Mainnet
       - 84532  # Base Sepolia
-    
-    # Thirdweb-specific settings
-    use_gasless: true
-    sponsor_gas: false  # Set true to sponsor user gas fees
+      - 42161  # Arbitrum One
+      - 421614 # Arbitrum Sepolia
+      - 10     # Optimism Mainnet
+      - 11155420 # Optimism Sepolia
+      - 137    # Polygon Mainnet
+      - 1      # Ethereum Mainnet
   
   # Future: Stripe/credit card integration
   stripe:

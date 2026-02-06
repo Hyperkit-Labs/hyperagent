@@ -22,7 +22,13 @@ RISK_SCORE_WARNING_THRESHOLD = 70
 
 
 class AuditAgent(ServiceInterface):
-    """Security analysis of smart contracts using parallel execution of Slither, Mythril, Echidna
+    """
+    DEPRECATED: Use AuditService instead.
+    
+    This class is maintained for backward compatibility only.
+    New code should use hyperagent.core.services.audit_service.AuditService
+    
+    Security analysis of smart contracts using parallel execution of Slither, Mythril, Echidna
     
     SLA: p99 < 90s, p95 < 60s
     """

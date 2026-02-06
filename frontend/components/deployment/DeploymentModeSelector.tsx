@@ -2,7 +2,9 @@
 
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { CheckCircle2, Shield, Zap } from 'lucide-react';
+import CheckCircle2 from 'lucide-react/dist/esm/icons/check-circle-2'
+import Shield from 'lucide-react/dist/esm/icons/shield'
+import Zap from 'lucide-react/dist/esm/icons/zap'
 
 interface DeploymentModeSelectorProps {
   onSelect: (mode: 'server-wallet' | 'erc4337') => void;

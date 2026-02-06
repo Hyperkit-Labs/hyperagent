@@ -73,6 +73,20 @@ class ResolvedNetwork:
         }
 
 
+"""
+NetworkResolver: Network ID resolution and normalization utilities
+
+Responsibilities:
+- Resolve network identifiers (name, chain ID, etc.) to canonical format
+- Normalize network names and IDs
+- Provide network resolution utilities for consistent network handling
+
+Note: This module provides utility functions for network resolution.
+For network configuration, use NetworkRegistry.
+For Web3 connections, use NetworkManager.
+For feature flags, use NetworkFeatureManager.
+"""
+
 def resolve_network(network: str, *, thirdweb_client_id: Optional[str]) -> ResolvedNetwork:
     """Resolve a network string into a fully usable config.
 

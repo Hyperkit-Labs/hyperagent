@@ -9,7 +9,11 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { getTemplates, searchTemplates } from '@/lib/api';
 import type { Template } from '@/lib/types';
-import { FileText, Search, Code, Tag, ArrowRight } from 'lucide-react';
+import FileText from 'lucide-react/dist/esm/icons/file-text'
+import Search from 'lucide-react/dist/esm/icons/search'
+import Code from 'lucide-react/dist/esm/icons/code'
+import Tag from 'lucide-react/dist/esm/icons/tag'
+import ArrowRight from 'lucide-react/dist/esm/icons/arrow-right'
 import Link from 'next/link';
 
 const containerVariants = {

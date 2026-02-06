@@ -20,6 +20,19 @@ logger = logging.getLogger(__name__)
 
 class NetworkRegistry:
     """
+    NetworkRegistry: Network configuration storage and retrieval
+    
+    Responsibilities:
+    - Store and retrieve network configurations (chain ID, RPC URLs, etc.)
+    - Manage network metadata (name, explorer URLs, etc.)
+    - Provide network configuration lookup by ID or name
+    - Handle network configuration validation
+    
+    Note: This class handles network configuration data.
+    For Web3 connections, use NetworkManager.
+    For feature flags, use NetworkFeatureManager.
+    """
+    """
     Centralized network registry supporting 1000+ networks
     
     Sources (in priority order):

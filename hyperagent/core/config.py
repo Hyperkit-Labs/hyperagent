@@ -80,7 +80,7 @@ class Settings(BaseSettings):
     guardian_model_url: Optional[str] = ""
     guardian_model_api_key: Optional[str] = ""
     attestation_contract_address: Optional[str] = ""
-    mlflow_tracking_uri: str = "http://localhost:5000"
+    mlflow_tracking_uri: str = "http://mlflow:5000"
     dune_api_key: Optional[str] = ""
     dune_mantle_query_id: Optional[int] = 6388392
     dune_tvl_query_ethereum: Optional[int] = None
@@ -119,12 +119,28 @@ class Settings(BaseSettings):
         20  # Timeout for constructor value generation (shorter for simpler task)
     )
     llm_embed_timeout_seconds: int = 10  # Timeout for embedding generation
+    
+    # Workflow Timeout Settings
+    workflow_stuck_timeout_minutes: int = 30  # Mark workflows as stuck after this many minutes
+    workflow_cleanup_interval_seconds: int = 300  # Run cleanup every N seconds (default: 5 minutes)
+    workflow_execution_timeout_seconds: int = 600  # Overall workflow execution timeout (10 minutes max, increased for complex workflows)
+    architecture_design_timeout_seconds: int = 30  # Timeout for architecture design generation
 
     # IPFS/Pinata
     pinata_jwt: Optional[str] = ""
     pinata_gateway: Optional[str] = "https://gateway.pinata.cloud"
     enable_ipfs_upload: Union[bool, str] = True
     ipfs_verify_integrity: Union[bool, str] = True
+
+    @field_validator("pinata_jwt", mode="before")
+    @classmethod
+    def get_pinata_jwt(cls, v):
+        """Get Pinata JWT from PINATA_JWT or PINATA_JWT_TOKEN environment variable"""
+        if v:
+            return v
+        import os
+        # Check both environment variable names for compatibility
+        return os.getenv("PINATA_JWT_TOKEN") or os.getenv("PINATA_JWT") or ""
 
     @field_validator("enable_ipfs_upload", "ipfs_verify_integrity", mode="before")
     @classmethod
@@ -153,6 +169,7 @@ class Settings(BaseSettings):
     thirdweb_server_wallet_private_key: Optional[str] = (
         ""  # Facilitator wallet private key (if EOA)
     )
+    # Deprecated: Use config/deployment.yaml instead (get_merchant_wallet_address())
     merchant_wallet_address: Optional[str] = ""  # HyperKit treasury
 
     # x402 Configuration

@@ -10,6 +10,7 @@ import { getNetworks } from '@/lib/api';
 import type { Network } from '@/lib/types';
 import { useEffect } from 'react';
 import { useActiveWallet, useActiveAccount, ConnectButton } from 'thirdweb/react';
+import { createWallet } from 'thirdweb/wallets';
 import { thirdwebClient, isThirdwebConfigured } from '@/lib/thirdwebClient';
 import { TaskSelector, type TaskCostBreakdown } from '@/components/workflows/TaskSelector';
 
@@ -19,20 +20,17 @@ interface WorkflowFormProps {
     network: string;
     contract_type?: string;
     name?: string;
-    selected_tasks?: string[];  // NEW: Selected tasks
-    skip_audit?: boolean;  // Deprecated: kept for backward compatibility
-    skip_deployment?: boolean;  // Deprecated: kept for backward compatibility
-    wallet_address: string;  // REQUIRED: User wallet address
-    use_gasless?: boolean;  // Use facilitator for gasless deployment
-    cost_breakdown?: TaskCostBreakdown;  // NEW: Cost breakdown for payment
+    selected_tasks?: string[];
+    wallet_address: string;
+    use_gasless?: boolean;
+    cost_breakdown?: TaskCostBreakdown;
   }) => void;
   loading?: boolean;
-  onCostUpdate?: (cost: TaskCostBreakdown | null) => void;  // NEW: Cost update callback
-  initialPrompt?: string; // NEW: Initial prompt from landing page
+  onCostUpdate?: (cost: TaskCostBreakdown | null) => void;
+  initialPrompt?: string;
 }
 
 export function WorkflowForm({ onSubmit, loading = false, onCostUpdate, initialPrompt = '' }: WorkflowFormProps) {
-  const wallet = useActiveWallet();
   const account = useActiveAccount();
   const [nlpInput, setNlpInput] = useState(initialPrompt);
   const [network, setNetwork] = useState('');
@@ -40,13 +38,11 @@ export function WorkflowForm({ onSubmit, loading = false, onCostUpdate, initialP
   const [name, setName] = useState('');
   const [selectedTasks, setSelectedTasks] = useState<string[]>(['generation', 'audit', 'testing', 'deployment']);
   const [costBreakdown, setCostBreakdown] = useState<TaskCostBreakdown | null>(null);
-  const [skipAudit, setSkipAudit] = useState(false);  // Deprecated: kept for backward compatibility
-  const [skipDeployment, setSkipDeployment] = useState(false);  // Deprecated: kept for backward compatibility
   const [useGasless, setUseGasless] = useState(false);
   const [networks, setNetworks] = useState<Network[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [thirdwebConfigured, setThirdwebConfigured] = useState(() => isThirdwebConfigured());
-  const [useV2API, setUseV2API] = useState(false); // NEW: v2 API toggle
+  const [useV2API, setUseV2API] = useState(false);
 
   useEffect(() => {
     getNetworks()
@@ -62,25 +58,23 @@ export function WorkflowForm({ onSubmit, loading = false, onCostUpdate, initialP
       return;
     }
 
-    // For v2 API, only intent is required
     if (useV2API) {
       onSubmit({
         nlp_input: nlpInput,
-        network: network || 'avalanche', // v2 defaults to avalanche
-        intent: nlpInput, // v2 uses 'intent'
-        wallet_address: account?.address || '', // Optional for v2
-        use_v2_api: true, // Flag to indicate v2 API
+        network: network || 'avalanche',
+        intent: nlpInput,
+        wallet_address: account?.address || '',
+        use_v2_api: true,
       } as any);
       return;
     }
 
-    // For v1 API, require network and wallet
     if (!network) {
       setError('Please select a network');
       return;
     }
 
-    if (!wallet || !account) {
+    if (!account) {
       setError('Please connect your wallet to create a workflow');
       return;
     }
@@ -91,8 +85,6 @@ export function WorkflowForm({ onSubmit, loading = false, onCostUpdate, initialP
       contract_type: contractType,
       name: name || undefined,
       selected_tasks: selectedTasks,
-      skip_audit: skipAudit,
-      skip_deployment: skipDeployment,
       wallet_address: account.address,
       use_gasless: useGasless,
       cost_breakdown: costBreakdown,
@@ -159,16 +151,28 @@ export function WorkflowForm({ onSubmit, loading = false, onCostUpdate, initialP
           <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-semibold text-gray-300">Wallet Connection *</label>
-              {thirdwebClient && <ConnectButton client={thirdwebClient} />}
+              {thirdwebClient && (
+                <ConnectButton
+                  client={thirdwebClient}
+                  wallets={[
+                    createWallet("io.metamask"),
+                    createWallet("okx.wallet"),
+                    createWallet("com.coinbase.wallet"),
+                    createWallet("com.trustwallet.app"),
+                    createWallet("io.rabby"),
+                    createWallet("me.rainbow"),
+                  ]}
+                />
+              )}
             </div>
-            {!wallet || !account ? (
+            {!account ? (
                 <p className="text-sm text-gray-400">
                   Please connect your wallet to create a workflow. All deployments require a connected wallet.
                 </p>
               ) : (
                 <div className="space-y-1">
                   <p className="text-sm text-green-400">
-                    Connected: {account.address.slice(0, 6)}...{account.address.slice(-4)}
+                    Connected Wallet: {account.address.slice(0, 6)}...{account.address.slice(-4)}
                   </p>
                 </div>
               )}
@@ -232,24 +236,6 @@ export function WorkflowForm({ onSubmit, loading = false, onCostUpdate, initialP
               <label className="flex items-center text-gray-400">
                 <input
                   type="checkbox"
-                  checked={skipAudit}
-                  onChange={(e) => setSkipAudit(e.target.checked)}
-                  className="mr-2 rounded border-white/20 bg-white/5 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-sm">Skip Security Audit</span>
-              </label>
-              <label className="flex items-center text-gray-400">
-                <input
-                  type="checkbox"
-                  checked={skipDeployment}
-                  onChange={(e) => setSkipDeployment(e.target.checked)}
-                  className="mr-2 rounded border-white/20 bg-white/5 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-sm">Skip Deployment (Generate Only)</span>
-              </label>
-              <label className="flex items-center text-gray-400">
-                <input
-                  type="checkbox"
                   checked={useGasless}
                   onChange={(e) => setUseGasless(e.target.checked)}
                   className="mr-2 rounded border-white/20 bg-white/5 text-blue-600 focus:ring-blue-500"
@@ -268,12 +254,12 @@ export function WorkflowForm({ onSubmit, loading = false, onCostUpdate, initialP
 
         <Button 
           type="submit" 
-          disabled={loading || (!useV2API && (!wallet || !account || !thirdwebConfigured))} 
+          disabled={loading || (!useV2API && (!account || !thirdwebConfigured))} 
           className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl h-11 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading 
             ? 'Creating Workflow...' 
-            : (!useV2API && (!wallet || !account)) 
+            : (!useV2API && !account) 
               ? 'Connect Wallet to Continue' 
               : 'Create Workflow'
           }

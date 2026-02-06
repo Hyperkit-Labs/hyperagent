@@ -33,10 +33,10 @@ or rely on Thirdweb RPC fallback:
 - network specified by chain id `5003` / `eip155:5003`
 
 ## Services to run
-For the cleanest demo, run these 3 components:
-- Python backend (FastAPI) — network registry + features endpoint
+For the cleanest demo, run these components:
+- Python backend (FastAPI) — handles all API endpoints, workflow orchestration, and WebSocket
 - x402 verifier service (TypeScript) — only needed if x402 is enabled
-- TS API (Fastify) — used by the frontend (`/api/v1/*`)
+- Frontend (Next.js) — connects to Python backend
 
 You can run with Docker Compose (recommended) OR locally.
 
@@ -44,58 +44,57 @@ You can run with Docker Compose (recommended) OR locally.
 ### 1) Start infra + Python backend + x402 verifier
 If your Docker supports the newer CLI, either command works:
 ```bash
-docker-compose up -d
-# or
-docker compose up -d
+docker compose up -d postgres redis hyperagent x402-verifier
 ```
 
-### 2) Start TS API (Fastify)
+### 2) Start the frontend
 In a separate terminal:
 ```bash
-npm -w ts/api run dev
+cd frontend
+npm install  # First time only
+npm run dev
 ```
 
-### 3) Start the frontend
-In a separate terminal:
-```bash
-npm -w frontend run dev
-```
-
-### 4) Confirm health
+### 3) Confirm health
 - Python backend docs: `http://localhost:8000/docs`
-- TS API health: `http://localhost:4000/api/v1/health`
+- Python backend health: `http://localhost:8000/api/v1/health`
 - Frontend: `http://localhost:3000`
 
 ## Option B — Local (no Docker)
-### 1) Python backend
+### 1) Start database and Redis
+```bash
+docker compose up -d postgres redis
+```
+
+### 2) Python backend
 PowerShell:
 ```bash
+cd hyperagent
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 uvicorn hyperagent.api.main:app --reload --port 8000
 ```
 
-### 2) x402 verifier (only if x402 enabled)
+### 3) x402 verifier (only if x402 enabled)
 ```bash
-npm -w services/x402-verifier run dev
-```
-
-### 3) TS API
-```bash
-npm -w ts/api run dev
+cd services/x402-verifier
+npm install
+npm run dev
 ```
 
 ### 4) Frontend
 ```bash
-npm -w frontend run dev
+cd frontend
+npm install
+npm run dev
 ```
 
 ## Live demo script (recommended flow)
 ### Part 1 — Show networks are dynamic (1 minute)
 Open in browser:
-- `http://localhost:4000/api/v1/networks?search=mantle`
-- `http://localhost:4000/api/v1/networks?search=5003`
+- `http://localhost:8000/api/v1/networks?search=mantle`
+- `http://localhost:8000/api/v1/networks?search=5003`
 
 Point out:
 - Search by name returns curated networks
@@ -130,25 +129,25 @@ If the UI has issues, use direct API calls.
 ### 1) Confirm network features
 PowerShell (avoid the `curl` alias by using `curl.exe`):
 ```bash
-curl.exe http://localhost:4000/api/v1/networks/mantle_testnet/features
+curl.exe http://localhost:8000/api/v1/networks/mantle_testnet/features
 ```
 
-### 2) Deploy via TS API directly
+### 2) Deploy via Python API directly
 PowerShell one-liner:
 ```bash
-curl.exe -X POST http://localhost:4000/api/v1/x402/deployments/deploy -H "Content-Type: application/json" -H "x-wallet-address: <YOUR_WALLET_ADDRESS>" -d "{\"compiled_contract\":{\"contract_name\":\"Demo\",\"source_code\":\"pragma solidity ^0.8.20; contract Demo { uint256 public value=1; }\"},\"network\":\"mantle_testnet\",\"wallet_address\":\"<YOUR_WALLET_ADDRESS>\",\"use_gasless\":true}"
+curl.exe -X POST http://localhost:8000/api/v1/workflows/generate -H "Content-Type: application/json" -d "{\"prompt\":\"Create a minimal storage contract with an owner and a set/get value function\",\"selected_tasks\":[\"generation\",\"compilation\",\"deployment\"],\"target_chain\":\"mantle_testnet\",\"wallet_address\":\"<YOUR_WALLET_ADDRESS>\"}"
 ```
 Notes:
 - Replace `<YOUR_WALLET_ADDRESS>` with a real address (`0x` + 40 hex chars).
-- `x-wallet-address` is required by the `/api/v1/x402/*` routes.
-- This deploy path is server-side; it uses `DEPLOYER_PRIVATE_KEY` / `PRIVATE_KEY`.
+- This creates a full workflow: generation → compilation → deployment.
+- Server-side deployment uses `PRIVATE_KEY` from environment.
 
 ## Troubleshooting (demo day)
 ### “RPC URL not configured for network”
 Fix: set either `MANTLE_TESTNET_RPC` (or `RPC_URL_MANTLE_TESTNET`) OR set `THIRDWEB_CLIENT_ID` and pass chain id `5003`.
 
-### “Deployment is not configured (DEPLOYER_PRIVATE_KEY not set)”
-Fix: set `PRIVATE_KEY` (root env) or `DEPLOYER_PRIVATE_KEY` (TS API env). Must be 0x + 64 hex chars.
+### “Deployment is not configured (PRIVATE_KEY not set)”
+Fix: set `PRIVATE_KEY` in root `.env`. Must be 0x + 64 hex chars. Wallet must have testnet MNT tokens.
 
 ### Tx sent but no contract address
 - Wait ~30–90 seconds (testnets can lag)

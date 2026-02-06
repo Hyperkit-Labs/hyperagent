@@ -2,7 +2,11 @@
 
 import { motion } from 'framer-motion';
 import { useWorkflowProgress } from '@/hooks/useWorkflowProgress';
-import { Brain, Zap, Shield, FlaskConical, Link2 } from 'lucide-react';
+import Brain from 'lucide-react/dist/esm/icons/brain'
+import Zap from 'lucide-react/dist/esm/icons/zap'
+import Shield from 'lucide-react/dist/esm/icons/shield'
+import FlaskConical from 'lucide-react/dist/esm/icons/flask-conical'
+import Link2 from 'lucide-react/dist/esm/icons/link-2'
 
 interface DynamicIslandProps {
   workflowId: string;

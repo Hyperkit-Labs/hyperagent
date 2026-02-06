@@ -6,8 +6,13 @@ from typing import Any, Dict, List, Optional
 from eth_account import Account
 from web3 import Web3
 
-from hyperagent.blockchain.mantle_sdk import MantleSDKClient
 from hyperagent.blockchain.networks import NetworkManager
+
+# Optional Mantle SDK import (bridge service removed)
+try:
+    from hyperagent.blockchain.mantle_sdk import MantleSDKClient
+except ImportError:
+    MantleSDKClient = None
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +37,7 @@ class StandardDeploymentHelper:
         Falls back to Web3.py via NetworkManager.
         """
         # Check if this is a Mantle network and try Mantle SDK
-        if network in ["mantle_testnet", "mantle_mainnet"]:
+        if network in ["mantle_testnet", "mantle_mainnet"] and MantleSDKClient is not None:
             try:
                 mantle_client = MantleSDKClient(network=network)
                 if mantle_client.is_available():

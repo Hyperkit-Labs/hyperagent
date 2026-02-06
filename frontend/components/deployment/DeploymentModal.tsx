@@ -4,7 +4,10 @@ import { useState, useEffect } from 'react';
 import { useActiveAccount, useActiveWallet } from 'thirdweb/react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { Loader2, CheckCircle2, XCircle, ExternalLink } from 'lucide-react';
+import Loader2 from 'lucide-react/dist/esm/icons/loader-2'
+import CheckCircle2 from 'lucide-react/dist/esm/icons/check-circle-2'
+import XCircle from 'lucide-react/dist/esm/icons/x-circle'
+import ExternalLink from 'lucide-react/dist/esm/icons/external-link'
 import { motion } from 'framer-motion';
 import { createFetchWithPayment, isThirdwebConfigured } from '@/lib/thirdwebClient';
 import { handleX402FetchError, handleHttpErrorResponse, parseResponseData, MAX_PAYMENT_ALLOWED } from '@/lib/x402ErrorHandler';
@@ -99,9 +102,13 @@ export function DeploymentModal({
   };
 
   const handleDeploy = async () => {
-    if (!wallet || !account) {
-      setError('Please connect your wallet first');
+    if (!account) {
+      setError('Please connect your wallet');
       return;
+    }
+    
+    if (!wallet) {
+      console.warn('Wallet not available - x402 payments may not work');
     }
 
     if (!isThirdwebConfigured()) {

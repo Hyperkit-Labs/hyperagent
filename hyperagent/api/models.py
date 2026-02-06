@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+import re
 
 from hyperagent.core.exceptions import ValidationError
 
@@ -18,8 +19,8 @@ class WorkflowCreateRequest(BaseModel):
     network: str = Field(..., description="Target blockchain network")
     contract_type: Optional[str] = Field("Custom", description="Contract type", max_length=50)
     name: Optional[str] = Field(None, description="Workflow name", max_length=255)
-    # REQUIRED: User wallet information for deployment
-    wallet_address: str = Field(..., description="User's wallet address for deployment (REQUIRED)")
+    # REQUIRED: User wallet information for deployment (optional for generation-only workflows)
+    wallet_address: Optional[str] = Field(None, description="User's wallet address for deployment (required if deployment task is selected)")
     use_gasless: Optional[bool] = Field(
         False, description="Use facilitator for gasless deployment (optional)"
     )
@@ -57,10 +58,10 @@ class WorkflowCreateRequest(BaseModel):
 
     @field_validator("wallet_address")
     @classmethod
-    def validate_wallet_address(cls, v: str) -> str:
+    def validate_wallet_address(cls, v: Optional[str]) -> Optional[str]:
         """Validate wallet address format"""
         if not v:
-            raise ValueError("wallet_address is required")
+            return None  # Allow None for generation-only workflows
         # Basic format check
         if not re.match(r"^0x[a-fA-F0-9]{40}$", v):
             raise ValueError(

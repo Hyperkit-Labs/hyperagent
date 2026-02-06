@@ -134,7 +134,7 @@ class GeminiProvider(LLMProvider):
                 loop.run_in_executor(
                     None,
                     lambda: genai.embed_content(
-                        model="models/text-embedding-004",  # Updated to text-embedding-004 for 768 dims
+                        model="models/embedding-001",  # Gemini embedding-001 (stable, 768 dims)
                         content=text,
                     ),
                 ),

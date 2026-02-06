@@ -24,7 +24,7 @@ class MLflowTracker:
             try:
                 import mlflow
 
-                mlflow_uri = getattr(settings, "mlflow_tracking_uri", None) or "http://localhost:5000"
+                mlflow_uri = getattr(settings, "mlflow_tracking_uri", None) or "http://mlflow:5000"
                 mlflow.set_tracking_uri(mlflow_uri)
                 self._mlflow_client = mlflow
             except ImportError:

@@ -11,6 +11,10 @@ class HyperAgentError(Exception):
         self.details = details or {}
         super().__init__(self.message)
 
+    def __str__(self) -> str:
+        """Return the full error message"""
+        return self.message
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert exception to dictionary for API responses"""
         return {"error": self.__class__.__name__, "message": self.message, "details": self.details}

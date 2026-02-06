@@ -22,6 +22,11 @@ logger = logging.getLogger(__name__)
 
 class TestingAgent(ServiceInterface):
     """
+    DEPRECATED: Use TestingService instead.
+    
+    This class is maintained for backward compatibility only.
+    New code should use hyperagent.core.services.testing_service.TestingService
+    
     Testing Agent
 
     Concept: Compile contracts and run tests
@@ -127,8 +132,20 @@ class TestingAgent(ServiceInterface):
                 # Step 6: Calculate coverage (if supported)
                 coverage = await self._calculate_coverage(temp_path)
 
+                # Determine test status based on test results
+                # Status should be "passed" if all tests pass, "failed" if any tests fail
+                test_status = "passed"
+                if test_results.get("failed", 0) > 0:
+                    test_status = "failed"
+                elif test_results.get("total_tests", 0) == 0:
+                    # If no tests were run, mark as passed (tests may be optional)
+                    test_status = "passed"
+                elif test_results.get("error"):
+                    # If there was an error running tests, mark as failed
+                    test_status = "failed"
+
                 result = {
-                    "status": "success",
+                    "status": test_status,  # "passed" or "failed" for deployment service validation
                     "compilation_successful": True,
                     "abi": abi,
                     "bytecode": bytecode,

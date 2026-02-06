@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Header } from "@/components/layout/Header";
-import { Footer } from "@/components/layout/Footer";
+import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { ThirdwebProviderWrapper } from "@/components/providers/ThirdwebProviderWrapper";
+import { Toaster } from "sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HyperAgent - AI Agent Platform for Smart Contracts",
-  description: "Generate, audit, test, and deploy smart contracts using AI",
+  title: "HyperAgent - AI-Powered Smart Contract Platform",
+  description: "Production-ready smart contract development in under 2 minutes. x402 Native | Mantle SDK | Thirdweb | EigenDA",
 };
 
 export default function RootLayout({
@@ -26,18 +26,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen bg-[#030712] text-white`}
-        >
-          <ThirdwebProviderWrapper>
-            <Header />
-            <main className="flex-1 w-full">
-              {children}
-            </main>
-            <Footer />
-          </ThirdwebProviderWrapper>
-        </body>
+    <html lang="en">
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        <ThirdwebProviderWrapper>
+          <DashboardLayout>{children}</DashboardLayout>
+          <Toaster position="top-right" richColors />
+        </ThirdwebProviderWrapper>
+      </body>
     </html>
   );
 }

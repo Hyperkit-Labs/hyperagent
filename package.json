@@ -5,12 +5,8 @@
   "private": true,
   "workspaces": [
     "frontend",
-    "packages/cli",
     "packages/env",
-    "ts/api",
-    "ts/orchestrator",
-    "services/x402-verifier",
-    "services/mantle-bridge"
+    "services/x402-verifier"
   ],
   "scripts": {
     "commit": "node scripts/version/parallel-commit.js",
@@ -21,10 +17,7 @@
     "commit:auto": "bash scripts/version/parallel-commit.sh --max 3",
     "status": "git status",
     "changes": "git status --porcelain",
-    "staged": "git diff --cached --name-only",
-    "hyperagent": "node packages/cli/dist/index.js",
-    "hyperagent:build": "npm -w packages/cli run build",
-    "hyperagent:dev": "npm -w packages/cli run dev --"
+    "staged": "git diff --cached --name-only"
   },
   "keywords": [
     "smart-contracts",
@@ -43,5 +36,15 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "resolutions": {
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "@emotion/use-insertion-effect-with-fallbacks": "^1.1.0"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@emotion/use-insertion-effect-with-fallbacks": "^1.2.0"
   }
 }

@@ -7,6 +7,7 @@ Base = declarative_base()
 from hyperagent.models.audit import SecurityAudit
 from hyperagent.models.contract import GeneratedContract
 from hyperagent.models.deployment import Deployment
+from hyperagent.models.event_log import EventLog
 from hyperagent.models.payment_history import PaymentHistory
 from hyperagent.models.spending_control import SpendingControl
 from hyperagent.models.template import ContractTemplate

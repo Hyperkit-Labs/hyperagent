@@ -1,4 +1,5 @@
 import { Env } from "../config/env";
+import { getMerchantWalletAddress } from "../config/configLoader";
 
 export type X402SettleResult =
   | { status: 200; verified: true }
@@ -30,13 +31,15 @@ export async function settleX402Payment(args: {
     };
   }
 
-  const payTo = args.env.MERCHANT_WALLET_ADDRESS;
+  // Get merchant wallet from YAML config (config/deployment.yaml)
+  // Fallback to env for backward compatibility
+  const payTo = getMerchantWalletAddress() || args.env.MERCHANT_WALLET_ADDRESS;
   if (!payTo) {
     return {
       status: 502,
       verified: false,
       error: "Merchant not configured",
-      errorMessage: "MERCHANT_WALLET_ADDRESS is not set on the API server",
+      errorMessage: "Merchant wallet address not configured in config/deployment.yaml or MERCHANT_WALLET_ADDRESS env",
     };
   }
 

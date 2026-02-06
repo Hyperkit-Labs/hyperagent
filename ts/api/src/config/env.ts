@@ -42,6 +42,8 @@ function resolvePriceTier(raw: string | undefined, fallback: number | undefined)
   return fallback === undefined ? undefined : String(fallback);
 }
 
+// Note: x402 pricing is now in config/x402.yaml
+// Use getX402Pricing() from configLoader instead of env vars
 const priceTiers = safeParseJsonObject(process.env.X402_PRICE_TIERS) as Record<string, unknown> | null;
 const tierBasic = typeof priceTiers?.basic === "number" ? priceTiers.basic : undefined;
 const tierAdvanced = typeof priceTiers?.advanced === "number" ? priceTiers.advanced : undefined;
@@ -65,7 +67,9 @@ function resolveDatabaseUrl(): string | undefined {
     return `postgresql://postgres:${supabasePassword}@db.${supabaseHost}:5432/postgres`;
   }
 
-  return undefined;
+  // Default: Use localhost for local development (outside Docker)
+  // Inside Docker, this is overridden by explicit DATABASE_URL env var
+  return "postgresql://hyperagent_user:secure_password@localhost:5432/hyperagent_db";
 }
 
 // Map legacy/root env names to the TS API-specific env schema.
@@ -132,8 +136,10 @@ const envSchema = z.object({
   // Optional legacy JSON blob: {"network_key": "https://..."}
   RPC_URLS: z.string().optional(),
 
-  // x402 (used by endpoints that require payment)
+  // x402 (deprecated - use config/x402.yaml and config/deployment.yaml instead)
+  // Merchant wallet address is now in config/deployment.yaml (getMerchantWalletAddress())
   MERCHANT_WALLET_ADDRESS: z.string().regex(/^0x[a-fA-F0-9]{40}$/).optional(),
+  // Pricing is now in config/x402.yaml (getX402Pricing())
   X402_CONTRACT_PRICE_USDC: z.coerce.number().default(0.01),
   X402_WORKFLOW_PRICE_USDC: z.coerce.number().default(0.02),
   X402_DEPLOY_PRICE_USDC: z.coerce.number().default(0.1),

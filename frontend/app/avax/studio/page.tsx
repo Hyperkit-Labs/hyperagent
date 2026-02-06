@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useActiveAccount } from 'thirdweb/react';
 import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/Card';
@@ -9,7 +9,11 @@ import { WalletConnect } from '@/components/wallet/WalletConnect';
 import { DeploymentModal } from '@/components/deployment/DeploymentModal';
 import { DynamicIsland } from '@/components/workflow/DynamicIsland';
 import { createWorkflow, getWorkflowStatus } from '@/lib/api';
-import { Loader2, CheckCircle2, XCircle, Code, Rocket } from 'lucide-react';
+import Loader2 from 'lucide-react/dist/esm/icons/loader-2'
+import CheckCircle2 from 'lucide-react/dist/esm/icons/check-circle-2'
+import XCircle from 'lucide-react/dist/esm/icons/x-circle'
+import Code from 'lucide-react/dist/esm/icons/code'
+import Rocket from 'lucide-react/dist/esm/icons/rocket'
 
 export default function StudioPage() {
   const [description, setDescription] = useState('');

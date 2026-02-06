@@ -5,7 +5,10 @@ import { Card } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Badge } from '@/components/ui/Badge';
 import { getSpendingControlWithBudget, type SpendingControlWithBudget } from '@/lib/api';
-import { Wallet, DollarSign, Calendar, TrendingDown } from 'lucide-react';
+import Wallet from 'lucide-react/dist/esm/icons/wallet'
+import DollarSign from 'lucide-react/dist/esm/icons/dollar-sign'
+import Calendar from 'lucide-react/dist/esm/icons/calendar'
+import TrendingDown from 'lucide-react/dist/esm/icons/trending-down'
 import { motion } from 'framer-motion';
 
 interface BudgetDisplayProps {

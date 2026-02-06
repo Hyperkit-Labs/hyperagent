@@ -69,7 +69,8 @@ class SecurityAuditor:
             from py_solc_x import compile_source
 
             # Strip markdown code blocks if present (safety net)
-            contract_code = self._strip_markdown_code_blocks(contract_code)
+            from hyperagent.utils.markdown import strip_markdown_code_blocks
+            contract_code = strip_markdown_code_blocks(contract_code)
 
             compiled = compile_source(contract_code)
             if not compiled:
@@ -87,40 +88,3 @@ class SecurityAuditor:
         except Exception as e:
             return {"success": False, "error": str(e), "bytecode": None, "abi": None}
 
-    def _strip_markdown_code_blocks(self, text: str) -> str:
-        """
-        Strip markdown code blocks from contract code (safety net)
-
-        This is a fallback in case markdown wasn't stripped earlier in the pipeline.
-
-        Args:
-            text: Contract code that may contain markdown formatting
-
-        Returns:
-            Clean Solidity code without markdown
-        """
-        import re
-
-        if not text:
-            return ""
-
-        text = text.strip()
-
-        # If code starts with ```, extract content
-        if text.startswith("```"):
-            # Try to find closing ```
-            closing_index = text.find("```", 3)  # Start searching after first ```
-            if closing_index != -1:
-                # Extract content between code block markers
-                first_newline = text.find("\n")
-                if first_newline != -1:
-                    text = text[first_newline + 1 : closing_index].strip()
-            else:
-                # No closing ```, extract everything after first line
-                first_newline = text.find("\n")
-                if first_newline != -1:
-                    text = text[first_newline + 1 :].strip()
-                # Remove any trailing backticks
-                text = text.rstrip("`").strip()
-
-        return text

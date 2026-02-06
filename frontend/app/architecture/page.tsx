@@ -2,31 +2,29 @@
 
 import { useState, useMemo, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Network, 
-  Database, 
-  Zap, 
-  Shield, 
-  Code, 
-  Rocket, 
-  GitBranch, 
-  Layers,
-  Workflow,
-  Wallet,
-  Server,
-  Cpu,
-  FileCode,
-  TestTube,
-  Search,
-  MessageSquare,
-  Settings,
-  BarChart3,
-  Lock,
-  Globe,
-  ChevronDown,
-  ChevronRight,
-  Sparkles
-} from 'lucide-react';
+import Network from 'lucide-react/dist/esm/icons/network';
+import Database from 'lucide-react/dist/esm/icons/database';
+import Zap from 'lucide-react/dist/esm/icons/zap';
+import Shield from 'lucide-react/dist/esm/icons/shield';
+import Code from 'lucide-react/dist/esm/icons/code';
+import Rocket from 'lucide-react/dist/esm/icons/rocket';
+import GitBranch from 'lucide-react/dist/esm/icons/git-branch';
+import Layers from 'lucide-react/dist/esm/icons/layers';
+import Workflow from 'lucide-react/dist/esm/icons/workflow';
+import Wallet from 'lucide-react/dist/esm/icons/wallet';
+import Server from 'lucide-react/dist/esm/icons/server';
+import Cpu from 'lucide-react/dist/esm/icons/cpu';
+import FileCode from 'lucide-react/dist/esm/icons/file-code';
+import TestTube from 'lucide-react/dist/esm/icons/test-tube';
+import Search from 'lucide-react/dist/esm/icons/search';
+import MessageSquare from 'lucide-react/dist/esm/icons/message-square';
+import Settings from 'lucide-react/dist/esm/icons/settings';
+import BarChart3 from 'lucide-react/dist/esm/icons/bar-chart-3';
+import Lock from 'lucide-react/dist/esm/icons/lock';
+import Globe from 'lucide-react/dist/esm/icons/globe';
+import ChevronDown from 'lucide-react/dist/esm/icons/chevron-down';
+import ChevronRight from 'lucide-react/dist/esm/icons/chevron-right';
+import Sparkles from 'lucide-react/dist/esm/icons/sparkles';
 
 // Lazy load heavy components
 const MindMapCanvas = lazy(() => import('@/components/architecture/MindMapCanvas'));

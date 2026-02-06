@@ -15,7 +15,10 @@ interface PaymentSummaryProps {
 }
 
 import { Card } from '@/components/ui/Card';
-import { DollarSign, Calendar, History, TrendingUp } from 'lucide-react';
+import DollarSign from 'lucide-react/dist/esm/icons/dollar-sign'
+import Calendar from 'lucide-react/dist/esm/icons/calendar'
+import History from 'lucide-react/dist/esm/icons/history'
+import TrendingUp from 'lucide-react/dist/esm/icons/trending-up'
 
 export function PaymentSummary({ summary }: PaymentSummaryProps) {
   // Safely handle undefined or null values

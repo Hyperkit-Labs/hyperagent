@@ -35,6 +35,14 @@
     - https://portal.thirdweb.com/wallets
     - API: `/v1/auth/initiate`, `/v1/auth/complete`
     - Social auth: `/v1/auth/social`
+- **Thirdweb Gas Sponsorship**: Sponsor gas fees for transactions
+  - Supports both EIP-7702 (recommended) and ERC-4337
+  - EIP-7702: Default execution mode for user and server wallets
+  - ERC-4337: Account abstraction standard for gasless transactions
+  - References:
+    - https://portal.thirdweb.com/wallets/sponsor-gas
+    - API: `/v1/contracts/write` with automatic gas sponsorship
+    - Sponsorship policies: Configure rules for gas sponsorship
 
 ### Database & Backend
 - **Supabase**: PostgreSQL database with pgbouncer connection pooling

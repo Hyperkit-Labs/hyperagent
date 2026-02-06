@@ -8,11 +8,20 @@ from typing import Any, Dict, List, Optional
 from hyperagent.architecture.soa import SequentialOrchestrator, ServiceRegistry
 from hyperagent.cache.redis_manager import RedisManager
 from hyperagent.core.agent_system import WorkflowStage
+from hyperagent.core.agents.error_analyzer import ErrorAnalyzer
+from hyperagent.core.agents.fix_generator import FixGenerator
+from hyperagent.core.agents.requirements_agent import RequirementsAgent
+from hyperagent.core.agents.design_agent import DesignAgent
+from hyperagent.core.agents.capability_checker import CapabilityChecker
+from hyperagent.core.agents.design_document_generator import DesignDocumentGenerator
+from hyperagent.core.agents.reflection_agent import ReflectionAgent
+from hyperagent.core.memory.long_term_memory import LongTermMemory
 from hyperagent.core.planning.roma_planner import ROMAPlanner
 from hyperagent.core.routing.multi_model_router import MultiModelRouter
 from hyperagent.events.event_bus import EventBus
 from hyperagent.events.event_types import Event, EventType
 from hyperagent.rag.firecrawl_rag import FirecrawlRAG
+from hyperagent.llm.provider import LLMProvider
 
 logger = logging.getLogger(__name__)
 
@@ -43,10 +52,10 @@ class WorkflowCoordinator:
         roma_planner: Optional[ROMAPlanner] = None,
         firecrawl_rag: Optional[FirecrawlRAG] = None,
         multi_model_router: Optional[MultiModelRouter] = None,
+        llm_provider: Optional[LLMProvider] = None,
     ):
         self.registry = service_registry
         self.event_bus = event_bus
-        self.orchestrator = SequentialOrchestrator(service_registry, event_bus, progress_callback)
         self.workflow_id = None
         self.state = {}
         self.redis_manager = redis_manager
@@ -57,6 +66,85 @@ class WorkflowCoordinator:
         self.multi_model_router = multi_model_router or (
             MultiModelRouter(redis_manager=redis_manager) if redis_manager else None
         )
+        
+        # Initialize long-term memory first (needed by error analyzer)
+        long_term_memory = LongTermMemory() if (llm_provider or multi_model_router) else None
+        
+        # Initialize error analyzer and fix generator for feedback loops
+        error_analyzer = None
+        fix_generator = None
+        if llm_provider or multi_model_router:
+            error_analyzer = ErrorAnalyzer(
+                llm_provider=llm_provider,
+                multi_model_router=multi_model_router,
+                long_term_memory=long_term_memory,
+            )
+            # Get generation service for fix generator
+            generation_service = None
+            try:
+                generation_service = service_registry.get_service("generation")
+            except ValueError:
+                pass  # Generation service not registered yet
+            
+            fix_generator = FixGenerator(
+                error_analyzer=error_analyzer,
+                generation_service=generation_service,
+                llm_provider=llm_provider,
+                multi_model_router=multi_model_router,
+            )
+        
+        self.orchestrator = SequentialOrchestrator(
+            service_registry,
+            event_bus,
+            progress_callback,
+            error_analyzer=error_analyzer,
+            fix_generator=fix_generator,
+        )
+        
+        # Initialize requirements agent for Phase 2
+        self.requirements_agent = None
+        if llm_provider or multi_model_router:
+            self.requirements_agent = RequirementsAgent(
+                llm_provider=llm_provider,
+                multi_model_router=multi_model_router,
+            )
+        
+        # Initialize design agent for Phase 3
+        self.design_agent = None
+        if llm_provider or multi_model_router:
+            self.design_agent = DesignAgent(
+                llm_provider=llm_provider,
+                multi_model_router=multi_model_router,
+            )
+        
+        # Initialize capability checker for Phase 4
+        self.capability_checker = None
+        if llm_provider or multi_model_router:
+            self.capability_checker = CapabilityChecker(
+                llm_provider=llm_provider,
+                multi_model_router=multi_model_router,
+            )
+        
+        # Initialize design document generator for Phase 4
+        self.design_document_generator = None
+        if llm_provider or multi_model_router:
+            self.design_document_generator = DesignDocumentGenerator(
+                llm_provider=llm_provider,
+                multi_model_router=multi_model_router,
+            )
+        
+        # Initialize reflection agent for Phase 5 (reuse long_term_memory from above)
+        self.reflection_agent = None
+        self.long_term_memory = long_term_memory
+        if llm_provider or multi_model_router:
+            self.reflection_agent = ReflectionAgent(
+                llm_provider=llm_provider,
+                multi_model_router=multi_model_router,
+            )
+        
+        # Initialize workflow learner for AI-native learning
+        self.workflow_learner = None
+        # Will be initialized with db session when execute_workflow is called
 
     async def update_stage_progress(self, stage: str, sub_progress: float):
         """
@@ -165,12 +253,17 @@ class WorkflowCoordinator:
         pipeline = []
         
         if "generation" in selected_tasks:
+            # Get similar workflows from state (populated in execute_workflow)
+            similar_workflows = self.state.get("similar_workflows", [])
+            
             pipeline.append({
                 "service": "generation",
                 "input_mapping": {
                     "nlp_description": "nlp_input",
                     "network": "network",
                     "rag_context": "rag_context",
+                    "architecture_design": "architecture_design",  # Pass architecture design to generation
+                    "similar_workflows": similar_workflows,  # Pass similar workflows for learning
                 },
             })
         
@@ -209,6 +302,9 @@ class WorkflowCoordinator:
                     "wallet_address": "wallet_address",
                     "use_gasless": "use_gasless",
                     "signed_transaction": "signed_transaction",
+                    "audit_result": "audit_result",
+                    "test_result": "test_result",
+                    "workflow_context": "workflow_context",  # Pass workflow_context from state
                 },
             })
         
@@ -255,6 +351,7 @@ class WorkflowCoordinator:
         use_gasless: bool = False,  # Use facilitator for gasless deployment
         signed_transaction: Optional[str] = None,  # Pre-signed transaction (optional)
         selected_tasks: Optional[List[str]] = None,  # NEW: Selected tasks to execute
+        db_session = None,  # Database session for learning system
     ) -> Dict[str, Any]:
         """
         Execute complete workflow pipeline
@@ -269,25 +366,180 @@ class WorkflowCoordinator:
         5. Test contract (TestingService)
         6. Deploy contract (DeploymentService) - requires wallet_address
         """
-        # Validate wallet_address is provided (required for deployment)
-        if not wallet_address:
+        # Validate wallet_address only if deployment is selected
+        if selected_tasks is None:
+            selected_tasks = ["generation", "compilation", "audit", "testing", "deployment"]
+        
+        # Check if deployment is in selected tasks
+        deployment_selected = "deployment" in [task.lower() for task in selected_tasks]
+        
+        if deployment_selected and not wallet_address:
             raise ValueError(
-                "wallet_address is required for all workflows. "
-                "Please provide the user's wallet address for deployment. "
-                "No PRIVATE_KEY is needed - deployments are user-controlled."
+                "wallet_address is required for deployment. "
+                "Please provide the user's wallet address or remove deployment from selected tasks."
             )
 
-        # Validate wallet address format
-        from hyperagent.utils.helpers import normalize_wallet_address, validate_wallet_address
+        # Validate wallet address format if provided
+        if wallet_address:
+            from hyperagent.utils.helpers import normalize_wallet_address, validate_wallet_address
 
-        is_valid, error_msg = validate_wallet_address(wallet_address)
-        if not is_valid:
-            raise ValueError(f"Invalid wallet address: {error_msg}")
+            is_valid, error_msg = validate_wallet_address(wallet_address)
+            if not is_valid:
+                raise ValueError(f"Invalid wallet address: {error_msg}")
 
-        # Normalize to checksum format
-        wallet_address = normalize_wallet_address(wallet_address)
+            # Normalize to checksum format
+            wallet_address = normalize_wallet_address(wallet_address)
 
         self.workflow_id = workflow_id
+
+        # Requirements clarification step
+        # Use self.requirements_agent if initialized, otherwise skip clarification
+        requirements_spec = None
+        if self.requirements_agent:
+            needs_clarification, clarification_questions = await self.requirements_agent.needs_clarification(nlp_input)
+            
+            if needs_clarification:
+                # Return clarification needed status
+                return {
+                    "status": "clarification_needed",
+                    "workflow_id": workflow_id,
+                    "questions": clarification_questions,
+                    "original_prompt": nlp_input,
+                }
+            
+            # Extract structured requirements spec
+            requirements_spec = await self.requirements_agent.extract_spec(nlp_input)
+        else:
+            logger.warning("RequirementsAgent not initialized, skipping clarification step.")
+        
+        # Store requirements spec in state if available
+        if requirements_spec:
+            self.state["requirements_spec"] = requirements_spec.model_dump()
+        
+        # Phase 4: Capability Check
+        capability_assessment = None
+        if self.capability_checker and requirements_spec:
+            logger.info("Checking system capabilities...")
+            try:
+                capability_assessment = await self.capability_checker.assess_capability(
+                    requirements_spec=requirements_spec,
+                )
+                self.state["capability_assessment"] = capability_assessment.model_dump()
+                logger.info(
+                    f"Capability check: is_supported={capability_assessment.is_supported}, "
+                    f"can_proceed={capability_assessment.can_proceed}"
+                )
+                
+                # Graceful stopping if requirements exceed capabilities
+                if not capability_assessment.can_proceed:
+                    logger.warning(
+                        f"Requirements exceed system capabilities. Unsupported features: "
+                        f"{capability_assessment.unsupported_features}"
+                    )
+                    self.state["status"] = "capability_exceeded"
+                    
+                    # Generate design document for capability-exceeded workflow
+                    design_document = None
+                    if self.design_document_generator:
+                        try:
+                            logger.info("Generating design document for capability-exceeded workflow...")
+                            design_document = await self.design_document_generator.generate_design_document(
+                                requirements_spec=requirements_spec,
+                                capability_assessment=capability_assessment,
+                            )
+                            design_document["workflow_id"] = str(workflow_id)
+                            self.state["design_document"] = design_document
+                            logger.info("Design document generated successfully")
+                        except Exception as e:
+                            logger.error(f"Failed to generate design document: {e}", exc_info=True)
+                            # Continue without design document if generation fails
+                    
+                    await self.event_bus.publish(
+                        Event(
+                            id=str(uuid.uuid4()),
+                            type=EventType.WORKFLOW_CAPABILITY_EXCEEDED,
+                            workflow_id=str(workflow_id),
+                            timestamp=datetime.now(),
+                            data={
+                                "capability_assessment": capability_assessment.model_dump(),
+                                "requirements_spec": requirements_spec.model_dump(),
+                                "design_document": design_document,
+                            },
+                            source_agent="coordinator",
+                        )
+                    )
+                    return {
+                        "status": "capability_exceeded",
+                        "workflow_id": workflow_id,
+                        "capability_assessment": capability_assessment.model_dump(),
+                        "requirements_spec": requirements_spec.model_dump(),
+                        "design_document": design_document,
+                    }
+            except Exception as e:
+                logger.error(f"Capability check failed: {e}", exc_info=True)
+                # Continue workflow if capability check fails
+                logger.warning("Continuing workflow despite capability check failure.")
+        else:
+            if not self.capability_checker:
+                logger.warning("CapabilityChecker not initialized, skipping capability check.")
+            elif not requirements_spec:
+                logger.warning("Requirements spec not available, skipping capability check.")
+        
+        # Phase 3: Architecture Design (with timeout and learning-based skip)
+        architecture_design = None
+        
+        # Check if we should skip architecture design based on learning
+        should_skip_arch = False
+        if hasattr(self, 'workflow_learner') and self.workflow_learner:
+            try:
+                contract_type = requirements_spec.contract_type if requirements_spec and hasattr(requirements_spec, 'contract_type') else "Custom"
+                should_skip_arch = await self.workflow_learner.should_skip_architecture_design(
+                    contract_type=contract_type,
+                    network=network,
+                    nlp_input=nlp_input,
+                )
+                if should_skip_arch:
+                    logger.info("Skipping architecture design based on learning system (template-based or previous failures)")
+            except Exception as e:
+                logger.warning(f"Failed to check learning system for architecture skip: {e}")
+        
+        if not should_skip_arch and self.design_agent and requirements_spec:
+            logger.info("Generating architecture design...")
+            try:
+                import asyncio
+                from hyperagent.core.config import settings
+                
+                # Get RAG context if available (will be fetched later, but we can pass empty for now)
+                rag_context_dict = {}  # Will be populated later if firecrawl_rag is available
+                
+                # Use configurable timeout for architecture design
+                architecture_timeout = settings.architecture_design_timeout_seconds
+                try:
+                    architecture_design = await asyncio.wait_for(
+                        self.design_agent.design_architecture(
+                            requirements_spec=requirements_spec,
+                            network=network,
+                            rag_context=rag_context_dict,
+                        ),
+                        timeout=architecture_timeout
+                    )
+                    self.state["architecture_design"] = architecture_design.model_dump()
+                    logger.info(f"Architecture design generated: {architecture_design.contract_type}")
+                except asyncio.TimeoutError:
+                    logger.warning(f"Architecture design generation timed out after {architecture_timeout}s, continuing without it")
+                    architecture_design = None
+            except Exception as e:
+                logger.error(f"Architecture design generation failed: {e}", exc_info=True)
+                # Continue without architecture design if it fails (non-blocking)
+                logger.warning("Continuing workflow without architecture design.")
+                architecture_design = None
+        else:
+            if should_skip_arch:
+                logger.info("Skipping architecture design (template-based workflow or learning recommendation)")
+            elif not self.design_agent:
+                logger.warning("DesignAgent not initialized, skipping architecture design.")
+            elif not requirements_spec:
+                logger.warning("Requirements spec not available, skipping architecture design.")
 
         plan = None
         rag_context = ""
@@ -346,6 +598,28 @@ class WorkflowCoordinator:
         if selected_tasks is None:
             selected_tasks = ["generation", "compilation", "audit", "testing", "deployment"]
 
+        # Get similar successful workflows for learning (if learner is available)
+        # This must be done before building pipeline so it's available in state
+        similar_workflows = []
+        if self.workflow_learner:
+            try:
+                contract_type = "Custom"
+                if requirements_spec:
+                    if hasattr(requirements_spec, 'contract_type'):
+                        contract_type = requirements_spec.contract_type
+                    elif isinstance(requirements_spec, dict):
+                        contract_type = requirements_spec.get("contract_type", "Custom")
+                
+                similar_workflows = await self.workflow_learner.get_similar_successful_workflows(
+                    contract_type=contract_type,
+                    network=network,
+                    limit=3,
+                )
+                if similar_workflows:
+                    logger.info(f"Found {len(similar_workflows)} similar successful workflows for learning")
+            except Exception as e:
+                logger.warning(f"Failed to get similar workflows: {e}")
+
         self.state = {
             "workflow_id": workflow_id,
             "nlp_input": nlp_input,
@@ -356,6 +630,9 @@ class WorkflowCoordinator:
             "plan_timeouts": plan_timeouts,
             "rag_metadata": rag_metadata,
             "selected_tasks": selected_tasks,  # Store selected tasks
+            "requirements_spec": self.state.get("requirements_spec"),  # Store requirements spec
+            "architecture_design": self.state.get("architecture_design"),  # Store architecture design
+            "similar_workflows": similar_workflows,  # Store similar workflows for learning
         }
 
         # Publish workflow started
@@ -385,6 +662,11 @@ class WorkflowCoordinator:
                 rag_metadata=rag_metadata,
             )
 
+            workflow_context_data = {
+                "selected_tasks": selected_tasks,
+                "requirements_spec": self.state.get("requirements_spec"),  # Include requirements spec
+            }
+
             workflow_context = {
                 "pipeline": pipeline,
                 "initial_data": {
@@ -397,6 +679,9 @@ class WorkflowCoordinator:
                     "rag_context": rag_context,
                     "plan_timeouts": plan_timeouts,
                     "rag_metadata": rag_metadata,
+                    "selected_tasks": selected_tasks,
+                    "requirements_spec": self.state.get("requirements_spec"),  # Include requirements spec
+                    "workflow_context": workflow_context_data,  # Include workflow_context in initial_data
                 },
             }
 
@@ -415,20 +700,79 @@ class WorkflowCoordinator:
                 )
             )
 
+            # Phase 5: Trigger reflection for successful workflow
+            if self.reflection_agent and self.long_term_memory:
+                try:
+                    logger.info(f"Triggering reflection for successful workflow {workflow_id}")
+                    workflow_data = {
+                        "id": workflow_id,
+                        "status": "completed",
+                        "progress_percentage": 100,
+                        "network": network,
+                        "contract_type": result.get("contract_type", "Custom"),
+                        "nlp_input": nlp_input,
+                        "meta_data": self.state,
+                        "stages": result.get("stages", []),
+                    }
+                    reflection = await self.reflection_agent.reflect_on_workflow(
+                        workflow_id=workflow_id,
+                        workflow_data=workflow_data,
+                        outcome="success",
+                    )
+                    await self.long_term_memory.store_reflection(reflection)
+                    logger.info(f"Reflection stored for workflow {workflow_id}")
+                except Exception as e:
+                    logger.error(f"Failed to perform reflection for workflow {workflow_id}: {e}", exc_info=True)
+                    # Don't fail the workflow if reflection fails
+
             return {"status": "success", "workflow_id": self.workflow_id, "result": result}
 
         except Exception as e:
+            # Preserve full error message for HyperAgentError exceptions
+            if hasattr(e, 'message'):
+                error_msg = e.message
+            else:
+                error_msg = str(e)
+            
             await self.event_bus.publish(
                 Event(
                     id=str(uuid.uuid4()),
                     type=EventType.WORKFLOW_FAILED,
                     workflow_id=workflow_id,
                     timestamp=datetime.now(),
-                    data={"error": str(e)},
+                    data={"error": error_msg},
                     source_agent="coordinator",
                 )
             )
-            return {"status": "failed", "workflow_id": self.workflow_id, "error": str(e)}
+            
+            # Phase 5: Trigger reflection for failed workflow
+            if self.reflection_agent and self.long_term_memory:
+                try:
+                    logger.info(f"Triggering reflection for failed workflow {workflow_id}")
+                    workflow_data = {
+                        "id": workflow_id,
+                        "status": "failed",
+                        "progress_percentage": self.state.get("progress_percentage", 0),
+                        "network": network,
+                        "contract_type": self.state.get("contract_type", "Custom"),
+                        "nlp_input": nlp_input,
+                        "error_message": error_msg,
+                        "error_stacktrace": str(e),
+                        "meta_data": self.state,
+                        "retry_count": self.state.get("retry_count", 0),
+                    }
+                    reflection = await self.reflection_agent.reflect_on_workflow(
+                        workflow_id=workflow_id,
+                        workflow_data=workflow_data,
+                        outcome="failure",
+                    )
+                    await self.long_term_memory.store_reflection(reflection)
+                    logger.info(f"Reflection stored for failed workflow {workflow_id}")
+                except Exception as reflection_error:
+                    logger.error(f"Failed to perform reflection for failed workflow {workflow_id}: {reflection_error}", exc_info=True)
+                    # Don't fail the workflow error handling if reflection fails
+            
+            return {"status": "failed", "workflow_id": self.workflow_id, "error": error_msg}
 
     async def execute_workflow_from_contract(
         self,
@@ -453,27 +797,29 @@ class WorkflowCoordinator:
         3. Test contract (TestingService)
         4. Deploy contract (DeploymentService) - requires wallet_address
         """
-        # Validate wallet_address is provided (required for deployment)
-        if not wallet_address:
-            raise ValueError(
-                "wallet_address is required for all workflows. "
-                "Please provide the user's wallet address for deployment. "
-                "No PRIVATE_KEY is needed - deployments are user-controlled."
-            )
-
-        # Validate wallet address format
-        from hyperagent.utils.helpers import normalize_wallet_address, validate_wallet_address
-
-        is_valid, error_msg = validate_wallet_address(wallet_address)
-        if not is_valid:
-            raise ValueError(f"Invalid wallet address: {error_msg}")
-
-        # Normalize to checksum format
-        wallet_address = normalize_wallet_address(wallet_address)
-
         # Store selected tasks in state
         if selected_tasks is None:
             selected_tasks = ["compilation", "audit", "testing", "deployment"]
+        
+        # Validate wallet_address only if deployment is selected
+        deployment_selected = "deployment" in [task.lower() for task in selected_tasks]
+        
+        if deployment_selected and not wallet_address:
+            raise ValueError(
+                "wallet_address is required for deployment. "
+                "Please provide the user's wallet address or remove deployment from selected tasks."
+            )
+
+        # Validate wallet address format if provided
+        if wallet_address:
+            from hyperagent.utils.helpers import normalize_wallet_address, validate_wallet_address
+
+            is_valid, error_msg = validate_wallet_address(wallet_address)
+            if not is_valid:
+                raise ValueError(f"Invalid wallet address: {error_msg}")
+
+            # Normalize to checksum format
+            wallet_address = normalize_wallet_address(wallet_address)
 
         self.workflow_id = workflow_id
         self.state = {
@@ -565,14 +911,20 @@ class WorkflowCoordinator:
             return {"status": "success", "workflow_id": self.workflow_id, "result": result}
 
         except Exception as e:
+            # Preserve full error message for HyperAgentError exceptions
+            if hasattr(e, 'message'):
+                error_msg = e.message
+            else:
+                error_msg = str(e)
+            
             await self.event_bus.publish(
                 Event(
                     id=str(uuid.uuid4()),
                     type=EventType.WORKFLOW_FAILED,
                     workflow_id=workflow_id,
                     timestamp=datetime.now(),
-                    data={"error": str(e)},
+                    data={"error": error_msg},
                     source_agent="coordinator",
                 )
             )
-            return {"status": "failed", "workflow_id": self.workflow_id, "error": str(e)}
+            return {"status": "failed", "workflow_id": self.workflow_id, "error": error_msg}

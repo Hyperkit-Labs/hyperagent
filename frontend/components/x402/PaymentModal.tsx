@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { motion } from 'framer-motion';
 import type { PaymentInfo } from '@/lib/x402Client';
-import { createPaymentWallet, createFetchWithPayment } from '@/lib/thirdwebClient';
+import { createFetchWithPayment } from '@/lib/thirdwebClient';
 import type { TaskCostBreakdown } from '@/components/workflows/TaskSelector';
 
 interface PaymentModalProps {
@@ -22,6 +22,8 @@ export function PaymentModal({
   isOpen,
   costBreakdown,
 }: PaymentModalProps) {
+  const wallet = useActiveWallet();
+  
   const [status, setStatus] = useState<'idle' | 'pending' | 'success' | 'failed'>('idle');
   const [error, setError] = useState<string | null>(null);
 
@@ -37,17 +39,10 @@ export function PaymentModal({
     setError(null);
 
     try {
-      // Create wallet and fetch wrapper with x402 payment handling
-      const wallet = await createPaymentWallet();
-      
-      // Connect wallet (user will approve connection)
-      const account = await wallet.connect();
-
-      if (!account) {
-        throw new Error('Wallet connection failed. Please ensure your wallet is unlocked and try again.');
+      if (!wallet) {
+        throw new Error('Wallet not connected');
       }
 
-      // Create fetch wrapper that handles x402 payments automatically
       const fetchWithPayment = createFetchWithPayment(wallet);
 
       // Build the resource URL for payment

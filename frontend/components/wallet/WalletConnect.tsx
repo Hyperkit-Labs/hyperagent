@@ -5,6 +5,17 @@ import { ConnectButton } from 'thirdweb/react';
 import { createWallet } from 'thirdweb/wallets';
 import { getThirdwebClient } from '@/lib/thirdwebClient';
 
+const getSupportedWallets = () => {
+  return [
+    createWallet("io.metamask"),
+    createWallet("okx.wallet"),
+    createWallet("com.coinbase.wallet"),
+    createWallet("com.trustwallet.app"),
+    createWallet("io.rabby"),
+    createWallet("me.rainbow"),
+  ];
+};
+
 /**
  * Universal Wallet Connect Component
  * Supports: MetaMask, Core Wallet, OKX Wallet, Phantom, and more
@@ -13,6 +24,7 @@ import { getThirdwebClient } from '@/lib/thirdwebClient';
 export function WalletConnect() {
   const [mounted, setMounted] = useState(false);
   const client = getThirdwebClient();
+  const supportedWallets = getSupportedWallets();
   
   useEffect(() => {
     setMounted(true);
@@ -24,20 +36,10 @@ export function WalletConnect() {
     );
   }
 
-  // Define supported wallets using Thirdweb v5 API
-  const wallets = [
-    createWallet('io.metamask'),
-    createWallet('app.core'),
-    createWallet('com.okex.wallet'),
-    createWallet('app.phantom'),
-    createWallet('com.coinbase.wallet'),
-    createWallet('me.rainbow'),
-  ];
-
   return (
     <ConnectButton
       client={client}
-      wallets={wallets}
+      wallets={supportedWallets}
       theme="dark"
       connectButton={{
         label: 'Connect Wallet',
@@ -60,6 +62,7 @@ export function WalletConnect() {
 export function CompactWalletButton() {
   const [mounted, setMounted] = useState(false);
   const client = getThirdwebClient();
+  const supportedWallets = getSupportedWallets();
   
   useEffect(() => {
     setMounted(true);
@@ -71,17 +74,10 @@ export function CompactWalletButton() {
     );
   }
 
-  const wallets = [
-    createWallet('io.metamask'),
-    createWallet('app.core'),
-    createWallet('com.okex.wallet'),
-    createWallet('app.phantom'),
-  ];
-
   return (
     <ConnectButton
       client={client}
-      wallets={wallets}
+      wallets={supportedWallets}
       theme="dark"
       connectButton={{
         label: 'Connect',

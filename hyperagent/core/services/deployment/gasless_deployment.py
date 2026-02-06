@@ -59,8 +59,7 @@ class GaslessDeploymentHelper:
 
         if not facilitator_private_key:
             raise ValueError(
-                f"Gasless deployment on non-x402 network ({network}) requires THIRDWEB_SERVER_WALLET_PRIVATE_KEY "
-                f"to be configured (facilitator is EOA). "
+                f"Gasless deployment on non-x402 network ({network}) requires facilitator wallet configuration. "
                 f"Alternatively, provide a signed_transaction from user wallet for direct deployment."
             )
 

@@ -39,26 +39,20 @@ hyperagent deploy contracts/NFT.sol --network avalanche-fuji
 # CLI
 npm run hyperagent:build
 
-# TS API
-cd ts/api && npm run build
-
-# Orchestrator
-cd ts/orchestrator && npm run build
-
 # Frontend
 cd frontend && npm run build
 ```
 
 ### Run Services
 ```bash
-# TS API (port 4000)
-cd ts/api && npm run dev
+# Python Backend (port 8000)
+cd hyperagent && uvicorn hyperagent.api.main:app --reload
 
 # Frontend (port 3000)
 cd frontend && npm run dev
 
-# Python Backend (port 8000) - optional
-cd hyperagent && python -m uvicorn main:app --reload
+# x402 Verifier (port 3002)
+cd services/x402-verifier && npm run dev
 ```
 
 ## 🧪 Testing & Validation
@@ -74,12 +68,11 @@ bash scripts/sanity-check.sh
 
 ### API Health Checks
 ```bash
-# TS API
-curl http://localhost:4000/healthz
-curl http://localhost:4000/api/v1/health/detailed
+# Python Backend
+curl http://localhost:8000/api/v1/health/basic
 
 # Test networks endpoint
-curl "http://localhost:4000/api/v1/networks?search=mantle"
+curl "http://localhost:8000/api/v1/networks?search=mantle"
 ```
 
 ## 🔧 Configuration
@@ -88,19 +81,19 @@ curl "http://localhost:4000/api/v1/networks?search=mantle"
 ```bash
 # LLM APIs
 GEMINI_API_KEY=your_key
+OPENAI_API_KEY=your_key
 ANTHROPIC_API_KEY=your_key
 
 # Blockchain
 PRIVATE_KEY=your_private_key
 THIRDWEB_CLIENT_ID=your_client_id
 
-# API Configuration
-TS_API_PORT=4000
-PYTHON_BACKEND_URL=http://localhost:8000
+# Database
+DATABASE_URL=postgresql://hyperagent_user:secure_password@localhost:5432/hyperagent_db
 
 # Frontend
-NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1
-NEXT_PUBLIC_WS_ENABLED=false  # Enable when Python backend is running
+NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws
 ```
 
 ## 📁 Project Structure
@@ -108,13 +101,12 @@ NEXT_PUBLIC_WS_ENABLED=false  # Enable when Python backend is running
 hyperkit_agent/
 ├── packages/
 │   ├── cli/              # Hyperkit CLI
-│   ├── env/              # Environment utilities
-│   └── ...
-├── ts/
-│   ├── api/              # TS API (Fastify)
-│   └── orchestrator/     # LangGraph orchestrator
+│   └── env/              # Environment utilities
+├── hyperagent/           # Python backend (FastAPI)
 ├── frontend/             # Next.js frontend
-├── hyperagent/           # Python backend (optional)
+├── services/
+│   ├── x402-verifier/    # Payment verification
+│   └── mantle-bridge/    # Mantle bridge service
 └── scripts/              # Utility scripts
 ```
 
@@ -130,15 +122,15 @@ hyperkit_agent/
 ## 🔗 Important URLs
 
 - **Frontend:** http://localhost:3000
-- **TS API:** http://localhost:4000
-- **Python API:** http://localhost:8000 (optional)
-- **Health Check:** http://localhost:4000/healthz
+- **Python API:** http://localhost:8000
+- **x402 Verifier:** http://localhost:3002
+- **Health Check:** http://localhost:8000/api/v1/health/basic
 
 ## 📚 Documentation
 
 - [CLI Usage Guide](./CLI_USAGE.md)
-- [Global Install Guide](./packages/cli/GLOBAL_INSTALL.md)
-- [Alignment Summary](./ALIGNMENT_SUMMARY.md)
+- [Architecture Overview](./docs/ARCHITECTURE_SIMPLIFIED.md)
+- [User Guides](./GUIDE/)
 - [Contributing Guide](./CONTRIBUTING.md)
 
 ## 🐛 Troubleshooting
@@ -155,10 +147,10 @@ cd packages/cli && npm link
 ### API not responding
 ```bash
 # Check if running
-curl http://localhost:4000/healthz
+curl http://localhost:8000/api/v1/health/basic
 
 # Restart API
-cd ts/api && npm run dev
+cd hyperagent && uvicorn hyperagent.api.main:app --reload
 ```
 
 ### Build errors
@@ -171,13 +163,13 @@ npm install
 npm run hyperagent:build
 ```
 
-### WebSocket not working
+### Database connection errors
 ```bash
-# WebSocket is disabled by default
-# Enable in .env:
-NEXT_PUBLIC_WS_ENABLED=true
+# Start PostgreSQL
+docker compose up postgres -d
 
-# Requires Python backend running
+# Run migrations
+alembic upgrade head
 ```
 
 ## 🎯 Common Workflows
@@ -196,8 +188,8 @@ npm run hyperagent -- deploy contracts/StakingContract.sol --network mantle-test
 
 ### Development Workflow
 ```bash
-# 1. Start TS API
-cd ts/api && npm run dev
+# 1. Start Python Backend
+cd hyperagent && uvicorn hyperagent.api.main:app --reload
 
 # 2. Start Frontend (new terminal)
 cd frontend && npm run dev
@@ -206,25 +198,26 @@ cd frontend && npm run dev
 npm run hyperagent -- generate "Create a token"
 ```
 
-### Production Build
+### Docker Workflow
 ```bash
-# Build all components
-npm run hyperagent:build
-cd ts/api && npm run build
-cd frontend && npm run build
+# Start all services
+docker compose up -d
 
-# Run sanity checks
-powershell -ExecutionPolicy Bypass -File scripts/sanity-check.ps1
+# Check logs
+docker compose logs -f hyperagent
+
+# Stop all services
+docker compose down
 ```
 
 ## 💡 Tips
 
 - Use `npm link` for global CLI access during development
-- Set `NEXT_PUBLIC_WS_ENABLED=false` to disable WebSocket (default)
-- Use `PYTHON_BACKEND_URL` to proxy network searches to Python
 - Check `.env.example` for all available configuration options
 - Run sanity checks before committing changes
+- Use Docker for quick local development setup
+- Frontend connects to Python backend on port 8000
 
 ---
 
-For detailed information, see [ALIGNMENT_SUMMARY.md](./ALIGNMENT_SUMMARY.md)
+For detailed architecture, see [docs/ARCHITECTURE_SIMPLIFIED.md](./docs/ARCHITECTURE_SIMPLIFIED.md)

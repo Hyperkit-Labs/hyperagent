@@ -17,6 +17,11 @@ logger = logging.getLogger(__name__)
 
 class GenerationAgent(ServiceInterface):
     """
+    DEPRECATED: Use GenerationService instead.
+    
+    This class is maintained for backward compatibility only.
+    New code should use hyperagent.core.services.generation_service.GenerationService
+    
     Generation Agent
 
     Concept: Converts NLP to Solidity code
@@ -164,7 +169,8 @@ class GenerationAgent(ServiceInterface):
             from py_solc_x import compile_source
 
             # Strip markdown code blocks if present (safety net)
-            contract_code = self._strip_markdown_code_blocks(contract_code)
+            from hyperagent.utils.markdown import strip_markdown_code_blocks
+            contract_code = strip_markdown_code_blocks(contract_code)
 
             # Compile contract
             compiled = compile_source(contract_code)
@@ -199,21 +205,6 @@ class GenerationAgent(ServiceInterface):
             # Fallback: return empty structure
             return {"functions": [], "events": [], "errors": [], "constructor": None}
 
-    def _strip_markdown_code_blocks(self, text: str) -> str:
-        """
-        Strip markdown code blocks from contract code (safety net)
-
-        This is a fallback in case markdown wasn't stripped earlier in the pipeline.
-
-        Args:
-            text: Contract code that may contain markdown formatting
-
-        Returns:
-            Clean Solidity code without markdown
-        """
-        from hyperagent.utils.markdown import strip_markdown_code_blocks
-
-        return strip_markdown_code_blocks(text)
 
     def _extract_abi_regex(self, contract_code: str) -> Dict[str, Any]:
         """Fallback ABI extraction using regex (basic)"""

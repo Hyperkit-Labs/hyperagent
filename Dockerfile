@@ -33,15 +33,18 @@ RUN pip install --no-cache-dir --user --upgrade pip setuptools wheel && \
 # solc-select manages multiple Solidity compiler versions
 # Note: In builder stage, packages are installed to /root/.local
 # Create solc-select directory first (it will be created by solc-select, but ensure it exists)
+# Install versions supporting range 0.8.20^ - 0.8.28^
 RUN mkdir -p /root/.solc-select && \
     /root/.local/bin/solc-select install 0.8.20 && \
     /root/.local/bin/solc-select install 0.8.27 && \
+    /root/.local/bin/solc-select install 0.8.28 && \
     /root/.local/bin/solc-select install 0.8.30 && \
-    /root/.local/bin/solc-select use 0.8.30 && \
+    /root/.local/bin/solc-select use 0.8.27 && \
     /root/.local/bin/solc --version || echo "solc-select installation completed"
 
 # Also install solc versions via solcx (for py-solc-x compatibility)
-RUN python3 -c "from solcx import install_solc; install_solc('0.8.20'); install_solc('0.8.27'); install_solc('0.8.30')" || echo "solcx install completed"
+# Install versions for range 0.8.20^ - 0.8.28^ support
+RUN python3 -c "from solcx import install_solc; install_solc('0.8.20'); install_solc('0.8.27'); install_solc('0.8.28'); install_solc('0.8.30')" || echo "solcx install completed"
 
 # Install global npm solc as fallback
 RUN npm install -g solc@latest && \
@@ -65,7 +68,24 @@ RUN mkdir -p /build/node_modules && \
       solidity-coverage \
       prettier prettier-plugin-solidity solhint \
       hardhat-contract-sizer \
-      dotenv
+      dotenv && \
+    # Verify OpenZeppelin installation (check multiple possible locations)
+    if [ -d "node_modules/@openzeppelin/contracts" ]; then \
+      echo "✓ OpenZeppelin contracts directory found"; \
+      if [ -f "node_modules/@openzeppelin/contracts/security/ReentrancyGuard.sol" ]; then \
+        echo "✓ OpenZeppelin ReentrancyGuard found at security/"; \
+      elif [ -f "node_modules/@openzeppelin/contracts/utils/ReentrancyGuard.sol" ]; then \
+        echo "✓ OpenZeppelin ReentrancyGuard found at utils/"; \
+      else \
+        echo "⚠ ReentrancyGuard not found, but contracts directory exists"; \
+        ls -la node_modules/@openzeppelin/contracts/ | head -10; \
+      fi; \
+      echo "✓ OpenZeppelin contracts installed successfully"; \
+    else \
+      echo "✗ OpenZeppelin contracts directory not found"; \
+      ls -la node_modules/@openzeppelin/ 2>&1 || echo "OpenZeppelin package not installed"; \
+      exit 1; \
+    fi
 
 # Stage 2: Runtime
 # Updated to Python 3.12-slim for latest security patches
@@ -92,6 +112,20 @@ COPY --from=builder /root/.local /home/hyperagent/.local
 
 # Copy node_modules from builder (Hardhat and OpenZeppelin)
 COPY --from=builder /build/node_modules /app/node_modules
+
+# Verify OpenZeppelin is accessible in runtime stage (flexible check)
+RUN if [ -d "/app/node_modules/@openzeppelin/contracts" ]; then \
+      echo "✓ OpenZeppelin contracts directory verified in runtime stage"; \
+      if [ -f "/app/node_modules/@openzeppelin/contracts/security/ReentrancyGuard.sol" ] || \
+         [ -f "/app/node_modules/@openzeppelin/contracts/utils/ReentrancyGuard.sol" ]; then \
+        echo "✓ OpenZeppelin ReentrancyGuard verified"; \
+      else \
+        echo "⚠ ReentrancyGuard not found, but contracts directory exists (may be different version)"; \
+      fi; \
+    else \
+      echo "✗ OpenZeppelin not found in runtime stage"; \
+      exit 1; \
+    fi
 
 # Copy solc-select directory from builder
 # solc-select stores compiler versions in ~/.solc-select

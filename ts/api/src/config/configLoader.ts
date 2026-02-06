@@ -218,6 +218,17 @@ export interface X402Config {
     require_wallet_age_days: number;
     require_min_balance_usdc: number;
   };
+  integrations?: {
+    thirdweb?: {
+      use_facilitator: boolean;
+      gas_sponsorship?: {
+        enabled: boolean;
+        protocol: string;
+        sponsor_user_transactions: boolean;
+      };
+      supported_chains: number[];
+    };
+  };
 }
 
 class ConfigLoader {
@@ -473,6 +484,16 @@ class ConfigLoader {
   getX402RateLimits() {
     const config = this.getX402Config();
     return config.fraud_prevention?.rate_limits;
+  }
+
+  getX402ProtocolStandard(): string {
+    const config = this.getX402Config();
+    return config.protocol_standard ?? "EIP-7702";
+  }
+
+  getX402GasSponsorshipConfig() {
+    const config = this.getX402Config();
+    return (config as any).integrations?.thirdweb?.gas_sponsorship;
   }
 
   clearCache(): void {

@@ -1,38 +1,21 @@
-# HyperAgent Services Status Monitor
+# HyperAgent Services Status
 
-**Last Updated**: January 27, 2026
+## Active Services
 
-## Service Status
-
-### ✅ Running Services
-
-| Service | Port | Status | Health |
-|---------|------|--------|--------|
-| **Frontend (Next.js)** | 3000 | ✅ Running | ✅ Healthy |
-| **PostgreSQL** | 5432 | ✅ Running | ✅ Healthy |
-| **Redis** | 6379 | ✅ Running | ✅ Healthy |
-| **MLflow** | 5000 | ✅ Running | ⚠️ No health check |
-| **x402 Verifier** | 3002 | ✅ Running | ✅ Healthy |
-
-### ⚠️ Issues
-
-| Service | Port | Status | Issue |
-|---------|------|--------|-------|
-| **Python Backend** | 8000 | ⚠️ Unhealthy | Child processes dying - check logs |
-| **TS Orchestrator API** | 4000 | ❌ Not Started | Needs to be started manually |
+| Service | Port | Purpose |
+|---------|------|---------|
+| **Python Backend** | 8000 | REST API, WebSocket, orchestration |
+| **Frontend** | 3000 | User interface |
+| **x402 Verifier** | 3002 | Payment verification |
+| **PostgreSQL** | 5432 | Database |
+| **Redis** | 6379 | Cache and events |
+| **MLflow** | 5000 | Model tracking |
 
 ## Quick Commands
 
 ### Start All Services
 ```bash
-make up
-# or
 docker compose up -d
-```
-
-### Start TS Orchestrator API
-```bash
-docker compose up ts-orchestrator -d
 ```
 
 ### Check Status
@@ -48,7 +31,7 @@ docker compose logs -f
 
 # Specific service
 docker compose logs -f hyperagent
-docker compose logs -f ts-orchestrator
+docker compose logs -f x402-verifier
 ```
 
 ### Health Checks
@@ -56,29 +39,39 @@ docker compose logs -f ts-orchestrator
 # Python Backend
 curl http://localhost:8000/api/v1/health/basic
 
-# TS API
-curl http://localhost:4000/healthz
+# x402 Verifier
+curl http://localhost:3002/health
 
 # Frontend
 curl http://localhost:3000
 ```
 
-## Frontend Dev Server
+## Development
 
-Frontend is running outside Docker:
-- **Status**: ✅ Running on port 3000
-- **Command**: `cd frontend && npm run dev`
-- **URL**: http://localhost:3000
+### Python Backend
+```bash
+cd hyperagent
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+alembic upgrade head
+uvicorn hyperagent.api.main:app --reload
+```
 
-## Next Steps
+### Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-1. ✅ Frontend: Running and accessible
-2. ⚠️ Backend: Fix health check issue
-3. ⚠️ TS API: Start ts-orchestrator service
-4. ✅ Database: Healthy
-5. ✅ Redis: Healthy
+### x402 Verifier
+```bash
+cd services/x402-verifier
+npm install
+npm run dev
+```
 
----
+## Architecture
 
-**Monitor Script**: `bash scripts/monitor-services.sh`
-
+See `docs/ARCHITECTURE_SIMPLIFIED.md` for complete architecture overview.

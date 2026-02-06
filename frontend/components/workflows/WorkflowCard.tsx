@@ -8,7 +8,10 @@ import { formatRelativeTime } from '@/lib/utils';
 import type { Workflow } from '@/lib/types';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowRight, FileCode, Clock, CheckCircle2 } from 'lucide-react';
+import ArrowRight from 'lucide-react/dist/esm/icons/arrow-right'
+import FileCode from 'lucide-react/dist/esm/icons/file-code'
+import Clock from 'lucide-react/dist/esm/icons/clock'
+import CheckCircle2 from 'lucide-react/dist/esm/icons/check-circle-2'
 
 interface WorkflowCardProps {
   workflow: Workflow;

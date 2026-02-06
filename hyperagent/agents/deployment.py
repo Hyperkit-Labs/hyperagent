@@ -20,6 +20,12 @@ logger = logging.getLogger(__name__)
 
 class DeploymentAgent(ServiceInterface):
     """
+    DEPRECATED: Use DeploymentService instead.
+    
+    This class is maintained for backward compatibility only.
+    New code should use hyperagent.core.services.deployment_service.DeploymentService
+    """
+    """
     Deployment Agent
 
     Concept: Deploy contracts to blockchain

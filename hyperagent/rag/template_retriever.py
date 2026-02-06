@@ -82,8 +82,30 @@ class TemplateRetriever:
                 logger.error("LLM provider not configured. Cannot generate embeddings.")
                 raise ValueError("LLM provider required for template retrieval")
 
-            # Step 1: Generate query embedding
-            query_embedding = await self.llm_provider.embed(user_query)
+            # Step 1: Generate query embedding with timeout and caching
+            import asyncio
+            from hyperagent.core.config import settings
+            from hyperagent.rag.embedding_cache import get_embedding_cache
+            
+            # Check cache first
+            embedding_cache = get_embedding_cache()
+            query_embedding = embedding_cache.get(user_query)
+            
+            if query_embedding is None:
+                # Generate new embedding
+                try:
+                    query_embedding = await asyncio.wait_for(
+                        self.llm_provider.embed(user_query),
+                        timeout=settings.llm_embed_timeout_seconds
+                    )
+                    # Cache the embedding
+                    embedding_cache.set(user_query, query_embedding)
+                    logger.debug("Generated and cached new embedding")
+                except asyncio.TimeoutError:
+                    logger.warning(f"Template retrieval embedding timed out after {settings.llm_embed_timeout_seconds}s, returning empty results")
+                    return []  # Return empty, fallback to direct generation
+            else:
+                logger.debug("Using cached embedding for template retrieval")
 
             if not query_embedding or len(query_embedding) != 1536:
                 logger.warning("Invalid embedding generated, returning empty results")
@@ -277,5 +299,10 @@ Requirements:
 2. Include security best practices
 3. Add comprehensive NatSpec comments
 4. Return ONLY Solidity code without explanations
+5. Use actual values, NOT template placeholders:
+   - Use numbers like 1000000 * 10**18, NOT double curly braces with supply or single curly braces with supply
+   - Use strings like "MyToken", NOT double curly braces with name or single curly braces with name
+   - Use address(0) or msg.sender, NOT double curly braces with address or single curly braces with address
+   - NO curly braces with variable names in the code
 
 Contract:"""

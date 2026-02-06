@@ -83,7 +83,19 @@ NETWORK_FEATURES: Dict[str, Dict[str, Any]] = {
 
 
 class NetworkFeatureManager:
-    """Manage network feature detection and compatibility"""
+    """
+    NetworkFeatureManager: Feature flag management (x402, ERC4337, EigenDA, etc.)
+    
+    Responsibilities:
+    - Manage feature flags per network (x402 payments, ERC-4337, EigenDA, etc.)
+    - Check network feature compatibility
+    - Provide fallback strategies for unavailable features
+    - Support dynamic network registration with feature flags
+    
+    Note: This class handles feature flag management.
+    For network configuration, use NetworkRegistry.
+    For Web3 connections, use NetworkManager.
+    """
 
 
     @staticmethod

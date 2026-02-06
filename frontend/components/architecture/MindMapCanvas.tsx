@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, useMotionValue, useSpring } from 'framer-motion';
-import { ZoomIn, ZoomOut, Maximize2, RotateCcw } from 'lucide-react';
+import ZoomIn from 'lucide-react/dist/esm/icons/zoom-in'
+import ZoomOut from 'lucide-react/dist/esm/icons/zoom-out'
+import Maximize2 from 'lucide-react/dist/esm/icons/maximize-2'
+import RotateCcw from 'lucide-react/dist/esm/icons/rotate-ccw'
 
 export interface MindMapNode {
   id: string;

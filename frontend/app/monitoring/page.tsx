@@ -7,21 +7,19 @@ import { Badge } from '@/components/ui/Badge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useHealth } from '@/hooks/useHealth';
 import { getMetrics, type Metrics } from '@/lib/api';
-import {
-  Activity,
-  Database,
-  Server,
-  Cpu,
-  CheckCircle2,
-  AlertCircle,
-  XCircle,
-  Clock,
-  TrendingUp,
-  Zap,
-  Shield,
-  Network as NetworkIcon,
-  RefreshCw,
-} from 'lucide-react';
+import Activity from 'lucide-react/dist/esm/icons/activity';
+import Database from 'lucide-react/dist/esm/icons/database';
+import Server from 'lucide-react/dist/esm/icons/server';
+import Cpu from 'lucide-react/dist/esm/icons/cpu';
+import CheckCircle2 from 'lucide-react/dist/esm/icons/check-circle-2';
+import AlertCircle from 'lucide-react/dist/esm/icons/alert-circle';
+import XCircle from 'lucide-react/dist/esm/icons/x-circle';
+import Clock from 'lucide-react/dist/esm/icons/clock';
+import TrendingUp from 'lucide-react/dist/esm/icons/trending-up';
+import Zap from 'lucide-react/dist/esm/icons/zap';
+import Shield from 'lucide-react/dist/esm/icons/shield';
+import NetworkIcon from 'lucide-react/dist/esm/icons/network';
+import RefreshCw from 'lucide-react/dist/esm/icons/refresh-cw';
 import {
   LineChart,
   Line,

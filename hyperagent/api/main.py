@@ -10,11 +10,12 @@ from hyperagent.api.middleware.security import (
     SecurityHeadersMiddleware,
 )
 from hyperagent.api.routes import (
+    agents,
     auth,
     contracts,
-    deployment,
     deployments,
     health,
+    logs,
     metrics,
     networks,
     templates,
@@ -83,14 +84,16 @@ if getattr(settings, "enable_rate_limiting", False):
 # Include routers
 app.include_router(health.router)
 app.include_router(auth.router)
+app.include_router(agents.router)
 app.include_router(workflows.router)
 app.include_router(contracts.router)
 app.include_router(contract_interact)  # Contract interaction API
-app.include_router(deployment.router)  # User-signed deployment
 app.include_router(deployments.router)
+app.include_router(deployments.workflow_router)  # Workflow-specific deployment endpoints
 app.include_router(templates.router)
 app.include_router(networks.router)
 app.include_router(metrics.router)
+app.include_router(logs.router)
 app.include_router(x402_contracts.router)
 app.include_router(x402_deployments.router)
 app.include_router(x402_workflows.router)
@@ -116,6 +119,10 @@ async def startup_validation():
     from hyperagent.core.exceptions import ConfigurationError
 
     logger = logging.getLogger(__name__)
+    
+    # Start workflow cleanup task to handle stuck workflows
+    from hyperagent.api.tasks.workflow_cleanup import start_cleanup_task
+    start_cleanup_task()
     errors = []
     warnings = []
 

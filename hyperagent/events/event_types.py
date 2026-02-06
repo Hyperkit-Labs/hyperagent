@@ -16,6 +16,8 @@ class EventType(Enum):
     WORKFLOW_COMPLETED = "workflow.completed"
     WORKFLOW_FAILED = "workflow.failed"
     WORKFLOW_CANCELLED = "workflow.cancelled"
+    WORKFLOW_CLARIFICATION_NEEDED = "workflow.clarification_needed"
+    WORKFLOW_CAPABILITY_EXCEEDED = "workflow.capability_exceeded"
 
     # Agent events
     GENERATION_STARTED = "generation.started"

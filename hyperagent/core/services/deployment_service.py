@@ -8,8 +8,13 @@ from eth_account import Account
 from web3 import Web3
 
 from hyperagent.blockchain.eigenda_client import EigenDAClient
-from hyperagent.blockchain.mantle_sdk import MantleSDKClient
 from hyperagent.blockchain.networks import NetworkManager
+
+# Optional Mantle SDK import (bridge service removed)
+try:
+    from hyperagent.blockchain.mantle_sdk import MantleSDKClient
+except ImportError:
+    MantleSDKClient = None
 from hyperagent.core.agent_system import ServiceInterface
 from hyperagent.core.config import settings
 from hyperagent.core.exceptions import DeploymentError, NetworkError, ValidationError, WalletError
@@ -50,8 +55,85 @@ class DeploymentService(ServiceInterface):
         self.standard_helper = StandardDeploymentHelper(self.network_manager)
         self.batch_helper = BatchDeploymentHelper()
 
+    def _validate_workflow_prerequisites(self, input_data: Dict[str, Any], workflow_context: Dict[str, Any]) -> None:
+        """
+        Validate that all required workflow stages are completed before deployment
+        
+        Ensures end-to-end workflow integrity:
+        1. Generation: Contract code must exist
+        2. Compilation: Compiled contract with bytecode must exist
+        3. Audit: Audit results must exist (if audit was selected)
+        4. Testing: Test results must exist (if testing was selected)
+        
+        Raises:
+            ValidationError: If any required stage is not completed
+        """
+        errors = []
+        
+        # 1. Validate generation stage - contract code must exist
+        source_code = input_data.get("source_code")
+        if not source_code or not source_code.strip():
+            errors.append("Generation stage not completed: Contract code is missing")
+        
+        # 2. Validate compilation stage - compiled contract with bytecode must exist
+        compiled = input_data.get("compiled_contract")
+        if not compiled:
+            errors.append("Compilation stage not completed: Compiled contract is missing")
+        elif not compiled.get("bytecode"):
+            errors.append("Compilation stage not completed: Contract bytecode is missing")
+        elif not compiled.get("abi"):
+            errors.append("Compilation stage not completed: Contract ABI is missing")
+        
+        # 3. Validate audit stage - audit results must exist if audit was selected
+        selected_tasks = workflow_context.get("selected_tasks", [])
+        if isinstance(selected_tasks, str):
+            selected_tasks = [selected_tasks]
+        selected_tasks = [task.lower() for task in selected_tasks] if selected_tasks else []
+        
+        if "audit" in selected_tasks:
+            audit_result = input_data.get("audit_result") or workflow_context.get("audit_result")
+            if not audit_result:
+                errors.append("Audit stage not completed: Audit results are missing")
+            elif audit_result.get("status") == "failed":
+                errors.append("Audit stage failed: Cannot deploy contract with failed audit")
+        
+        # 4. Validate testing stage - test results must exist if testing was selected
+        if "testing" in selected_tasks:
+            test_result = input_data.get("test_result") or workflow_context.get("test_result")
+            if not test_result:
+                errors.append("Testing stage not completed: Test results are missing")
+            elif test_result.get("status") == "failed":
+                errors.append("Testing stage failed: Cannot deploy contract with failed tests")
+        
+        # 5. Validate wallet address is provided for deployment
+        wallet_address = input_data.get("wallet_address")
+        if not wallet_address:
+            errors.append("Wallet address is required for deployment. Please connect your wallet.")
+        
+        if errors:
+            error_message = "Cannot proceed with deployment. The following requirements are not met:\n" + "\n".join(f"  - {error}" for error in errors)
+            raise ValidationError(
+                error_message,
+                details={"missing_stages": errors, "workflow_context": workflow_context}
+            )
+        
+        logger.info(
+            f"Workflow prerequisites validated successfully for deployment: "
+            f"generation={bool(source_code)}, compilation={bool(compiled)}, "
+            f"audit={'completed' if 'audit' not in selected_tasks or input_data.get('audit_result') else 'skipped'}, "
+            f"testing={'completed' if 'testing' not in selected_tasks or input_data.get('test_result') else 'skipped'}"
+        )
+
     async def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Deploy contract to blockchain"""
+        """
+        Deploy contract to blockchain
+        
+        Validates that all required workflow stages are completed before deployment:
+        - Generation: Contract code must exist
+        - Compilation: Compiled contract with bytecode must exist
+        - Audit: Audit must be completed (if selected)
+        - Testing: Tests must be passed (if selected)
+        """
         compiled = input_data.get("compiled_contract")
         network = input_data.get("network")
         signed_transaction = input_data.get("signed_transaction")
@@ -60,6 +142,10 @@ class DeploymentService(ServiceInterface):
         constructor_args = input_data.get("constructor_args", [])
         source_code = input_data.get("source_code")
         use_gasless = input_data.get("use_gasless", False)
+        workflow_context = input_data.get("workflow_context", {})
+        
+        # Validate all required workflow stages are completed
+        self._validate_workflow_prerequisites(input_data, workflow_context)
 
         from hyperagent.blockchain.network_features import NetworkFeatureManager
 
@@ -100,6 +186,26 @@ class DeploymentService(ServiceInterface):
                 result["status"] = "success"
             return result
 
+        # Automatically enable gasless for x402 networks (sponsored by paymaster)
+        # For x402 networks, gasless is automatic via ERC-4337 Smart Account paymaster
+        if is_x402_network and wallet_address:
+            # Override use_gasless to True for x402 networks (sponsored by paymaster)
+            use_gasless = True
+            logger.info(
+                f"x402 network ({network}) detected. Gasless deployment enabled automatically. "
+                f"Gas fees will be sponsored by paymaster for wallet {wallet_address}."
+            )
+            # For x402 networks, deployment requires user-signed transaction
+            # The paymaster will automatically sponsor gas fees
+            if not signed_transaction:
+                # Return pending status - frontend will handle transaction signing
+                return {
+                    "status": "pending_signature",
+                    "message": "Deployment requires user wallet signature. Gas fees will be sponsored by paymaster.",
+                    "wallet_address": wallet_address,
+                    "network": network,
+                }
+        
         if use_gasless and wallet_address and settings.thirdweb_server_wallet_address:
             from hyperagent.utils.helpers import normalize_wallet_address, validate_wallet_address
 
@@ -127,7 +233,7 @@ class DeploymentService(ServiceInterface):
                     f"x402 network ({network}) detected. Facilitator is ERC-4337 Smart Account (not EOA). "
                     f"Gasless deployment via Smart Account requires Thirdweb SDK (TypeScript service). "
                     f"Using user-signed transaction deployment for {wallet_address}. "
-                    f"User will sign the deployment transaction in their wallet - no PRIVATE_KEY needed."
+                    f"User will sign the deployment transaction in their wallet."
                 )
             else:
                 facilitator_private_key = (
@@ -138,9 +244,9 @@ class DeploymentService(ServiceInterface):
 
                 if not facilitator_private_key:
                     logger.warning(
-                        f"Gasless deployment requested but THIRDWEB_SERVER_WALLET_PRIVATE_KEY not configured. "
+                        f"Gasless deployment requested but facilitator wallet not configured. "
                         f"Falling back to user-signed transaction deployment for {wallet_address} on {network}. "
-                        f"To enable gasless deployment on non-x402 networks, set THIRDWEB_SERVER_WALLET_PRIVATE_KEY in your environment."
+                        f"Note: Gasless deployment on non-x402 networks requires additional configuration."
                     )
                 else:
                     private_key = facilitator_private_key
@@ -187,58 +293,59 @@ class DeploymentService(ServiceInterface):
         )
         is_x402_network = network in enabled_networks and settings.x402_enabled
 
-        # x402 networks currently require user wallet signature for deployment
-        if is_x402_network and not signed_transaction:
+        # ALL deployments require user wallet signature - no server-side private key deployment
+        # Users own their contracts and must sign deployment transactions
+        if not signed_transaction:
+            if not wallet_address:
+                raise WalletError(
+                    "Deployment requires user wallet address. Please connect your wallet in the frontend.",
+                    details={
+                        "has_wallet_address": False,
+                        "has_signed_transaction": False,
+                        "network": network,
+                    },
+                )
+            
             logger.info(
-                f"Deployment skipped for x402 network ({network}). "
-                f"User must sign transaction via frontend. "
-                f"Workflow will complete without deployment. "
-                f"Use /x402/deployments/prepare and /x402/workflows/complete-deployment endpoints."
+                f"Deployment requires user wallet signature for {wallet_address} on {network}. "
+                f"Please use frontend to prepare and sign deployment transaction."
             )
             return {
-                "status": "skipped",
+                "status": "pending_signature",
                 "message": "Deployment requires user wallet signature. Please use frontend to sign and deploy.",
                 "contract_address": None,
                 "tx_hash": None,
-                "deployment_skipped": True,
+                "deployment_pending": True,
                 "requires_user_signature": True,
                 "network": network,
                 "wallet_address": wallet_address,
             }
 
-        # Non-x402: allow server-side deployment via PRIVATE_KEY
-        if private_key:
-            if settings.enable_deployment_validation:
-                try:
-                    await self.validate_deployment_requirements(network, private_key)
-                except Exception as e:
-                    raise WalletError(
-                        f"Deployment validation failed: {e}",
-                        details={"network": network},
-                    )
-
-            return await self._deploy_manual_with_retry(
-                compiled=compiled,
-                network=network,
-                private_key=private_key,
-                source_code=source_code,
-                constructor_args=constructor_args,
+        # Deploy with user-signed transaction (all networks require this)
+        if not wallet_address:
+            raise WalletError(
+                "wallet_address is required when signed_transaction is provided.",
+                details={"field": "wallet_address", "required": True},
             )
 
-        # Otherwise, require user signature or gasless facilitator
-        raise WalletError(
-            "Deployment requires either a signed transaction (signed_transaction + wallet_address), "
-            "use_gasless=true (with THIRDWEB_SERVER_WALLET_PRIVATE_KEY configured), or a server-side PRIVATE_KEY.",
-            details={
-                "has_signed_transaction": bool(signed_transaction),
-                "has_wallet_address": bool(wallet_address),
-                "use_gasless": use_gasless,
-                "facilitator_configured": bool(settings.thirdweb_server_wallet_address),
-                "has_private_key": bool(private_key),
-                "is_x402_network": is_x402_network,
-                "network": network,
-            },
+        from hyperagent.utils.helpers import normalize_wallet_address, validate_wallet_address
+
+        is_valid, error_msg = validate_wallet_address(wallet_address)
+        if not is_valid:
+            raise WalletError(
+                f"Invalid wallet address: {error_msg}",
+                details={"field": "wallet_address", "value": wallet_address},
+            )
+
+        wallet_address = normalize_wallet_address(wallet_address)
+
+        logger.info(f"Deploying with user wallet signature: {wallet_address} on {network}")
+        result = await self.x402_helper.deploy_with_signed_transaction(
+            signed_transaction, network, wallet_address
         )
+        if "status" not in result:
+            result["status"] = "success"
+        return result
 
     async def prepare_deployment_transaction(
         self,
@@ -277,37 +384,65 @@ class DeploymentService(ServiceInterface):
         else:
             constructor = contract.constructor()
 
+        # Validate bytecode
+        bytecode = compiled.get("bytecode", "")
+        if not bytecode or bytecode == "0x":
+            raise ValueError("Compiled contract must have bytecode")
+        
+        # Validate ABI
+        abi = compiled.get("abi", [])
+        if not abi:
+            logger.warning("Compiled contract has no ABI, proceeding with empty ABI")
+
         try:
             gas_estimate = constructor.estimate_gas({"from": wallet_address})
         except Exception as e:
-            raise ValueError(f"Gas estimation failed: {e}")
+            error_msg = str(e)
+            logger.error(f"Gas estimation failed for {wallet_address} on {network}: {error_msg}")
+            raise ValueError(f"Gas estimation failed: {error_msg}")
 
         network_config = self.network_manager.get_network_config(network)
+        if not network_config:
+            raise NetworkError(f"Network configuration not found for {network}")
+        
         chain_id = network_config.get("chain_id")
+        if not chain_id:
+            raise NetworkError(f"Chain ID not found for network {network}")
 
         try:
             fee_data = w3.eth.fee_history(FEE_HISTORY_BLOCKS, "latest")
             base_fee = fee_data["baseFeePerGas"][0]
             max_priority_fee = w3.to_wei(MAX_PRIORITY_FEE_GWEI, "gwei")
             gas_price = base_fee + max_priority_fee
-        except Exception:
-            gas_price = w3.eth.gas_price
+        except Exception as e:
+            logger.warning(f"Failed to get fee history, using legacy gas price: {e}")
+            try:
+                gas_price = w3.eth.gas_price
+            except Exception as gas_error:
+                raise NetworkError(f"Failed to get gas price: {gas_error}")
 
-        nonce = w3.eth.get_transaction_count(wallet_address)
+        try:
+            nonce = w3.eth.get_transaction_count(wallet_address)
+        except Exception as e:
+            raise NetworkError(f"Failed to get transaction count for {wallet_address}: {e}")
 
-        tx = constructor.build_transaction(
-            {
-                "from": wallet_address,
-                "nonce": nonce,
-                "gas": int(gas_estimate * GAS_BUFFER_MULTIPLIER),
-                "gasPrice": gas_price,
-                "chainId": chain_id,
-            }
-        )
+        try:
+            tx = constructor.build_transaction(
+                {
+                    "from": wallet_address,
+                    "nonce": nonce,
+                    "gas": int(gas_estimate * GAS_BUFFER_MULTIPLIER),
+                    "gasPrice": gas_price,
+                    "chainId": chain_id,
+                }
+            )
+        except Exception as e:
+            logger.error(f"Failed to build transaction: {e}")
+            raise ValueError(f"Failed to build deployment transaction: {e}")
 
         logger.info(
             f"Prepared deployment transaction for {wallet_address} on {network}: "
-            f"nonce={nonce}, gas={tx['gas']}, chainId={chain_id}"
+            f"nonce={nonce}, gas={tx.get('gas', 'unknown')}, chainId={chain_id}"
         )
 
         return {
@@ -645,12 +780,13 @@ class DeploymentService(ServiceInterface):
                 "batches_deployed": 0,
             }
 
-        pk = private_key or settings.private_key
-        if not pk:
-            raise WalletError(
-                "Batch deployment requires PRIVATE_KEY (server-side deployment).",
-                details={"network": network},
-            )
+        # Batch deployment with server-side private keys is disabled per security policy
+        # All deployments must use user-signed transactions
+        raise WalletError(
+            "Batch deployment with server-side keys is not supported. "
+            "Please deploy contracts individually using user wallet signatures.",
+            details={"network": network, "reason": "Security policy: no server-side private keys"},
+        )
 
         async def deploy_single(contract_config: Dict[str, Any]) -> Dict[str, Any]:
             return await self._deploy_manual_with_retry(

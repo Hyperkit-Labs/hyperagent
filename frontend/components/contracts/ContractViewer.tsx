@@ -6,7 +6,9 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { copyToClipboard } from '@/lib/utils';
-import { Copy, Check, Download } from 'lucide-react';
+import Copy from 'lucide-react/dist/esm/icons/copy'
+import Check from 'lucide-react/dist/esm/icons/check'
+import Download from 'lucide-react/dist/esm/icons/download'
 
 interface ContractViewerProps {
   contractCode: string;

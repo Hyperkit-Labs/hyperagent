@@ -19,7 +19,10 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { Card } from '@/components/ui/Card';
-import { TrendingUp, DollarSign, Calendar, PieChart as PieChartIcon } from 'lucide-react';
+import TrendingUp from 'lucide-react/dist/esm/icons/trending-up'
+import DollarSign from 'lucide-react/dist/esm/icons/dollar-sign'
+import Calendar from 'lucide-react/dist/esm/icons/calendar'
+import PieChartIcon from 'lucide-react/dist/esm/icons/pie-chart'
 
 interface PaymentHistoryItem {
   timestamp: string;

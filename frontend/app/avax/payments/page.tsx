@@ -7,7 +7,10 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { BudgetDisplay } from '@/components/x402/BudgetDisplay';
 import { PaymentHistoryTable } from '@/components/analytics/PaymentHistoryTable';
 import { getPaymentHistory, getPaymentSummary, type PaymentHistoryItem, type PaymentSummary } from '@/lib/api';
-import { Wallet, History, TrendingUp, DollarSign } from 'lucide-react';
+import Wallet from 'lucide-react/dist/esm/icons/wallet'
+import History from 'lucide-react/dist/esm/icons/history'
+import TrendingUp from 'lucide-react/dist/esm/icons/trending-up'
+import DollarSign from 'lucide-react/dist/esm/icons/dollar-sign'
 import { motion } from 'framer-motion';
 
 export default function PaymentsPage() {

@@ -42,7 +42,11 @@ async function buildServer() {
   await app.register(registerHealthRoutes);
   
   // Database connection with automatic fallback: Supabase (primary) -> Local Postgres (fallback)
-  const localPostgresUrl = "postgresql://hyperagent_user:secure_password@postgres:5432/hyperagent_db";
+  // Use localhost when running outside Docker, postgres hostname when inside Docker
+  const isInsideDocker = env.DATABASE_URL.includes("@postgres:");
+  const localPostgresHost = isInsideDocker ? "postgres" : "localhost";
+  const localPostgresUrl = `postgresql://hyperagent_user:secure_password@${localPostgresHost}:5432/hyperagent_db`;
+  
   const store = await WorkflowStore.createWithFallback({
     supabaseUrl: env.DATABASE_URL,
     localUrl: localPostgresUrl,

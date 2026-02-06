@@ -12,27 +12,6 @@ def calculate_hash(content: str) -> str:
     return hashlib.sha256(content.encode()).hexdigest()
 
 
-def extract_solidity_code(text: str) -> Optional[str]:
-    """
-    Extract Solidity code from LLM response
-
-    Logic: Look for code blocks marked with ```solidity or ```sol
-    """
-    # Pattern to match Solidity code blocks
-    pattern = r"```(?:solidity|sol)?\s*\n(.*?)```"
-    matches = re.findall(pattern, text, re.DOTALL)
-
-    if matches:
-        return matches[0].strip()
-
-    # If no code block found, try to extract between pragma and last }
-    pragma_match = re.search(r"pragma\s+solidity.*?}", text, re.DOTALL)
-    if pragma_match:
-        return pragma_match.group(0)
-
-    return None
-
-
 def validate_ethereum_address(address: str) -> bool:
     """Validate Ethereum address format"""
     pattern = r"^0x[a-fA-F0-9]{40}$"

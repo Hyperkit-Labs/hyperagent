@@ -16,8 +16,7 @@ Next.js frontend application for HyperAgent - AI Agent Platform for On-Chain Sma
 ### Prerequisites
 
 - Node.js 18+ and npm
-- HyperAgent TS API running on `http://localhost:4000` (default)
-- Optional: Python backend on `http://localhost:8000` (some legacy endpoints / websockets)
+- Python backend (HyperAgent) running on `http://localhost:8000`
 
 ### Installation
 
@@ -26,19 +25,23 @@ Next.js frontend application for HyperAgent - AI Agent Platform for On-Chain Sma
 npm install
 ```
 
-2. Create environment file:
-```bash
-cp .env.local.example .env.local
+2. Configure environment variables:
+
+**IMPORTANT:** The frontend uses the root `.env` file as the single source of truth.  
+All environment variables should be configured in the root `.env` file, not in the frontend directory.
+
+Required variables in root `.env`:
+```
+# Thirdweb (Required for wallet connect and x402 payments)
+NEXT_PUBLIC_THIRDWEB_CLIENT_ID=your_thirdweb_client_id
+
+# API URLs (Optional - defaults shown)
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_WS_URL=ws://localhost:8000
+NEXT_PUBLIC_X402_VERIFIER_URL=http://localhost:3001
 ```
 
-3. Update `.env.local` with your API URL:
-```
-# REST API (TS-first)
-NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1
-
-# WebSocket (currently served by the Python backend)
-NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws
-```
+The `next.config.ts` automatically loads these variables from the root `.env` file.
 
 ### Development
 

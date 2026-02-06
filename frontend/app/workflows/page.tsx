@@ -1,170 +1,163 @@
+/**
+ * Workflows Page
+ * Displays list of all workflows with filtering and real-time updates
+ * Uses real data from backend with error handling
+ */
+
 'use client';
 
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { WorkflowCard } from '@/components/workflows/WorkflowCard';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { getWorkflows } from '@/lib/api';
-import type { Workflow } from '@/lib/types';
-import { FileCode, Plus, Filter, RefreshCw } from 'lucide-react';
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.05,
-    },
-  },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-  },
-};
+import { ErrorBoundary } from '@/components/errors/ErrorBoundary';
+import { LoadingState, TableSkeleton } from '@/components/ui/LoadingState';
+import { ErrorAlert, EmptyState } from '@/components/ui/ErrorAlert';
+import { WorkflowsHeader } from '@/components/pages/workflows/page-header';
+import { WorkflowsToolbar } from '@/components/pages/workflows/toolbar';
+import { WorkflowsTable } from '@/components/pages/workflows/workflow-stable';
+import { useWorkflows } from '@/hooks/useWorkflows';
 
 export default function WorkflowsPage() {
-  const [workflows, setWorkflows] = useState<Workflow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
 
-  useEffect(() => {
-    fetchWorkflows();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter]);
+  // Fetch workflows with real-time updates
+  const { 
+    workflows, 
+    loading, 
+    error, 
+    refetch, 
+    isEmpty,
+    total
+  } = useWorkflows({
+    autoRefresh: true,
+    refreshInterval: 15000, // 15 seconds for faster updates
+    filters: {
+      status: statusFilter === 'all' ? undefined : statusFilter,
+    },
+  });
 
-  const fetchWorkflows = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await getWorkflows({
-        status: filter !== 'all' ? filter : undefined,
-        limit: 100,
-      });
-      setWorkflows(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load workflows');
-      console.error('Failed to fetch workflows:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Client-side search filter
+  const filteredWorkflows = workflows.filter(workflow => {
+    const matchesSearch = searchTerm === '' || 
+      workflow.nlp_input?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      workflow.workflow_id?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    return matchesSearch;
+  });
 
-  const filteredWorkflows = workflows;
+  // Error state
+  if (error) {
+    return (
+      <ErrorBoundary>
+        <div className="space-y-8">
+          <WorkflowsHeader />
+          <ErrorAlert
+            title="Failed to load workflows"
+            message={error}
+            severity="error"
+            action={{
+              label: 'Retry',
+              onClick: refetch,
+            }}
+          />
+        </div>
+      </ErrorBoundary>
+    );
+  }
+
+  // Initial loading state
+  if (loading && workflows.length === 0) {
+    return (
+      <ErrorBoundary>
+        <div className="space-y-8">
+          <WorkflowsHeader />
+          <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-xl p-6">
+            <TableSkeleton rows={10} />
+          </div>
+        </div>
+      </ErrorBoundary>
+    );
+  }
+
+  // Empty state
+  if (isEmpty && !loading) {
+    return (
+      <ErrorBoundary>
+        <div className="space-y-8">
+          <WorkflowsHeader />
+          <EmptyState
+            title="No workflows yet"
+            message="Create your first workflow to get started with smart contract development."
+            action={{
+              label: 'Create Workflow',
+              onClick: () => window.location.href = '/workflows/create',
+            }}
+          />
+        </div>
+      </ErrorBoundary>
+    );
+  }
 
   return (
-    <div className="relative w-full bg-[#030712] text-white min-h-screen">
-      <div className="max-w-[1440px] mx-auto px-6 py-12">
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="space-y-8"
-        >
-          {/* Header */}
-          <motion.div variants={itemVariants} className="flex items-center justify-between">
-            <div>
-              <h1 className="text-4xl font-bold text-white flex items-center gap-3 mb-2">
-                <FileCode className="w-8 h-8 text-blue-400" />
-                Workflows
-              </h1>
-              <p className="text-gray-400 mt-2">View and manage your smart contract workflows</p>
-            </div>
-            <Link href="/workflows/create">
-              <Button className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 h-11 rounded-xl shadow-lg shadow-blue-500/20 transition-all hover:scale-105 active:scale-95">
-                <Plus className="w-4 h-4 mr-2" />
-                Create Workflow
-              </Button>
-            </Link>
-          </motion.div>
+    <ErrorBoundary>
+      <div className="space-y-8">
+        <WorkflowsHeader />
 
-          {/* Filters */}
-          <motion.div variants={itemVariants}>
-            <div className="bg-gray-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Filter className="w-5 h-5 text-gray-400" />
-                  <span className="text-sm font-semibold text-gray-300">Filter by Status:</span>
-                  <div className="flex gap-2">
-                    {['all', 'completed', 'generating', 'compiling', 'auditing', 'testing', 'deploying', 'failed', 'processing', 'success'].map((status) => (
-                      <button
-                        key={status}
-                        onClick={() => setFilter(status)}
-                        className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-                          filter === status
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/5'
-                        }`}
-                      >
-                        {status.charAt(0).toUpperCase() + status.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <button
-                  onClick={fetchWorkflows}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 bg-white/5 hover:bg-white/10 rounded-lg border border-white/5 transition-colors"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  Refresh
-                </button>
-              </div>
-            </div>
-          </motion.div>
+        {/* Toolbar with filters and actions */}
+        <WorkflowsToolbar
+          searchQuery={searchTerm}
+          onSearchChange={setSearchTerm}
+          selectedStatus={statusFilter}
+          onStatusChange={setStatusFilter}
+          selectedProject="All"
+          onProjectChange={() => {}}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+        />
 
-          {/* Workflows Grid */}
-          {loading ? (
-            <div className="flex items-center justify-center min-h-[400px]">
-              <LoadingSpinner size="lg" text="Loading workflows..." />
+        {/* Workflows Table */}
+        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-xl overflow-hidden">
+          {loading && workflows.length > 0 && (
+            <div className="p-3 bg-violet-500/10 border-b border-violet-500/20 flex items-center gap-2 text-sm text-violet-400">
+              <LoadingState variant="minimal" message="Refreshing..." />
             </div>
-          ) : error ? (
-            <div className="bg-gray-900/50 backdrop-blur-xl border border-red-500/20 rounded-2xl p-12">
-              <div className="text-center">
-                <p className="text-red-400 font-semibold mb-2">Error loading workflows</p>
-                <p className="text-sm text-gray-400 mb-4">{error}</p>
-                <Button onClick={fetchWorkflows} className="bg-blue-600 hover:bg-blue-500 text-white">
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Retry
-                </Button>
-              </div>
-            </div>
-          ) : filteredWorkflows.length === 0 ? (
-            <div className="bg-gray-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-12">
-              <div className="text-center">
-                <FileCode className="w-16 h-16 mx-auto mb-4 text-gray-500" />
-                <p className="text-gray-300 font-semibold mb-2">No workflows found</p>
-                <p className="text-sm text-gray-500 mb-6">
-                  {filter !== 'all' ? `No workflows with status "${filter}"` : 'Get started by creating your first workflow'}
-                </p>
-                <Link href="/workflows/create">
-                  <Button className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 h-11 rounded-xl">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Your First Workflow
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <motion.div
-              variants={containerVariants}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-            >
-              {filteredWorkflows.map((workflow) => (
-                <motion.div key={workflow.workflow_id} variants={itemVariants}>
-                  <WorkflowCard workflow={workflow} />
-                </motion.div>
-              ))}
-            </motion.div>
           )}
-        </motion.div>
+
+          <WorkflowsTable 
+            workflows={filteredWorkflows}
+            onRefresh={refetch}
+          />
+
+          {filteredWorkflows.length === 0 && !loading && (
+            <div className="p-12 text-center">
+              <p className="text-slate-400">
+                No workflows match your filters.
+              </p>
+              <button
+                onClick={() => {
+                  setStatusFilter('all');
+                  setSearchTerm('');
+                }}
+                className="mt-4 text-violet-400 hover:text-violet-300 text-sm font-medium"
+              >
+                Clear filters
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Create New Workflow Button - Fixed position */}
+        <Link
+          href="/workflows/create"
+          className="fixed bottom-8 right-8 px-6 py-3 bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-500 hover:to-violet-400 text-white rounded-xl font-medium shadow-lg hover:shadow-xl hover:shadow-violet-500/25 transition-all duration-200 flex items-center gap-2"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          New Workflow
+        </Link>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }

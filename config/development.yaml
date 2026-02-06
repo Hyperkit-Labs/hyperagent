@@ -1,0 +1,50 @@
+# Development Environment Configuration
+# Overrides base.yaml settings for local development
+
+config_version: "1.0"
+
+# Development-specific service settings
+services:
+  backend:
+    host: localhost
+    port: 8000
+    
+  frontend:
+    host: localhost
+    port: 3000
+    
+  orchestrator:
+    host: localhost
+    port: 4000
+
+# Development feature flags
+features:
+  x402_payments:
+    enabled: true
+    networks: "*"
+    
+  eigenda_storage:
+    enabled: false
+    
+  monitoring:
+    prometheus: true
+    mlflow: true
+    custom_metrics: false  # Disable custom metrics in dev
+
+# Development logging
+logging:
+  level: DEBUG
+  format: colored
+  outputs:
+    - console
+
+# Development security (relaxed)
+security:
+  cors_origins: "*"  # Allow all origins in dev
+  jwt_secret: "dev-secret-do-not-use-in-production"
+
+# Development performance (lower limits)
+performance:
+  max_workers: 2
+  request_timeout_seconds: 60
+  max_concurrent_requests: 50

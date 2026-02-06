@@ -21,6 +21,8 @@ app.get("/health", (req: Request, res: Response) => {
 app.post("/settle-payment", async (req: Request, res: Response) => {
   try {
     const { resourceUrl, method, paymentData, payTo, network, price, routeConfig } = req.body;
+    // Note: payTo should be passed from API (config/deployment.yaml)
+    // MERCHANT_WALLET_ADDRESS env is fallback only
     const merchantWallet = payTo || process.env.MERCHANT_WALLET_ADDRESS;
 
     if (!resourceUrl || !method || !network || !price || !merchantWallet) {

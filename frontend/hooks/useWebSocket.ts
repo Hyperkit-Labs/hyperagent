@@ -11,6 +11,11 @@ export function useWebSocket(workflowId: string | null) {
   const wsRef = useRef<WorkflowWebSocket | null>(null);
 
   useEffect(() => {
+    // Skip WebSocket during SSR
+    if (typeof window === 'undefined') {
+      return;
+    }
+
     if (!workflowId) {
       return;
     }

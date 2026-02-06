@@ -284,6 +284,18 @@ class ConfigLoader:
         config = self.get_x402_config()
         fraud = config.get("fraud_prevention", {})
         return fraud.get("rate_limits", {})
+    
+    def get_x402_protocol_standard(self) -> str:
+        """Get x402 protocol standard (EIP-7702 or ERC-4337)"""
+        config = self.get_x402_config()
+        return config.get("protocol_standard", "EIP-7702")
+    
+    def get_x402_gas_sponsorship_config(self) -> Dict[str, Any]:
+        """Get Thirdweb gas sponsorship configuration"""
+        config = self.get_x402_config()
+        integrations = config.get("integrations", {})
+        thirdweb = integrations.get("thirdweb", {})
+        return thirdweb.get("gas_sponsorship", {})
 
 
 # Singleton instance
@@ -357,4 +369,19 @@ def get_x402_supported_networks() -> list[str]:
 def is_network_x402_supported(network_id: str) -> bool:
     """Check if network supports x402"""
     return get_config_loader().is_network_x402_supported(network_id)
+
+
+def get_x402_pricing(category: str, tier: str = "basic") -> float:
+    """Get x402 pricing for category and tier"""
+    return get_config_loader().get_x402_pricing(category, tier)
+
+
+def get_x402_config() -> Dict[str, Any]:
+    """Get x402 configuration"""
+    return get_config_loader().get_x402_config()
+
+
+def get_x402_protocol_standard() -> str:
+    """Get x402 protocol standard"""
+    return get_config_loader().get_x402_protocol_standard()
 

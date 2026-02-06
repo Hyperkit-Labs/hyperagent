@@ -1,0 +1,90 @@
+# Thirdweb Documentation for HyperAgent
+
+## Overview
+
+Thirdweb is a Web3 development platform that provides SDKs, tools, and infrastructure for building decentralized applications. HyperAgent uses Thirdweb primarily for wallet management, account abstraction (ERC-4337), and EIP-7702 EOA support.
+
+## Key Use Cases in HyperAgent
+
+- **Account Abstraction**: ERC-4337 smart contract wallets for gasless transactions
+- **EOA Support**: EIP-7702 for enabling smart contract features on EOAs
+- **Multi-Chain Deployment**: Unified SDK for deploying across EVM chains
+- **Wallet Management**: Secure wallet creation and management
+- **x402 Payments**: Integration with x402 payment protocol on SKALE
+
+## Documentation Links
+
+### Official Documentation
+- **Main Docs**: https://portal.thirdweb.com/
+- **SDK Documentation**: https://portal.thirdweb.com/sdk
+- **React SDK**: https://portal.thirdweb.com/react
+- **TypeScript SDK**: https://portal.thirdweb.com/typescript
+- **Account Abstraction**: https://portal.thirdweb.com/account-abstraction
+- **Deployment**: https://portal.thirdweb.com/deploy
+
+### Key Concepts
+- **Smart Wallets**: ERC-4337 account abstraction implementation
+- **EOAs with EIP-7702**: Traditional wallets with smart contract capabilities
+- **Contract Deployment**: Simplified deployment across chains
+- **Wallet SDK**: Client-side wallet management
+
+## Implementation in HyperAgent
+
+### DeployAgent Integration
+- Uses Thirdweb SDK for multi-chain contract deployment
+- Supports ERC-4337 for gasless deployments
+- Integrates with x402 for payment processing on SKALE
+
+### Wallet Management
+- Smart wallet creation for users
+- Session key management for agent operations
+- Multi-signature support for enterprise use cases
+
+### Chain Support
+- Mantle, Avalanche, BNB, SKALE, Arbitrum, Base, Polygon
+- Unified API across all supported chains
+
+## Code Examples
+
+### Deploying Contracts
+```typescript
+import { ThirdwebSDK } from "@thirdweb-dev/sdk";
+
+const sdk = ThirdwebSDK.fromPrivateKey(
+  privateKey,
+  chainId
+);
+
+const contract = await sdk.deployer.deployContract(
+  contractName,
+  constructorParams
+);
+```
+
+### Account Abstraction
+```typescript
+import { SmartWallet } from "@thirdweb-dev/wallets";
+
+const wallet = new SmartWallet({
+  factoryAddress: "0x...",
+  chain: supportedChains.mantle,
+});
+
+await wallet.connect({
+  personalWallet: personalWallet,
+});
+```
+
+## Best Practices
+
+1. **Gas Optimization**: Use account abstraction for gasless transactions
+2. **Security**: Always validate contract addresses and parameters
+3. **Error Handling**: Implement retry logic for network operations
+4. **Rate Limiting**: Respect API rate limits for production use
+
+## Related Resources
+
+- ERC-4337 Specification: https://eips.ethereum.org/EIPS/eip-4337
+- EIP-7702 Specification: https://eips.ethereum.org/EIPS/eip-7702
+- Thirdweb GitHub: https://github.com/thirdweb-dev
+

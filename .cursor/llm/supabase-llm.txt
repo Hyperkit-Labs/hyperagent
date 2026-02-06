@@ -1,0 +1,94 @@
+# Supabase Documentation for HyperAgent
+
+## Overview
+
+Supabase is an open-source Firebase alternative providing PostgreSQL database, authentication, real-time subscriptions, and storage. HyperAgent uses Supabase for relational data storage, multi-tenant workspace management, and Row Level Security (RLS) for data isolation.
+
+## Key Use Cases in HyperAgent
+
+- **Workspace Management**: Multi-tenant workspace isolation
+- **Project Storage**: Store projects, runs, and artifacts
+- **User Management**: Authentication and authorization
+- **Row Level Security**: Workspace-scoped data access
+- **Real-time Subscriptions**: Live updates for workflow progress
+
+## Documentation Links
+
+### Official Documentation
+- **Main Docs**: https://supabase.com/docs
+- **PostgreSQL Guide**: https://supabase.com/docs/guides/database
+- **Row Level Security**: https://supabase.com/docs/guides/auth/row-level-security
+- **Python Client**: https://supabase.com/docs/reference/python
+- **Realtime**: https://supabase.com/docs/guides/realtime
+
+### Key Concepts
+- **Row Level Security (RLS)**: Policy-based access control
+- **PostgreSQL Functions**: Stored procedures and triggers
+- **Realtime**: WebSocket-based live updates
+- **Storage**: File storage with access policies
+- **Auth**: Built-in authentication with JWT
+
+## Implementation in HyperAgent
+
+### Database Schema
+- Tables: `workspaces`, `projects`, `runs`, `artefacts`, `deployments`
+- RLS policies for workspace isolation
+- Foreign key relationships for data integrity
+
+### Key Tables
+- `workspaces` - Tenant isolation
+- `projects` - User projects
+- `runs` - Workflow execution history
+- `artefacts` - Generated code and audit reports
+- `deployment_audits` - Deployment tracking
+
+### Connection Pooling
+- Use Supabase connection pooler for production
+- Session management via SQLAlchemy
+- Migration management with Alembic
+
+## Code Examples
+
+### Database Connection
+```python
+from supabase import create_client, Client
+
+supabase: Client = create_client(
+    supabase_url=os.getenv("SUPABASE_URL"),
+    supabase_key=os.getenv("SUPABASE_KEY")
+)
+```
+
+### Row Level Security
+```sql
+-- Example RLS policy
+CREATE POLICY "Users can only see their workspace projects"
+ON projects
+FOR SELECT
+USING (workspace_id = current_setting('app.workspace_id')::uuid);
+```
+
+### Querying Data
+```python
+from hyperagent.db.session import get_db
+
+def get_projects(workspace_id: str, db: Session):
+    return db.query(Project).filter(
+        Project.workspace_id == workspace_id
+    ).all()
+```
+
+## Best Practices
+
+1. **RLS Policies**: Always implement RLS for multi-tenant data
+2. **Connection Pooling**: Use Supabase pooler for production
+3. **Migrations**: Use Alembic for schema versioning
+4. **Indexes**: Add indexes for frequently queried columns
+5. **Backups**: Enable automatic backups in Supabase dashboard
+
+## Related Resources
+
+- Supabase GitHub: https://github.com/supabase/supabase
+- PostgreSQL Documentation: https://www.postgresql.org/docs/
+- Alembic (Migrations): https://alembic.sqlalchemy.org/
+

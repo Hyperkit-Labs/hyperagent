@@ -1,0 +1,80 @@
+# Slither & Mythril Documentation for HyperAgent
+
+## Overview
+
+Slither and Mythril are static analysis tools for Solidity smart contracts. HyperAgent uses these tools in the AuditAgent to automatically detect security vulnerabilities, gas optimization opportunities, and code quality issues before deployment.
+
+## Key Use Cases in HyperAgent
+
+- **Security Auditing**: Automated vulnerability detection
+- **Gas Optimization**: Identify gas-saving opportunities
+- **Code Quality**: Check for best practices and patterns
+- **Pre-deployment Checks**: Validate contracts before deployment
+- **Continuous Integration**: Run in CI/CD pipeline
+
+## Documentation Links
+
+### Slither
+- **Main Docs**: https://github.com/crytic/slither
+- **Detectors**: https://github.com/crytic/slither/wiki/Detector-Documentation
+- **Python API**: https://github.com/crytic/slither#slither-as-a-library
+- **Installation**: https://github.com/crytic/slither#installation
+
+### Mythril
+- **Main Docs**: https://mythril-classic.readthedocs.io/
+- **GitHub**: https://github.com/ConsenSys/mythril
+- **Usage**: https://mythril-classic.readthedocs.io/en/master/usage.html
+
+### Additional Tools
+- **MythX**: https://docs.mythx.io/
+- **Echidna**: https://github.com/crytic/echidna
+
+## Implementation in HyperAgent
+
+### AuditAgent Integration
+- Location: `hyperagent/agents/audit.py`
+- Wrappers: `hyperagent/security/slither_wrapper.py`, `mythril_wrapper.py`
+- Service: `hyperagent/core/services/audit_service.py`
+
+### Security Checks
+- Reentrancy vulnerabilities
+- Access control issues
+- Integer overflow/underflow
+- Gas optimization opportunities
+- Best practice violations
+
+## Code Examples
+
+### Slither Analysis
+```python
+from slither import Slither
+
+slither = Slither("contracts/MyContract.sol")
+results = slither.run_detectors()
+
+for detector in results:
+    for finding in detector:
+        print(f"{finding.check}: {finding.description}")
+```
+
+### Mythril Analysis
+```bash
+myth analyze contracts/MyContract.sol
+myth analyze contracts/MyContract.sol --execution-timeout 300
+```
+
+## Best Practices
+
+1. **Run Before Deployment**: Always audit before deploying
+2. **Fix Critical Issues**: Address high-severity findings
+3. **Gas Optimization**: Review gas-related findings
+4. **CI Integration**: Automate in deployment pipeline
+5. **False Positives**: Tune detectors to reduce noise
+
+## Related Resources
+
+- Slither GitHub: https://github.com/crytic/slither
+- Mythril GitHub: https://github.com/ConsenSys/mythril
+- Echidna GitHub: https://github.com/crytic/echidna
+- Secureum: https://secureum.xyz/
+

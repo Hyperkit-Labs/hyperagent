@@ -70,21 +70,46 @@ function getUnstagedFiles() {
     .trim()
     .split('\n')
     .filter(line => {
-      // Untracked files: ??
-      // Modified unstaged:  M (space before M)
-      // Deleted unstaged:  D (space before D)
-      // Renamed unstaged:  R (space before R)
-      // Copied unstaged:  C (space before C)
-      const status = line.substring(0, 2);
-      return status === '??' || 
-             status === ' M' || 
-             status === ' D' || 
-             status === ' R' || 
-             status === ' C' ||
-             status === 'AM' || // Added and modified
-             status === 'AD';   // Added and deleted
+      if (!line.trim()) return false;
+      // Git status porcelain format: XY filename
+      // X = index status, Y = working tree status
+      // We want files that are not staged (X != ' ' means not staged)
+      const indexStatus = line[0];
+      const workTreeStatus = line[1];
+      
+      // Include if:
+      // - Untracked (??)
+      // - Modified in working tree but not staged ( M,  D, etc.)
+      // - Staged but modified in working tree (M , D , etc.)
+      // - Any combination that indicates unstaged changes
+      return indexStatus !== ' ' || workTreeStatus !== ' ';
     })
-    .map(line => line.substring(3).trim());
+    .map(line => {
+      // Extract filename (skip the 2-char status and space)
+      const filename = line.substring(3).trim();
+      // Handle renamed files (old -> new)
+      return filename.split(' -> ').pop();
+    })
+    .filter(Boolean);
+}
+
+function getAllChangedFiles() {
+  // Get all files that would be staged with 'git add -A'
+  // This includes modified, deleted, and untracked files
+  const result = execCommand('git status --porcelain');
+  if (!result.success) {
+    return [];
+  }
+  return result.stdout
+    .trim()
+    .split('\n')
+    .filter(line => line.trim())
+    .map(line => {
+      const filename = line.substring(3).trim();
+      // Handle renamed files (old -> new)
+      return filename.split(' -> ').pop();
+    })
+    .filter(Boolean);
 }
 
 function groupFilesByType(files) {
@@ -127,8 +152,6 @@ function groupFilesByType(files) {
 
 function generateCommitMessage(files, group) {
   const fileCount = files.length;
-  const fileList = files.slice(0, 5).join(', ');
-  const more = files.length > 5 ? ` and ${files.length - 5} more` : '';
   
   const prefixes = {
     frontend: 'feat(frontend)',
@@ -139,7 +162,15 @@ function generateCommitMessage(files, group) {
   };
 
   const prefix = prefixes[group] || 'chore';
-  return `${prefix}: update ${fileCount} file(s)${more ? more : ''}`;
+  
+  // Generate a more descriptive message based on file count
+  if (fileCount === 1) {
+    return `${prefix}: update ${files[0]}`;
+  } else if (fileCount <= 5) {
+    return `${prefix}: update ${fileCount} file(s)`;
+  } else {
+    return `${prefix}: update ${fileCount} file(s)`;
+  }
 }
 
 function main() {
@@ -157,24 +188,29 @@ function main() {
   
   // If no staged files, check for unstaged changes
   if (stagedFiles.length === 0) {
-    const unstagedFiles = getUnstagedFiles();
-    if (unstagedFiles.length === 0) {
+    // In dry-run, get all files that would be staged (including deleted)
+    // In actual run, get unstaged files
+    const allChangedFiles = isDryRun ? getAllChangedFiles() : getUnstagedFiles();
+    
+    if (allChangedFiles.length === 0) {
       log('No changes to commit');
       process.exit(0);
     }
     
-    log(`Found ${unstagedFiles.length} unstaged file(s). Staging all changes...`);
-    const stageResult = execCommand('git add -A');
-    if (!stageResult.success) {
-      log(`Error staging files: ${stageResult.stderr}`);
-      process.exit(1);
-    }
+    log(`Found ${allChangedFiles.length} unstaged file(s). Staging all changes...`);
     
-    // In dry-run mode, simulate what would be staged
     if (isDryRun) {
-      // Use the unstaged files we found as what would be staged
-      stagedFiles = unstagedFiles;
+      // In dry-run, use all changed files as what would be staged
+      stagedFiles = allChangedFiles;
+      log(`[DRY RUN] Would stage ${stagedFiles.length} file(s) with 'git add -A'`);
     } else {
+      // Actually stage files
+      const stageResult = execCommand('git add -A');
+      if (!stageResult.success) {
+        log(`Error staging files: ${stageResult.stderr}`);
+        process.exit(1);
+      }
+      
       // Re-fetch staged files after actual staging
       stagedFiles = getStagedFiles();
       if (stagedFiles.length === 0) {
@@ -212,7 +248,15 @@ function main() {
   log(`\nPlanning ${commitsToProcess.length} commit(s):`);
   commitsToProcess.forEach((commit, index) => {
     log(`  ${index + 1}. [${commit.group}] ${commit.message}`);
-    log(`     Files: ${commit.files.slice(0, 3).join(', ')}${commit.files.length > 3 ? '...' : ''}`);
+    log(`     Files (${commit.files.length} total):`);
+    // In dry-run, show all files. In actual run, show first 10
+    const filesToShow = isDryRun ? commit.files : commit.files.slice(0, 10);
+    filesToShow.forEach(file => {
+      log(`       - ${file}`);
+    });
+    if (!isDryRun && commit.files.length > 10) {
+      log(`       ... and ${commit.files.length - 10} more`);
+    }
   });
 
   if (isDryRun) {
@@ -227,11 +271,39 @@ function main() {
   commitsToProcess.forEach((commit, index) => {
     log(`\n[${index + 1}/${commitsToProcess.length}] Committing ${commit.group}...`);
     
-    // Stage only files for this group
-    const stageResult = execCommand(`git add ${commit.files.join(' ')}`);
-    if (!stageResult.success) {
-      log(`  Warning: Failed to stage files: ${stageResult.stderr}`);
+    if (isDryRun) {
+      log(`  [DRY RUN] Would commit ${commit.files.length} file(s):`);
+      commit.files.forEach(file => {
+        log(`    - ${file}`);
+      });
+      log(`  [DRY RUN] Message: ${commit.message}`);
+      successCount++;
       return;
+    }
+    
+    // Stage files for this group
+    // For deleted files, we need to use 'git add' which stages deletions
+    // Use git add with individual files, properly quoted
+    const filesToStage = commit.files.map(file => {
+      // Quote filenames with spaces or special characters
+      if (file.includes(' ') || file.includes('(') || file.includes(')')) {
+        return `"${file}"`;
+      }
+      return file;
+    });
+    
+    // Try staging individual files first
+    let stageResult = execCommand(`git add -- ${filesToStage.join(' ')}`);
+    if (!stageResult.success) {
+      log(`  Warning: Failed to stage individual files: ${stageResult.stderr}`);
+      // Fallback: unstage everything, then stage only files in this group
+      execCommand('git reset');
+      // Use a different approach: stage by pattern or use git add with paths
+      stageResult = execCommand(`git add -A -- ${filesToStage.join(' ')}`);
+      if (!stageResult.success) {
+        log(`  ✗ Failed to stage files: ${stageResult.stderr}`);
+        return;
+      }
     }
 
     // Commit

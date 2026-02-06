@@ -33,6 +33,7 @@
     "type": "git",
     "url": "https://github.com/Hyperkit-Labs/hyperagent.git"
   },
+  "packageManager": "pnpm@10.20.0",
   "engines": {
     "node": ">=18.0.0"
   },

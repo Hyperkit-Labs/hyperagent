@@ -1,0 +1,10 @@
+packages:
+  # Apps
+  - "apps/*"                # hyperagent-api, hyperagent-web, issue-automation
+  # Backend services
+  - "services/*"            # agents, deploy, orchestrator, etc.
+  # Shared packages
+  - "packages/*"            # sdk-ts, config, shared-ui, core-lib
+  # Contracts tooling (optional, if you wrap them as packages)
+  - "contracts/*"
+

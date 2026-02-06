@@ -1,0 +1,45 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "pipeline": {
+    // Lint all TS/JS packages and apps
+    "lint": {
+      "cache": true,
+      "outputs": [],
+      "dependsOn": []
+    },
+
+    // Type-check
+    "typecheck": {
+      "cache": true,
+      "outputs": [],
+      "dependsOn": []
+    },
+
+    // Unit / integration tests
+    "test": {
+      "cache": true,
+      "outputs": [],
+      "dependsOn": ["^build"]
+    },
+
+    // Build step for deployable units (web, api, SDK, issue automation worker if needed)
+    "build": {
+      "cache": true,
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "build/**", ".next/**"]
+    },
+
+    // Local dev servers (not cached, run only where invoked)
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+
+    // Format (optional)
+    "format": {
+      "cache": false,
+      "outputs": []
+    }
+  }
+}
+

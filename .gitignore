@@ -35,12 +35,18 @@ skills/
 .env.*
 !.env.example
 !.env.template
+!.env.*.example
 .env.local
+.env.*.local
 .env.development
 .env.production
 .env.staging
 .env.test
 *.env
+# Per-app env files (only .example files are tracked)
+apps/*/.env.local
+apps/*/.env.*.local
+apps/*/.env.issue.local
 secrets/
 secrets.yaml
 secrets.yml
@@ -433,3 +439,18 @@ local/
 .railway
 .now
 .turbo
+
+# ============================================================
+# DOCUMENTATION & SCRIPTS (Project-specific ignores)
+# ============================================================
+# Planning documents
+docs/plan/
+
+# Compliance documentation
+scripts/docs/compliance/
+
+# GitHub automation documentation
+scripts/docs/github-automation/
+
+# GitHub automation scripts
+scripts/github/

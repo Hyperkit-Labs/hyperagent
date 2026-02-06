@@ -59,13 +59,13 @@ jobs:
           pip install flake8 black isort mypy bandit
       
       - name: Run Black formatter check
-        run: black --check hyperagent/
+        run: black --check apps/api/hyperagent/
       
       - name: Run isort import check
-        run: isort --check-only hyperagent/
+        run: isort --check-only apps/api/hyperagent/
       
       - name: Run MyPy type checking
-        run: mypy hyperagent/
+        run: mypy apps/api/hyperagent/
         continue-on-error: true
 
   # ============================================================================
@@ -81,8 +81,8 @@ jobs:
       - name: Run Bandit security linter
         run: |
           pip install bandit
-          bandit -r hyperagent/ -f json -o bandit-report.json || true
-          bandit -r hyperagent/ || true
+          bandit -r apps/api/hyperagent/ -f json -o bandit-report.json || true
+          bandit -r apps/api/hyperagent/ || true
       
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
@@ -143,7 +143,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r apps/api/requirements.txt
           pip install pytest pytest-asyncio pytest-cov pytest-mock
       
       - name: Set up database
@@ -158,7 +158,10 @@ jobs:
       
       - name: Run unit tests
         run: |
-          pytest tests/unit/ -v --cov=hyperagent --cov-report=xml --cov-report=term --cov-report=html -p no:web3.tools.pytest_ethereum
+          pytest tests/unit/ -v --cov=apps.api.hyperagent --cov-report=xml --cov-report=term --cov-report=html -p no:web3.tools.pytest_ethereum
+          # Also add apps/api to Python path for imports
+        env:
+          PYTHONPATH: apps/api:${{ env.PYTHONPATH }}
         env:
           DATABASE_URL: postgresql://test_user:test_password@localhost:5432/hyperagent_test
           REDIS_URL: redis://localhost:6379/0
@@ -197,18 +200,18 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: apps/web/package-lock.json
       
       - name: Install dependencies
-        working-directory: ./frontend
+        working-directory: ./apps/web
         run: npm ci
       
       - name: Run ESLint
-        working-directory: ./frontend
+        working-directory: ./apps/web
         run: npm run lint
       
       - name: Check code formatting
-        working-directory: ./frontend
+        working-directory: ./apps/web
         run: npm run format:check || echo "Format check skipped (Prettier not configured)"
         continue-on-error: true
   
@@ -223,14 +226,14 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: apps/web/package-lock.json
       
       - name: Install dependencies
-        working-directory: ./frontend
+        working-directory: ./apps/web
         run: npm ci
       
       - name: Run tests
-        working-directory: ./frontend
+        working-directory: ./apps/web
         run: npm test
         continue-on-error: true
 
@@ -276,7 +279,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r apps/api/requirements.txt
           pip install pytest pytest-asyncio
       
       - name: Run integration tests
@@ -326,7 +329,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          file: ./Dockerfile
+          file: ./infra/docker/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -350,12 +353,12 @@ jobs:
       
       - name: Start services with Docker Compose
         run: |
-          docker-compose up -d
+          docker-compose -f infra/docker/docker-compose.yml up -d
           sleep 10
       
       - name: Wait for services to be healthy
         run: |
-          timeout 60 bash -c 'until docker-compose ps | grep -q "healthy"; do sleep 2; done'
+          timeout 60 bash -c 'until docker-compose -f infra/docker/docker-compose.yml ps | grep -q "healthy"; do sleep 2; done'
       
       - name: Test API health endpoint
         run: |
@@ -364,7 +367,7 @@ jobs:
       - name: Stop services
         if: always()
         run: |
-          docker-compose down -v
+          docker-compose -f infra/docker/docker-compose.yml down -v
 
   # ============================================================================
   # STAGE 7: NOTIFICATIONS

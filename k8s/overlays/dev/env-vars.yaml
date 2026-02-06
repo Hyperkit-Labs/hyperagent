@@ -1,0 +1,15 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hyperagent-api
+spec:
+  template:
+    spec:
+      containers:
+      - name: api
+        env:
+        - name: ENVIRONMENT
+          value: development
+        - name: DEBUG
+          value: "true"
+

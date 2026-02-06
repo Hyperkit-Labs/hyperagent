@@ -1,4 +1,9 @@
+<<<<<<< HEAD
 ﻿Hyperagent in 60 Seconds
+=======
+﻿Hyperagent in 60 seconds
+Hyperagent in 60 Seconds
+>>>>>>> origin/projects
 What Hyperagent Is
 Hyperagent is an AI-powered smart contract platform that turns natural-language specs into production‑ready, audited contracts and deployments across multiple EVM chains in minutes, not weeks.​
 It orchestrates a system of specialized agents spec, design, generation, audit, test, and deploy on top of a microservice architecture with strong observability, security tooling, and multi‑chain adapters.​

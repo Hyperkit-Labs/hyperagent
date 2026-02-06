@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@fastify/cors": "^8.4.0",
-    "@hyperagent/env": "file:../../packages/env",
+    "@hyperagent/env": "workspace:*",
     "@hyperagent/orchestrator": "file:../orchestrator",
     "dotenv": "^16.6.1",
     "ethers": "^6.13.4",

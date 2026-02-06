@@ -45,5 +45,14 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@emotion/use-insertion-effect-with-fallbacks": "^1.2.0"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "react": "19.2.3",
+      "react-dom": "19.2.3"
+    }
   }
 }

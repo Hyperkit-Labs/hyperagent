@@ -54,9 +54,5 @@
     "prettier": "^3.2.5",
     "tailwindcss": "^4",
     "typescript": "^5"
-  },
-  "resolutions": {
-    "react": "19.2.3",
-    "react-dom": "19.2.3"
   }
 }

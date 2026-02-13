@@ -46,7 +46,7 @@ requests==2.32.4  # Fixed: CVE-2024-35195, CVE-2024-47081
 # Updated to latest versions with security patches
 slither-analyzer==0.10.2
 PyJWT==2.9.0
-cryptography==43.0.1  # Fixed: GHSA-h4gh-qq45-vh27 (requires 43.0.1+)
+cryptography==46.0.5  # Fixed: GHSA-h4gh-qq45-vh27 (requires 43.0.1+)
 bcrypt==4.2.0
 passlib[bcrypt]==1.7.4
 

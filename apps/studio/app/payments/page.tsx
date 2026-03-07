@@ -11,6 +11,8 @@ import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { PaymentHistoryTable } from "@/components/analytics/PaymentHistoryTable";
 import { SpendingTrends } from "@/components/analytics/SpendingTrends";
 import { SpendingControlCard } from "@/components/settings/SpendingControlCard";
+import { CreditsCard } from "@/components/settings/CreditsCard";
+import { PaymentTopUpCard } from "@/components/settings/PaymentTopUpCard";
 import { ROUTES } from "@/constants/routes";
 import { DollarSign, ArrowRight, CreditCard, TrendingUp } from "lucide-react";
 
@@ -63,6 +65,7 @@ export default function PaymentsPage() {
   const [control, setControl] = useState<{ budget?: string; spent?: string; currency?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [creditsRefetchTrigger, setCreditsRefetchTrigger] = useState(0);
   const pageSize = 20;
 
   useEffect(() => {
@@ -116,6 +119,12 @@ export default function PaymentsPage() {
         <ApiErrorBanner error={error} onRetry={() => setPage((p) => p)} />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="glass-panel rounded-xl p-5">
+            <CreditsCard refetchTrigger={creditsRefetchTrigger} />
+          </div>
+          <div className="glass-panel rounded-xl p-5">
+            <PaymentTopUpCard onTopUpSuccess={() => setCreditsRefetchTrigger((t) => t + 1)} />
+          </div>
           <div className="glass-panel rounded-xl p-5">
             <div className="flex items-center gap-2 text-[var(--color-text-tertiary)] text-xs font-medium">
               <DollarSign className="w-4 h-4" />

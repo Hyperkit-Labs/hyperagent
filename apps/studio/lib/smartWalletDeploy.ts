@@ -6,7 +6,7 @@ import type { Chain } from 'thirdweb/chains';
 import {
   mantleMainnet,
   mantleSepoliaTestnet,
-  skaleChaosTestnet,
+  skaleBaseSepolia,
   filecoinMainnet,
   filecoinCalibration,
 } from '@/lib/chains';
@@ -28,9 +28,10 @@ const NETWORK_TO_CHAIN: Record<string, Chain> = {
   'mantle-mainnet': mantleMainnet,
   'mantle-sepolia': mantleSepoliaTestnet,
   'mantle-sepolia-testnet': mantleSepoliaTestnet,
-  skale: skaleChaosTestnet,
-  'skale-chaos': skaleChaosTestnet,
-  'skale-chaos-testnet': skaleChaosTestnet,
+  skale: skaleBaseSepolia,
+  'skale-base': skaleBaseSepolia,
+  'skale-base-sepolia': skaleBaseSepolia,
+  'skalebase-sepolia': skaleBaseSepolia,
   filecoin: filecoinMainnet,
   'filecoin-mainnet': filecoinMainnet,
   'filecoin-calibration': filecoinCalibration,
@@ -60,7 +61,7 @@ export function getChainFromNetwork(network: string): Chain {
   if (chain) return chain;
   const byId = Object.entries(NETWORK_TO_CHAIN).find(([k]) => k.includes(key) || key.includes(k));
   if (byId) return byId[1];
-  return mantleSepoliaTestnet;
+  return skaleBaseSepolia;
 }
 
 export function getChainByChainId(chainId: number): Chain | undefined {

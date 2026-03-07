@@ -1,0 +1,81 @@
+# Docker Documentation for HyperAgent
+
+## Overview
+
+Docker is a containerization platform used by HyperAgent for packaging services, ensuring consistent environments, and simplifying deployment. HyperAgent uses Docker and Docker Compose for local development and production deployments.
+
+## Key Use Cases in HyperAgent
+
+- **Service Containerization**: Package each microservice
+- **Development Environment**: Consistent local setup
+- **CI/CD**: Containerized builds and tests
+- **Production Deployment**: Deploy containers to cloud
+- **Dependency Isolation**: Isolate service dependencies
+
+## Documentation Links
+
+### Official Documentation
+- **Main Docs**: https://docs.docker.com/
+- **Docker Compose**: https://docs.docker.com/compose/
+- **Best Practices**: https://docs.docker.com/develop/dev-best-practices/
+- **Multi-stage Builds**: https://docs.docker.com/build/building/multi-stage/
+
+### Key Concepts
+- **Images**: Immutable templates for containers
+- **Containers**: Running instances of images
+- **Dockerfile**: Instructions for building images
+- **Docker Compose**: Multi-container orchestration
+- **Volumes**: Persistent data storage
+
+## Implementation in HyperAgent
+
+### Dockerfiles
+- Location: `infra/docker/` (see README). Images for API gateway, orchestrator, and services as needed.
+- Frontend: `apps/studio` (Next.js; see app Dockerfile if present).
+
+### Docker Compose
+- Compose files in `infra/docker` or repo root for local development.
+- Services: API gateway, Studio, database, Redis, MLflow (per runbooks).
+
+## Code Examples
+
+### Dockerfile
+```dockerfile
+FROM python:3.12-slim
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0"]
+```
+
+### Docker Compose
+```yaml
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://...
+    depends_on:
+      - db
+      - redis
+```
+
+## Best Practices
+
+1. **Multi-stage Builds**: Reduce image size
+2. **Layer Caching**: Optimize build times
+3. **Security**: Use non-root users
+4. **Health Checks**: Add health check endpoints
+5. **Resource Limits**: Set memory and CPU limits
+
+## Related Resources
+
+- Docker GitHub: https://github.com/docker
+- Docker Hub: https://hub.docker.com/
+- Best Practices: https://docs.docker.com/develop/dev-best-practices/
+

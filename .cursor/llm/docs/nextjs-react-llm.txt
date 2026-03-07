@@ -1,0 +1,103 @@
+# Next.js & React Documentation for HyperAgent
+
+## Overview
+
+Next.js is a React framework for production with features like server-side rendering, static site generation, and API routes. HyperAgent uses Next.js 14+ with App Router for the frontend, providing a modern, type-safe UI for managing workflows, viewing deployments, and monitoring agent operations.
+
+## Key Use Cases in HyperAgent
+
+- **Dashboard UI**: Project management and workflow visualization
+- **Run Pipeline UI**: Real-time workflow progress tracking
+- **Deployment Interface**: Multi-chain deployment configuration
+- **Template Selection**: Preset and template browsing
+- **Analytics**: Usage metrics and spending dashboards
+
+## Documentation Links
+
+### Official Documentation
+- **Next.js Docs**: https://nextjs.org/docs
+- **App Router**: https://nextjs.org/docs/app
+- **React Docs**: https://react.dev/
+- **TypeScript**: https://www.typescriptlang.org/docs/
+
+### Key Concepts
+- **App Router**: File-based routing with layouts and loading states
+- **Server Components**: React Server Components for data fetching
+- **Client Components**: Interactive UI with "use client" directive
+- **Tailwind CSS**: Utility-first CSS framework
+- **shadcn/ui**: Component library built on Radix UI
+
+## Implementation in HyperAgent
+
+### Frontend Structure
+- Location: `apps/studio` (Next.js App Router).
+- App Router: `apps/studio/app/`
+- Components: `apps/studio/components/` (and shared in `packages/ui` where applicable)
+- Hooks: `apps/studio/hooks/`
+
+### Key Pages
+- `/` - Dashboard with project overview
+- `/workflows` - Workflow management
+- `/workflows/create` - Create new workflow
+- `/workflows/[id]` - Workflow detail and progress
+- `/deployments` - Deployment history
+- `/templates` - Template library
+
+### State Management
+- TanStack Query for server state
+- Zustand for client state
+- WebSocket hooks for real-time updates
+
+## Code Examples
+
+### Server Component
+```typescript
+// app/workflows/page.tsx
+export default async function WorkflowsPage() {
+  const workflows = await fetchWorkflows();
+  
+  return (
+    <div>
+      <h1>Workflows</h1>
+      {workflows.map(workflow => (
+        <WorkflowCard key={workflow.id} workflow={workflow} />
+      ))}
+    </div>
+  );
+}
+```
+
+### Client Component with State
+```typescript
+// components/workflows/WorkflowProgress.tsx
+"use client";
+
+import { useWorkflowProgress } from "@/hooks/useWorkflowProgress";
+
+export function WorkflowProgress({ workflowId }: { workflowId: string }) {
+  const { progress, status } = useWorkflowProgress(workflowId);
+  
+  return (
+    <div>
+      <ProgressBar value={progress} />
+      <StatusBadge status={status} />
+    </div>
+  );
+}
+```
+
+## Best Practices
+
+1. **Server Components**: Use for data fetching and static content
+2. **Client Components**: Only when interactivity is needed
+3. **Type Safety**: Use TypeScript for all components
+4. **Error Boundaries**: Implement error handling for robust UX
+5. **Loading States**: Show loading indicators for async operations
+
+## Related Resources
+
+- Next.js GitHub: https://github.com/vercel/next.js
+- React GitHub: https://github.com/facebook/react
+- Tailwind CSS: https://tailwindcss.com/docs
+- shadcn/ui: https://ui.shadcn.com/
+

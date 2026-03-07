@@ -1,0 +1,89 @@
+# Pinecone Documentation for HyperAgent
+
+## Overview
+
+Pinecone is a vector database for building AI applications with semantic search capabilities. HyperAgent uses Pinecone for RAG (Retrieval-Augmented Generation), storing embeddings of Solidity documentation, security best practices, and contract templates for agent context retrieval.
+
+## Key Use Cases in HyperAgent
+
+- **RAG System**: Retrieve relevant documentation for code generation
+- **Template Retrieval**: Find similar contract templates
+- **Security Patterns**: Retrieve security best practices
+- **Code Examples**: Find relevant code snippets
+- **Knowledge Base**: Store agent knowledge embeddings
+
+## Documentation Links
+
+### Official Documentation
+- **Main Docs**: https://docs.pinecone.io/
+- **Python Client**: https://docs.pinecone.io/python-client
+- **Quickstart**: https://docs.pinecone.io/guides/get-started/quickstart
+- **API Reference**: https://docs.pinecone.io/api-reference
+
+### Key Concepts
+- **Vectors**: High-dimensional embeddings
+- **Indexes**: Collections of vectors
+- **Metadata**: Additional data stored with vectors
+- **Querying**: Semantic similarity search
+- **Namespaces**: Logical separation of data
+
+## Implementation in HyperAgent
+
+### RAG Service
+- Location: Planned in `services/storage` or `services/codegen` (vector store for Solidity docs and security patterns). See `external/docs/runbooks`.
+- Stores Solidity docs and security patterns
+- Retrieves context for CodeGenAgent
+
+### Embeddings
+- Generated from documentation
+- Stored in Pinecone indexes
+- Retrieved based on query similarity
+
+## Code Examples
+
+### Creating Index
+```python
+from pinecone import Pinecone
+
+pc = Pinecone(api_key="your-api-key")
+index = pc.create_index(
+    name="hyperagent-docs",
+    dimension=1536,  # OpenAI embedding dimension
+    metric="cosine"
+)
+```
+
+### Upserting Vectors
+```python
+index.upsert(vectors=[
+    {
+        "id": "doc-1",
+        "values": embedding_vector,
+        "metadata": {"title": "ERC20 Guide", "type": "docs"}
+    }
+])
+```
+
+### Querying
+```python
+results = index.query(
+    vector=query_embedding,
+    top_k=5,
+    include_metadata=True
+)
+```
+
+## Best Practices
+
+1. **Dimension Consistency**: Use same dimension for all vectors
+2. **Metadata Filtering**: Use metadata for efficient filtering
+3. **Batch Operations**: Batch upserts for better performance
+4. **Index Management**: Monitor index size and performance
+5. **Cost Optimization**: Use appropriate index types
+
+## Related Resources
+
+- Pinecone GitHub: https://github.com/pinecone-io/pinecone-python-client
+- Embeddings Guide: https://docs.pinecone.io/guides/embeddings
+- Best Practices: https://docs.pinecone.io/guides/best-practices
+

@@ -1,0 +1,562 @@
+# Wagmi
+
+Wagmi is a set of **type-safe React hooks for EVM chains**, built on top of **Viem**. [build.avax](https://build.avax.network)
+It handles wallet connections, chain switching, contract reads/writes, and common Web3 UX flows for React apps. [build.avax](https://build.avax.network)
+
+***
+
+## Documentation
+
+- Getting started with Wagmi React hooks  
+  - https://wagmi.sh/react/getting-started [build.avax](https://build.avax.network)
+
+- Core concepts and architecture  
+  - https://wagmi.sh/react/core [build.avax](https://build.avax.network)
+
+- Full hooks API reference  
+  - https://wagmi.sh/react/api/hooks [build.avax](https://build.avax.network)
+
+- Config & client setup (`createConfig`, `WagmiProvider`)  
+  - https://wagmi.sh/react/api/createConfig [build.avax](https://build.avax.network)
+
+- Wallet connectors (MetaMask, WalletConnect, etc.)  
+  - https://wagmi.sh/react/api/connectors [build.avax](https://build.avax.network)
+
+- Supported chains and helpers  
+  - https://wagmi.sh/react/api/chains [build.avax](https://build.avax.network)
+
+***
+
+## Installation & setup
+
+### Packages
+
+Typical install for a React / Next.js app:
+
+```bash
+pnpm add wagmi viem
+# or
+npm install wagmi viem
+# or
+yarn add wagmi viem
+```
+
+If you use specific wallet connectors (e.g. WalletConnect), install those too per docs. [build.avax](https://build.avax.network)
+
+### Basic config
+
+Create a Wagmi config with chains + transport:
+
+```ts
+// wagmiConfig.ts
+import { http, createConfig } from "wagmi";
+import { mainnet, polygon, avalanche, base } from "wagmi/chains";
+
+export const config = createConfig({
+  chains: [mainnet, polygon, avalanche, base],
+  transports: {
+    [mainnet.id]: http(),
+    [polygon.id]: http(),
+    [avalanche.id]: http(),
+    [base.id]: http(),
+  },
+});
+```
+
+Wrap your React app:
+
+```tsx
+// app/providers.tsx (Next.js)
+"use client";
+
+import { WagmiProvider } from "wagmi";
+import { config } from "./wagmiConfig";
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  return <WagmiProvider config={config}>{children}</WagmiProvider>;
+}
+```
+
+***
+
+## Core hooks and capabilities
+
+- **Wallet + account state**
+  - `useAccount()` – address, connection status.  
+  - `useConnect()` – trigger wallet connection via connectors.  
+  - `useDisconnect()` – disconnect current wallet.  
+  - `useChainId()` / `useSwitchChain()` – get or change active chain. [build.avax](https://build.avax.network)
+
+- **Contract interactions**
+  - `useReadContract()` – read-only calls (view/pure functions).  
+  - `useWriteContract()` – send state-changing txs.  
+  - `useSimulateContract()` – get gas estimation and prepared config before writing. [build.avax](https://build.avax.network)
+
+- **Network & balances**
+  - `useBalance()` – token/native balances.  
+  - `useBlockNumber()` / `useBlock()` – basic chain data.  
+  - `useFeeData()` or Viem utilities for gas-price-like information.
+
+***
+
+## Example: basic wallet connect button
+
+```tsx
+// components/ConnectButton.tsx
+"use client";
+
+import { useAccount, useConnect, useDisconnect } from "wagmi";
+
+export function ConnectButton() {
+  const { address, isConnected } = useAccount();
+  const { connectors, connect, isPending } = useConnect();
+  const { disconnect } = useDisconnect();
+
+  if (isConnected) {
+    return (
+      <button onClick={() => disconnect()}>
+        Connected: {address?.slice(0, 6)}…{address?.slice(-4)} (Disconnect)
+      </button>
+    );
+  }
+
+  return (
+    <div>
+      {connectors.map((connector) => (
+        <button
+          key={connector.uid}
+          disabled={!connector.ready || isPending}
+          onClick={() => connect({ connector })}
+        >
+          {connector.name}
+        </button>
+      ))}
+    </div>
+  );
+}
+```
+
+***
+
+## Example: read ERC‑20 balance
+
+```tsx
+// components/TokenBalance.tsx
+"use client";
+
+import { useReadContract } from "wagmi";
+import erc20Abi from "./abi/erc20.json";
+
+export function TokenBalance({ token, owner }: { token: `0x${string}`; owner: `0x${string}` }) {
+  const { data, isLoading, error } = useReadContract({
+    address: token,
+    abi: erc20Abi,
+    functionName: "balanceOf",
+    args: [owner],
+  });
+
+  if (isLoading) return <span>Loading…</span>;
+  if (error) return <span>Error</span>;
+
+  const balance = data ?? 0n;
+  return <span>Balance: {balance.toString()}</span>;
+}
+```
+
+***
+
+## Example: write (transfer) with simulation
+
+Good pattern for agents / safety: **simulate first, write second**.
+
+```tsx
+// components/TokenTransfer.tsx
+"use client";
+
+import { useState } from "react";
+import { useAccount, useSimulateContract, useWriteContract } from "wagmi";
+import erc20Abi from "./abi/erc20.json";
+
+export function TokenTransfer({ token }: { token: `0x${string}` }) {
+  const { address } = useAccount();
+  const [to, setTo] = useState<`0x${string}` | "">("");
+  const [amount, setAmount] = useState("0");
+
+  const value = BigInt(amount || "0");
+
+  const { data: simData, error: simError } = useSimulateContract(
+    address && to && value > 0n
+      ? {
+          address: token,
+          abi: erc20Abi,
+          functionName: "transfer",
+          args: [to as `0x${string}`, value],
+        }
+      : undefined
+  );
+
+  const { writeContract, isPending } = useWriteContract();
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!simData) return;
+    // simData.request contains gas + prepared tx config
+    writeContract(simData.request);
+  };
+
+  return (
+    <form onSubmit={onSubmit}>
+      <input
+        placeholder="Recipient"
+        value={to}
+        onChange={(e) => setTo(e.target.value as any)}
+      />
+      <input
+        placeholder="Amount (wei)"
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+      />
+      {simError && <div>Simulation failed</div>}
+      <button type="submit" disabled={!simData || isPending}>
+        {isPending ? "Sending…" : "Send"}
+      </button>
+    </form>
+  );
+}
+```
+
+***
+
+## Multichain notes
+
+- Wagmi’s `chains` exports include many networks (Ethereum, Polygon, Optimism, Base, Arbitrum, etc.). [build.avax](https://build.avax.network)
+- You can pass any subset to `createConfig`, and use `useSwitchChain()` to move between them in the same app. [build.avax](https://build.avax.network)
+- For AI agents, the current chain + account from Wagmi can be treated as **environment context**:
+  - which network to target,  
+  - which signer to use for contract interactions.
+
+***
+
+## 1. What WagmiToolkit should do
+
+High-level agent actions:
+
+- `getCurrentAccount` – who am I? On which chain?  
+- `readContract` – safe, read-only call.  
+- `simulateContractWrite` – estimate gas and check success.  
+- `writeContract` – actually send tx (only if simulation succeeded / allowed).  
+- `switchChain` – change the active chain (whitelisted only).
+
+***
+
+## 2. TypeScript interfaces
+
+```ts
+// wagmi-toolkit/types.ts
+export type Address = `0x${string}`;
+export type ChainId = number;
+
+export interface GetCurrentAccountResult {
+  address: Address | null;
+  chainId: ChainId | null;
+  isConnected: boolean;
+}
+
+export interface ReadContractInput {
+  address: Address;
+  abi: any; // or Abi type from viem
+  functionName: string;
+  args?: readonly unknown[];
+  chainId?: ChainId;
+}
+
+export interface ReadContractOutput {
+  value: unknown;
+}
+
+export interface SimulateWriteInput extends ReadContractInput {
+  valueWei?: bigint;
+}
+
+export interface SimulateWriteOutput {
+  ok: boolean;
+  gasEstimate?: bigint;
+  errorMessage?: string;
+  request?: any; // prepared request for writeContract
+}
+
+export interface WriteContractInput {
+  request: any; // from SimulateWriteOutput
+}
+
+export interface WriteContractOutput {
+  txHash: string;
+}
+
+export interface SwitchChainInput {
+  chainId: ChainId;
+}
+
+export interface SwitchChainOutput {
+  chainId: ChainId;
+}
+
+export interface WagmiToolkit {
+  getCurrentAccount(): GetCurrentAccountResult;
+  readContract(input: ReadContractInput): Promise<ReadContractOutput>;
+  simulateContractWrite(input: SimulateWriteInput): Promise<SimulateWriteOutput>;
+  writeContract(input: WriteContractInput): Promise<WriteContractOutput>;
+  switchChain(input: SwitchChainInput): Promise<SwitchChainOutput>;
+}
+```
+
+***
+
+## 3. Implementation with Wagmi hooks
+
+You can implement this as a **React hook wrapper** that your components or agent-UI bridge use.
+
+```tsx
+// wagmi-toolkit/useWagmiToolkit.tsx
+"use client";
+
+import {
+  useAccount,
+  useChainId,
+  useReadContract as useWagmiReadContract,
+  useSimulateContract,
+  useWriteContract,
+  useSwitchChain,
+} from "wagmi";
+import type {
+  WagmiToolkit,
+  GetCurrentAccountResult,
+  ReadContractInput,
+  ReadContractOutput,
+  SimulateWriteInput,
+  SimulateWriteOutput,
+  WriteContractInput,
+  WriteContractOutput,
+  SwitchChainInput,
+  SwitchChainOutput,
+} from "./types";
+
+export function useWagmiToolkit(): WagmiToolkit {
+  const account = useAccount();
+  const activeChainId = useChainId();
+  const { switchChainAsync } = useSwitchChain();
+  const { writeContractAsync } = useWriteContract();
+
+  async function readContract(input: ReadContractInput): Promise<ReadContractOutput> {
+    const { data } = await useWagmiReadContract({
+      address: input.address,
+      abi: input.abi,
+      functionName: input.functionName as any,
+      args: input.args,
+      chainId: input.chainId,
+    } as any);
+    return { value: data };
+  }
+
+  async function simulateContractWrite(
+    input: SimulateWriteInput,
+  ): Promise<SimulateWriteOutput> {
+    const { data, error } = await useSimulateContract({
+      address: input.address,
+      abi: input.abi,
+      functionName: input.functionName as any,
+      args: input.args,
+      value: input.valueWei,
+      chainId: input.chainId,
+    } as any);
+
+    if (error || !data) {
+      return {
+        ok: false,
+        errorMessage: error?.message ?? "Simulation failed",
+      };
+    }
+
+    return {
+      ok: true,
+      gasEstimate: data.request.gas as bigint | undefined,
+      request: data.request,
+    };
+  }
+
+  async function writeContract(input: WriteContractInput): Promise<WriteContractOutput> {
+    const hash = await writeContractAsync(input.request);
+    return { txHash: hash as string };
+  }
+
+  async function switchChain(input: SwitchChainInput): Promise<SwitchChainOutput> {
+    const chain = await switchChainAsync({ chainId: input.chainId });
+    return { chainId: chain.id };
+  }
+
+  function getCurrentAccount(): GetCurrentAccountResult {
+    return {
+      address: (account.address ?? null) as any,
+      chainId: activeChainId ?? null,
+      isConnected: account.isConnected,
+    };
+  }
+
+  return {
+    getCurrentAccount,
+    readContract,
+    simulateContractWrite,
+    writeContract,
+    switchChain,
+  };
+}
+```
+
+This is intentionally simple; in real code you’d avoid calling hooks inside async functions, but the interface shows how you separate **agent-visible actions** from raw Wagmi.
+
+***
+
+## 4. Safety policies for agents
+
+When you expose this to agents:
+
+- Only allow `switchChain` to **whitelisted chain IDs**.  
+- Always require `simulateContractWrite` before `writeContract`, and block writes where `ok === false`.  
+- Never let the agent control `valueWei` or gas beyond safe bounds without an extra policy check.
+
+**Goal:**  
+From the Studio UI, an agent can **safely transfer an ERC‑20 token** on the **currently connected chain** using Wagmi, with mandatory simulation before sending.
+
+***
+
+## 1. Agent-level “WagmiToolkit” contract
+
+Agent is allowed to call only these methods:
+
+- `getCurrentAccount()`  
+- `readContract({ address, abi, functionName, args })`  
+- `simulateContractWrite({ address, abi, functionName, args, valueWei? })`  
+- `writeContract({ request })`  
+
+Policy:
+
+- Agent may only call `writeContract` **with a `request` previously returned by `simulateContractWrite` where `ok === true`**.  
+- Agent may not change chain; it must use the current UI chain.
+
+***
+
+## 2. UI component: Agent-driven ERC‑20 transfer
+
+This is a full React component using Wagmi + an “agent call” to decide the transfer parameters and sequence.
+
+```tsx
+// app/components/AgentTokenTransfer.tsx
+"use client";
+
+import { useState } from "react";
+import { useAccount } from "wagmi";
+import erc20Abi from "@/abi/erc20.json";
+import { useWagmiToolkit } from "@/wagmi-toolkit/useWagmiToolkit";
+import type { Address } from "@/wagmi-toolkit/types";
+
+export function AgentTokenTransfer({ token }: { token: Address }) {
+  const { isConnected } = useAccount();
+  const wagmi = useWagmiToolkit();
+
+  const [to, setTo] = useState<Address | "">("");
+  const [amount, setAmount] = useState("0");
+  const [status, setStatus] = useState<string | null>(null);
+
+  const onAgentTransfer = async () => {
+    if (!isConnected) {
+      setStatus("Wallet not connected");
+      return;
+    }
+
+    try {
+      setStatus("Agent: preparing transfer…");
+
+      // 1) Agent gets context
+      const acct = wagmi.getCurrentAccount();
+      if (!acct.address || !acct.chainId) {
+        setStatus("Missing account or chain");
+        return;
+      }
+
+      // In a real system, here you’d call your LLM/agent with:
+      // - current address, chainId
+      // - token address
+      // - desired outcome (e.g., send N tokens)
+      // For this concrete example, we just use user-provided to/amount.
+
+      const valueWei = BigInt(amount);
+
+      // 2) Agent asks toolkit to simulate the transfer
+      setStatus("Agent: simulating transfer…");
+      const sim = await wagmi.simulateContractWrite({
+        address: token,
+        abi: erc20Abi,
+        functionName: "transfer",
+        args: [to as Address, valueWei],
+      });
+
+      if (!sim.ok || !sim.request) {
+        setStatus(`Simulation failed: ${sim.errorMessage ?? "unknown error"}`);
+        return;
+      }
+
+      // 3) Agent decides it is safe and sends the actual tx
+      setStatus("Agent: sending transaction…");
+      const writeRes = await wagmi.writeContract({ request: sim.request });
+
+      setStatus(`Success! tx hash: ${writeRes.txHash}`);
+    } catch (err: any) {
+      setStatus(`Error: ${err.message ?? "unknown"}`);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <label>Recipient</label>
+        <input
+          className="input"
+          value={to}
+          onChange={(e) => setTo(e.target.value as any)}
+          placeholder="0x…"
+        />
+      </div>
+      <div>
+        <label>Amount (wei)</label>
+        <input
+          className="input"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+        />
+      </div>
+      <button onClick={onAgentTransfer} className="btn-primary">
+        Let Agent Transfer
+      </button>
+      {status && <p className="text-sm text-muted">{status}</p>}
+    </div>
+  );
+}
+```
+
+This is “agent-driven” because:
+
+- The only on-chain actions the agent can trigger are `simulateContractWrite` and `writeContract` through the toolkit.  
+- You can move the decision-making (should we send? adjust gas? etc.) into your LLM layer without changing the on-chain safety boundary.
+
+***
+
+## 3. How this would look from the agent’s POV (pseudo-steps)
+
+1. Call `getCurrentAccount()` → see `address`, `chainId`.  
+2. Maybe call `readContract` to check `decimals`, `symbol`, or `balanceOf`.  
+3. Call `simulateContractWrite` with a proposed `to` and `amount`.  
+4. If simulation is reverted/error → explain why and ask user to adjust input.  
+5. If simulation is ok → call `writeContract` with `request` from step 3.  
+6. Report `txHash` and optionally poll for confirmations.
+
+***

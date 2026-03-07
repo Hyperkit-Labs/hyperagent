@@ -1,0 +1,156 @@
+# AI Elements Documentation for HyperAgent
+
+## Overview
+
+AI Elements is a component library and custom registry built on top of shadcn/ui for building AI-native applications. It is maintained alongside the Vercel AI SDK and provides composable UI blocks with deep integration for streaming, tool calls, reasoning, and type safety. HyperAgent uses AI Elements in the Studio frontend (apps/studio) to build chat interfaces, agent UIs, code artifacts, and workflow surfaces that work with the AI SDK and BYOK flows.
+
+## Key Use Cases in HyperAgent
+
+- **Studio Chat and Prompts**: Conversation, Message, PromptInput, and related components for the Web IDE chat experience
+- **Agent and Tool UI**: Agent, AgentHeader, AgentTools, AgentTool, and Tool components for displaying agent state and tool calls
+- **Code and Artifacts**: CodeBlock, Artifact, Snippet, File Tree, Sandbox, Terminal for generated code and artifacts
+- **Reasoning and Citations**: ChainOfThought, Reasoning, Sources, Inline Citation for transparent AI reasoning and RAG sources
+- **Voice and Audio**: AudioPlayer, SpeechInput, Transcription, MicSelector, VoiceSelector for voice features when enabled
+- **Workflow and Canvas**: Canvas (React Flow), Node, Edge, Panel, Toolbar for workflow or graph UIs
+- **Task and Queue**: Queue, Task, Todo, Plan, Confirmation for task lists and step-by-step flows
+
+## Documentation Links
+
+### Official Documentation
+- **Main site**: https://elements.ai-sdk.dev
+- **Docs**: https://elements.ai-sdk.dev/docs
+- **Setup**: https://elements.ai-sdk.dev/docs/setup
+- **Usage**: https://elements.ai-sdk.dev/docs/usage
+- **Troubleshooting**: https://elements.ai-sdk.dev/docs/troubleshooting
+- **Skill (Cursor/agents)**: https://elements.ai-sdk.dev/docs/skill
+
+### Registry and Installation
+- **Full registry (all components)**: https://elements.ai-sdk.dev/api/registry/all.json
+- **CLI**: `npx ai-elements@latest add <component-name>` adds components into the project with full source; tree-shaking friendly
+
+### Component Categories (with doc links)
+- **Chatbot**: Attachments, Chain of Thought, Checkpoint, Confirmation, Context, Conversation, Inline Citation, Message, Model Selector, Plan, Prompt Input, Queue, Reasoning, Shimmer, Sources, Suggestion, Task, Tool
+- **Code**: Agent, Artifact, Code Block, Commit, Environment Variables, File Tree, JSX Preview, Package Info, Sandbox, Schema Display, Snippet, Stack Trace, Terminal, Test Results, Web Preview
+- **Voice**: Audio Player, Mic Selector, Persona, Speech Input, Transcription, Voice Selector
+- **Workflow**: Canvas, Connection, Controls, Edge, Node, Panel, Toolbar
+- **Utilities**: Image, Open In Chat
+
+### Examples
+- **Chatbot**: https://elements.ai-sdk.dev/examples/chatbot
+- **IDE**: https://elements.ai-sdk.dev/examples/ide
+- **Workflow**: https://elements.ai-sdk.dev/examples/workflow
+- **v0 clone**: https://elements.ai-sdk.dev/examples/v0
+
+## Implementation in HyperAgent
+
+### Where It Is Used
+- **apps/studio**: Next.js 14 App Router frontend; AI Elements components are used for chat, prompts, messages, and any AI-driven UI that aligns with the AI SDK (useChat, streaming, tools). See `.cursor/skills/ai-sdk` for AI SDK usage; Elements provide the visual layer on top.
+
+### Integration Points
+- **AI SDK**: Components consume types from the `ai` package (e.g. Tool, ToolUIPart, FileUIPart, SourceDocumentUIPart, streaming message shapes). Use `InferAgentUIMessage` and agent types as in the ai-sdk skill for type-safe tool results.
+- **shadcn/ui**: Elements follow shadcn conventions; existing theme and UI primitives (Button, Tooltip, Accordion, etc.) apply. Components are installed into the repo (e.g. `components/ai-elements/`) and can be customized.
+- **Next.js**: Use "use client" where required; App Router and RSC boundaries apply as in other Studio pages.
+
+### Dependencies (from registry)
+The full bundle pulls in: ai, lucide-react, media-chrome, @xyflow/react, @radix-ui/react-use-controllable-state, shiki, tokenlens, use-stick-to-bottom, react-jsx-parser, @streamdown/cjk, @streamdown/code, @streamdown/math, @streamdown/mermaid, streamdown, @rive-app/react-webgl2, nanoid, motion, ansi-to-react. Install only what you need by adding individual components via the CLI so dependency set stays minimal.
+
+## Code Examples
+
+### Adding a single component
+```bash
+npx ai-elements@latest add conversation
+# Installs deps and creates components/ai-elements/conversation.tsx (or project-equivalent path)
+```
+
+### Typical chat shell with Conversation and PromptInput
+```tsx
+"use client";
+import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
+import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
+import { PromptInput, PromptInputTextarea, PromptInputFooter } from "@/components/ai-elements/prompt-input";
+
+export function ChatShell() {
+  return (
+    <div className="flex flex-col h-full">
+      <Conversation>
+        <ConversationContent>
+          {/* messages from useChat or similar */}
+        </ConversationContent>
+        <ConversationScrollButton />
+      </Conversation>
+      <PromptInput onSubmit={handleSubmit}>
+        <PromptInputTextarea placeholder="Ask anything" />
+        <PromptInputFooter />
+      </PromptInput>
+    </div>
+  );
+}
+```
+
+### Agent and tools display (AI SDK tool types)
+```tsx
+import { Agent, AgentHeader, AgentContent, AgentTools, AgentTool } from "@/components/ai-elements/agent";
+import type { Tool } from "ai";
+
+<Agent>
+  <AgentHeader name="Codegen" model="claude-sonnet-4" />
+  <AgentContent>
+    <AgentTools>
+      {tools.map((tool: Tool) => (
+        <AgentTool key={tool.name} tool={tool} />
+      ))}
+    </AgentTools>
+  </AgentContent>
+</Agent>
+```
+
+### Attachments (files and source documents)
+Components use `FileUIPart` and `SourceDocumentUIPart` from `ai`. Use `Attachments`, `Attachment`, `AttachmentPreview`, `AttachmentInfo`, `AttachmentRemove` with `getMediaCategory` and `getAttachmentLabel` for consistent labels and previews.
+
+## Cursor / AI SDK relationship
+
+Cursor chat uses the same patterns as the Vercel AI SDK (streaming messages, tool calls, code blocks, composer). It does not ship the Elements registry as a dependency, but the building blocks are the same: message list, scroll-to-bottom, tool results, markdown/code rendering, and a composer. Maximizing AI SDK Elements in the app is the closest you can get to using the same SDK-style components Cursor-like UIs are built from.
+
+## Local components (aligned with registry)
+
+Studio implements registry-style behavior in apps/studio/components/ai-elements/ so chat and run views use the same primitives without pulling the full registry (shadcn, streamdown, shiki, etc.). Use these consistently; swap to registry via npx ai-elements@latest add <name> when shadcn is adopted.
+
+Component / Where in app / Why use it:
+- Conversation (stickToBottom, scroll, download) / Chat page / Scroll-to-bottom, optional download, stable empty state. Same behavior as modern chat UIs.
+- Message + MessageContent + MessageResponse / Chat message list / MessageResponse wraps content (plain or future Streamdown). Assistant bubbles consistent.
+- PromptInput (attachments, footer slots) / Chat footer / Optional attachments and footer (provider, submit/stop). Fits describe your contract + file upload without custom code.
+- Tool / ToolHeader / ToolContent / ToolInput / ToolOutput / Chat + run detail / One component for all tool calls (state, input, output). Same UX as Cursor-like apps.
+- CodeBlock (copy, line numbers) / Chat + contract viewer + run artifacts / Syntax highlighting + copy. Use everywhere you show code.
+- Artifact (header, close, title, actions, content) / Run artifacts (spec, contract, audit) / Header, close, title, actions. Use for open this artifact panels.
+- Plan (collapsible steps) / Workflow run stages / Spec to design to codegen to audit to deploy. Collapsible steps with title/description.
+- Reasoning (collapsible thought for N seconds) / Chat or run when agent thinks / Duration and collapsible content. Use so you do not hand-roll thinking UI.
+- ChainOfThought (steps + optional search) / Spec or design steps from orchestrator/ROMA / Expandable steps. Use where you show step-by-step reasoning.
+- Shimmer (text loading) / Loading states (e.g. Thinking...) / Keep using for loading; align with registry so styling is consistent.
+- Suggestion / Below chat input / Quick prompts / follow-ups so the input does not feel empty.
+- Terminal (copy, clear, streaming) / Workflow run logs / build output / Copy, clear. Use for run logs so you do not maintain a custom log viewer.
+- Context (token/usage) / Settings or run summary (BYOK usage) / Trigger + breakdown (input/output). Use so you do not build a custom usage widget.
+- Confirmation (approval UI) / Tool approval (e.g. Run this?) / Human-in-the-loop. Use when you add approve before running flows.
+- StackTrace / Run or tool error view / Parsed stack trace for failures. Use so debugging is consistent.
+
+Summary: Chat uses Conversation, Message/MessageResponse, PromptInput, Tool, CodeBlock, Shimmer, Suggestion (same SDK stack as Cursor-style UIs). Runs/artifacts use Plan, Reasoning, ChainOfThought, Artifact, Terminal, StackTrace. BYOK/settings use Context, ModelSelector (future), Confirmation when approval is added.
+
+## Design system
+
+See docs/frontend-design.md for: theme tokens only, shared Card/Table/EmptyState/Status, and prefer AI Elements registry for AI-facing UI.
+
+## Best Practices
+
+1. **Install per component**: Use `npx ai-elements@latest add <name>` instead of pulling the entire bundle to keep bundle size and dependencies minimal.
+2. **Align with AI SDK**: Use the same agent and message types as in the AI SDK skill (ToolLoopAgent, InferAgentUIMessage, useChat). Elements are the view layer; keep logic in hooks and server/route handlers.
+3. **Theme and tokens**: Rely on shadcn theme (CSS variables); avoid hard-coded colors so dark/light and Studio branding stay consistent.
+4. **Streaming**: Prefer streaming-friendly patterns (Reasoning, MessageResponse with streamed content) as documented in the chatbot example.
+5. **Accessibility**: Use semantic structure and ARIA where Elements expose props; test keyboard and screen reader for chat and forms.
+6. **Overwrite with care**: Use `--overwrite` only when intentionally syncing with registry; otherwise avoid overwriting local customizations.
+
+## Related Resources
+
+- **AI SDK skill**: `.cursor/skills/ai-sdk` and `node_modules/ai/docs/` for generateText, streamText, useChat, tools, and type-safe agents
+- **Next.js + React**: `.cursor/llm/docs/nextjs-react-llm.txt` for App Router and client patterns
+- **shadcn/ui**: Project UI primitives and theming used by Elements
+- **Vercel AI Frontend**: https://elements.ai-sdk.dev/docs/vercel-ai-frontend
+- **Registry schema**: https://ui.shadcn.com/schema/registry-item.json (shadcn-style registry)

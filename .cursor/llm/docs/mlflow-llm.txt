@@ -1,0 +1,81 @@
+# MLflow Documentation for HyperAgent
+
+## Overview
+
+MLflow is an open-source platform for managing the machine learning lifecycle, including experiment tracking, model packaging, and deployment. HyperAgent uses MLflow for tracking LLM model performance, routing decisions, and agent experiment results.
+
+## Key Use Cases in HyperAgent
+
+- **Model Tracking**: Track which LLM models perform best
+- **Experiment Tracking**: Compare different agent configurations
+- **Routing Decisions**: Log model routing choices and outcomes
+- **Performance Metrics**: Track latency, cost, and quality metrics
+- **Model Registry**: Version and manage LLM configurations
+
+## Documentation Links
+
+### Official Documentation
+- **Main Docs**: https://mlflow.org/docs/latest/index.html
+- **Tracking**: https://mlflow.org/docs/latest/tracking.html
+- **Python API**: https://mlflow.org/docs/latest/python_api/index.html
+- **Quickstart**: https://mlflow.org/docs/latest/quickstart.html
+
+### Key Concepts
+- **Experiments**: Group related runs
+- **Runs**: Individual execution records
+- **Metrics**: Numerical measurements
+- **Parameters**: Input configurations
+- **Artifacts**: Files and models
+
+## Implementation in HyperAgent
+
+### Tracking Service
+- Location: Planned in `services/orchestrator` or `services/agent-runtime` for experiment tracking. Registry: `infra/registries/models.yaml`.
+- Tracks agent runs and model performance
+- Logs routing decisions and outcomes
+
+### Metrics Tracked
+- Agent execution time
+- LLM response quality
+- Cost per operation
+- Success rates
+- Error rates
+
+## Code Examples
+
+### Basic Tracking
+```python
+import mlflow
+
+mlflow.set_experiment("hyperagent-agents")
+
+with mlflow.start_run():
+    mlflow.log_param("agent", "CodeGenAgent")
+    mlflow.log_param("model", "claude-opus-4.5")
+    mlflow.log_metric("execution_time", 2.5)
+    mlflow.log_metric("cost", 0.15)
+    mlflow.log_artifact("generated_contract.sol")
+```
+
+### Model Registry
+```python
+mlflow.register_model(
+    model_uri="runs:/run-id/model",
+    name="CodeGenAgent-v1"
+)
+```
+
+## Best Practices
+
+1. **Experiment Organization**: Use clear experiment names
+2. **Metric Consistency**: Use consistent metric names
+3. **Artifact Management**: Store important artifacts
+4. **Model Versioning**: Version models in registry
+5. **Cost Tracking**: Track costs for optimization
+
+## Related Resources
+
+- MLflow GitHub: https://github.com/mlflow/mlflow
+- MLflow Tracking: https://mlflow.org/docs/latest/tracking.html
+- Best Practices: https://mlflow.org/docs/latest/tracking.html#best-practices
+

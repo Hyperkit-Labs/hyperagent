@@ -1,0 +1,548 @@
+# EigenDA for HyperAgent
+
+EigenDA is a **data availability (DA) service** built as an Actively Validated Service (AVS) on EigenLayer. [github](https://github.com/Layr-Labs/eigenda)
+It provides high-throughput blob storage with cryptographic guarantees that data is available, secured by restaked ETH and EIGEN. [eigenda](https://www.eigenda.xyz)
+
+HyperAgent uses EigenDA as a **verifiable data layer** for long‑term agent artifacts.
+
+***
+
+## Roles in HyperAgent
+
+- **Verifiable traces**  
+  - Store agent execution traces as EigenDA blobs with DA certificates, enabling external verification that a specific trace existed and was available at a given reference block. [layr-labs.github](https://layr-labs.github.io/eigenda/integration/spec/5-lifecycle-phases.html)
+
+- **Audit provenance**  
+  - Anchor audit reports (for smart contracts or agent plans) to EigenDA, so a report hash + blob ID can be independently verified.
+
+- **Contract metadata**  
+  - Persist deployment metadata (bytecode hash, ABI hash, chain ID, address) as blobs.
+
+- **Agent accountability**  
+  - For critical actions, HyperAgent can require that a decision’s input and reasoning are stored as a blob and referenced on-chain or in logs before execution.
+
+- **Verifiable Factory preset**  
+  - In your “Verifiable Factory” configuration, EigenDA is one of the data availability backends used alongside IPFS/Pinata and DB storage.
+
+***
+
+## Docs
+
+- EigenDA docs hub: https://eigenda-docs-phi.vercel.app [eigenda-docs-phi.vercel](https://eigenda-docs-phi.vercel.app)
+- EigenDA spec (mdBook): https://layr-labs.github.io/eigenda [layr-labs.github](https://layr-labs.github.io/eigenda/)
+- Integration spec: https://layr-labs.github.io/eigenda/integration.html [layr-labs.github](https://layr-labs.github.io/eigenda/integration.html)
+- Lifecycle phases (dispersal, retrieval, verification): https://layr-labs.github.io/eigenda/integration/spec/5-lifecycle-phases.html [layr-labs.github](https://layr-labs.github.io/eigenda/integration/spec/5-lifecycle-phases.html)
+- EigenDA repo: https://github.com/Layr-Labs/eigenda [github](https://github.com/Layr-Labs/eigenda)
+- EigenLayer / EigenCloud (context): https://eigencloud.xyz [eigencloud](https://eigencloud.xyz)
+
+Key protocol concepts: **operators, disperser, retriever, DA certificates (DACerts), blob headers, quorums, KZG commitments, erasure coding.** [daic](https://daic.capital/blog/eigenlayer-avs-ecosystem)
+
+***
+
+## EigenDA client lifecycle (conceptual)
+
+The spec defines three flows: [layr-labs.github](https://layr-labs.github.io/eigenda/)
+
+1. **Dispersal**  
+   - Client splits payload into a **blob**, encodes it (e.g., Reed–Solomon), sends it to the **disperser** with required quorum info.  
+   - Disperser sends chunks to operators, verifies inclusion, aggregates BLS signatures, and returns a **DA certificate + reference block number**.
+
+2. **Retrieval**  
+   - Client (or retriever) asks operators for blob chunks, reconstructs the blob by decoding the erasure-coded data.
+
+3. **Verification**  
+   - Client verifies the DA certificate against EigenDA’s Ethereum contracts (e.g., using `EigenDACertVerifierRouter`) and ensures quorum thresholds are met at the given reference block. [layr-labs.github](https://layr-labs.github.io/eigenda/integration/spec/5-lifecycle-phases.html)
+
+In practice, an application integrates through an **EigenDA client library or stack** that wraps these flows.
+
+***
+
+## HyperAgent EigenDA Toolkit (design)
+
+HyperAgent benefits from a very small, clear interface:
+
+```ts
+// eigenda/types.ts
+export interface StoreBlobInput {
+  namespace: string;           // e.g. "hyperagent-traces"
+  data: Uint8Array;            // raw bytes (JSON-serialized)
+  metadata?: Record<string, any>;
+}
+
+export interface StoreBlobOutput {
+  blobId: string;              // opaque id from EigenDA client
+  daCert: string;              // DA certificate (serialized)
+  referenceBlock: number;      // L1 block number used for verification
+}
+
+export interface RetrieveBlobInput {
+  blobId: string;
+}
+
+export interface RetrieveBlobOutput {
+  data: Uint8Array;
+}
+
+export interface VerifyAvailabilityInput {
+  daCert: string;
+  referenceBlock: number;
+}
+
+export interface VerifyAvailabilityOutput {
+  isAvailable: boolean;
+  reason?: string;
+}
+
+export interface EigenDAToolkit {
+  storeBlob(input: StoreBlobInput): Promise<StoreBlobOutput>;
+  retrieveBlob(input: RetrieveBlobInput): Promise<RetrieveBlobOutput>;
+  verifyAvailability(input: VerifyAvailabilityInput): Promise<VerifyAvailabilityOutput>;
+}
+```
+
+### Usage contracts in HyperAgent
+
+- For **critical traces**:
+  - Agent must call `storeBlob` with JSON trace → receive `{ blobId, daCert, referenceBlock }`.  
+  - Agent (or orchestrator) logs these fields into Postgres, S3/IPFS, and optionally an on-chain anchor.
+
+- For **audits / metadata**:
+  - Before marking an audit as “final” or a contract as “verified”, the audit summary or deployment descriptor must be stored on EigenDA and its `blobId` recorded.
+
+- For **verification**:
+  - For external checkers or downstream services, call `verifyAvailability` with `daCert` and `referenceBlock` to ensure the blob is still provably available.
+
+***
+
+## Skeleton implementation (Node/TypeScript)
+
+At the time of writing, EigenDA exposes integration APIs documented in its spec and integration site; concrete JS/TS clients are emerging as part of rollup stacks and EigenCloud. [eigenda-docs-phi.vercel](https://eigenda-docs-phi.vercel.app)
+Treat the following as structure, not exact library calls.
+
+```ts
+// eigenda/client.ts
+import type {
+  EigenDAToolkit,
+  StoreBlobInput,
+  StoreBlobOutput,
+  RetrieveBlobInput,
+  RetrieveBlobOutput,
+  VerifyAvailabilityInput,
+  VerifyAvailabilityOutput,
+} from "./types";
+
+export function createEigenDAToolkit(): EigenDAToolkit {
+  // In reality, you would initialize a specific EigenDA client here,
+  // e.g., via EigenCloud SDK or an RPC endpoint.
+  const disperserUrl = process.env.EIGENDA_DISPERSER_URL!;
+  const retrieverUrl = process.env.EIGENDA_RETRIEVER_URL!;
+  const verifierRpcUrl = process.env.EIGENDA_VERIFIER_RPC_URL!;
+  const eigenNetwork = process.env.EIGENDA_NETWORK ?? "mainnet";
+
+  async function storeBlob(input: StoreBlobInput): Promise<StoreBlobOutput> {
+    // Pseudocode: actual fields follow EigenDA integration spec.
+    const res = await fetch(`${disperserUrl}/disperse`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        namespace: input.namespace,
+        payload: Buffer.from(input.data).toString("base64"),
+        metadata: input.metadata ?? {},
+        network: eigenNetwork,
+      }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`EigenDA disperse failed: ${res.status} ${text}`);
+    }
+
+    const json = await res.json() as {
+      blob_id: string;
+      da_cert: string;
+      reference_block: number;
+    };
+
+    return {
+      blobId: json.blob_id,
+      daCert: json.da_cert,
+      referenceBlock: json.reference_block,
+    };
+  }
+
+  async function retrieveBlob(input: RetrieveBlobInput): Promise<RetrieveBlobOutput> {
+    const res = await fetch(`${retrieverUrl}/blobs/${input.blobId}`);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`EigenDA retrieve failed: ${res.status} ${text}`);
+    }
+    const json = await res.json() as { payload_base64: string };
+    return { data: Buffer.from(json.payload_base64, "base64") };
+  }
+
+  async function verifyAvailability(
+    input: VerifyAvailabilityInput,
+  ): Promise<VerifyAvailabilityOutput> {
+    // Pseudocode: call verifier service or Ethereum contract via RPC
+    const res = await fetch(`${disperserUrl}/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        da_cert: input.daCert,
+        reference_block: input.referenceBlock,
+        network: eigenNetwork,
+      }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      return { isAvailable: false, reason: text };
+    }
+    const json = await res.json() as { available: boolean; reason?: string };
+    return { isAvailable: json.available, reason: json.reason };
+  }
+
+  return { storeBlob, retrieveBlob, verifyAvailability };
+}
+```
+
+This matches EigenDA’s conceptual lifecycle (dispersal, retrieval, verification), with endpoints shaped according to the integration docs for your specific deployment. [layr-labs.github](https://layr-labs.github.io/eigenda/integration.html)
+
+***
+
+## Python-style example (matching your current doc)
+
+Assuming a Python client wraps the spec’s disperser/retriever calls:
+
+```python
+from eigenda_client import EigenDAClient
+
+client = EigenDAClient(
+    disperser_url=os.environ["EIGENDA_DISPERSER_URL"],
+    retriever_url=os.environ["EIGENDA_RETRIEVER_URL"],
+    network=os.environ.get("EIGENDA_NETWORK", "mainnet"),
+)
+
+async def store_agent_trace(trace: dict, namespace: str = "hyperagent-traces") -> dict:
+    data = json.dumps(trace).encode("utf-8")
+    blob_id, da_cert, reference_block = await client.disperse_blob(
+        namespace=namespace,
+        payload=data,
+    )
+    return {
+        "blob_id": blob_id,
+        "da_cert": da_cert,
+        "reference_block": reference_block,
+    }
+
+async def verify_trace(blob_info: dict) -> bool:
+    proof = await client.get_availability_proof(blob_info["blob_id"])
+    return await client.verify_proof(
+        proof=proof,
+        da_cert=blob_info["da_cert"],
+        reference_block=blob_info["reference_block"],
+    )
+```
+
+Pattern: always store `{ blob_id, da_cert, reference_block }` alongside any high‑value artifact.
+
+***
+
+## Best practices
+
+1. **Structured JSON blobs**  
+   - For traces/audits, store JSON with clear schema (`run_id`, `workspace_id`, `agent_version`, `input_hash`, `output_hash`, timestamps).
+
+2. **Namespace hygiene**  
+   - Use namespaces like:
+     - `hyperagent-traces/<workspace>/<project>`  
+     - `hyperagent-audits/<workspace>`  
+   - This helps when querying or debugging DA usage.
+
+3. **Mandatory DA for critical actions**  
+   - For “verifiable mode” workflows, require EigenDA storage + successful verification before executing mainnet changes.
+
+4. **Separation of duties**  
+   - Let workers (not the LLM directly) call the EigenDA toolkit; the LLM only decides *what* to store, not *how*.
+
+5. **Cost + throughput awareness**  
+   - Use EigenDA for high‑value, not high‑frequency low‑value noise. Aggregate multiple small traces into a single blob if they are naturally grouped by run. [ankr](https://www.ankr.com/docs/scaling-services-rollups/data-availability/eigenda/)
+
+Here’s a concrete, future‑proof JSON schema you can use for an **Agent Trace Blob** stored on EigenDA (and referenced from DB/IPFS).
+
+Think of this as `AgentTraceBlob v1`.
+
+***
+
+## 1. Top-level shape
+
+```jsonc
+{
+  "schema_version": "hyperagent.trace.v1",
+  "trace_id": "trace_01HZX7...",
+  "workspace_id": "ws_123",
+  "project_id": "proj_hyperagent_core",
+  "run_id": "run_2025_02_26_001",
+  "agent": {
+    "type": "CodeGenAgent",
+    "version": "1.3.0",
+    "variant": "roma-planner"
+  },
+  "user": {
+    "id": "user_abc",
+    "wallet_address": "0x1234...abcd",
+    "labels": ["enterprise", "beta"]
+  },
+  "context": {
+    "chain_ids": [1, 8453],
+    "networks": ["ethereum-mainnet", "base-mainnet"],
+    "workspace_tags": ["erc20", "gas_optimized"]
+  },
+  "inputs": {
+    "goal": "Deploy a gas-optimized ERC20 on Base and mainnet.",
+    "prompt_hash": "sha256:...",
+    "config_hash": "sha256:...",
+    "artifacts": [
+      {
+        "type": "user_spec",
+        "cid": "ipfs://QmSpec...",
+        "hash": "sha256:...",
+        "mime_type": "application/json"
+      }
+    ]
+  },
+  "steps": [
+    {
+      "step_id": "step_1",
+      "index": 0,
+      "type": "plan",
+      "started_at": "2025-02-26T07:31:00Z",
+      "finished_at": "2025-02-26T07:31:03Z",
+      "tool": "roma.planner",
+      "input_summary": "User wants ERC20 on Base and mainnet.",
+      "output_summary": "Plan with 5 steps: design, codegen, compile, simulate, deploy.",
+      "status": "success",
+      "artifacts": [],
+      "error": null
+    }
+  ],
+  "outputs": {
+    "status": "success",
+    "completion_reason": "completed",
+    "contracts": [
+      {
+        "name": "HyperToken",
+        "chain_id": 8453,
+        "address": "0xHyper...",
+        "deployer": "0x1234...abcd",
+        "artifact_cid": "ipfs://QmArtifact...",
+        "artifact_hash": "sha256:...",
+        "verification": {
+          "explorer": "basescan.org",
+          "verified": true,
+          "verification_tx_hash": "0xverif..."
+        }
+      }
+    ],
+    "audit_reports": [
+      {
+        "cid": "ipfs://QmAudit...",
+        "hash": "sha256:...",
+        "severity": "low",
+        "tool": "AuditAgent:v2.0.1"
+      }
+    ]
+  },
+  "security": {
+    "eigenda": {
+      "blob_id": "eigenda_blob_...",
+      "da_cert": "base64-encoded-da-cert",
+      "reference_block": 21738291
+    },
+    "ipfs": {
+      "trace_cid": "ipfs://QmTraceJson...",
+      "trace_hash": "sha256:..."
+    }
+  },
+  "meta": {
+    "created_at": "2025-02-26T07:31:45Z",
+    "created_by_service": "orchestrator",
+    "labels": ["prod", "verifiable"],
+    "notes": "Initial deployment of HyperToken for workspace ws_123."
+  }
+}
+```
+
+***
+
+## 2. Field-by-field notes
+
+- `schema_version`  
+  - Lock to `"hyperagent.trace.v1"` so future versions can coexist.
+
+- `trace_id`, `workspace_id`, `project_id`, `run_id`  
+  - Primary keys to join against your DB and Acontext memory.
+
+- `agent`  
+  - `type`: SpecAgent / CodeGenAgent / AuditAgent / etc.  
+  - `version`: semantic version of the agent logic.  
+  - `variant`: planner/executor flavor (“roma-planner”, “simple-executor”).
+
+- `user`  
+  - Minimal user identity; wallet is optional but useful for accountability.
+
+- `context`  
+  - Chains involved, networks, workspace tags for quick filtering.
+
+- `inputs`  
+  - `goal`: natural-language objective.  
+  - `prompt_hash`: SHA‑256 hash of the main system+user prompt, stored separately.  
+  - `config_hash`: hash of config (models, tool settings, safety flags).  
+  - `artifacts`: references to IPFS/EigenDA of any large input (design docs, specs).
+
+- `steps[]`  
+  Each element is one pipeline step (plan, codegen, compile, simulate, deploy, verify, post_check):
+
+  - `step_id`: unique within trace.  
+  - `index`: numeric order.  
+  - `type`: enum (`plan`, `tool_call`, `codegen`, `compile`, `simulate`, `deploy`, `verify`, `post_check`, `other`).  
+  - `tool`: concrete tool or service name (`tenderly.simulate_tx`, `deploy-service`, `qdrant.search`).  
+  - `input_summary`, `output_summary`: short human-readable summaries (not full logs).  
+  - `artifacts`: optional list of CIDs/hashes for logs, compiled artifacts, etc.  
+  - `status`: `success` | `failed` | `skipped`.  
+  - `error`: structured error if `status == "failed"` (code, message).
+
+- `outputs`  
+  - Overall `status` + `completion_reason` (completed, aborted_by_user, safety_block, error).  
+  - `contracts[]`: list of all contracts the run deployed or touched.  
+  - `audit_reports[]`: references to audit artifacts.
+
+- `security.eigenda`  
+  - The EigenDA metadata associated with this blob:
+    - `blob_id`, `da_cert`, `reference_block`.
+
+- `security.ipfs`  
+  - If you also mirror the JSON to IPFS, store `trace_cid` and `trace_hash`.
+
+- `meta`  
+  - `created_at`: ISO timestamp.  
+  - `created_by_service`: `orchestrator` / `agent-runtime` / `cli`.  
+  - `labels`, `notes`: free-form tags and notes.
+
+***
+
+## 3. How to serialize & store
+
+When writing to EigenDA:
+
+1. Build a **canonical JSON** object following the schema.  
+2. Serialize as UTF‑8 JSON with stable key ordering (if you care about reproducible hashes).  
+3. Compute `sha256` of the bytes → store this as `security.ipfs.trace_hash` (even if you don’t mirror to IPFS yet).  
+4. Use `EigenDAToolkit.storeBlob` with `namespace = "hyperagent-traces/<workspace_id>"`.  
+5. Fill `security.eigenda` with `blob_id`, `da_cert`, `reference_block` from the client.  
+6. Optionally pin the same JSON to IPFS/Pinata and fill `security.ipfs.trace_cid`.
+
+This makes it trivial for an external verifier to:
+
+- Fetch blob via EigenDA, recompute SHA‑256, compare to `trace_hash`.  
+- (If mirrored) fetch from IPFS via CID and check the same hash.
+
+***
+
+## 4. Minimal TypeScript type
+
+```ts
+export type AgentTraceBlobV1 = {
+  schema_version: "hyperagent.trace.v1";
+  trace_id: string;
+  workspace_id: string;
+  project_id: string;
+  run_id: string;
+  agent: {
+    type: string;
+    version: string;
+    variant?: string;
+  };
+  user: {
+    id: string;
+    wallet_address?: string;
+    labels?: string[];
+  };
+  context: {
+    chain_ids: number[];
+    networks: string[];
+    workspace_tags?: string[];
+  };
+  inputs: {
+    goal: string;
+    prompt_hash: string;
+    config_hash: string;
+    artifacts: {
+      type: string;
+      cid: string;
+      hash: string;
+      mime_type?: string;
+    }[];
+  };
+  steps: {
+    step_id: string;
+    index: number;
+    type: string;
+    started_at: string;
+    finished_at?: string;
+    tool: string;
+    input_summary: string;
+    output_summary: string;
+    status: "success" | "failed" | "skipped";
+    error?: { code: string; message: string } | null;
+    artifacts: {
+      type: string;
+      cid: string;
+      hash: string;
+      mime_type?: string;
+    }[];
+  }[];
+  outputs: {
+    status: "success" | "failed" | "partial";
+    completion_reason: string;
+    contracts: {
+      name: string;
+      chain_id: number;
+      address: string;
+      deployer?: string;
+      artifact_cid?: string;
+      artifact_hash?: string;
+      verification?: {
+        explorer: string;
+        verified: boolean;
+        verification_tx_hash?: string;
+      };
+    }[];
+    audit_reports: {
+      cid: string;
+      hash: string;
+      severity: "info" | "low" | "medium" | "high" | "critical";
+      tool: string;
+    }[];
+  };
+  security: {
+    eigenda: {
+      blob_id: string;
+      da_cert: string;
+      reference_block: number;
+    };
+    ipfs?: {
+      trace_cid?: string;
+      trace_hash: string;
+    };
+  };
+  meta: {
+    created_at: string;
+    created_by_service: string;
+    labels?: string[];
+    notes?: string;
+  };
+};
+```
+
+***

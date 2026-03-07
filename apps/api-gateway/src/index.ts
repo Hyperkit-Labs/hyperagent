@@ -1,7 +1,7 @@
 /**
  * HyperAgent API Gateway
  * Versioned proxy /api/v1 to orchestrator; legacy /run, /runs.
- * Optional: Supabase JWT auth, Redis rate limit, request-id, error shaping.
+ * Required: JWT auth (AUTH_JWT_SECRET), Redis rate limit (REDIS_URL). Security is mandatory.
  */
 import cors from "cors";
 import express from "express";

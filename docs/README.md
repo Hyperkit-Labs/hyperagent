@@ -25,7 +25,9 @@ Documentation for onboarding, users, and developers. Use this index to find the 
 | Doc | Description |
 |-----|--------------|
 | [Developer guide](developer-guide.md) | Local setup, repo structure, running the frontend and backend, and contributing. |
-| [Network architecture](architecture-networks.md) | Single source of truth (network/chains.yaml), thirdweb for execution, Chainlink integration. |
+| [Network architecture](architecture-networks.md) | Single source of truth (network/chains.yaml), per-chain x402, thirdweb for execution, Chainlink integration. |
+| [Integrations config](integrations-config.md) | Tenderly, Pinata, Qdrant env vars for Settings > Integrations. |
+| [Render full stack](RENDER_FULL_STACK.md) | All Render services, env vars, VECTORDB_URL, Qdrant setup. |
 | [Control plane: runs and steps](control-plane-runs-steps.md) | Phase 1 step audit trail, run_steps table, and path to async control plane (Phase 2/3). |
 | [Deploy ownership](deploy-ownership.md) | Who owns deploy: Studio (wallet-signed via Thirdweb) vs orchestrator/deploy service (plans and config). |
 | [Storage policy](storage-policy.md) | Traces to EigenDA, artifacts to IPFS, indexes to Supabase; where blob_id/cid are stored. |

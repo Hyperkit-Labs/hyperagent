@@ -15,6 +15,7 @@ async def generate_design(
     run_id: str,
     api_keys: dict,
     agent_session_jwt: str | None = None,
+    security_context: dict | None = None,
 ) -> dict:
     context: dict = {
         "userId": user_id,
@@ -25,14 +26,17 @@ async def generate_design(
     headers: dict[str, str] = {}
     if agent_session_jwt:
         headers["X-Agent-Session"] = agent_session_jwt
+    body: dict = {
+        "spec": spec,
+        "targetChains": target_chains or spec.get("chains", []),
+        "context": context,
+    }
+    if security_context:
+        body["securityContext"] = security_context
     async with httpx.AsyncClient(timeout=get_timeout("design")) as client:
         r = await client.post(
             f"{AGENT_RUNTIME_URL.rstrip('/')}/agents/design",
-            json={
-                "spec": spec,
-                "targetChains": target_chains or spec.get("chains", []),
-                "context": context,
-            },
+            json=body,
             headers=headers,
         )
         r.raise_for_status()

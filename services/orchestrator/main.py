@@ -232,6 +232,7 @@ def _run_workflow_pipeline_job(
         update_workflow(
             workflow_id=workflow_id,
             status=status,
+            current_stage=current_stage,
             stages=stages,
             contracts=final.get("contracts") or {},
             deployments=final.get("deployments") or [],
@@ -700,6 +701,92 @@ class DeployCompleteBody(BaseModel):
     walletAddress: str = ""
     abi: list = Field(default_factory=list)
     chainId: int | None = None
+
+
+def _resume_deploy_approval_job(workflow_id: str, user_id: str, project_id: str, api_keys: dict) -> None:
+    """Resume pipeline from deploy interrupt with deploy_approved=True."""
+    set_request_id(None)
+    try:
+        final = run_pipeline(
+            "",
+            user_id,
+            project_id,
+            workflow_id,
+            api_keys,
+            checkpoint_id=workflow_id,
+            resume_update={"deploy_approved": True},
+        )
+        current_stage = final.get("current_stage") or "unknown"
+        status = "completed" if current_stage in ("deployed", "deploy", "ui_scaffold") else (
+            "failed" if current_stage in ("audit_failed", "simulation_failed", "failed") else "building"
+        )
+        stages = [
+            {"stage": "spec", "status": "completed"},
+            {"stage": "design", "status": "completed" if final.get("design_proposal") else "pending"},
+            {"stage": "codegen", "status": "completed" if final.get("contracts") else "pending"},
+            {"stage": "audit", "status": "completed" if final.get("audit_passed") else ("failed" if final.get("audit_findings") else "pending")},
+            {"stage": "guardian", "status": "completed" if final.get("invariants") else "pending"},
+            {"stage": "deploy", "status": "completed" if current_stage in ("deployed", "ui_scaffold") else "pending"},
+            {"stage": "simulation", "status": "completed" if final.get("simulation_passed") else ("failed" if final.get("simulation_results") and not final.get("simulation_passed") else "pending")},
+            {"stage": "ui_scaffold", "status": "completed" if final.get("ui_schema") else "pending"},
+        ]
+        update_workflow(
+            workflow_id=workflow_id,
+            status=status,
+            current_stage=current_stage,
+            stages=stages,
+            contracts=final.get("contracts") or {},
+            deployments=final.get("deployments") or [],
+            ui_schema=final.get("ui_schema"),
+            error=final.get("error"),
+            simulation_passed=final.get("simulation_passed"),
+            simulation_results=final.get("simulation_results"),
+        )
+        if db.is_configured():
+            db.update_run(
+                workflow_id,
+                status=_run_status_for_store(status),
+                current_stage=current_stage,
+                error_message=final.get("error"),
+                stages=stages,
+            )
+    except Exception as e:
+        err_msg = str(e)
+        logger.exception("[orchestrator] deploy approval resume failed workflow_id=%s", workflow_id)
+        update_workflow(workflow_id=workflow_id, status="failed", error=err_msg)
+        if db.is_configured():
+            db.update_run(workflow_id, status="failed", error_message=err_msg)
+    finally:
+        try:
+            api_keys.clear()
+        except Exception:
+            pass
+
+
+@app.post("/api/v1/workflows/{workflow_id}/deploy/approve")
+def deploy_approve_api(workflow_id: str, background_tasks: BackgroundTasks, request: Request = None) -> dict[str, Any]:
+    """Approve deploy after Guardian; resume pipeline to create deploy plans."""
+    w = get_workflow(workflow_id)
+    if not w:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    if request:
+        _assert_workflow_owner(w, request)
+    current_stage = w.get("current_stage") or ""
+    if current_stage != "awaiting_deploy_approval":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Deploy approval not applicable. Current stage: {current_stage}. Approve only when Guardian passed and stage is awaiting_deploy_approval.",
+        )
+    user_id = w.get("user_id") or "anonymous"
+    project_id = w.get("project_id") or workflow_id
+    api_keys = _get_keys_for_run(user_id, DEFAULT_WORKSPACE)
+    if not api_keys:
+        raise HTTPException(
+            status_code=422,
+            detail="LLM API keys required to resume. Add keys in Settings.",
+        )
+    background_tasks.add_task(_resume_deploy_approval_job, workflow_id, user_id, project_id, dict(api_keys))
+    return {"workflow_id": workflow_id, "status": "resuming", "message": "Deploy approved; pipeline resuming."}
 
 
 @app.post("/api/v1/workflows/{workflow_id}/deploy/complete")

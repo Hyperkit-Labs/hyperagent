@@ -1,0 +1,12 @@
+# Build from repo root so workspace:* deps resolve. Context: ../..
+FROM node:20-alpine
+RUN corepack enable && corepack prepare pnpm@10.20.0 --activate
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages ./packages
+COPY services/simulation ./services/simulation
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter hyperagent-simulation... build
+WORKDIR /app/services/simulation
+EXPOSE 8002
+CMD ["node", "build/index.js"]

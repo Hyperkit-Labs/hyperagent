@@ -21,8 +21,10 @@ from nodes import (
     spec_agent,
     design_agent,
     codegen_agent,
+    scrubd_validation_agent,
     audit_agent,
     simulation_agent,
+    exploit_simulation_agent,
     deploy_agent,
     ui_scaffold_agent,
     autofix_agent,
@@ -46,6 +48,16 @@ def _should_approve_spec(state: AgentState) -> str:
     return "design"
 
 
+def _after_scrubd(state: AgentState) -> str:
+    """Route after SCRUBD: pass -> audit, fail -> autofix (if cycles remain) or END."""
+    if state.get("scrubd_validation_passed", True):
+        return "audit"
+    cycle = state.get("autofix_cycle", 0)
+    if cycle < MAX_AUTOFIX_CYCLES:
+        return "autofix"
+    return "failed"
+
+
 def _after_audit(state: AgentState) -> str:
     """Route after audit: pass -> guardian, fail -> autofix (if cycles remain) or END."""
     if state.get("audit_passed", True):
@@ -57,8 +69,18 @@ def _after_audit(state: AgentState) -> str:
 
 
 def _after_simulation(state: AgentState) -> str:
-    """Route after simulation: pass -> ui_scaffold, fail -> autofix (if cycles remain) or END."""
+    """Route after simulation: pass -> exploit_simulation, fail -> autofix (if cycles remain) or END."""
     if state.get("simulation_passed", True):
+        return "exploit_simulation"
+    cycle = state.get("autofix_cycle", 0)
+    if cycle < MAX_AUTOFIX_CYCLES:
+        return "autofix"
+    return "failed"
+
+
+def _after_exploit_simulation(state: AgentState) -> str:
+    """Route after exploit simulation: pass -> ui_scaffold, fail -> autofix (if cycles remain) or END."""
+    if state.get("exploit_simulation_passed", True):
         return "ui_scaffold"
     cycle = state.get("autofix_cycle", 0)
     if cycle < MAX_AUTOFIX_CYCLES:
@@ -85,10 +107,12 @@ def create_workflow():
     workflow.add_node("spec", spec_agent)
     workflow.add_node("design", design_agent)
     workflow.add_node("codegen", codegen_agent)
+    workflow.add_node("scrubd_validation", scrubd_validation_agent)
     workflow.add_node("audit", audit_agent)
     workflow.add_node("autofix", autofix_agent)
     workflow.add_node("guardian", guardian_agent)
     workflow.add_node("simulation", simulation_agent)
+    workflow.add_node("exploit_simulation", exploit_simulation_agent)
     workflow.add_node("deploy", deploy_agent)
     workflow.add_node("ui_scaffold", ui_scaffold_agent)
 
@@ -103,13 +127,18 @@ def create_workflow():
         "design": "design",
     })
     workflow.add_edge("design", "codegen")
-    workflow.add_edge("codegen", "audit")
+    workflow.add_edge("codegen", "scrubd_validation")
+    workflow.add_conditional_edges("scrubd_validation", _after_scrubd, {
+        "audit": "audit",
+        "autofix": "autofix",
+        "failed": END,
+    })
     workflow.add_conditional_edges("audit", _after_audit, {
         "guardian": "guardian",
         "autofix": "autofix",
         "failed": END,
     })
-    workflow.add_edge("autofix", "audit")
+    workflow.add_edge("autofix", "scrubd_validation")
     workflow.add_conditional_edges("guardian", _after_guardian, {
         "deploy": "deploy",
         "autofix": "autofix",
@@ -117,6 +146,11 @@ def create_workflow():
     })
     workflow.add_edge("deploy", "simulation")
     workflow.add_conditional_edges("simulation", _after_simulation, {
+        "exploit_simulation": "exploit_simulation",
+        "autofix": "autofix",
+        "failed": END,
+    })
+    workflow.add_conditional_edges("exploit_simulation", _after_exploit_simulation, {
         "ui_scaffold": "ui_scaffold",
         "autofix": "autofix",
         "failed": END,
@@ -195,6 +229,8 @@ def run_pipeline(
             "needs_human_approval": False,
             "autofix_cycle": 0,
             "autofix_history": [],
+            "discussion_trace": [],
+            "debate_converged": False,
             "invariants": [],
             "invariant_violations": [],
             "estimated_complexity": "",

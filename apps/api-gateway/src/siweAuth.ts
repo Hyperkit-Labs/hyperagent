@@ -123,7 +123,7 @@ export async function siweAuthHandler(req: Request, res: Response): Promise<void
       if (isMissingTableError(selectError.message, (selectError as { code?: string }).code)) {
         res.status(503).json({
           error: "Service Unavailable",
-          message: "Database schema missing. Run Supabase migrations so the wallet_users table exists (e.g. 004_wallet_users.sql).",
+          message: "Database schema missing. Run Supabase migrations so the wallet_users table exists.",
         });
         return;
       }
@@ -155,7 +155,7 @@ export async function siweAuthHandler(req: Request, res: Response): Promise<void
         if (insertError && isMissingTableError(insertError.message, (insertError as { code?: string }).code)) {
           res.status(503).json({
             error: "Service Unavailable",
-            message: "Database schema missing. Run Supabase migrations so the wallet_users table exists (e.g. 004_wallet_users.sql).",
+            message: "Database schema missing. Run Supabase migrations so the wallet_users table exists (platform/supabase/migrations/run.sql).",
           });
           return;
         }

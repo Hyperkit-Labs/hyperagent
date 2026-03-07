@@ -1,10 +1,12 @@
 /**
  * Default values from chain registry (GitOps single source).
- * Default is first testnet from GET /api/v1/networks or this fallback. Sepolia is the default network.
+ * Must match infra/registries/network/chains.yaml anchor (skalebase-sepolia).
+ * Prefer GET /api/v1/config (default_network_id, default_chain_id) when available.
  */
 
-/** Fallback default network when API list is not loaded (must match a testnet slug in chain registry). */
 export const FALLBACK_DEFAULT_NETWORK_ID = "skalebase-sepolia";
+export const FALLBACK_DEFAULT_CHAIN_ID = 324705682;
+export const FALLBACK_DEFAULT_CHAIN_LABEL = "SKALE Base Sepolia";
 
 /**
  * Polling and timeout constants. Tune in one place for all data hooks.
@@ -34,4 +36,12 @@ export function getDefaultNetworkIdFromList(
 ): string {
   const testnet = networks.find((n) => n.is_mainnet === false);
   return testnet?.id ?? FALLBACK_DEFAULT_NETWORK_ID;
+}
+
+/** Default chain ID: use first testnet from list, else fallback. */
+export function getDefaultChainIdFromList(
+  networks: Array<{ chain_id?: number; is_mainnet?: boolean }>
+): number {
+  const testnet = networks.find((n) => n.is_mainnet === false);
+  return testnet?.chain_id ?? FALLBACK_DEFAULT_CHAIN_ID;
 }

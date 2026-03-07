@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { History, Search, Filter, Loader2, ChevronRight } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
@@ -35,7 +35,7 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchData = useCallback(() => {
     setLoading(true);
     setError(null);
     if (tab === "workflows") {
@@ -50,6 +50,10 @@ export default function HistoryPage() {
         .finally(() => setLoading(false));
     }
   }, [tab]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const filteredWorkflows = search.trim()
     ? workflows.filter(
@@ -113,7 +117,7 @@ export default function HistoryPage() {
         </div>
       </div>
 
-      {error && <ApiErrorBanner error={error} onRetry={() => setError(null)} />}
+      {error && <ApiErrorBanner error={error} onRetry={fetchData} />}
 
       {loading ? (
         <div className="flex items-center justify-center py-16">

@@ -14,8 +14,8 @@ const NODE_ENV = process.env.NODE_ENV || "development";
 /** When true, allow requests through when Redis is unreachable (skip rate limit). Use for local/staging when Redis is unavailable. */
 const RATE_LIMIT_BYPASS_ON_FAIL = process.env.RATE_LIMIT_BYPASS_ON_FAIL === "true";
 const RATE_LIMIT_WINDOW_SEC = Number(process.env.RATE_LIMIT_WINDOW_SEC) || 60;
-const RATE_LIMIT_MAX_IP = Number(process.env.RATE_LIMIT_MAX_IP) || 100;
-const RATE_LIMIT_MAX_USER = Number(process.env.RATE_LIMIT_MAX_USER) || 200;
+const RATE_LIMIT_MAX_IP = Number(process.env.RATE_LIMIT_MAX_IP) || 300;
+const RATE_LIMIT_MAX_USER = Number(process.env.RATE_LIMIT_MAX_USER) || 500;
 
 /** Stricter limit for POST llm-keys to prevent key-stuffing attacks. Window 60s. */
 const LLM_KEYS_PATH = "/api/v1/workspaces/current/llm-keys";
@@ -123,6 +123,25 @@ export async function rateLimitMiddleware(
     return;
   }
   if (req.path === "/health") {
+    next();
+    return;
+  }
+  const isLightweightRead =
+    req.method === "GET" &&
+    (req.path === "/api/v1/config" || req.path === "/api/v1/networks" || req.path === "/api/v1/tokens/stablecoins");
+  if (isLightweightRead) {
+    const lightKey = `rl:ip:${(req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown"}:light`;
+    const lightOk = await checkLimit(lightKey, 500, RATE_LIMIT_WINDOW_SEC);
+    if (!lightOk) {
+      logSecurityEvent("rate_limit_light", 429, req.path, req.requestId, req.userId);
+      res.setHeader("Retry-After", String(RATE_LIMIT_WINDOW_SEC));
+      res.status(429).json({
+        error: "Too Many Requests",
+        message: "Config/networks rate limit exceeded. Try again later.",
+        requestId: req.requestId,
+      });
+      return;
+    }
     next();
     return;
   }

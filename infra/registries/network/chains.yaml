@@ -114,6 +114,7 @@ spec:
             erc4337: true
             eip7702: false
           x402: true
+          erc8004: true
           verification: true
         defaults:
           framework: foundry
@@ -153,6 +154,7 @@ spec:
             erc4337: true
             eip7702: false
           x402: true
+          erc8004: true
           verification: true
         defaults:
           framework: foundry
@@ -228,6 +230,7 @@ spec:
             erc4337: true
             eip7702: false
           x402: true
+          erc8004: true
           verification: true
         defaults:
           framework: hardhat
@@ -266,13 +269,14 @@ spec:
             erc4337: true
             eip7702: false
           x402: true
+          erc8004: true
           verification: true
         defaults:
           framework: hardhat
           gasStrategy: cheap
           securityProfile: relaxed
         notes:
-          - "Avalanche testnet for MVP and closed beta."
+          - "Avalanche testnet for closed beta."
           - "Use with Skale Base Sepolia as alternate testnet options."
 
     # -------------------------------------------------------------------------

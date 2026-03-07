@@ -10,10 +10,11 @@ const DISMISS_KEY = "hyperagent_onboarding_dismissed";
 export interface OnboardingChecklistProps {
   onConnectClick?: () => void;
   onByokClick?: () => void;
+  onPaymentClick?: () => void;
   className?: string;
 }
 
-export function OnboardingChecklist({ onConnectClick, onByokClick, className = "" }: OnboardingChecklistProps) {
+export function OnboardingChecklist({ onConnectClick, onByokClick, onPaymentClick, className = "" }: OnboardingChecklistProps) {
   const { steps, nextStep, completed } = useOnboarding();
   const [dismissed, setDismissed] = useState(false);
 
@@ -45,8 +46,10 @@ export function OnboardingChecklist({ onConnectClick, onByokClick, className = "
   const progressPct = Math.round((doneCount / steps.length) * 100);
   const isConnectStep = nextStep?.id === "connect";
   const isByokStep = nextStep?.id === "byok";
+  const isPaymentStep = nextStep?.id === "payment";
   const useConnectButton = isConnectStep && onConnectClick;
   const useByokButton = isByokStep && onByokClick;
+  const usePaymentButton = isPaymentStep && onPaymentClick;
 
   const ctaButton = nextStep && (
     useConnectButton ? (
@@ -62,6 +65,15 @@ export function OnboardingChecklist({ onConnectClick, onByokClick, className = "
       <button
         type="button"
         onClick={onByokClick}
+        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg btn-primary-gradient text-xs font-medium"
+      >
+        {nextStep.cta}
+        <ArrowRight className="w-3 h-3" />
+      </button>
+    ) : usePaymentButton ? (
+      <button
+        type="button"
+        onClick={onPaymentClick}
         className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg btn-primary-gradient text-xs font-medium"
       >
         {nextStep.cta}

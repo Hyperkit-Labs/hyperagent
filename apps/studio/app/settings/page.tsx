@@ -309,11 +309,11 @@ export default function SettingsPage() {
             <h3 className="text-sm font-medium text-[var(--color-text-primary)]">Connected services</h3>
             <div className="grid grid-cols-1 gap-3">
               {[
-                { name: "Tenderly", desc: "Simulation and monitoring", env: "TENDERLY_ACCESS_KEY", status: config?.monitoring_enabled },
+                { name: "Tenderly", desc: "Simulation and monitoring", env: "TENDERLY_API_KEY", status: config?.integrations?.tenderly_configured ?? config?.monitoring_enabled },
                 { name: "Blockchain RPC", desc: "Chain access via registry", env: "Networks configured", status: networks.length > 0 },
                 { name: "Supabase", desc: "Database and authentication", env: "SUPABASE_URL", status: true },
-                { name: "Pinata / IPFS", desc: "Artifact storage and pinning", env: "PINATA_JWT", status: false },
-                { name: "Qdrant / VectorDB", desc: "RAG embeddings and search", env: "QDRANT_URL", status: false },
+                { name: "Pinata / IPFS", desc: "Artifact storage and pinning", env: "PINATA_JWT", status: config?.integrations?.pinata_configured ?? false },
+                { name: "Qdrant / VectorDB", desc: "RAG embeddings and search", env: "QDRANT_URL", status: config?.integrations?.qdrant_configured ?? false },
               ].map((svc) => (
                 <div key={svc.name} className="flex items-center justify-between py-3 px-4 rounded-lg bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)]">
                   <div>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { FileText, Layout, Code, Shield, TestTube, Rocket, LayoutGrid, Clock, Download, Loader2, RefreshCw, ShieldCheck } from 'lucide-react';
+import { FileText, Layout, Code, Shield, TestTube, Rocket, LayoutGrid, Clock, Download, Loader2, RefreshCw, ShieldCheck, Search, MessageSquare, Bug } from 'lucide-react';
 import { Plan } from '@/components/ai-elements';
 import type { PlanStep, PlanStepStatus } from '@/components/ai-elements';
 import type { Workflow } from '@/lib/types';
@@ -11,24 +11,34 @@ const STAGE_ICONS: Record<string, React.ReactNode> = {
   spec: <FileText className="w-5 h-5" />,
   design: <Layout className="w-5 h-5" />,
   codegen: <Code className="w-5 h-5" />,
+  scrubd: <Search className="w-5 h-5" />,
   audit: <Shield className="w-5 h-5" />,
   autofix: <RefreshCw className="w-5 h-5" />,
+  debate: <MessageSquare className="w-5 h-5" />,
   guardian: <ShieldCheck className="w-5 h-5" />,
   simulation: <TestTube className="w-5 h-5" />,
+  exploit_sim: <Bug className="w-5 h-5" />,
   deploy: <Rocket className="w-5 h-5" />,
   ui_scaffold: <LayoutGrid className="w-5 h-5" />,
 };
 
-const BACKEND_STAGES = [
+/**
+ * Canonical pipeline order. Non-negotiable, mandatory as default.
+ * Must match backend STEP_ORDER (nodes.py) + conditional stages (autofix, guardian).
+ */
+const PIPELINE_ORDER = [
   { name: 'spec', label: 'Spec', required: true },
   { name: 'design', label: 'Design', required: true },
   { name: 'codegen', label: 'Codegen', required: true },
+  { name: 'scrubd', label: 'Scrubd', required: true },
   { name: 'audit', label: 'Audit', required: true },
-  { name: 'autofix', label: 'Autofix', required: false },
-  { name: 'guardian', label: 'Guardian', required: false },
+  { name: 'autofix', label: 'Autofix', required: true },
+  { name: 'debate', label: 'Debate', required: true },
+  { name: 'guardian', label: 'Guardian', required: true },
   { name: 'simulation', label: 'Simulation', required: true },
+  { name: 'exploit_sim', label: 'Exploit Sim', required: true },
   { name: 'deploy', label: 'Deploy', required: true },
-  { name: 'ui_scaffold', label: 'UI Schema', required: false },
+  { name: 'ui_scaffold', label: 'UI Schema', required: true },
 ];
 
 interface WorkflowStagesProps {
@@ -57,14 +67,7 @@ export function WorkflowStages({ workflow, contractData }: WorkflowStagesProps) 
   const errorSource = ((workflow.metadata ?? workflow.meta_data) as Record<string, unknown> | undefined);
   const workflowError = errorSource?.error as string | undefined;
 
-  const autofixStage = stageMap.get('autofix') as { status?: string; cycles?: number } | undefined;
-  const guardianStage = stageMap.get('guardian') as { status?: string } | undefined;
-
-  const activeStageDefs = BACKEND_STAGES.filter((s) => {
-    if (s.name === 'autofix') return !!autofixStage;
-    if (s.name === 'guardian') return !!guardianStage;
-    return true;
-  });
+  const activeStageDefs = PIPELINE_ORDER;
 
   const steps: PlanStep[] = activeStageDefs.map((stageDef) => {
     const stage = stageMap.get(stageDef.name) as { status?: string; error?: string; cycles?: number } | undefined;

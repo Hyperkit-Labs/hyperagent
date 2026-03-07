@@ -4,15 +4,14 @@
 # Areas
 'area:frontend':
   - changed-files:
-    - any-glob-to-any-file: 'apps/web/**/*'
+    - any-glob-to-any-file: 'apps/hyperagent-web/**/*'
     - any-glob-to-any-file: '**/*.tsx'
     - any-glob-to-any-file: '**/*.jsx'
     - any-glob-to-any-file: '**/*.css'
 
 'area:backend':
   - changed-files:
-    - any-glob-to-any-file: 'hyperagent/api/**/*'
-    - any-glob-to-any-file: 'hyperagent/core/**/*'
+    - any-glob-to-any-file: 'apps/hyperagent-api/hyperagent/**/*'
     - any-glob-to-any-file: '**/*.py'
 
 'area:contracts':
@@ -22,6 +21,7 @@
 
 'area:infra':
   - changed-files:
+    - any-glob-to-any-file: 'infra/**/*'
     - any-glob-to-any-file: 'k8s/**/*'
     - any-glob-to-any-file: 'docker/**/*'
     - any-glob-to-any-file: 'Dockerfile*'
@@ -30,7 +30,7 @@
 
 'area:database':
   - changed-files:
-    - any-glob-to-any-file: 'hyperagent/db/**/*'
+    - any-glob-to-any-file: 'apps/hyperagent-api/hyperagent/**/*'
     - any-glob-to-any-file: '**/migrations/**/*'
     - any-glob-to-any-file: '**/alembic/**/*'
 
@@ -42,8 +42,8 @@
 # Types
 'type:feature':
   - changed-files:
-    - any-glob-to-any-file: 'hyperagent/**/*.py'
-    - any-glob-to-any-file: 'apps/web/src/**/*'
+    - any-glob-to-any-file: 'apps/hyperagent-api/hyperagent/**/*.py'
+    - any-glob-to-any-file: 'apps/hyperagent-web/src/**/*'
   - head-branch: ['^feature/', '^feat/']
 
 'type:bugfix':
@@ -91,20 +91,19 @@
 # Priority (based on file patterns)
 'priority:critical':
   - changed-files:
-    - any-glob-to-any-file: 'hyperagent/security/**/*'
+    - any-glob-to-any-file: 'apps/hyperagent-api/hyperagent/**/*'
     - any-glob-to-any-file: 'contracts/security/**/*'
 
 # Testing
 'needs-tests':
   - changed-files:
-    - any-glob-to-any-file: 'hyperagent/**/*.py'
-    - any-glob-to-any-file: 'apps/web/src/**/*.{ts,tsx}'
+    - any-glob-to-any-file: 'apps/hyperagent-api/hyperagent/**/*.py'
+    - any-glob-to-any-file: 'apps/hyperagent-web/src/**/*.{ts,tsx}'
     - all-globs-to-all-files: '!**/*.test.{py,ts,tsx}'
     - all-globs-to-all-files: '!**/tests/**'
 
 # Security
 'security':
   - changed-files:
-    - any-glob-to-any-file: 'hyperagent/auth/**/*'
-    - any-glob-to-any-file: 'hyperagent/security/**/*'
+    - any-glob-to-any-file: 'apps/hyperagent-api/hyperagent/**/*'
     - any-glob-to-any-file: 'contracts/security/**/*'

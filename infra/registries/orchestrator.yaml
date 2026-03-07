@@ -7,7 +7,7 @@ metadata:
 spec:
   # Backends: one code path picks SDK from this. No hardcoded backend list in business logic.
   backends:
-    da_backend: none          # eigenda | none. When eigenda, set EIGENDA_API_URL (and optional EIGENDA_DISPERSER_URL).
+    da_backend: none          # stub mode; trace_blob_id stored in run_steps.
     memory_backend: supabase  # acontext | supabase | memory. For acontext set ACONTEXT_API_URL and ACONTEXT_API_KEY.
   timeouts:
     default: 60

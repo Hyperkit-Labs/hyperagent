@@ -800,15 +800,46 @@ def get_networks_api(skale: bool = False) -> list[dict[str, Any]]:
     return get_networks_for_api(skale=skale)
 
 
+AGENT_RUNTIME_URL = os.environ.get("AGENT_RUNTIME_URL", "http://localhost:4001").rstrip("/")
+VECTORDB_URL = os.environ.get("VECTORDB_URL", "http://localhost:8010").rstrip("/")
+INTEGRATIONS_TIMEOUT = 2.0
+
+
+async def _fetch_integrations() -> dict[str, bool]:
+    """Fetch integration status from agent-runtime and vectordb health endpoints."""
+    tenderly = False
+    pinata = False
+    qdrant = False
+    async with httpx.AsyncClient(timeout=INTEGRATIONS_TIMEOUT) as client:
+        try:
+            r = await client.get(f"{AGENT_RUNTIME_URL}/health")
+            if r.status_code == 200:
+                data = r.json()
+                tenderly = data.get("tenderly_configured", False)
+                pinata = data.get("pinata_configured", False)
+        except Exception:
+            pass
+        try:
+            r = await client.get(f"{VECTORDB_URL}/health")
+            if r.status_code == 200:
+                data = r.json()
+                qdrant = data.get("qdrant_configured", False)
+        except Exception:
+            pass
+    return {"tenderly_configured": tenderly, "pinata_configured": pinata, "qdrant_configured": qdrant}
+
+
 @app.get("/api/v1/config")
-def get_config_api() -> dict[str, Any]:
-    """Return public runtime config (x402, monitoring, payment) from registries. No auth required for Studio bootstrap."""
+async def get_config_api() -> dict[str, Any]:
+    """Return public runtime config (x402, monitoring, payment, integrations) from registries. No auth required for Studio bootstrap."""
     merchant = os.environ.get("MERCHANT_WALLET_ADDRESS", "").strip()
+    integrations = await _fetch_integrations()
     return {
         "x402_enabled": get_x402_enabled(),
         "monitoring_enabled": get_monitoring_enabled(),
         "merchant_wallet_address": merchant or None,
         "credits_enabled": credits_supabase.is_configured(),
+        "integrations": integrations,
     }
 
 

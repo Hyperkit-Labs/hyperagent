@@ -47,6 +47,7 @@ from trace_context import set_request_id, get_trace_headers
 import db
 
 COMPILE_SERVICE_URL = os.environ.get("COMPILE_SERVICE_URL", "http://localhost:8004").rstrip("/")
+AUDIT_SERVICE_URL = os.environ.get("AUDIT_SERVICE_URL", "http://localhost:8001").rstrip("/")
 
 # Map store status to runs.status (pending|running|success|failed|cancelled)
 def _run_status_for_store(status: str) -> str:
@@ -80,6 +81,32 @@ def _create_agent_session_jwt_if_configured(user_id: str, run_id: str, api_keys:
         return None
 
 app = FastAPI(title="HyperAgent Orchestrator", version="0.1.0")
+
+
+@app.on_event("startup")
+def _validate_critical_services() -> None:
+    """Log missing critical service URLs. Full lifecycle requires compile, audit, agent-runtime."""
+    required = [
+        ("COMPILE_SERVICE_URL", COMPILE_SERVICE_URL),
+        ("AUDIT_SERVICE_URL", AUDIT_SERVICE_URL),
+        ("AGENT_RUNTIME_URL", os.environ.get("AGENT_RUNTIME_URL", "").strip()),
+    ]
+    missing = [k for k, v in required if not v or v.startswith("http://localhost:")]
+    if missing:
+        logger.warning(
+            "[orchestrator] Critical services not configured: %s. "
+            "Workflow pipeline will fail. Set env vars or use Render Blueprint fromService.",
+            ", ".join(missing),
+        )
+    from pathlib import Path
+    scrubd_path = os.environ.get("SCRUBD_PATH", "./data/SCRUBD").strip()
+    labels = Path(scrubd_path).resolve() / "SCRUBD-CD" / "data" / "labels.csv"
+    if not labels.exists():
+        logger.warning(
+            "[orchestrator] SCRUBD dataset not found at %s. "
+            "Clone during build: git clone --depth 1 --branch V6.0 https://github.com/sujeetc/SCRUBD data/SCRUBD",
+            labels,
+        )
 
 
 @app.middleware("http")
@@ -390,6 +417,9 @@ def get_workflow_api(workflow_id: str, request: Request = None) -> dict[str, Any
     out = {k: v for k, v in w.items() if k not in ("contracts", "deployments")}
     out["contracts"] = w.get("contracts") or {}
     out["deployments"] = w.get("deployments") or []
+    meta = w.get("metadata") or {}
+    if meta.get("error") and "error" not in out:
+        out["error"] = meta["error"]
     return out
 
 
@@ -1819,6 +1849,7 @@ def health_detailed() -> dict[str, Any]:
     services["supabase"] = _check_supabase_health()
     services["redis"] = _check_redis_health()
     services["compile"] = _check_service_health("compile", COMPILE_SERVICE_URL)
+    services["audit"] = _check_service_health("audit", AUDIT_SERVICE_URL)
     sim_url = os.environ.get("SIMULATION_SERVICE_URL", "http://localhost:8002").strip()
     services["simulation"] = _check_service_health("simulation", sim_url)
     deploy_url = os.environ.get("DEPLOY_SERVICE_URL", "http://localhost:8003").strip()

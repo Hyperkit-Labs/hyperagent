@@ -44,11 +44,33 @@ For Chainlink integration (CCIP, oracles, CRE):
 
 ---
 
+## Per-chain capabilities (including x402)
+
+Each chain in `chains.yaml` has `hyperagent.capabilities`:
+
+| Capability | Meaning |
+|------------|---------|
+| `x402: true/false` | x402 payments supported on that chain |
+| `tenderly: true/false` | Tenderly simulation supported |
+| `accountAbstraction.erc4337` | ERC-4337 support |
+| `accountAbstraction.eip7702` | EIP-7702 support |
+| `verification: true/false` | Block explorer verification |
+
+Chains with `x402: true` can use x402 pay-per-call. USDC/USDT addresses per chain are in `infra/registries/x402/stablecoins.yaml`.
+
+## Adding a new chain
+
+1. Add an entry to `infra/registries/network/chains.yaml` with `chainlist` and `hyperagent` sections.
+2. If x402 is supported, add USDC/USDT addresses to `infra/registries/x402/stablecoins.yaml`.
+3. Commit and deploy; no code change required (GitOps).
+
 ## Summary
 
 | Concern | Source / Tool |
 |--------|----------------|
 | List of networks (selectable in UI) | `infra/registries/network/chains.yaml` via `GET /api/v1/networks` |
+| x402 per chain | `capabilities.x402` in chains.yaml |
+| USDC/USDT for x402 | `x402/stablecoins.yaml` |
 | Deploy default / registry path | Same network/chains.yaml (repo or env-configured path) |
 | RPC, wallet, execution | thirdweb (Chain resolution, connect, sign, deploy) |
 | API auth | SIWE -> gateway JWT |

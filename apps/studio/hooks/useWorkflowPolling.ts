@@ -5,12 +5,15 @@ import { getWorkflow, getWorkflowContracts } from '@/lib/api';
 import { POLLING } from '@/constants/defaults';
 import type { Workflow } from '@/lib/types';
 
+type ContractItem = { bytecode?: string; abi?: unknown; source_code?: string; [key: string]: unknown };
+
 export function useWorkflowPolling(workflowId: string | null) {
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
+  const [contracts, setContracts] = useState<ContractItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [contractData, setContractData] = useState<{ bytecode?: string; abi?: unknown; source_code?: string; [key: string]: unknown } | null>(null);
+  const [contractData, setContractData] = useState<ContractItem | null>(null);
   const [contractCode, setContractCode] = useState<string | null>(null);
   const [isFetching, setIsFetching] = useState(false);
   const [pollingStartTime, setPollingStartTime] = useState<number | null>(null);
@@ -30,7 +33,16 @@ export function useWorkflowPolling(workflowId: string | null) {
     try {
       setIsFetching(true);
       setError(null);
-      const data = await getWorkflow(workflowId);
+      const shouldFetchContracts =
+        !contractData ||
+        lastWorkflowStatus === null ||
+        ['compiling', 'auditing', 'testing', 'completed', 'success'].includes(lastWorkflowStatus ?? '');
+
+      const [data, contractsResponse] = await Promise.all([
+        getWorkflow(workflowId),
+        shouldFetchContracts ? getWorkflowContracts(workflowId).catch(() => []) : Promise.resolve(null),
+      ]);
+
       setWorkflow(data);
 
       if (data.status !== lastWorkflowStatus) {
@@ -40,26 +52,13 @@ export function useWorkflowPolling(workflowId: string | null) {
         setStatusUnchangedCount((prev) => prev + 1);
       }
 
-      const shouldFetchContracts =
-        !contractData ||
-        (data.status === 'completed' && !contractData.bytecode) ||
-        (data.status === 'compiling' && lastWorkflowStatus !== 'compiling') ||
-        (data.status === 'auditing' && lastWorkflowStatus !== 'auditing') ||
-        (data.status === 'testing' && lastWorkflowStatus !== 'testing');
-
-      if (shouldFetchContracts) {
-        try {
-          const contractsResponse = await getWorkflowContracts(workflowId);
-          const contracts = Array.isArray(contractsResponse) ? contractsResponse : (contractsResponse as { contracts?: unknown[] })?.contracts ?? [];
-          if (contracts?.length > 0) {
-            const contract = contracts[0] as { bytecode?: string; abi?: unknown; source_code?: string; [key: string]: unknown };
-            setContractData(contract);
-            if (contract.source_code) setContractCode(contract.source_code);
-          }
-        } catch (contractErr: unknown) {
-          if (typeof console !== 'undefined' && console.error) {
-            console.error('[useWorkflowPolling] Contract fetch failed:', contractErr);
-          }
+      if (contractsResponse !== null) {
+        const contractsList = Array.isArray(contractsResponse) ? contractsResponse : (contractsResponse as { contracts?: unknown[] })?.contracts ?? [];
+        if (contractsList.length > 0) {
+          setContracts(contractsList as ContractItem[]);
+          const first = contractsList[0] as ContractItem;
+          setContractData(first);
+          setContractCode(first.source_code ?? null);
         }
       }
 
@@ -96,6 +95,13 @@ export function useWorkflowPolling(workflowId: string | null) {
 
   useEffect(() => {
     if (!workflowId) {
+      setWorkflow(null);
+      setContracts([]);
+      setContractData(null);
+      setContractCode(null);
+      setLastWorkflowStatus(null);
+      setStatusUnchangedCount(0);
+      setPollingStartTime(null);
       setLoading(false);
       return;
     }
@@ -110,6 +116,7 @@ export function useWorkflowPolling(workflowId: string | null) {
 
   return {
     workflow,
+    contracts,
     loading,
     error,
     autoRefresh,

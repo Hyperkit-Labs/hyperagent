@@ -13,6 +13,8 @@ infra/registries/
 ├── models.yaml            # ModelRegistry (LLM provider → models, BYOK routing)
 ├── network/
 │   └── chains.yaml        # ChainRegistry (chain IDs, RPCs, capabilities)
+├── erc8004/
+│   └── erc8004.yaml       # ERC8004Registry (Identity/Reputation/Validation per chain)
 ├── sdks/
 │   └── sdks.yaml          # SdkRegistry (Thirdweb, viem, Hardhat, Foundry)
 └── x402/
@@ -25,7 +27,8 @@ infra/registries/
 
 | Path | Kind | Purpose |
 |------|------|---------|
-| `network/chains.yaml` | ChainRegistry | Chain IDs, RPCs, explorers, capabilities (Tenderly, AA, x402), gas/security defaults |
+| `network/chains.yaml` | ChainRegistry | Chain IDs, RPCs, explorers, capabilities (Tenderly, AA, x402, erc8004), gas/security defaults |
+| `erc8004/erc8004.yaml` | ERC8004Registry | Identity, Reputation, Validation registry addresses per chain for A2A agent discovery. Deployer tooling (scripts, .env.deployer) lives in `external/erc8004/` |
 | `sdks/sdks.yaml` | SdkRegistry | Thirdweb, viem, Hardhat, Foundry; blessed chains, features (ERC4337, 7702, x402) |
 | `models.yaml` | ModelRegistry | Provider → models, context window, cost, use (spec/audit/quick edit), BYOK mapping |
 | `tokens.yaml` | TokenTemplateRegistry | Canonical templates (ERC20/721, governance), flags, audit links |

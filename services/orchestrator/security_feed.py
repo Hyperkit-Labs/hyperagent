@@ -1,6 +1,6 @@
 """Security Feed: cron-compatible zero-day resilience.
-Scrapes high-signal security feeds (Immunefi, PeckShield, BlockSec) and
-injects recent exploit patterns into the DesignAgent system prompt.
+Fetches recent exploit advisories from DeFiLlama (public API) and
+injects them into the DesignAgent system prompt.
 
 Run via: python security_feed.py (standalone) or import and call update_feed() from a scheduler."""
 from __future__ import annotations

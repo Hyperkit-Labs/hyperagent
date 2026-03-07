@@ -27,6 +27,10 @@
 skills/
 .cursor/
 .cursor/*
+CLAUDE.md
+llm.txt
+skills-lock.json
+.gitmodules
 
 # ============================================================
 # SECURITY & CREDENTIALS (CRITICAL - Never commit these!)

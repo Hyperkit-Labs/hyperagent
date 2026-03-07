@@ -282,6 +282,7 @@ def _run_workflow_pipeline_job(
 
 
 CREDITS_PER_RUN = float(os.environ.get("CREDITS_PER_RUN", "7"))
+CREDITS_PER_USD = float(os.environ.get("CREDITS_PER_USD", "10"))
 
 
 @app.post("/api/v1/workflows/generate")
@@ -839,6 +840,8 @@ async def get_config_api() -> dict[str, Any]:
         "monitoring_enabled": get_monitoring_enabled(),
         "merchant_wallet_address": merchant or None,
         "credits_enabled": credits_supabase.is_configured(),
+        "credits_per_usd": CREDITS_PER_USD,
+        "credits_per_run": CREDITS_PER_RUN,
         "integrations": integrations,
     }
 
@@ -1231,17 +1234,21 @@ def credits_top_up_api(
     body: CreditsTopUpBody,
     x_user_id: str | None = Header(None, alias="X-User-Id"),
 ) -> dict[str, Any]:
-    """Record a credit top-up (e.g. after Stripe/fiat or USDC/USDT). Idempotency via reference_id recommended."""
+    """Record a credit top-up (e.g. after Stripe/fiat or USDC/USDT). Idempotency via reference_id recommended.
+    When amount is in USD (usdc_transfer, fiat), it is multiplied by CREDITS_PER_USD to get credits."""
     if not x_user_id:
         raise HTTPException(status_code=401, detail="X-User-Id required")
     if not credits_supabase.is_configured():
         raise HTTPException(status_code=503, detail="Credits not configured")
+    is_usd_input = (body.reference_type or "").lower() in ("usdc_transfer", "usdt_transfer", "fiat") or (body.currency or "").upper() == "USD"
+    credits_to_add = body.amount * CREDITS_PER_USD if is_usd_input else body.amount
     result = credits_supabase.top_up(
         x_user_id,
-        amount=body.amount,
+        amount=credits_to_add,
         currency=body.currency or "USD",
         reference_id=body.reference_id,
         reference_type=body.reference_type or "manual",
+        metadata={"usd_amount": body.amount, "credits_per_usd": CREDITS_PER_USD} if is_usd_input else None,
     )
     if not result:
         raise HTTPException(status_code=500, detail="Top-up failed")

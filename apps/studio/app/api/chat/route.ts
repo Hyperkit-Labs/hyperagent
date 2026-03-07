@@ -16,10 +16,9 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { jwtVerify } from 'jose';
 import { getApiBase } from '@/lib/api';
+import { FALLBACK_DEFAULT_NETWORK_ID } from '@/constants/defaults';
 
 export const maxDuration = 60;
-
-const DEFAULT_NETWORK = 'skalebase-sepolia';
 
 const JWT_SECRET = process.env.AUTH_JWT_SECRET || process.env.SUPABASE_JWT_SECRET || '';
 const jwtSecretKey = JWT_SECRET ? new TextEncoder().encode(JWT_SECRET) : null;
@@ -169,7 +168,7 @@ async function callBackendWorkflow(
     headers,
     body: JSON.stringify({
       nlp_input: body.nlp_input,
-      network: body.network || DEFAULT_NETWORK,
+      network: body.network || FALLBACK_DEFAULT_NETWORK_ID,
       ...(body.template_id ? { template_id: body.template_id } : {}),
       ...(body.api_keys && Object.keys(body.api_keys).length > 0 ? { api_keys: body.api_keys } : {}),
     }),
@@ -230,7 +229,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const defaultNetwork = bodyNetwork || DEFAULT_NETWORK;
+  const defaultNetwork = bodyNetwork || FALLBACK_DEFAULT_NETWORK_ID;
 
   const resolved = resolveModel(req);
   if (resolved instanceof Response) return resolved;

@@ -67,6 +67,9 @@ services:
         sync: false
       - key: AGENT_SESSION_PAYLOAD_KEY
         sync: false
+      # REGISTRIES_PATH: omit to use orchestrator default (Path from __file__ to infra/registries)
+      - key: CREDITS_ENABLED
+        value: "true"
 
   - type: web
     name: hyperagent-agent-runtime

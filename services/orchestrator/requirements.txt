@@ -9,3 +9,9 @@ pyyaml>=6.0
 PyJWT>=2.8.0
 cryptography>=42.0.0
 web3>=6.0.0
+redis>=5.0.0
+datasets>=2.14.0
+# Execution backend (Local + OpenSandbox); optional opensandbox-sdk for OPENSANDBOX_ENABLED
+-e ../../packages/execution-backend
+# Vercel Sandbox SDK for Quick Demo (https://vercel.com/docs/vercel-sandbox)
+vercel>=0.4.0

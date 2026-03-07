@@ -13,7 +13,7 @@ services:
     name: hyperagent-api
     runtime: python
     plan: free
-    buildCommand: cd services/orchestrator && pip install -r requirements.txt
+    buildCommand: cd services/orchestrator && pip install -r requirements.txt && mkdir -p data && git clone --depth 1 --branch V6.0 https://github.com/sujeetc/SCRUBD data/SCRUBD
     startCommand: cd services/orchestrator && uvicorn main:app --host 0.0.0.0 --port ${PORT:-9000}
     healthCheckPath: /health
     buildFilter:
@@ -59,23 +59,50 @@ services:
       - key: REGISTRIES_PATH
         sync: false
       - key: AGENT_RUNTIME_URL
-        sync: false
-      - key: ROMA_URL
-        sync: false
-      - key: SIMULATION_SERVICE_URL
-        sync: false
-      - key: DEPLOY_SERVICE_URL
-        sync: false
-      - key: STORAGE_SERVICE_URL
-        sync: false
+        fromService:
+          name: hyperagent-agent-runtime
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
       - key: COMPILE_SERVICE_URL
-        sync: false
+        fromService:
+          name: hyperagent-compile
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
       - key: AUDIT_SERVICE_URL
-        sync: false
-      - key: TOOLS_BASE_URL
-        sync: false
+        fromService:
+          name: hyperagent-audit
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: ROMA_URL
+        fromService:
+          name: hyperagent-roma
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
       - key: VECTORDB_URL
-        sync: false
+        fromService:
+          name: hyperagent-vectordb
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: SIMULATION_SERVICE_URL
+        fromService:
+          name: hyperagent-agent-runtime
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: DEPLOY_SERVICE_URL
+        fromService:
+          name: hyperagent-agent-runtime
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: STORAGE_SERVICE_URL
+        fromService:
+          name: hyperagent-agent-runtime
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: TOOLS_BASE_URL
+        fromService:
+          name: hyperagent-tools
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
       - key: INTERNAL_SERVICE_TOKEN
         sync: false
       - key: AGENT_SESSION_PAYLOAD_KEY
@@ -93,11 +120,11 @@ services:
         sync: false
       - key: PASHOV_SKILLS_PATH
         sync: false
-      # SCRUBD: mandatory RE/UX validation (clone at build/runtime)
+      # SCRUBD: cloned at build; path relative to services/orchestrator
       - key: SCRUBD_PATH
-        sync: false
+        value: ./data/SCRUBD
       - key: SCRUBD_VERSION
-        sync: false
+        value: V6.0
       - key: MAX_DEBATE_ROUNDS
         sync: false
       - key: VERCEL_SANDBOX_TOKEN

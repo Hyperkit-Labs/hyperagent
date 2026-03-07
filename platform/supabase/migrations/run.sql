@@ -475,3 +475,43 @@ begin
   return jsonb_build_object('balance', v_new_balance, 'currency', p_currency, 'user_id', p_user_id);
 end;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- upsert_spending_control RPC (atomic, avoids concurrent PATCH race)
+-- ---------------------------------------------------------------------------
+create or replace function public.upsert_spending_control(
+  p_user_id uuid,
+  p_budget_amount numeric,
+  p_budget_currency text default 'USD',
+  p_period text default 'monthly',
+  p_alert_threshold_percent integer default 80
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_row jsonb;
+begin
+  insert into public.spending_controls (user_id, budget_amount, budget_currency, period, alert_threshold_percent)
+  values (p_user_id, p_budget_amount, p_budget_currency, p_period, greatest(0, least(100, p_alert_threshold_percent)))
+  on conflict (user_id) do update set
+    budget_amount = excluded.budget_amount,
+    budget_currency = excluded.budget_currency,
+    period = excluded.period,
+    alert_threshold_percent = excluded.alert_threshold_percent,
+    updated_at = now();
+
+  select jsonb_build_object(
+    'budget_amount', budget_amount,
+    'budget_currency', budget_currency,
+    'period', period,
+    'alert_threshold_percent', alert_threshold_percent
+  ) into v_row
+  from public.spending_controls
+  where user_id = p_user_id;
+
+  return v_row;
+end;
+$$;

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useConnectModal } from "thirdweb/react";
 import { Code, HardDrive, Package, Activity, Info, List, Rocket, GitBranch, ArrowRight } from "lucide-react";
@@ -15,6 +16,7 @@ import { MetricCard } from "@/components/ui";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
 
 export default function DashboardPage() {
+  const router = useRouter();
   const client = getThirdwebClient();
   const { connect } = useConnectModal();
   const { metrics, loading: metricsLoading, error: metricsError, refetch: refetchMetrics } = useMetrics();
@@ -42,7 +44,11 @@ export default function DashboardPage() {
     <div className="p-6 lg:p-8">
       <div className="max-w-[1200px] mx-auto space-y-6 animate-enter">
         <ApiErrorBanner error={apiError ?? null} onRetry={refetchAll} />
-        <OnboardingChecklist onConnectClick={() => { if (client) void connect({ client, wallets: CONNECT_WALLETS }); }} />
+        <OnboardingChecklist
+          onConnectClick={() => { if (client) void connect({ client, wallets: CONNECT_WALLETS }); }}
+          onByokClick={() => router.push(ROUTES.SETTINGS)}
+          onPaymentClick={() => router.push(ROUTES.PAYMENTS)}
+        />
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-2">
           <div>
             <div className="flex items-center gap-2 mb-1">

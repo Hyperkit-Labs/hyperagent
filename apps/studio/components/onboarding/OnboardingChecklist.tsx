@@ -11,10 +11,11 @@ export interface OnboardingChecklistProps {
   onConnectClick?: () => void;
   onByokClick?: () => void;
   onPaymentClick?: () => void;
+  onTryItNowClick?: () => void;
   className?: string;
 }
 
-export function OnboardingChecklist({ onConnectClick, onByokClick, onPaymentClick, className = "" }: OnboardingChecklistProps) {
+export function OnboardingChecklist({ onConnectClick, onByokClick, onPaymentClick, onTryItNowClick, className = "" }: OnboardingChecklistProps) {
   const { steps, nextStep, completed } = useOnboarding();
   const [dismissed, setDismissed] = useState(false);
 
@@ -27,14 +28,25 @@ export function OnboardingChecklist({ onConnectClick, onByokClick, onPaymentClic
   if (completed) {
     return (
       <div className={`glass-panel rounded-xl p-4 border border-emerald-500/20 ${className}`.trim()}>
-        <div className="flex items-center gap-3">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
-            <Check className="w-4 h-4" />
-          </span>
-          <div>
-            <p className="text-sm font-medium text-[var(--color-text-primary)]">Setup complete</p>
-            <p className="text-xs text-[var(--color-text-tertiary)]">You are ready to build. Create a workflow to generate your first contract.</p>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
+              <Check className="w-4 h-4" />
+            </span>
+            <div>
+              <p className="text-sm font-medium text-[var(--color-text-primary)]">Setup complete</p>
+              <p className="text-xs text-[var(--color-text-tertiary)]">You are ready to build. Create a workflow to generate your first contract.</p>
+            </div>
           </div>
+          {onTryItNowClick && (
+            <button
+              type="button"
+              onClick={onTryItNowClick}
+              className="shrink-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--color-border-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] text-xs font-medium"
+            >
+              Try it Now
+            </button>
+          )}
         </div>
       </div>
     );

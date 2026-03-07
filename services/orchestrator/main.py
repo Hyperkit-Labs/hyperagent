@@ -31,7 +31,7 @@ from llm_keys_store import (
 import llm_keys_supabase
 import payments_supabase
 import credits_supabase
-from registries import DEFAULT_PIPELINE_ID, get_registry_versions, get_networks_for_api, get_templates_for_api, get_template, get_x402_enabled, get_timeout, get_monitoring_enabled, get_chain_rpc_explorer, get_chain_id_by_network_slug, get_x402_plans, get_x402_plan, get_x402_resources, get_resource_price, check_plan_limit
+from registries import DEFAULT_PIPELINE_ID, ANCHOR_NETWORK_SLUG, get_registry_versions, get_networks_for_api, get_templates_for_api, get_template, get_x402_enabled, get_timeout, get_monitoring_enabled, get_chain_rpc_explorer, get_chain_id_by_network_slug, get_default_chain_id, get_x402_plans, get_x402_plan, get_x402_resources, get_resource_price, get_stablecoins_by_chain, check_plan_limit, get_a2a_agent_id, get_a2a_default_chain_id, get_erc8004_agent_identity
 from store import (
     create_workflow,
     update_workflow,
@@ -42,7 +42,7 @@ from store import (
     MAX_INTENT_LENGTH,
 )
 from workflow import run_pipeline
-from trace_context import set_request_id
+from trace_context import set_request_id, get_trace_headers
 import db
 
 COMPILE_SERVICE_URL = os.environ.get("COMPILE_SERVICE_URL", "http://localhost:8004").rstrip("/")
@@ -83,8 +83,9 @@ app = FastAPI(title="HyperAgent Orchestrator", version="0.1.0")
 
 @app.middleware("http")
 async def log_request_id(request: Request, call_next):
-    """Log x-request-id for trace correlation; downstream services receive it from gateway."""
-    rid = (request.headers.get("x-request-id") or request.headers.get("X-Request-Id") or "").strip()
+    """Set and log x-request-id for trace correlation; downstream services receive it from gateway."""
+    rid = (request.headers.get("x-request-id") or request.headers.get("X-Request-Id") or "").strip() or None
+    set_request_id(rid)
     if rid:
         logger.info("[orchestrator] request_id=%s path=%s", rid, request.url.path)
     response = await call_next(request)
@@ -566,7 +567,7 @@ def export_ui_app_api(workflow_id: str, body: UiAppExportBody | None = None, req
         raise HTTPException(status_code=400, detail="Generate UI schema first (POST /ui-schema/generate)")
     template = (body.template if body else "hyperagent-default") or "hyperagent-default"
     app_name = _sanitize_name(schema.get("name") or "dapp").lower().replace(" ", "-")
-    chain_id = schema.get("chainId", 8453)
+    chain_id = schema.get("chainId") or get_default_chain_id()
     contract_addr = schema.get("contractAddress", "")
     abi = schema.get("abi", [])
     raw_actions = schema.get("actions", [])
@@ -637,9 +638,10 @@ def prepare_deploy_api(
     workflow_id: str,
     request: Request,
     body: PrepareDeployBody | None = Body(None),
-    chain_id: int = 8453,
+    chain_id: int | None = None,
 ) -> dict[str, Any]:
     """Compile first contract and return deploy payload for client to sign. Mainnet guarded."""
+    chain_id = chain_id if chain_id is not None else get_default_chain_id()
     w = get_workflow(workflow_id)
     if not w:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -662,10 +664,12 @@ def prepare_deploy_api(
     source = contracts[first_name]
     contract_name = first_name.replace(".sol", "")
     try:
+        headers = get_trace_headers()
         with httpx.Client(timeout=get_timeout("main")) as client:
             r = client.post(
                 f"{COMPILE_SERVICE_URL}/compile",
                 json={"contractCode": source, "framework": "hardhat"},
+                headers=headers,
             )
             r.raise_for_status()
             data = r.json()
@@ -801,6 +805,12 @@ def get_networks_api(skale: bool = False) -> list[dict[str, Any]]:
     return get_networks_for_api(skale=skale)
 
 
+@app.get("/api/v1/tokens/stablecoins")
+def get_stablecoins_api() -> dict[str, dict[str, str]]:
+    """Return USDC/USDT addresses per chain from x402/stablecoins.yaml. Keys are chain IDs as strings."""
+    return get_stablecoins_by_chain()
+
+
 AGENT_RUNTIME_URL = os.environ.get("AGENT_RUNTIME_URL", "http://localhost:4001").rstrip("/")
 VECTORDB_URL = os.environ.get("VECTORDB_URL", "http://localhost:8010").rstrip("/")
 INTEGRATIONS_TIMEOUT = 2.0
@@ -832,9 +842,10 @@ async def _fetch_integrations() -> dict[str, bool]:
 
 @app.get("/api/v1/config")
 async def get_config_api() -> dict[str, Any]:
-    """Return public runtime config (x402, monitoring, payment, integrations) from registries. No auth required for Studio bootstrap."""
+    """Return public runtime config (x402, monitoring, payment, integrations, A2A identity) from registries. No auth required for Studio bootstrap."""
     merchant = os.environ.get("MERCHANT_WALLET_ADDRESS", "").strip()
     integrations = await _fetch_integrations()
+    a2a_identity = get_erc8004_agent_identity()
     return {
         "x402_enabled": get_x402_enabled(),
         "monitoring_enabled": get_monitoring_enabled(),
@@ -842,6 +853,11 @@ async def get_config_api() -> dict[str, Any]:
         "credits_enabled": credits_supabase.is_configured(),
         "credits_per_usd": CREDITS_PER_USD,
         "credits_per_run": CREDITS_PER_RUN,
+        "default_network_id": ANCHOR_NETWORK_SLUG,
+        "default_chain_id": get_default_chain_id(),
+        "a2a_agent_id": get_a2a_agent_id(),
+        "a2a_default_chain_id": get_a2a_default_chain_id(),
+        "a2a_identity": a2a_identity,
         "integrations": integrations,
     }
 
@@ -1544,6 +1560,113 @@ def _check_tools_health() -> dict[str, Any]:
         return {"status": "offline", "url": TOOLS_BASE_URL, "error": str(e)}
 
 
+# Vercel Sandbox: https://vercel.com/docs/vercel-sandbox, https://vercel.com/docs/vercel-sandbox/concepts/authentication
+VERCEL_SANDBOX_API = "https://api.vercel.com/v1/sandboxes"
+VERCEL_SANDBOX_TOKEN = (
+    os.environ.get("VERCEL_SANDBOX_TOKEN", "").strip()
+    or os.environ.get("VERCEL_TOKEN", "").strip()
+)
+VERCEL_TEAM_ID = os.environ.get("VERCEL_TEAM_ID", "").strip()
+VERCEL_PROJECT_ID = os.environ.get("VERCEL_PROJECT_ID", "").strip()
+DEMO_SANDBOX_SOURCE_URL = os.environ.get("DEMO_SANDBOX_SOURCE_URL", "https://github.com/NomicFoundation/hardhat-template").strip()
+DEMO_SANDBOX_SOURCE_TYPE = os.environ.get("DEMO_SANDBOX_SOURCE_TYPE", "git").strip().lower()
+
+
+def _ensure_vercel_sandbox_env() -> None:
+    """Ensure Vercel Sandbox SDK reads our env vars. SDK uses VERCEL_TOKEN, VERCEL_TEAM_ID, VERCEL_PROJECT_ID."""
+    if VERCEL_SANDBOX_TOKEN and not os.environ.get("VERCEL_TOKEN"):
+        os.environ["VERCEL_TOKEN"] = VERCEL_SANDBOX_TOKEN
+    if VERCEL_TEAM_ID and not os.environ.get("VERCEL_TEAM_ID"):
+        os.environ["VERCEL_TEAM_ID"] = VERCEL_TEAM_ID
+    if VERCEL_PROJECT_ID and not os.environ.get("VERCEL_PROJECT_ID"):
+        os.environ["VERCEL_PROJECT_ID"] = VERCEL_PROJECT_ID
+
+
+@app.post("/api/v1/quick-demo")
+async def quick_demo_api() -> dict[str, Any]:
+    """Create a Vercel Sandbox from the demo template using the official SDK.
+    Returns sandbox URL for Try it Now. Requires VERCEL_SANDBOX_TOKEN or VERCEL_TOKEN.
+    For non-Vercel hosting, also set VERCEL_TEAM_ID and VERCEL_PROJECT_ID.
+    Local dev: run `vercel link` and `vercel env pull` to get .env.local with VERCEL_OIDC_TOKEN."""
+    if not VERCEL_SANDBOX_TOKEN and not os.environ.get("VERCEL_TOKEN") and not os.environ.get("VERCEL_OIDC_TOKEN"):
+        raise HTTPException(status_code=503, detail="Quick demo not configured: set VERCEL_SANDBOX_TOKEN, VERCEL_TOKEN, or run vercel env pull")
+    _ensure_vercel_sandbox_env()
+    source_type = "tarball" if DEMO_SANDBOX_SOURCE_TYPE == "tarball" else "git"
+    source: dict[str, Any] = {"type": source_type, "url": DEMO_SANDBOX_SOURCE_URL}
+    create_kwargs: dict[str, Any] = {
+        "source": source,
+        "runtime": "node24",
+        "ports": [3000],
+        "timeout": 300000,
+    }
+    if VERCEL_PROJECT_ID:
+        create_kwargs["project_id"] = VERCEL_PROJECT_ID
+    if VERCEL_TEAM_ID:
+        create_kwargs["team_id"] = VERCEL_TEAM_ID
+    try:
+        from vercel.sandbox import AsyncSandbox
+
+        sandbox = await AsyncSandbox.create(**create_kwargs)
+        sandbox_id = getattr(sandbox, "sandbox_id", None) or getattr(sandbox, "sandboxId", None) or getattr(sandbox, "id", None)
+        status = getattr(sandbox, "status", "running")
+        url: str | None = None
+        try:
+            url = sandbox.domain(3000)
+        except Exception:
+            pass
+        return {
+            "sandbox_id": sandbox_id,
+            "url": url,
+            "status": status,
+        }
+    except (ImportError, AttributeError) as e:
+        logger.info("[quick-demo] SDK unavailable (%s), using REST API fallback", e)
+        return await _quick_demo_via_rest()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("[quick-demo] %s", e)
+        raise HTTPException(status_code=502, detail=str(e)[:200])
+
+
+async def _quick_demo_via_rest() -> dict[str, Any]:
+    """Fallback: create sandbox via REST API when SDK is unavailable (e.g. Windows)."""
+    token = VERCEL_SANDBOX_TOKEN or os.environ.get("VERCEL_TOKEN", "").strip()
+    if not token:
+        raise HTTPException(status_code=503, detail="Quick demo not configured: VERCEL_SANDBOX_TOKEN or VERCEL_TOKEN required")
+    source_type = "tarball" if DEMO_SANDBOX_SOURCE_TYPE == "tarball" else "git"
+    source = {"type": source_type, "url": DEMO_SANDBOX_SOURCE_URL}
+    body: dict[str, Any] = {
+        "runtime": "node24",
+        "source": source,
+        "ports": [3000],
+        "timeout": 300000,
+    }
+    if VERCEL_PROJECT_ID:
+        body["projectId"] = VERCEL_PROJECT_ID
+    params = {"teamId": VERCEL_TEAM_ID} if VERCEL_TEAM_ID else None
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.post(
+            VERCEL_SANDBOX_API,
+            json=body,
+            params=params,
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        )
+        if r.status_code != 200:
+            err = r.text[:500] if r.text else str(r.status_code)
+            logger.warning("[quick-demo] Vercel API %s: %s", r.status_code, err)
+            raise HTTPException(status_code=502, detail=f"Sandbox creation failed: {err}")
+        data = r.json()
+        routes = data.get("routes") or []
+        sandbox = data.get("sandbox") or {}
+        url = routes[0].get("url") if routes else None
+        return {
+            "sandbox_id": sandbox.get("id"),
+            "url": url,
+            "status": sandbox.get("status", "pending"),
+        }
+
+
 @app.get("/health")
 def health() -> dict[str, Any]:
     """Health and registry versions."""
@@ -1551,11 +1674,63 @@ def health() -> dict[str, Any]:
     return {"status": "ok", "registries": versions}
 
 
+def _check_supabase_health() -> dict[str, Any]:
+    """Ping Supabase when configured."""
+    if not db.is_configured():
+        return {"status": "not_configured"}
+    try:
+        client = db._client()
+        if client:
+            client.table("runs").select("id").limit(1).execute()
+            return {"status": "ok"}
+    except Exception as e:
+        return {"status": "error", "error": str(e)[:200]}
+    return {"status": "not_configured"}
+
+
+def _check_redis_health() -> dict[str, Any]:
+    """Ping Redis when REDIS_URL is set."""
+    url = (os.environ.get("REDIS_URL") or "").strip()
+    if not url or url.startswith("#"):
+        return {"status": "not_configured"}
+    try:
+        from redis import Redis
+        r = Redis.from_url(url)
+        r.ping()
+        return {"status": "ok"}
+    except ImportError:
+        return {"status": "not_configured", "message": "redis package not installed"}
+    except Exception as e:
+        return {"status": "error", "error": str(e)[:200]}
+
+
+def _check_service_health(name: str, url: str, timeout: float = 2.0) -> dict[str, Any]:
+    """Ping a service /health endpoint."""
+    if not url or not url.strip():
+        return {"status": "not_configured", "url": None}
+    try:
+        with httpx.Client(timeout=timeout) as client:
+            r = client.get(f"{url.rstrip('/')}/health")
+            if r.status_code == 200:
+                return {"status": "ok", "url": url}
+            return {"status": "error", "url": url, "code": r.status_code}
+    except Exception as e:
+        return {"status": "offline", "url": url, "error": str(e)[:200]}
+
+
 @app.get("/api/v1/health/detailed")
 def health_detailed() -> dict[str, Any]:
-    """Detailed health for Studio. Includes tools status when TOOLS_BASE_URL is set."""
+    """Detailed health for Studio. Includes Supabase, Redis, compile, simulation, deploy, tools, RAG."""
     versions = get_registry_versions()
     services: dict[str, Any] = {"orchestrator": {"status": "ok"}}
+    services["supabase"] = _check_supabase_health()
+    services["redis"] = _check_redis_health()
+    services["compile"] = _check_service_health("compile", COMPILE_SERVICE_URL)
+    sim_url = os.environ.get("SIMULATION_SERVICE_URL", "http://localhost:8002").strip()
+    services["simulation"] = _check_service_health("simulation", sim_url)
+    deploy_url = os.environ.get("DEPLOY_SERVICE_URL", "http://localhost:8003").strip()
+    services["deploy"] = _check_service_health("deploy", deploy_url)
+    services["rag"] = _check_service_health("rag", VECTORDB_URL)
     if TOOLS_BASE_URL:
         tools_status = _check_tools_health()
         services["tools"] = tools_status

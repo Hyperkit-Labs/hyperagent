@@ -9,7 +9,8 @@ from typing import Any
 
 import httpx
 
-from registries import get_timeout
+from registries import get_timeout, get_default_chain_id
+from trace_context import get_trace_headers
 
 COMPILE_SERVICE_URL = os.environ.get("COMPILE_SERVICE_URL", "http://localhost:8004").rstrip("/")
 
@@ -80,10 +81,12 @@ def build_ui_schema(
 async def get_abi_from_compile(contract_source: str, framework: str = "hardhat") -> list[dict] | None:
     """Call compile service to get ABI for contract source."""
     try:
+        headers = get_trace_headers()
         async with httpx.AsyncClient(timeout=get_timeout("ui_scaffold")) as client:
             r = await client.post(
                 f"{COMPILE_SERVICE_URL}/compile",
                 json={"contractCode": contract_source, "framework": framework},
+                headers=headers,
             )
             r.raise_for_status()
             data = r.json()
@@ -109,7 +112,7 @@ async def generate_ui_schema(
     contract_address = first.get("contract_address") or first.get("contractAddress")
     if not contract_address:
         return None
-    chain_id = first.get("chain_id") or first.get("chainId") or 8453
+    chain_id = first.get("chain_id") or first.get("chainId") or get_default_chain_id()
     abi = first.get("abi")
     first_name = next((n for n in (contracts or {}) if isinstance((contracts or {}).get(n), str)), None)
     if not abi and first_name and contracts:

@@ -11,6 +11,8 @@ import { RequestWithUser } from "./auth.js";
 
 const REDIS_URL = process.env.REDIS_URL;
 const NODE_ENV = process.env.NODE_ENV || "development";
+/** When true, allow requests through when Redis is unreachable (skip rate limit). Use for local/staging when Redis is unavailable. */
+const RATE_LIMIT_BYPASS_ON_FAIL = process.env.RATE_LIMIT_BYPASS_ON_FAIL === "true";
 const RATE_LIMIT_WINDOW_SEC = Number(process.env.RATE_LIMIT_WINDOW_SEC) || 60;
 const RATE_LIMIT_MAX_IP = Number(process.env.RATE_LIMIT_MAX_IP) || 100;
 const RATE_LIMIT_MAX_USER = Number(process.env.RATE_LIMIT_MAX_USER) || 200;
@@ -127,10 +129,15 @@ export async function rateLimitMiddleware(
   if (NODE_ENV === "production") {
     const r = await getRedis();
     if (!r) {
+      if (RATE_LIMIT_BYPASS_ON_FAIL) {
+        console.warn("[rate-limit] Redis unreachable, bypassing rate limit (RATE_LIMIT_BYPASS_ON_FAIL=true)");
+        next();
+        return;
+      }
       logSecurityEvent("rate_limit_unavailable", 503, req.path, req.requestId, req.userId);
       res.status(503).json({
         error: "Service Unavailable",
-        message: "Rate limiting unavailable. Redis connection failed. Ensure REDIS_URL is set and reachable (use rediss:// for TLS).",
+        message: "Rate limiting unavailable. Redis connection failed. Ensure REDIS_URL is set and reachable (use rediss:// for TLS). Set RATE_LIMIT_BYPASS_ON_FAIL=true to bypass when Redis is unavailable.",
         requestId: req.requestId,
       });
       return;

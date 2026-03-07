@@ -29,8 +29,12 @@ class AgentState(TypedDict, total=False):
     framework: str
     audit_findings: list
     audit_passed: bool
+    scrubd_validation_passed: bool
+    scrubd_findings: list
     simulation_results: dict
     simulation_passed: bool
+    exploit_simulation_passed: bool
+    exploit_simulation_findings: list
     deployments: list
     ui_schema: dict
     rag_context: dict
@@ -38,9 +42,11 @@ class AgentState(TypedDict, total=False):
     current_stage: str
     error: str | None
     needs_human_approval: bool
-    # Autofix loop state
+    # Autofix / debate loop state
     autofix_cycle: int
     autofix_history: list
+    discussion_trace: list
+    debate_converged: bool
     # Guardian invariant checks
     invariants: list
     invariant_violations: list

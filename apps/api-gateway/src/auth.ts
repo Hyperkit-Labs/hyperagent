@@ -1,7 +1,7 @@
 /**
  * JWT auth for gateway. Validates Authorization: Bearer <token> and sets req.userId (sub) and req.walletAddress.
  * Uses AUTH_JWT_SECRET (SIWE-issued tokens). Supabase Auth is not used; Supabase is database-only.
- * In production, AUTH_JWT_SECRET is required and auth is enforced on all /api/v1 except /health and /api/v1/auth/siwe.
+ * Auth is enforced by default (REQUIRE_AUTH=true or NODE_ENV=production). Set REQUIRE_AUTH=false to disable (dev only).
  */
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
@@ -13,7 +13,7 @@ export interface RequestWithUser extends Request {
 
 const AUTH_JWT_SECRET = process.env.AUTH_JWT_SECRET;
 const NODE_ENV = process.env.NODE_ENV || "development";
-const REQUIRE_AUTH = process.env.REQUIRE_AUTH === "true" || NODE_ENV === "production";
+const REQUIRE_AUTH = process.env.REQUIRE_AUTH !== "false" || NODE_ENV === "production";
 
 function isPublicPath(path: string): boolean {
   const p = (path || "").split("?")[0];
@@ -23,7 +23,8 @@ function isPublicPath(path: string): boolean {
     p === "" ||
     p === "/api/v1/auth/siwe" ||
     p === "/api/v1/config" ||
-    p === "/api/v1/networks"
+    p === "/api/v1/networks" ||
+    p === "/api/v1/tokens/stablecoins"
   );
 }
 

@@ -90,14 +90,23 @@ def set_keys_for_user(user_id: str, keys: dict[str, str]) -> list[str]:
         return []
 
 
-def delete_keys_for_user(user_id: str) -> None:
-    """Clear encrypted_llm_keys for user_id (wallet_users.id)."""
+def delete_keys_for_user(user_id: str) -> bool:
+    """Clear encrypted_llm_keys for user_id (wallet_users.id). Returns True if a row was updated."""
     if not _is_configured() or not user_id:
-        return
+        return False
+    if not db._is_uuid(user_id):
+        logger.warning("[byok] delete_keys_for_user invalid user_id (not UUID): %s", user_id[:20] if user_id else "")
+        return False
     client = db._client()
     if not client:
-        return
+        return False
     try:
-        client.table("wallet_users").update({"encrypted_llm_keys": None}).eq("id", user_id).execute()
+        r = client.table("wallet_users").update({"encrypted_llm_keys": None}).eq("id", user_id).execute()
+        updated = r.data if r.data is not None else []
+        if not updated:
+            logger.warning("[byok] delete_keys_for_user no row updated for user_id=%s", user_id)
+            return False
+        return True
     except Exception as e:
         logger.warning("[byok] delete_keys_for_user user_id=%s error=%s", user_id, e)
+        return False

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -84,40 +85,48 @@ def top_up(
     metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Add credits (e.g. after fiat/USDC/USDT top-up). Returns updated balance info or None.
-    Uses atomic RPC when available to avoid race conditions under concurrent load."""
+    Uses atomic RPC when available to avoid race conditions under concurrent load.
+    Retries up to 2 times on transient failures."""
     if not user_id or not is_configured() or amount <= 0:
         return None
     client = _client()
     if not client:
         return None
-    try:
-        r = client.rpc(
-            "top_up_credits",
-            {
-                "p_user_id": user_id,
-                "p_amount": str(amount),
-                "p_currency": currency or "USD",
-                "p_reference_id": reference_id,
-                "p_reference_type": reference_type or "manual",
-                "p_metadata": metadata or {},
-            },
-        ).execute()
-        data = r.data
-        if data is None:
-            return None
-        row = data[0] if isinstance(data, list) and data else data
-        if not isinstance(row, dict):
-            return None
-        return {
-            "balance": float(row.get("balance", 0)),
-            "currency": str(row.get("currency", "USD")),
-            "user_id": user_id,
-        }
-    except Exception as e:
-        logger.warning("[credits] top_up RPC user_id=%s error=%s", user_id, e)
-        return _top_up_fallback(
-            user_id, amount, currency, reference_id, reference_type, metadata
-        )
+    for attempt in range(3):
+        try:
+            r = client.rpc(
+                "top_up_credits",
+                {
+                    "p_user_id": user_id,
+                    "p_amount": str(amount),
+                    "p_currency": currency or "USD",
+                    "p_reference_id": reference_id,
+                    "p_reference_type": reference_type or "manual",
+                    "p_metadata": metadata or {},
+                },
+            ).execute()
+            data = r.data
+            if data is None:
+                return None
+            row = data[0] if isinstance(data, list) and data else data
+            if not isinstance(row, dict):
+                return None
+            return {
+                "balance": float(row.get("balance", 0)),
+                "currency": str(row.get("currency", "USD")),
+                "user_id": user_id,
+            }
+        except Exception as e:
+            logger.warning("[credits] top_up RPC attempt=%s user_id=%s error=%s", attempt + 1, user_id, e)
+            if attempt < 2:
+                time.sleep(0.1 * (attempt + 1))
+            else:
+                return _top_up_fallback(
+                    user_id, amount, currency, reference_id, reference_type, metadata
+                )
+    return _top_up_fallback(
+        user_id, amount, currency, reference_id, reference_type, metadata
+    )
 
 
 def _top_up_fallback(

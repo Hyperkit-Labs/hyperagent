@@ -5,6 +5,7 @@ Uses wallet_users.id (X-User-Id from gateway). Reads/writes payment_history and 
 from __future__ import annotations
 
 import logging
+import time
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -109,7 +110,8 @@ def upsert_spending_control(
     period: str = "monthly",
     alert_threshold_percent: int = 80,
 ) -> dict[str, Any] | None:
-    """Insert or update spending_controls for user_id. Returns row or None."""
+    """Insert or update spending_controls for user_id. Returns row or None.
+    Uses atomic RPC when available to avoid race conditions under concurrent load."""
     if not user_id or not is_configured():
         return None
     client = _client()
@@ -118,20 +120,81 @@ def upsert_spending_control(
     if period not in ("daily", "weekly", "monthly"):
         period = "monthly"
     alert_threshold_percent = max(0, min(100, int(alert_threshold_percent)))
-    try:
-        payload = {
-            "user_id": user_id,
-            "budget_amount": str(budget_amount),
-            "budget_currency": budget_currency or "USD",
-            "period": period,
-            "alert_threshold_percent": alert_threshold_percent,
-            "updated_at": datetime.now(UTC).isoformat(),
-        }
-        r = client.table("spending_controls").upsert(payload, on_conflict="user_id").execute()
-        return r.data[0] if r.data else None
-    except Exception as e:
-        logger.warning("[payments] upsert_spending_control user_id=%s error=%s", user_id, e)
+    for attempt in range(5):
+        try:
+            r = client.rpc(
+                "upsert_spending_control",
+                {
+                    "p_user_id": user_id,
+                    "p_budget_amount": str(budget_amount),
+                    "p_budget_currency": budget_currency or "USD",
+                    "p_period": period,
+                    "p_alert_threshold_percent": alert_threshold_percent,
+                },
+            ).execute()
+            data = r.data
+            if data is None:
+                return _upsert_spending_control_fallback(
+                    user_id, budget_amount, budget_currency, period, alert_threshold_percent
+                )
+            row = data[0] if isinstance(data, list) and data else data
+            if not isinstance(row, dict):
+                return _upsert_spending_control_fallback(
+                    user_id, budget_amount, budget_currency, period, alert_threshold_percent
+                )
+            return {
+                "user_id": user_id,
+                "budget_amount": float(row.get("budget_amount", budget_amount)),
+                "budget_currency": str(row.get("budget_currency", budget_currency)),
+                "period": str(row.get("period", period)),
+                "alert_threshold_percent": int(row.get("alert_threshold_percent", alert_threshold_percent)),
+            }
+        except Exception as e:
+            logger.warning(
+                "[payments] upsert_spending_control RPC attempt=%s user_id=%s error=%s",
+                attempt + 1, user_id, e,
+            )
+            if attempt < 4:
+                time.sleep(0.15 * (attempt + 1))
+            else:
+                return _upsert_spending_control_fallback(
+                    user_id, budget_amount, budget_currency, period, alert_threshold_percent
+                )
+
+
+def _upsert_spending_control_fallback(
+    user_id: str,
+    budget_amount: float,
+    budget_currency: str,
+    period: str,
+    alert_threshold_percent: int,
+) -> dict[str, Any] | None:
+    """Fallback when RPC not available (e.g. migration not run). Retries on transient failure."""
+    client = _client()
+    if not client:
         return None
+    for attempt in range(4):
+        try:
+            payload = {
+                "user_id": user_id,
+                "budget_amount": str(budget_amount),
+                "budget_currency": budget_currency or "USD",
+                "period": period,
+                "alert_threshold_percent": alert_threshold_percent,
+                "updated_at": datetime.now(UTC).isoformat(),
+            }
+            r = client.table("spending_controls").upsert(payload, on_conflict="user_id").execute()
+            return r.data[0] if r.data else None
+        except Exception as e:
+            logger.warning(
+                "[payments] upsert_spending_control fallback attempt=%s user_id=%s error=%s",
+                attempt + 1, user_id, e,
+            )
+            if attempt < 3:
+                time.sleep(0.2 * (attempt + 1))
+            else:
+                return None
+    return None
 
 
 def insert_payment(

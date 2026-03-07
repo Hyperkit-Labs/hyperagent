@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 import uuid
 from typing import Any
 
@@ -1301,13 +1302,18 @@ def payments_spending_control_patch_api(
     if not payments_supabase.is_configured():
         raise HTTPException(status_code=503, detail="Spending controls not configured")
     period = body.period if body.period in ("daily", "weekly", "monthly") else "monthly"
-    row = payments_supabase.upsert_spending_control(
-        x_user_id,
-        budget_amount=body.budget_amount,
-        budget_currency=body.budget_currency or "USD",
-        period=period,
-        alert_threshold_percent=body.alert_threshold_percent,
-    )
+    for api_attempt in range(3):
+        row = payments_supabase.upsert_spending_control(
+            x_user_id,
+            budget_amount=body.budget_amount,
+            budget_currency=body.budget_currency or "USD",
+            period=period,
+            alert_threshold_percent=body.alert_threshold_percent,
+        )
+        if row:
+            break
+        if api_attempt < 2:
+            time.sleep(0.2 * (api_attempt + 1))
     if not row:
         raise HTTPException(status_code=500, detail="Failed to update spending control")
     return {

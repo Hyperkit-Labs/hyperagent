@@ -1,6 +1,3 @@
-[submodule "contracts/evm/erc8004/erc-8004-contracts"]
-	path = contracts/evm/erc8004/erc-8004-contracts
-	url = https://github.com/erc-8004/erc-8004-contracts.git
 [submodule "packages/pashov-skills"]
 	path = packages/pashov-skills
 	url = https://github.com/pashov/skills.git

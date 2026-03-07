@@ -9,9 +9,20 @@
  */
 
 let runtimeFeatures: Record<string, boolean> = {};
+let runtimeConfig: Record<string, unknown> = {};
 
 export function setRuntimeFeatures(features: Record<string, boolean>): void {
   runtimeFeatures = { ...runtimeFeatures, ...features };
+}
+
+/** Store config from GET /api/v1/config (default_network_id, default_chain_id, a2a_identity, etc.). */
+export function setRuntimeConfig(config: Record<string, unknown>): void {
+  runtimeConfig = { ...runtimeConfig, ...config };
+}
+
+/** Get a runtime config value (e.g. default_network_id, default_chain_id). */
+export function getRuntimeConfig<K = unknown>(key: string): K | undefined {
+  return runtimeConfig[key] as K | undefined;
 }
 
 interface ServiceConfig {

@@ -3,9 +3,9 @@
 import { useParams } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { useWorkflow } from "@/hooks/useWorkflow";
+import { useAppDetailData } from "@/hooks/useAppDetailData";
 import { useNetworks } from "@/hooks/useNetworks";
-import { getWorkflowContracts, getWorkflowDeployments, prepareDeploymentTransaction, completeDeployment } from "@/lib/api";
+import { prepareDeploymentTransaction, completeDeployment } from "@/lib/api";
 import { ArrowLeft, FileCode, ExternalLink, Rocket, Loader2, LayoutGrid, GitBranch, Layers, Activity, MessageSquare, Terminal } from "lucide-react";
 import { Shimmer } from "@/components/ai-elements";
 import { ROUTES } from "@/constants/routes";
@@ -21,8 +21,18 @@ export default function AppDetailPage() {
   const params = useParams();
   const id = params?.id as string;
   const [tab, setTab] = useState<AppTab>("overview");
-  const { workflow, loading, error } = useWorkflow(id);
   const { networks } = useNetworks();
+  const {
+    workflow,
+    contracts,
+    deployments,
+    loading,
+    error,
+    refetch: refetchOverview,
+  } = useAppDetailData({
+    workflowId: id,
+    enabled: !!id,
+  });
   const chainOptions = useMemo(
     () =>
       networks
@@ -31,9 +41,6 @@ export default function AppDetailPage() {
     [networks]
   );
   const initialChainId = getDefaultChainIdFromList(networks);
-  const [contracts, setContracts] = useState<ContractItem[]>([]);
-  const [deployments, setDeployments] = useState<DeploymentItem[]>([]);
-  const [contractsLoading, setContractsLoading] = useState(false);
   const [deployChainId, setDeployChainId] = useState(initialChainId);
   useEffect(() => {
     if (chainOptions.length > 0 && !chainOptions.some((o) => o.chainId === deployChainId)) {
@@ -46,19 +53,6 @@ export default function AppDetailPage() {
   const [activityLogs, setActivityLogs] = useState<Array<{ timestamp?: string; step_type?: string; status?: string; output_summary?: string; error_message?: string; service?: string; [key: string]: unknown }>>([]);
   const [activityLoading, setActivityLoading] = useState(false);
 
-  useEffect(() => {
-    if (!id || !workflow?.workflow_id) return;
-    setContractsLoading(true);
-    Promise.all([
-      getWorkflowContracts(workflow.workflow_id).catch(() => []),
-      getWorkflowDeployments(workflow.workflow_id).then((r) => r.deployments ?? []).catch(() => []),
-    ])
-      .then(([cList, dList]) => {
-        setContracts(Array.isArray(cList) ? cList : []);
-        setDeployments(Array.isArray(dList) ? dList : []);
-      })
-      .finally(() => setContractsLoading(false));
-  }, [id, workflow?.workflow_id]);
 
   useEffect(() => {
     if (tab !== "activity" || !workflow?.workflow_id) return;
@@ -161,13 +155,13 @@ export default function AppDetailPage() {
             <FileCode className="w-5 h-5 text-[var(--color-semantic-violet)]" />
             <h2 className="font-medium text-white">Contracts & deployments</h2>
           </div>
-          {contractsLoading && (
+          {loading && (
             <div className="text-[var(--color-text-tertiary)] text-sm">Loading contracts...</div>
           )}
-          {!contractsLoading && contracts.length === 0 && deployments.length === 0 && (
+          {!loading && contracts.length === 0 && deployments.length === 0 && (
             <p className="text-[var(--color-text-tertiary)] text-sm">No contracts or deployments yet. Run the workflow to generate and deploy.</p>
           )}
-          {!contractsLoading && (contracts.length > 0 || deployments.length > 0) && (
+          {!loading && (contracts.length > 0 || deployments.length > 0) && (
             <ul className="space-y-2 text-sm">
               {contracts.map((c, i) => (
                 <li key={i} className="text-[var(--color-text-tertiary)]">
@@ -242,8 +236,7 @@ export default function AppDetailPage() {
                         walletAddress: "",
                       });
                       setPreparePayload(null);
-                      const deps = await getWorkflowDeployments(workflow.workflow_id);
-                      setDeployments(Array.isArray(deps) ? deps : (deps as Record<string, unknown>).deployments as DeploymentItem[] || []);
+                      refetchOverview();
                       setTab("deployments");
                     } catch (e) {
                       setPrepareError(e instanceof Error ? e.message : "Complete deploy failed");

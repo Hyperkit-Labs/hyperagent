@@ -260,7 +260,7 @@ def update_step(
     trace_da_cert: str | None = None,
     trace_reference_block: str | None = None,
 ) -> bool:
-    """Update a run step to completed or failed. Optional trace fields for EigenDA verifiable trace."""
+    """Update a run step to completed or failed. Optional trace fields for run_steps trace storage."""
     client = _client()
     if not client:
         return False

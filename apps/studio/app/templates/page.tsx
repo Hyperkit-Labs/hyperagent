@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ROUTES } from "@/constants/routes";
-import { getTemplates, searchTemplates, getBlueprints, type TemplateItem } from "@/lib/api";
+import { searchTemplates, type TemplateItem } from "@/lib/api";
+import { useTemplatesData } from "@/hooks/useTemplatesData";
 import { LayoutTemplate, Plus, Search } from "lucide-react";
 import { ShimmerGrid } from "@/components/ai-elements";
 
@@ -38,39 +39,9 @@ function filterByCategory(items: TemplateItem[], category: string): TemplateItem
 function TemplatesContent() {
   const searchParams = useSearchParams();
   const category = searchParams.get("category")?.toLowerCase() ?? "all";
-  const [templates, setTemplates] = useState<TemplateItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const { templates, loading, error: loadError, refetch: loadTemplates } = useTemplatesData();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
-
-  const loadTemplates = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const [t, b] = await Promise.all([
-        getTemplates(),
-        getBlueprints().catch(() => []),
-      ]);
-      const tArr = Array.isArray(t) ? t : [];
-      const bArr = Array.isArray(b) ? b : [];
-      const byId = new Map<string, TemplateItem>();
-      tArr.forEach((x) => x.id && byId.set(x.id, x as TemplateItem));
-      bArr.forEach((x: { id?: string; name?: string; description?: string }) =>
-        x.id && !byId.has(x.id) ? byId.set(x.id, { id: x.id, name: x.name, description: x.description }) : undefined
-      );
-      setTemplates(Array.from(byId.values()));
-    } catch (e) {
-      setTemplates([]);
-      setLoadError(e instanceof Error ? e.message : "Failed to load templates");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadTemplates();
-  }, [loadTemplates]);
 
   const [searchResults, setSearchResults] = useState<TemplateItem[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -166,7 +137,7 @@ function TemplatesContent() {
         {loadError && !loading && (
           <div className="glass-panel rounded-xl p-6 flex items-center justify-between">
             <p className="text-xs text-red-400">{loadError}</p>
-            <button type="button" onClick={loadTemplates} className="text-xs text-red-400 underline">Retry</button>
+            <button type="button" onClick={() => void loadTemplates()} className="text-xs text-red-400 underline">Retry</button>
           </div>
         )}
 

@@ -10,7 +10,8 @@
 ## Credit Conversion
 
 - User sends USDC/USDT from wallet to `MERCHANT_WALLET_ADDRESS`
-- 1 USDC/USDT = 1 credit (1:1)
+- 1 USD = 10 credits by default (configurable via `CREDITS_PER_USD`)
+- Example: $10 USDC yields 100 credits, ~14 workflow runs at 7 credits/run
 - Thirdweb server wallet can sponsor gas (Paymaster) when configured
 - Backend credits user after tx confirmation
 
@@ -19,6 +20,8 @@
 - `MERCHANT_WALLET_ADDRESS` - Receives USDC/USDT
 - `THIRDWEB_SERVER_WALLET_ADDRESS` - Pays gas when using Paymaster
 - `CREDITS_ENABLED=true` - Enables credit system
+- `CREDITS_PER_USD` - Credits granted per 1 USD (default 10)
+- `CREDITS_PER_RUN` - Credits consumed per workflow run (default 7)
 - `REGISTRIES_PATH` - Chain registry for orchestrator (Render/Docker)
 
 ## Network Registry Fix

@@ -1,8 +1,8 @@
 """
-Load GitOps registries from infra/registries (categorized: network/, x402/, sdks/, root).
+Load GitOps registries from infra/registries (categorized: network/, x402/, sdks/, erc8004/, root).
 Single source of truth; load at startup and cache. Set REGISTRIES_PATH to override.
 Paths: pipelines.yaml, network/chains.yaml, security.yaml, tokens.yaml, x402/settings.yaml,
-roma.yaml, orchestrator.yaml.
+roma.yaml, orchestrator.yaml, erc8004/erc8004.yaml.
 """
 from __future__ import annotations
 
@@ -24,8 +24,10 @@ _SECURITY: dict[str, Any] | None = None
 _TOKENS: dict[str, Any] | None = None
 _X402_SETTINGS: dict[str, Any] | None = None
 _X402_PRODUCTS: dict[str, Any] | None = None
+_STABLECOINS: dict[str, Any] | None = None
 _ROMA: dict[str, Any] | None = None
 _ORCHESTRATOR: dict[str, Any] | None = None
+_ERC8004: dict[str, Any] | None = None
 
 
 def _registries_dir() -> Path:
@@ -46,7 +48,7 @@ def _load_yaml(name: str) -> dict[str, Any]:
 
 
 def _ensure_loaded() -> None:
-    global _PIPELINES, _CHAINS, _SECURITY, _TOKENS, _X402_SETTINGS, _X402_PRODUCTS, _ROMA, _ORCHESTRATOR
+    global _PIPELINES, _CHAINS, _SECURITY, _TOKENS, _X402_SETTINGS, _X402_PRODUCTS, _STABLECOINS, _ROMA, _ORCHESTRATOR, _ERC8004
     if _PIPELINES is None:
         _PIPELINES = _load_yaml("pipelines.yaml")
     if _CHAINS is None:
@@ -59,10 +61,14 @@ def _ensure_loaded() -> None:
         _X402_SETTINGS = _load_yaml("x402/settings.yaml")
     if _X402_PRODUCTS is None:
         _X402_PRODUCTS = _load_yaml("x402/x402-products.yaml")
+    if _STABLECOINS is None:
+        _STABLECOINS = _load_yaml("x402/stablecoins.yaml")
     if _ROMA is None:
         _ROMA = _load_yaml("roma.yaml")
     if _ORCHESTRATOR is None:
         _ORCHESTRATOR = _load_yaml("orchestrator.yaml")
+    if _ERC8004 is None:
+        _ERC8004 = _load_yaml("erc8004/erc8004.yaml")
 
 
 def get_x402_enabled() -> bool:
@@ -133,15 +139,8 @@ def get_timeout(agent: str) -> float:
 
 
 def get_da_backend() -> str:
-    """DA backend for traces: eigenda | none. Source: orchestrator.yaml spec.backends.da_backend. Env DA_BACKEND overrides."""
-    override = os.environ.get("DA_BACKEND", "").strip().lower()
-    if override in ("eigenda", "none", ""):
-        if override:
-            return override
-    _ensure_loaded()
-    backends = (_ORCHESTRATOR or {}).get("spec", {}).get("backends") or {}
-    out = (backends.get("da_backend") or "none").lower()
-    return out if out in ("eigenda", "none") else "none"
+    """DA backend for traces. Always none (stub mode)."""
+    return "none"
 
 
 def get_memory_backend() -> str:
@@ -195,6 +194,22 @@ def get_audit_max_severity(pipeline_id: str | None = None) -> str:
         if g.get("type") == "audit" and "maxSeverity" in g:
             return g["maxSeverity"]
     return "high"
+
+
+def get_slither_to_swc(category: str) -> str | None:
+    """Map Slither detector category to SWC ID. Source: security.yaml spec.slitherToSwc."""
+    _ensure_loaded()
+    spec = (_SECURITY or {}).get("spec", {})
+    mapping = spec.get("slitherToSwc") or {}
+    return mapping.get(category) if isinstance(mapping, dict) else None
+
+
+def get_high_severity_swc() -> list[str]:
+    """SWC IDs that block deploy when matched. Source: security.yaml spec.highSeveritySwc."""
+    _ensure_loaded()
+    spec = (_SECURITY or {}).get("spec", {})
+    swcs = spec.get("highSeveritySwc") or []
+    return [str(x) for x in swcs if x]
 
 
 def get_chain(chain_id: int) -> dict[str, Any] | None:
@@ -272,6 +287,9 @@ def get_registry_versions() -> dict[str, str]:
     if _CHAINS:
         meta = (_CHAINS or {}).get("metadata", {})
         versions["chains_version"] = meta.get("version", "unknown")
+    if _ERC8004:
+        meta = (_ERC8004 or {}).get("metadata", {})
+        versions["erc8004_version"] = meta.get("version", "unknown")
     return versions
 
 
@@ -343,6 +361,25 @@ def get_x402_plan(plan_id: str) -> dict[str, Any] | None:
     return None
 
 
+def get_stablecoins_by_chain() -> dict[str, dict[str, str]]:
+    """Return { chainId: { USDC: addr, USDT: addr } } from x402/stablecoins.yaml."""
+    _ensure_loaded()
+    spec = (_STABLECOINS or {}).get("spec", {})
+    out: dict[str, dict[str, str]] = {}
+    for token in spec.get("tokens", []):
+        symbol = (token.get("symbol") or "").upper()
+        if not symbol:
+            continue
+        for by_chain in token.get("byChain", []):
+            cid = str(by_chain.get("chainId", ""))
+            addr = (by_chain.get("address") or "").strip()
+            if cid and addr:
+                if cid not in out:
+                    out[cid] = {}
+                out[cid][symbol] = addr
+    return out
+
+
 def get_resource_price(resource_id: str) -> float:
     """Unit price for a resource (credits). Phase 1: flat pricing per resource type."""
     prices = {
@@ -366,13 +403,101 @@ def check_plan_limit(plan_id: str, resource_id: str, current_usage: int) -> bool
     return current_usage < int(limit)
 
 
-# MVP anchor testnet: first testnet in API list is default for Studio (live, no mocks).
-MVP_ANCHOR_SLUG = "skalebase-sepolia"
+ANCHOR_NETWORK_SLUG = "skalebase-sepolia"
+FALLBACK_CHAIN_ID = 324705682
+
+
+# --- ERC-8004 (Trustless Agents) ---
+
+
+def _get_erc8004_hyperagent() -> dict[str, Any]:
+    """Return hyperagent spec from erc8004.yaml."""
+    _ensure_loaded()
+    spec = (_ERC8004 or {}).get("spec", {})
+    return spec.get("hyperagent") or {}
+
+
+def _get_erc8004_chain(chain_id: int) -> dict[str, Any] | None:
+    """Return chain entry from erc8004 spec.chains by chainId."""
+    _ensure_loaded()
+    for c in (_ERC8004 or {}).get("spec", {}).get("chains") or []:
+        if c.get("chainId") == chain_id:
+            return c
+    return None
+
+
+def get_erc8004_agent_id(chain_id: int) -> str | None:
+    """Return HyperAgent agentId for chain_id from erc8004.yaml. Env A2A_AGENT_ID overrides when chain matches A2A_DEFAULT_CHAIN_ID."""
+    override_id = os.environ.get("A2A_AGENT_ID", "").strip()
+    override_chain = os.environ.get("A2A_DEFAULT_CHAIN_ID", "").strip()
+    if override_id and override_chain and str(chain_id) == override_chain:
+        return override_id
+    ha = _get_erc8004_hyperagent()
+    for entry in ha.get("agentIds") or []:
+        if entry.get("chainId") == chain_id:
+            return str(entry.get("agentId", ""))
+    return None
+
+
+def get_erc8004_agent_registry(chain_id: int) -> str | None:
+    """Return agentRegistry string (eip155:chainId:identityRegistry) for chain_id."""
+    c = _get_erc8004_chain(chain_id)
+    return (c.get("agentRegistry") or "").strip() or None
+
+
+def get_erc8004_payment_wallet() -> str | None:
+    """Return payment wallet from erc8004 hyperagent. Matches MERCHANT_WALLET_ADDRESS."""
+    ha = _get_erc8004_hyperagent()
+    return (ha.get("paymentWallet") or "").strip() or None
+
+
+def get_a2a_default_chain_id() -> int | None:
+    """Return default chain for A2A. Env A2A_DEFAULT_CHAIN_ID overrides; else anchor chain from registry."""
+    raw = os.environ.get("A2A_DEFAULT_CHAIN_ID", "").strip()
+    if raw:
+        try:
+            return int(raw)
+        except ValueError:
+            pass
+    return get_default_chain_id()
+
+
+def get_a2a_agent_id() -> str | None:
+    """Return agentId for A2A. Env A2A_AGENT_ID overrides; else from erc8004 for default chain."""
+    raw = os.environ.get("A2A_AGENT_ID", "").strip()
+    if raw:
+        return raw
+    chain_id = get_a2a_default_chain_id()
+    if chain_id is not None:
+        return get_erc8004_agent_id(chain_id)
+    return None
+
+
+def get_erc8004_agent_identity(chain_id: int | None = None) -> dict[str, Any] | None:
+    """Return agent identity for traces: agentId, agentRegistry, chainId."""
+    cid = chain_id if chain_id is not None else get_a2a_default_chain_id()
+    if cid is None:
+        return None
+    agent_id = get_erc8004_agent_id(cid)
+    agent_registry = get_erc8004_agent_registry(cid)
+    if not agent_id or not agent_registry:
+        return None
+    return {
+        "agentId": agent_id,
+        "agentRegistry": agent_registry,
+        "chainId": cid,
+    }
+
+
+def get_default_chain_id() -> int:
+    """Return chain_id for anchor network from registry."""
+    cid = get_chain_id_by_network_slug(ANCHOR_NETWORK_SLUG)
+    return cid if cid is not None else FALLBACK_CHAIN_ID
 
 
 def get_networks_for_api(skale: bool = False) -> list[dict[str, Any]]:
     """Return chains as API network list: network_id, name, chain_id, currency, tier, category, is_mainnet.
-    Single source from chain registry. MVP anchor (Skale Base Sepolia) first among testnets so Studio default is live.
+    Anchor testnet first among testnets so Studio default is live.
     When skale=True, return SKALE Base networks (slug starting with skalebase-)."""
     out = []
     for c in list_chains(enabled_only=True):
@@ -397,11 +522,10 @@ def get_networks_for_api(skale: bool = False) -> list[dict[str, Any]]:
             "category": category,
             "is_mainnet": is_mainnet,
         })
-    # MVP: put anchor testnet first so first testnet = Skale Base Sepolia (live).
     def order_key(item: dict[str, Any]) -> tuple[int, str]:
         slug = (item.get("network_id") or "").strip()
         is_mainnet = item.get("is_mainnet", True)
-        if slug == MVP_ANCHOR_SLUG:
+        if slug == ANCHOR_NETWORK_SLUG:
             return (0, slug)
         if not is_mainnet:
             return (1, slug)

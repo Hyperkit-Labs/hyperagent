@@ -1,12 +1,9 @@
 /**
- * Optional Redis-backed rate limit. When REDIS_URL is set, limits by IP and optionally by userId.
+ * Redis-backed rate limit. Security is mandatory; rate limiting protects against abuse.
  * Key pattern: rl:ip:{ip}, rl:user:{userId}. Window 60s; max 100 per window (configurable).
  *
- * Production: REDIS_URL is required. Without Redis, no rate limiting is applied (vulnerable to abuse).
- * See docs/PRODUCTION_DEPLOYMENT.md for production checklist.
- *
- * When Redis is unreachable (e.g. Docker cannot reach external Redis), rate limiting is skipped
- * and a backoff prevents log spam.
+ * Production: REDIS_URL is required at startup. When Redis is unreachable at runtime,
+ * requests are rejected (fail-closed) to avoid unmitigated abuse.
  */
 import { Response, NextFunction } from "express";
 import { RequestWithId } from "./requestId.js";
@@ -22,6 +19,14 @@ const RATE_LIMIT_MAX_USER = Number(process.env.RATE_LIMIT_MAX_USER) || 200;
 const LLM_KEYS_PATH = "/api/v1/workspaces/current/llm-keys";
 const RATE_LIMIT_LLM_KEYS_MAX_IP = Number(process.env.RATE_LIMIT_LLM_KEYS_MAX_IP) || 10;
 const RATE_LIMIT_LLM_KEYS_MAX_USER = Number(process.env.RATE_LIMIT_LLM_KEYS_MAX_USER) || 5;
+
+/** Stricter limit for workflow run start (POST /api/v1/workflows/generate). */
+const RATE_LIMIT_WORKFLOW_GENERATE_MAX_IP = Number(process.env.RATE_LIMIT_WORKFLOW_GENERATE_MAX_IP) || 20;
+const RATE_LIMIT_WORKFLOW_GENERATE_MAX_USER = Number(process.env.RATE_LIMIT_WORKFLOW_GENERATE_MAX_USER) || 30;
+
+/** Stricter limit for deploy prepare (POST /api/v1/workflows/:id/deploy/prepare). */
+const RATE_LIMIT_DEPLOY_PREPARE_MAX_IP = Number(process.env.RATE_LIMIT_DEPLOY_PREPARE_MAX_IP) || 30;
+const RATE_LIMIT_DEPLOY_PREPARE_MAX_USER = Number(process.env.RATE_LIMIT_DEPLOY_PREPARE_MAX_USER) || 50;
 
 /** After Redis failure, skip reconnects for this many ms to avoid log spam. */
 const REDIS_BACKOFF_MS = 60_000;
@@ -66,7 +71,10 @@ async function checkLimit(
   windowSec: number
 ): Promise<boolean> {
   const r = await getRedis();
-  if (!r) return true;
+  if (!r) {
+    if (NODE_ENV === "production") return false;
+    return true;
+  }
   try {
     const count = await r.incr(key);
     if (count === 1) await r.expire(key, windowSec);
@@ -76,11 +84,11 @@ async function checkLimit(
     const r = redis;
     redis = null;
     if (typeof r?.disconnect === "function") r.disconnect();
-    if (NODE_ENV === "development") {
-      console.warn("[rate-limit] Redis check failed, skipping rate limit for 60s:", err instanceof Error ? err.message : err);
-    } else {
+    if (NODE_ENV === "production") {
       console.error("[rate-limit] Redis check failed for key=%s: %s", key, err instanceof Error ? err.message : err);
+      return false;
     }
+    console.warn("[rate-limit] Redis check failed, skipping rate limit for 60s:", err instanceof Error ? err.message : err);
     return true;
   }
 }
@@ -94,6 +102,15 @@ export async function rateLimitMiddleware(
 ): Promise<void> {
   const url = (REDIS_URL || "").trim();
   if (!url || url.startsWith("#")) {
+    if (NODE_ENV === "production") {
+      logSecurityEvent("rate_limit_unavailable", 503, req.path, req.requestId, req.userId);
+      res.status(503).json({
+        error: "Service Unavailable",
+        message: "Rate limiting required. REDIS_URL must be set.",
+        requestId: req.requestId,
+      });
+      return;
+    }
     next();
     return;
   }
@@ -101,9 +118,81 @@ export async function rateLimitMiddleware(
     next();
     return;
   }
+  if (NODE_ENV === "production") {
+    const r = await getRedis();
+    if (!r) {
+      logSecurityEvent("rate_limit_unavailable", 503, req.path, req.requestId, req.userId);
+      res.status(503).json({
+        error: "Service Unavailable",
+        message: "Rate limiting unavailable. Redis is required.",
+        requestId: req.requestId,
+      });
+      return;
+    }
+  }
   const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
   const userId = req.userId || "";
   const isLlmKeysPost = req.method === "POST" && req.path === LLM_KEYS_PATH;
+  const isWorkflowGenerate = req.method === "POST" && req.path === "/api/v1/workflows/generate";
+  const isDeployPrepare = req.method === "POST" && /^\/api\/v1\/workflows\/[^/]+\/deploy\/prepare$/.test(req.path);
+
+  if (isWorkflowGenerate) {
+    const key = `rl:ip:${ip}:workflow-generate`;
+    const ok = await checkLimit(key, RATE_LIMIT_WORKFLOW_GENERATE_MAX_IP, RATE_LIMIT_WINDOW_SEC);
+    if (!ok) {
+      logSecurityEvent("rate_limit_workflow_generate", 429, req.path, req.requestId, userId || undefined);
+      res.setHeader("Retry-After", String(RATE_LIMIT_WINDOW_SEC));
+      res.status(429).json({
+        error: "Too Many Requests",
+        message: "Workflow start rate limit exceeded. Try again later.",
+        requestId: req.requestId,
+      });
+      return;
+    }
+    if (userId) {
+      const userKey = `rl:user:${userId}:workflow-generate`;
+      const userOk = await checkLimit(userKey, RATE_LIMIT_WORKFLOW_GENERATE_MAX_USER, RATE_LIMIT_WINDOW_SEC);
+      if (!userOk) {
+        logSecurityEvent("rate_limit_workflow_generate", 429, req.path, req.requestId, userId);
+        res.setHeader("Retry-After", String(RATE_LIMIT_WINDOW_SEC));
+        res.status(429).json({
+          error: "Too Many Requests",
+          message: "Workflow start rate limit exceeded.",
+          requestId: req.requestId,
+        });
+        return;
+      }
+    }
+  }
+
+  if (isDeployPrepare) {
+    const key = `rl:ip:${ip}:deploy-prepare`;
+    const ok = await checkLimit(key, RATE_LIMIT_DEPLOY_PREPARE_MAX_IP, RATE_LIMIT_WINDOW_SEC);
+    if (!ok) {
+      logSecurityEvent("rate_limit_deploy_prepare", 429, req.path, req.requestId, userId || undefined);
+      res.setHeader("Retry-After", String(RATE_LIMIT_WINDOW_SEC));
+      res.status(429).json({
+        error: "Too Many Requests",
+        message: "Deploy prepare rate limit exceeded. Try again later.",
+        requestId: req.requestId,
+      });
+      return;
+    }
+    if (userId) {
+      const userKey = `rl:user:${userId}:deploy-prepare`;
+      const userOk = await checkLimit(userKey, RATE_LIMIT_DEPLOY_PREPARE_MAX_USER, RATE_LIMIT_WINDOW_SEC);
+      if (!userOk) {
+        logSecurityEvent("rate_limit_deploy_prepare", 429, req.path, req.requestId, userId);
+        res.setHeader("Retry-After", String(RATE_LIMIT_WINDOW_SEC));
+        res.status(429).json({
+          error: "Too Many Requests",
+          message: "Deploy prepare rate limit exceeded.",
+          requestId: req.requestId,
+        });
+        return;
+      }
+    }
+  }
 
   const ipKey = `rl:ip:${ip}`;
   const ipOk = await checkLimit(ipKey, RATE_LIMIT_MAX_IP, RATE_LIMIT_WINDOW_SEC);

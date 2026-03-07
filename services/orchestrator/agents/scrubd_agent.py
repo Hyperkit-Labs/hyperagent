@@ -164,7 +164,8 @@ async def run_scrubd_validation(
     run_id: str,
     framework: str = "hardhat",
 ) -> tuple[bool, list]:
-    """Run SCRUBD validation. Returns (passed, findings)."""
+    """Run SCRUBD validation. Returns (passed, findings).
+    SCRUBD dataset must be available (clone during build or set SCRUBD_PATH)."""
     path = _ensure_scrubd()
     patterns = _load_scrubd_patterns(path)
     passed, findings = await _validate_against_scrubd(contracts, patterns, framework, run_id)

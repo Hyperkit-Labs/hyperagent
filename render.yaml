@@ -49,6 +49,12 @@ services:
         sync: false
       - key: AGENT_RUNTIME_URL
         sync: false
+      - key: SIMULATION_SERVICE_URL
+        sync: false
+      - key: DEPLOY_SERVICE_URL
+        sync: false
+      - key: STORAGE_SERVICE_URL
+        sync: false
       - key: COMPILE_SERVICE_URL
         sync: false
       - key: AUDIT_SERVICE_URL
@@ -81,6 +87,14 @@ services:
       - key: INTERNAL_SERVICE_TOKEN
         sync: false
       - key: AGENT_SESSION_PAYLOAD_KEY
+        sync: false
+      - key: TENDERLY_API_KEY
+        sync: false
+      - key: TENDERLY_ACCOUNT
+        sync: false
+      - key: TENDERLY_PROJECT
+        sync: false
+      - key: TENDERLY_API_URL
         sync: false
       - key: PINATA_JWT
         sync: false
@@ -143,6 +157,10 @@ services:
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: AUTH_JWT_SECRET
         sync: false
       - key: REDIS_URL
         sync: false

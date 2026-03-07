@@ -5,6 +5,9 @@
 # Architecture: Entire backend on Render. Production uses real services (no mocks).
 # Set sync: false vars in Render Dashboard. A2A_* and REGISTRIES_PATH optional (defaults from erc8004.yaml).
 #
+# Build filters: each service auto-deploys only when its paths change. Changes to docs/, .github/,
+# apps/studio, etc. do not trigger deploys. Add more paths if a service depends on shared packages.
+#
 services:
   - type: web
     name: hyperagent-api
@@ -13,6 +16,10 @@ services:
     buildCommand: cd services/orchestrator && pip install -r requirements.txt
     startCommand: cd services/orchestrator && uvicorn main:app --host 0.0.0.0 --port ${PORT:-9000}
     healthCheckPath: /health
+    buildFilter:
+      paths:
+        - services/orchestrator/**
+        - infra/registries/**
     envVars:
       - key: DATABASE_URL
         sync: false
@@ -111,6 +118,9 @@ services:
     buildCommand: pnpm install && pnpm --filter hyperagent-agent-runtime... build
     startCommand: cd services/agent-runtime && node build/index.js
     healthCheckPath: /health
+    buildFilter:
+      paths:
+        - services/agent-runtime/**
     envVars:
       - key: NODE_ENV
         value: production
@@ -144,6 +154,9 @@ services:
     buildCommand: cd services/compile && pip install -r requirements.txt
     startCommand: cd services/compile && uvicorn main:app --host 0.0.0.0 --port ${PORT:-9000}
     healthCheckPath: /health
+    buildFilter:
+      paths:
+        - services/compile/**
     envVars:
       - key: COMPILE_MODE
         value: lite
@@ -159,6 +172,9 @@ services:
     buildCommand: cd services/audit && pip install -r requirements.txt
     startCommand: cd services/audit && uvicorn main:app --host 0.0.0.0 --port ${PORT:-9000}
     healthCheckPath: /health
+    buildFilter:
+      paths:
+        - services/audit/**
     envVars:
       - key: AUDIT_MODE
         value: mythx
@@ -174,6 +190,9 @@ services:
     buildCommand: cd services/hyperagent-tools && pip install -r requirements.txt && python -c "import solcx; solcx.install_solc('0.8.24')"
     startCommand: sh services/hyperagent-tools/start.sh
     healthCheckPath: /health
+    buildFilter:
+      paths:
+        - services/hyperagent-tools/**
     envVars:
       - key: TOOLS_API_KEY
         sync: false
@@ -185,6 +204,9 @@ services:
     buildCommand: cd services/roma-service && pip install -r requirements.txt
     startCommand: cd services/roma-service && uvicorn main:app --host 0.0.0.0 --port ${PORT:-9000}
     healthCheckPath: /health
+    buildFilter:
+      paths:
+        - services/roma-service/**
     envVars:
       - key: AGENT_RUNTIME_URL
         sync: false
@@ -204,6 +226,9 @@ services:
     buildCommand: cd services/vectordb && pip install -r requirements.txt
     startCommand: cd services/vectordb && uvicorn main:app --host 0.0.0.0 --port ${PORT:-9000}
     healthCheckPath: /health
+    buildFilter:
+      paths:
+        - services/vectordb/**
     envVars:
       - key: QDRANT_URL
         sync: false
@@ -217,6 +242,9 @@ services:
     buildCommand: pnpm install && pnpm --filter hyperagent-api-gateway run build
     startCommand: cd apps/api-gateway && node build/index.js
     healthCheckPath: /health
+    buildFilter:
+      paths:
+        - apps/api-gateway/**
     envVars:
       - key: NODE_ENV
         value: production
@@ -237,4 +265,8 @@ services:
       - key: REDIS_TLS_VERIFY
         sync: false
       - key: RATE_LIMIT_BYPASS_ON_FAIL
+        sync: false
+      - key: RATE_LIMIT_MAX_IP
+        sync: false
+      - key: RATE_LIMIT_MAX_USER
         sync: false

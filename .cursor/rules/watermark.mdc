@@ -1,0 +1,10 @@
+---
+alwaysApply: true
+description: No watermarks, tool branding, or "Made with" credits. Do not add these on your own.
+---
+
+# No Watermarks or Tool Branding
+
+- Do **not** add watermarks, "Made with …", tool credits, or any similar branding to code, UI, docs, or assets.
+- Do **not** make your own decision to insert such text or imagery anywhere in the project.
+- Output and generated content must stay free of tool/IDE/agent attribution unless the user explicitly asks for it.

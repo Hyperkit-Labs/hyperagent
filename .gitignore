@@ -494,6 +494,8 @@ e2e/
 scripts/
 # Planning documents
 external/*
+artifacts/
+platform/
 
 # Docker environment files (contain secrets)
 infra/docker/.env

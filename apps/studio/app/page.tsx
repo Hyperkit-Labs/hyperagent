@@ -760,6 +760,7 @@ function ChatPageContent() {
           <OnboardingChecklist
             className="shrink-0 border-b border-[var(--color-border-subtle)]"
             onByokClick={() => setSettingsOpen(true)}
+            onPaymentClick={() => router.push(ROUTES.PAYMENTS)}
           />
 
           <div className="shrink-0 border-b border-[var(--color-border-subtle)] p-3">

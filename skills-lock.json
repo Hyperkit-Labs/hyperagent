@@ -16,6 +16,11 @@
       "sourceType": "github",
       "computedHash": "d823593e24d7493ab740db8f082cbe3b148ed29af9e804d11f5302ad79e4b96d"
     },
+    "erc8004-agent-creator": {
+      "source": "justinedevs/collection",
+      "sourceType": "github",
+      "computedHash": "d22a51f03e91f18c9035e3859421ca15badb4b7a41bccbd878829b857251e8ac"
+    },
     "holistic-ux": {
       "source": "connorads/dotfiles",
       "sourceType": "github",

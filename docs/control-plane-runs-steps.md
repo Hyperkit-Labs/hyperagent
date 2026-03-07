@@ -9,7 +9,7 @@ This document describes the phased control-plane design: explicit runs and step-
   Migration: `platform/supabase/migrations/run.sql`.
 
 - **Writing steps from the pipeline**  
-  Each LangGraph node (spec, design, codegen, audit, simulation, deploy, ui_scaffold) writes:
+  Each LangGraph node (spec, design, codegen, scrubd_validation, audit, simulation, deploy, ui_scaffold) writes:
   - At node start: insert/upsert step with `status=running`, `started_at=now`.
   - At node end: update step to `status=completed` or `status=failed`, with `output_summary` or `error_message`, `completed_at=now`.
 
@@ -18,6 +18,12 @@ This document describes the phased control-plane design: explicit runs and step-
 
 - **API**  
   - `GET /api/v1/runs/{run_id}/steps` returns the step-level audit for a run (for polling or debugging).
+
+- **`scrubd_validation` step**  
+  Mandatory SCRUBD validation runs after codegen and before audit. Validates contracts against RE (reentrancy) and UX (unhandled exceptions) patterns from the SCRUBD dataset. On failure, routes to autofix or failed. Configure via `SCRUBD_PATH` and `SCRUBD_VERSION`.
+
+- **Pashov solidity-auditor (optional)**  
+  When `PASHOV_AUDIT_ENABLED=true`, the audit step also runs an AI-driven security review using the pashov/skills solidity-auditor. Findings are merged with Slither/Mythril results and subject to the same pass/fail gates. Requires the `packages/pashov-skills` submodule and BYOK (LLM keys via workspace). Configure via `PASHOV_AUDIT_ENABLED` and `PASHOV_SKILLS_PATH`.
 
 ## Phase 2 (planned)
 
@@ -33,4 +39,4 @@ This document describes the phased control-plane design: explicit runs and step-
 ## References
 
 - DB helpers: `services/orchestrator/db.py` (`insert_step`, `update_step`, `get_steps`).
-- Node wiring: `services/orchestrator/nodes.py` (`_step_start`, `_step_complete`). All seven nodes (spec, design, codegen, audit, simulation, deploy, ui_scaffold) write steps.
+- Node wiring: `services/orchestrator/nodes.py` (`_step_start`, `_step_complete`). All eight nodes (spec, design, codegen, scrubd_validation, audit, simulation, deploy, ui_scaffold) write steps.

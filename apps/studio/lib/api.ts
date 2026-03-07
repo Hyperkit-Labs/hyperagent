@@ -460,6 +460,10 @@ export interface RuntimeConfig {
   monitoring_enabled?: boolean;
   merchant_wallet_address?: string | null;
   credits_enabled?: boolean;
+  /** Credits granted per 1 USD (e.g. 10 means $1 = 10 credits). Default 10. */
+  credits_per_usd?: number;
+  /** Credits consumed per workflow run. Default 7. */
+  credits_per_run?: number;
   integrations?: IntegrationsStatus;
 }
 

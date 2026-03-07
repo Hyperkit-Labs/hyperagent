@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useActiveAccount } from "thirdweb/react";
 import { useAppChat, hasActiveByokKey } from "@/hooks/useAppChat";
 import { useWorkflowPolling } from "@/hooks/useWorkflowPolling";
-import { createWorkflow, DEFAULT_NETWORK, getWorkflowContracts, getErrorMessage, handleApiError, requireLLMKeys, LLM_KEYS_REQUIRED_MESSAGE, isByokStorageOrMigrationError, BYOK_SAVE_AGAIN_HINT } from "@/lib/api";
+import { createWorkflow, DEFAULT_NETWORK, getErrorMessage, handleApiError, requireLLMKeys, LLM_KEYS_REQUIRED_MESSAGE, isByokStorageOrMigrationError, BYOK_SAVE_AGAIN_HINT } from "@/lib/api";
 import { getSessionOnlyLLMKey, SESSION_LLM_PASS_THROUGH_UPDATED_EVENT } from "@/lib/session-store";
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
 import { Suggestions, PromptInput } from "@/components/ai-elements";
@@ -123,11 +123,7 @@ function ChatPageContent() {
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(
     searchParams.get("workflow") || null
   );
-  const [contracts, setContracts] = useState<
-    Array<{ name?: string; source_code?: string; bytecode?: string; abi?: unknown; [key: string]: unknown }>
-  >([]);
   const [selectedContractIndex, setSelectedContractIndex] = useState<number>(0);
-  const [loadingContracts, setLoadingContracts] = useState(false);
   const [creatingWorkflow, setCreatingWorkflow] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [systemMessages, setSystemMessages] = useState<ChatMessage[]>([]);
@@ -191,12 +187,15 @@ function ChatPageContent() {
 
   const {
     workflow,
+    contracts,
     loading: workflowLoading,
     error: workflowError,
     contractData,
     contractCode,
     fetchWorkflow,
   } = useWorkflowPolling(selectedWorkflowId);
+
+  const loadingContracts = selectedWorkflowId && workflowLoading && contracts.length === 0;
 
   const { workflows, loading: workflowsLoading } = useWorkflows({ filters: { limit: 10 } });
 
@@ -242,26 +241,10 @@ function ChatPageContent() {
   }, [sdkMessages, selectedWorkflowId, router]);
 
   useEffect(() => {
-    if (selectedWorkflowId && !contracts.length) {
-      setLoadingContracts(true);
-      getWorkflowContracts(selectedWorkflowId)
-        .then((data) => {
-          const contractsList = Array.isArray(data)
-            ? data
-            : (data as { contracts?: unknown[] })?.contracts ?? [];
-          setContracts(contractsList as typeof contracts);
-          if (contractsList.length > 0) {
-            setSelectedContractIndex(0);
-          }
-        })
-        .catch(() => {
-          setContracts([]);
-        })
-        .finally(() => {
-          setLoadingContracts(false);
-        });
+    if (contracts.length > 0 && selectedContractIndex >= contracts.length) {
+      setSelectedContractIndex(0);
     }
-  }, [selectedWorkflowId, contracts.length]);
+  }, [contracts.length, selectedContractIndex]);
 
   function messageContent(raw: unknown): string {
     if (typeof raw === "string") return raw;
@@ -506,7 +489,7 @@ function ChatPageContent() {
                     >
                       <FileCode className="w-3.5 h-3.5 shrink-0" />
                       <span className="truncate">
-                        {contract.name || `Contract ${idx + 1}`}
+                        {String(contract.name ?? `Contract ${idx + 1}`)}
                       </span>
                     </button>
                   ))}
@@ -560,7 +543,6 @@ function ChatPageContent() {
                       type="button"
                       onClick={() => {
                         setSelectedWorkflowId(null);
-                        setContracts([]);
                         window.history.replaceState(null, "", ROUTES.HOME);
                       }}
                       className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)]"
@@ -598,7 +580,6 @@ function ChatPageContent() {
                           type="button"
                           onClick={() => {
                             setSelectedWorkflowId(null);
-                            setContracts([]);
                             setCreateError(null);
                             window.history.replaceState(null, "", ROUTES.HOME);
                           }}
@@ -614,7 +595,7 @@ function ChatPageContent() {
                     <ContractViewer
                       contractCode={displayCode}
                       abi={Array.isArray(selectedContract?.abi) ? (selectedContract.abi as unknown[]) : undefined}
-                      contractName={selectedContract?.name || `Contract ${selectedContractIndex + 1}`}
+                      contractName={String(selectedContract?.name ?? `Contract ${selectedContractIndex + 1}`)}
                       workflowId={workflow?.workflow_id}
                     />
                   ) : workflow?.status === "failed" ? (
@@ -636,7 +617,6 @@ function ChatPageContent() {
                         type="button"
                         onClick={() => {
                           setSelectedWorkflowId(null);
-                          setContracts([]);
                           setCreateError(null);
                           window.history.replaceState(null, "", ROUTES.HOME);
                         }}
@@ -745,7 +725,6 @@ function ChatPageContent() {
                 onClick={() => {
                   setMessages([]);
                   setSelectedWorkflowId(null);
-                  setContracts([]);
                   setCreateError(null);
                   window.history.replaceState(null, "", ROUTES.HOME);
                 }}

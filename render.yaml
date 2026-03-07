@@ -234,3 +234,7 @@ services:
         sync: false
       - key: REDIS_URL
         sync: false
+      - key: REDIS_TLS_VERIFY
+        sync: false
+      - key: RATE_LIMIT_BYPASS_ON_FAIL
+        sync: false

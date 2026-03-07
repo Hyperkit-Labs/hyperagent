@@ -73,6 +73,7 @@ def create_workflow(
 def update_workflow(
     workflow_id: str,
     status: str | None = None,
+    current_stage: str | None = None,
     stages: list[dict[str, Any]] | None = None,
     contracts: dict[str, Any] | None = None,
     deployments: list[dict[str, Any]] | None = None,
@@ -101,6 +102,8 @@ def update_workflow(
         return None
     if status is not None:
         rec["status"] = _normalize_status(status)
+    if current_stage is not None:
+        rec["current_stage"] = current_stage
     if stages is not None:
         rec["stages"] = stages
     if contracts is not None:

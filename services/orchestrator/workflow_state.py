@@ -53,6 +53,9 @@ class AgentState(TypedDict, total=False):
     # Complexity estimation
     estimated_complexity: str
     estimated_token_cost: int
+    # Deploy human gate
+    deploy_approved: bool
+    needs_deploy_approval: bool
 
 
 class AgentProtocol(Protocol):

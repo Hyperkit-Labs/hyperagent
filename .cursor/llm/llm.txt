@@ -1,82 +1,95 @@
-# HyperAgent LLM Documentation Index
+# HyperAgent
 
-This is the main index file for HyperAgent's LLM documentation resources. Each major dependency, library, and service has its own dedicated `llm.txt` file following the [llms.txt standard](https://llmstxt.org/).
+> HyperAgent is an AI-native, multi-agent platform that transforms natural-language specifications into production-ready, audited, simulated, and deployed smart contracts across multiple EVM networks. The platform uses a seven-agent pipeline: Spec, Design, Codegen, Audit, TenderlySim, Deploy, and Monitor. Phase 1 (Closed Beta) is Web-based IDE (Studio), BYOK, SKALE Base networks.
 
-## Purpose
+## Project Documentation
 
-These files help AI systems understand external dependencies and their integration with HyperAgent. Each file contains:
-- Technology overview and HyperAgent-specific use cases
-- Links to official documentation
-- Implementation details and code examples
-- Best practices for integration
+- [Platform Blueprint](../../external/docs/detailed/draft.md): Full specification (SOA, A2A, ERC-8004, pipeline, registries)
+- [Project Details](../../external/docs/detailed/Project%20Details.md): Goals, architecture, tech stack, roadmap
+- [System Design](../../external/docs/detailed/system-design.md): Three-layer architecture (client, API gateway, orchestrator, services, data)
+- [Monorepo & Git](../../external/docs/detailed/Monorepo.md): Repository layout and Git/GitHub strategy
+- [Agent Configuration](../rules/AGENT.mdc): AI agent configuration and instructions
+- [Repo Map](../commands/repo-map.md): Current structure (apps/studio, services, packages, infra/registries)
+- [Docs Index](../../docs/README.md): Onboarding, user guide, developer guide
+- [README](../../README.md): Project overview, features, quick start
 
-## Available Documentation Files
+## Technology Documentation
+
+All technology documentation files are in this directory (`.cursor/llm/docs/`). Each file follows the llms.txt standard.
 
 ### Core Frameworks & Languages
-- **[thirdweb-llm.txt](thirdweb-llm.txt)** - Thirdweb SDK for wallets, ERC-4337, EIP-7702, and multi-chain deployment
-- **[langgraph-llm.txt](langgraph-llm.txt)** - LangGraph for agent orchestration and workflow management
-- **[fastapi-llm.txt](fastapi-llm.txt)** - FastAPI for backend API gateway and REST endpoints
-- **[nextjs-react-llm.txt](nextjs-react-llm.txt)** - Next.js 14+ and React for frontend UI
 
-### Infrastructure & Data
-- **[supabase-llm.txt](supabase-llm.txt)** - Supabase (PostgreSQL) for database, multi-tenant workspaces, and RLS
-- **[redis-llm.txt](redis-llm.txt)** - Redis for caching, message queuing, and session management
-- **[pinecone-llm.txt](pinecone-llm.txt)** - Pinecone vector database for RAG and semantic search
-- **[acontext-llm.txt](acontext-llm.txt)** - Acontext for agent long-term memory and context management
+- [Thirdweb Documentation](docs/thirdweb-llm.txt): Thirdweb SDK for Web3, ERC-4337, EIP-7702, x402
+- [LangGraph Documentation](docs/langgraph-llm.txt): Graph-based workflows for multi-agent orchestration
+- [FastAPI Documentation](docs/fastapi-llm.txt): Python API framework (orchestrator, audit, compile services)
+- [Next.js Documentation](docs/nextjs-llm.txt): React framework with App Router (Studio frontend)
+- [Next.js + React Documentation](docs/nextjs-react-llm.txt): Combined Next.js and React patterns
+
+### Blockchain & Web3
+
+- [Wagmi Documentation](docs/wagmi-llm.txt): React Hooks for Ethereum and wallet connections
+- [Viem Documentation](docs/viem-llm.txt): TypeScript interface for Ethereum
+- [Tenderly Documentation](docs/tenderly-llm.txt): Simulation, debugging, monitoring
+- [Hardhat Documentation](docs/hardhat-llm.txt): Compilation and testing
+- [Foundry Documentation](docs/foundry-llm.txt): Forge, Cast, Anvil, fuzzing
+- [Hardhat + Foundry Documentation](docs/hardhat-foundry-llm.txt): Combined patterns
+
+### AI & Orchestration
+
+- [LangChain Documentation](docs/langchain-llm.txt): LLM-powered applications
+- [Anthropic & OpenAI Documentation](docs/anthropic-openai-llm.txt): LLM providers (BYOK)
+- [Gemini Documentation](docs/gemini-llm.txt): Google Gemini for generation
+- [AI Elements Documentation](docs/elements-ai-sdk.txt): AI-native UI components (shadcn registry) for Studio chat and agents
+
+### Data & Infrastructure
+
+- [Supabase Documentation](docs/supabase-llm.txt): PostgreSQL, auth, RLS (platform/supabase)
+- [Redis Documentation](docs/redis-llm.txt): Caching, message broker
+- [Pinecone Documentation](docs/pinecone-llm.txt): Vector DB for RAG
+- [Acontext Documentation](docs/acontext-llm.txt): Agent long-term memory (services/context)
 
 ### Smart Contract Development
-- **[hardhat-foundry-llm.txt](hardhat-foundry-llm.txt)** - Hardhat and Foundry for Solidity compilation, testing, and deployment
-- **[openzeppelin-llm.txt](openzeppelin-llm.txt)** - OpenZeppelin Contracts library for secure contract templates
-- **[slither-mythril-llm.txt](slither-mythril-llm.txt)** - Slither, Mythril, MythX, and Echidna for security auditing
+
+- [OpenZeppelin Documentation](docs/openzeppelin-llm.txt): Secure contract templates
+- [Slither & Mythril Documentation](docs/slither-mythril-llm.txt): Security auditing (services/audit)
 
 ### Blockchain Standards
-- **[erc-4337-llm.txt](erc-4337-llm.txt)** - ERC-4337 Account Abstraction for gasless transactions and smart wallets
-- **[erc-8004-llm.txt](erc-8004-llm.txt)** - ERC-8004 Trustless Agents for agent identity and reputation
-- **[x402-llm.txt](x402-llm.txt)** - x402 payment protocol for pay-per-use services on SKALE
-- **[erc1066-x402-llm.txt](erc1066-x402-llm.txt)** - ERC-1066-x402 SDKs (npm: hyperkit-erc1066, PyPI: hyperkitlabs-erc1066-x402)
+
+- [ERC-4337 Documentation](docs/erc-4337-llm.txt): Account Abstraction
+- [ERC-8004 Documentation](docs/erc-8004-llm.txt): Trustless Agents
+- [ERC-1066-x402 Documentation](docs/erc1066-x402-llm.txt): ERC-1066-x402 SDKs
 
 ### Storage & Data Availability
-- **[ipfs-pinata-llm.txt](ipfs-pinata-llm.txt)** - IPFS and Pinata for decentralized artifact storage and RAG
-- **[eigenda-llm.txt](eigenda-llm.txt)** - EigenDA for verifiable data availability and agent traces
+
+- [IPFS & Pinata Documentation](docs/ipfs-pinata-llm.txt): Artifact storage (services/storage)
+- [EigenDA Documentation](docs/eigenda-llm.txt): Verifiable data availability
 
 ### Observability & Monitoring
-- **[opentelemetry-llm.txt](opentelemetry-llm.txt)** - OpenTelemetry for distributed tracing and metrics
-- **[mlflow-llm.txt](mlflow-llm.txt)** - MLflow for LLM experiment tracking and model routing
-- **[tenderly-llm.txt](tenderly-llm.txt)** - Tenderly for contract simulation, debugging, and monitoring
-- **[dune-analytics-llm.txt](dune-analytics-llm.txt)** - Dune Analytics for on-chain analytics and dashboards
 
-### LLM Providers
-- **[anthropic-openai-llm.txt](anthropic-openai-llm.txt)** - Anthropic (Claude) and OpenAI (GPT) for code generation and reasoning
-- **[gemini-llm.txt](gemini-llm.txt)** - Google Gemini for fast, cost-effective code generation
+- [OpenTelemetry Documentation](docs/opentelemetry-llm.txt): Tracing and metrics
+- [MLflow Documentation](docs/mlflow-llm.txt): LLM experiment tracking
+- [Dune Analytics Documentation](docs/dune-analytics-llm.txt): On-chain analytics
 
 ### DevOps & Deployment
-- **[docker-llm.txt](docker-llm.txt)** - Docker and Docker Compose for containerization and deployment
 
-## How to Use
+- [Docker Documentation](docs/docker-llm.txt): Containerization (infra/docker)
 
-1. **Before implementing a feature** involving an external dependency, read the relevant `llm.txt` file
-2. **Reference official docs** using the provided links for detailed information
-3. **Follow best practices** outlined in each file
-4. **Use code examples** as starting points for implementation
+## Architecture
 
-## File Naming Convention
+- [System Design](../../external/docs/detailed/system-design.md): Client, API Gateway, Orchestrator (LangGraph), ROMA, AI SDK agents, services layer, data layer
+- [Draft Specification](../../external/docs/detailed/draft.md): Pipeline stages, chain/SDK registries, BYOK, versioning
+- [Technology Stack](../rules/AGENT.mdc): Stack reference
 
-Files follow the pattern: `{dependency}-llm.txt`
+## Development
 
-Examples:
-- `thirdweb-llm.txt` - Thirdweb documentation
-- `langgraph-llm.txt` - LangGraph documentation
-- `erc-4337-llm.txt` - ERC-4337 standard documentation
+- [Quick Start](../../README.md#quick-start): Installation and run
+- [Repo Structure](../commands/repo-map.md): apps/studio, services/*, packages/*, infra/registries, platform, docs
+- [Getting Started](../../docs/getting-started.md): First-time setup
+- [Developer Guide](../../docs/developer-guide.md): Local setup, contributing
+- [Code Standards](../rules/rules.mdc): Clean code and conventions
+- [Production Standards](../rules/production.mdc): Production-ready standards
 
-## Maintenance
+## Reference
 
-- Files are updated when dependencies change
-- New dependencies get their own `llm.txt` file
-- Documentation links are kept current
-- Code examples reflect current implementation
-
-## Related Resources
-
-- Main HyperAgent Spec: `docs/HyperAgent Spec.md`
-- Project Naming Conventions: `.cursor/llm/llm.txt` (original file)
-- Skills Directory: `.cursor/skills/`
+- [LLM Docs README](README.md): Guide to these documentation files
+- [llms.txt Specification](https://llmstxt.org/): Official llms.txt format

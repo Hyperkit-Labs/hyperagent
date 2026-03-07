@@ -4,7 +4,22 @@ import { useState, useEffect } from "react";
 import { getSpendingControlWithBudget, patchSpendingControl, type SpendingControlWithBudget } from "@/lib/api";
 import { useSession } from "@/hooks/useSession";
 
-export function SpendingControlCard() {
+export interface SpendingControlCardProps {
+  /** When provided (e.g. from Payments page consolidated fetch), skip internal fetch. */
+  controlFromParent?: SpendingControlWithBudget | null;
+  /** Called after save so parent can refetch. */
+  onRefetch?: () => void;
+}
+
+function initFromControl(data: SpendingControlWithBudget | null) {
+  return {
+    budgetAmount: data?.budget ?? "0",
+    period: (data?.period as "daily" | "weekly" | "monthly") ?? "monthly" as const,
+    alertPercent: typeof data?.alert_threshold_percent === "number" ? data.alert_threshold_percent : 80,
+  };
+}
+
+export function SpendingControlCard({ controlFromParent, onRefetch }: SpendingControlCardProps) {
   const { hasSession } = useSession();
   const [control, setControl] = useState<SpendingControlWithBudget | null>(null);
   const [loading, setLoading] = useState(true);
@@ -15,6 +30,15 @@ export function SpendingControlCard() {
   const [alertPercent, setAlertPercent] = useState(80);
 
   useEffect(() => {
+    if (controlFromParent !== undefined) {
+      setControl(controlFromParent);
+      const init = initFromControl(controlFromParent);
+      setBudgetAmount(init.budgetAmount);
+      setPeriod(init.period);
+      setAlertPercent(init.alertPercent);
+      setLoading(false);
+      return;
+    }
     if (!hasSession) {
       setLoading(false);
       return;
@@ -23,13 +47,14 @@ export function SpendingControlCard() {
     getSpendingControlWithBudget()
       .then((data) => {
         setControl(data);
-        setBudgetAmount(data?.budget ?? "0");
-        setPeriod((data?.period as "daily" | "weekly" | "monthly") ?? "monthly");
-        setAlertPercent(typeof data?.alert_threshold_percent === "number" ? data.alert_threshold_percent : 80);
+        const init = initFromControl(data);
+        setBudgetAmount(init.budgetAmount);
+        setPeriod(init.period);
+        setAlertPercent(init.alertPercent);
       })
       .catch(() => setError("Failed to load spending control"))
       .finally(() => setLoading(false));
-  }, [hasSession]);
+  }, [hasSession, controlFromParent]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,6 +74,7 @@ export function SpendingControlCard() {
         alert_threshold_percent: alertPercent,
       });
       setControl(updated);
+      onRefetch?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
     } finally {

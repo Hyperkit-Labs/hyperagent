@@ -452,10 +452,17 @@ interface NetworkApiItem {
 export interface RuntimeConfig {
   x402_enabled: boolean;
   monitoring_enabled?: boolean;
+  merchant_wallet_address?: string | null;
+  credits_enabled?: boolean;
 }
 
 export async function getConfig(): Promise<RuntimeConfig> {
-  return fetchJson<RuntimeConfig>('/config').catch(() => ({ x402_enabled: false, monitoring_enabled: false }));
+  return fetchJson<RuntimeConfig>('/config').catch(() => ({
+    x402_enabled: false,
+    monitoring_enabled: false,
+    merchant_wallet_address: null,
+    credits_enabled: false,
+  }));
 }
 
 /**
@@ -545,6 +552,15 @@ export async function topUpCredits(body: CreditsTopUpBody): Promise<CreditsBalan
   return fetchJson<CreditsBalance & { user_id?: string }>('/credits/top-up', {
     method: 'POST',
     body: JSON.stringify(body),
+  });
+}
+
+/** Top up credits after on-chain USDC/USDT transfer. reference_id should be tx_hash for audit. */
+export async function topUpCreditsWithTx(body: CreditsTopUpBody & { tx_hash?: string }): Promise<CreditsBalance & { user_id?: string }> {
+  return topUpCredits({
+    ...body,
+    reference_id: body.reference_id ?? body.tx_hash,
+    reference_type: body.reference_type ?? (body.tx_hash ? 'usdc_transfer' : 'manual'),
   });
 }
 

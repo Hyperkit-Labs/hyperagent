@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hyperagent-development
+  labels:
+    app.kubernetes.io/name: hyperagent
+    environment: development

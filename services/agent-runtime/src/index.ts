@@ -5,7 +5,7 @@
 
 import cors from "cors";
 import express from "express";
-import { specAgent, designAgent, codegenAgent, autofixAgent, estimateAgent, type AgentContext, type DesignProposal, type AutofixInput } from "./agents.js";
+import { specAgent, designAgent, codegenAgent, autofixAgent, estimateAgent, pashovAuditAgent, type AgentContext, type DesignProposal, type AutofixInput } from "./agents.js";
 import { resolveAgentSession } from "./agentSession.js";
 import { generateFromWizard } from "./ozWizard.js";
 import { simulate, getDeployPlan, pin, unpin } from "./simulateDeploy.js";
@@ -79,10 +79,10 @@ app.post("/agents/spec", async (req, res) => {
 
 app.post("/agents/design", async (req, res) => {
   try {
-    const { spec, targetChains } = req.body as { spec: Record<string, unknown>; targetChains: unknown[]; context?: AgentContext };
+    const { spec, targetChains, securityContext } = req.body as { spec: Record<string, unknown>; targetChains: unknown[]; context?: AgentContext; securityContext?: Record<string, unknown> };
     const context = getContext(req, req.body);
     if (!spec || !context) return res.status(400).json({ error: "spec and context.apiKeys or X-Agent-Session required" });
-    const design = await designAgent(spec, targetChains || [], context);
+    const design = await designAgent(spec, targetChains || [], context, securityContext);
     res.json(design);
   } catch (e: unknown) {
     console.error("[design]", e instanceof Error ? e.message : "Design failed");
@@ -92,10 +92,10 @@ app.post("/agents/design", async (req, res) => {
 
 app.post("/agents/codegen", async (req, res) => {
   try {
-    const { spec, design } = req.body as { spec: Record<string, unknown>; design: DesignProposal; context?: AgentContext };
+    const { spec, design, securityContext } = req.body as { spec: Record<string, unknown>; design: DesignProposal; context?: AgentContext; securityContext?: Record<string, unknown> };
     const context = getContext(req, req.body);
     if (!spec || !context) return res.status(400).json({ error: "spec and context.apiKeys or X-Agent-Session required" });
-    const contracts = await codegenAgent(spec, design || { components: [], frameworks: { primary: "hardhat" }, chains: [] }, context);
+    const contracts = await codegenAgent(spec, design || { components: [], frameworks: { primary: "hardhat" }, chains: [] }, context, securityContext);
     res.json(contracts);
   } catch (e: unknown) {
     console.error("[codegen]", e instanceof Error ? e.message : "Codegen failed");
@@ -148,6 +148,21 @@ app.post("/agents/estimate", async (req, res) => {
   } catch (e: unknown) {
     console.error("[estimate]", e instanceof Error ? e.message : "Estimate failed");
     res.status(500).json({ error: e instanceof Error ? e.message : "Estimate failed" });
+  }
+});
+
+app.post("/agents/pashov-audit", async (req, res) => {
+  try {
+    const { systemPrompt, userPrompt, context: ctx } = req.body as { systemPrompt: string; userPrompt: string; context?: AgentContext };
+    const context = getContext(req, req.body) ?? ctx;
+    if (!systemPrompt || !userPrompt || !context) {
+      return res.status(400).json({ error: "systemPrompt, userPrompt, and context.apiKeys or X-Agent-Session required" });
+    }
+    const result = await pashovAuditAgent({ systemPrompt, userPrompt, context });
+    res.json(result);
+  } catch (e: unknown) {
+    console.error("[pashov-audit]", e instanceof Error ? e.message : "Pashov audit failed");
+    res.status(500).json({ error: e instanceof Error ? e.message : "Pashov audit failed" });
   }
 });
 

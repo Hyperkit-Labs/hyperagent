@@ -2,8 +2,7 @@
 from providers import get_simulation_provider
 from db import insert_simulation, is_configured
 
-# Placeholder from-address for simulation (contract creation)
-SIM_FROM_PLACEHOLDER = "0x0000000000000000000000000000000000000001"
+SIM_FROM_ADDRESS = "0x0000000000000000000000000000000000000001"
 
 
 async def run_tenderly_simulations(
@@ -34,7 +33,7 @@ async def run_tenderly_simulations(
         try:
             result = await get_simulation_provider().simulate(
                 network=network,
-                from_address=SIM_FROM_PLACEHOLDER,
+                from_address=SIM_FROM_ADDRESS,
                 data=data,
                 value="0",
             )
@@ -61,7 +60,7 @@ async def run_tenderly_simulations(
             insert_simulation(
                 run_id=run_id,
                 network=network,
-                from_address=SIM_FROM_PLACEHOLDER,
+                from_address=SIM_FROM_ADDRESS,
                 success=result.get("success", False) and not tenderly_disabled,
                 gas_used=result.get("gasUsed"),
                 error_message=result.get("error"),

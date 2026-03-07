@@ -54,22 +54,20 @@ export function useNetworks(options: UseNetworksOptions = {}): UseNetworksReturn
   const fetchNetworks = useCallback(async (signal?: AbortSignal) => {
     try {
       setError(null);
-      
-      const data = await getNetworks(undefined, signal);
+
+      const [data, metrics] = await Promise.all([
+        getNetworks(undefined, signal),
+        includeStats ? getMetrics(signal).catch(() => null) : Promise.resolve(null),
+      ]);
 
       if (isMounted.current) {
         setNetworks(data);
-        
-        // If stats requested, fetch from metrics API
+
         if (includeStats) {
-          try {
-            const metrics = await getMetrics();
-            if (metrics && typeof metrics === 'object') {
-              // Map metrics to network stats if available
-              const stats: NetworkStats[] = data.map((network: NetworkConfig) => {
-                // Try to get network-specific metrics if available
+          const stats: NetworkStats[] = metrics && typeof metrics === 'object'
+            ? data.map((network: NetworkConfig) => {
                 const networksMap = (metrics as { networks?: Record<string, { requests?: number; avg_latency_ms?: number; uptime_percentage?: number; status?: string }> }).networks;
-                const networkMetrics = networksMap?.[network.network_id] || {};
+                const networkMetrics = networksMap?.[network.network_id ?? network.id] || {};
                 return {
                   chainId: network.chain_id ?? 0,
                   name: network.name || network.id,
@@ -78,11 +76,8 @@ export function useNetworks(options: UseNetworksOptions = {}): UseNetworksReturn
                   uptime: networkMetrics.uptime_percentage ?? 0,
                   status: (networkMetrics.status === 'degraded' || networkMetrics.status === 'offline' ? networkMetrics.status : 'online') as NetworkStats['status'],
                 };
-              });
-              setNetworkStats(stats);
-            } else {
-              // Fallback: set default stats
-              const stats: NetworkStats[] = data.map((network: NetworkConfig) => ({
+              })
+            : data.map((network: NetworkConfig) => ({
                 chainId: network.chain_id ?? 0,
                 name: network.name || network.id,
                 requests: 0,
@@ -90,23 +85,7 @@ export function useNetworks(options: UseNetworksOptions = {}): UseNetworksReturn
                 uptime: 0,
                 status: 'online' as const,
               }));
-              setNetworkStats(stats);
-            }
-          } catch (statsErr: unknown) {
-            if (typeof console !== 'undefined' && console.error) {
-              console.error('Failed to fetch network stats:', statsErr);
-            }
-            // Fallback: set default stats
-          const stats: NetworkStats[] = data.map((network: NetworkConfig) => ({
-            chainId: network.chain_id ?? 0,
-            name: network.name || network.id,
-              requests: 0,
-              latency: 0,
-              uptime: 0,
-            status: 'online' as const,
-          }));
           setNetworkStats(stats);
-          }
         }
       }
     } catch (err: unknown) {

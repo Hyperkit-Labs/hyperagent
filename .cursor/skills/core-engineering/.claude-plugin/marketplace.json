@@ -1,0 +1,19 @@
+{
+  "name": "core-engineering",
+  "owner": {
+    "name": "JustineDevs",
+    "email": "tradergofficial@gmail.com"
+  },
+  "metadata": {
+    "description": "OOP four pillars, SOLID, clean code (DRY, KISS, YAGNI, Law of Demeter), composition over inheritance, and relationship types (association, aggregation, composition) with example code for AI agents and developers.",
+    "pluginRoot": "."
+  },
+  "plugins": [
+    {
+      "name": "core-engineering",
+      "source": ".",
+      "description": "Core Engineering skill: Object-Oriented Design (Abstraction, Encapsulation, Inheritance, Polymorphism), SOLID principles, composition over inheritance, DRY/KISS/YAGNI/LoD, and association vs aggregation vs composition. Each principle includes how it looks and TypeScript examples.",
+      "category": "Software Design"
+    }
+  ]
+}

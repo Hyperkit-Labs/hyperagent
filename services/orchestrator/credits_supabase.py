@@ -83,9 +83,52 @@ def top_up(
     reference_type: str | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
-    """Add credits (e.g. after fiat/USDC/USDT top-up). Returns updated balance info or None."""
+    """Add credits (e.g. after fiat/USDC/USDT top-up). Returns updated balance info or None.
+    Uses atomic RPC when available to avoid race conditions under concurrent load."""
     if not user_id or not is_configured() or amount <= 0:
         return None
+    client = _client()
+    if not client:
+        return None
+    try:
+        r = client.rpc(
+            "top_up_credits",
+            {
+                "p_user_id": user_id,
+                "p_amount": str(amount),
+                "p_currency": currency or "USD",
+                "p_reference_id": reference_id,
+                "p_reference_type": reference_type or "manual",
+                "p_metadata": metadata or {},
+            },
+        ).execute()
+        data = r.data
+        if data is None:
+            return None
+        row = data[0] if isinstance(data, list) and data else data
+        if not isinstance(row, dict):
+            return None
+        return {
+            "balance": float(row.get("balance", 0)),
+            "currency": str(row.get("currency", "USD")),
+            "user_id": user_id,
+        }
+    except Exception as e:
+        logger.warning("[credits] top_up RPC user_id=%s error=%s", user_id, e)
+        return _top_up_fallback(
+            user_id, amount, currency, reference_id, reference_type, metadata
+        )
+
+
+def _top_up_fallback(
+    user_id: str,
+    amount: float,
+    currency: str,
+    reference_id: str | None,
+    reference_type: str | None,
+    metadata: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Fallback when RPC not available (e.g. migration not run). Non-atomic."""
     client = _client()
     if not client:
         return None
@@ -113,7 +156,7 @@ def top_up(
         }).execute()
         return {"balance": new_balance, "currency": currency or "USD", "user_id": user_id}
     except Exception as e:
-        logger.warning("[credits] top_up user_id=%s error=%s", user_id, e)
+        logger.warning("[credits] top_up fallback user_id=%s error=%s", user_id, e)
         return None
 
 

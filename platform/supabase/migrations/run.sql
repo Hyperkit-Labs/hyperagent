@@ -435,3 +435,43 @@ create table if not exists public.credit_transactions (
 create index if not exists idx_credit_transactions_user_id on public.credit_transactions using btree (user_id);
 create index if not exists idx_credit_transactions_created_at on public.credit_transactions using btree (created_at desc);
 create index if not exists idx_credit_transactions_reference on public.credit_transactions using btree (reference_id, reference_type);
+
+-- ---------------------------------------------------------------------------
+-- Atomic top-up: avoids race when concurrent requests add credits (read-modify-write)
+-- ---------------------------------------------------------------------------
+create or replace function public.top_up_credits(
+  p_user_id uuid,
+  p_amount numeric,
+  p_currency text default 'USD',
+  p_reference_id text default null,
+  p_reference_type text default 'manual',
+  p_metadata jsonb default '{}'::jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_new_balance numeric;
+begin
+  insert into public.user_credits (user_id, balance, currency)
+  values (p_user_id, 0, p_currency)
+  on conflict (user_id) do nothing;
+
+  update public.user_credits
+  set balance = balance + p_amount,
+      updated_at = now()
+  where user_id = p_user_id
+  returning balance into v_new_balance;
+
+  if v_new_balance is null then
+    return null;
+  end if;
+
+  insert into public.credit_transactions (user_id, amount_delta, balance_after, type, reference_id, reference_type, metadata)
+  values (p_user_id, p_amount, v_new_balance, 'top_up', p_reference_id, p_reference_type, coalesce(p_metadata, '{}'::jsonb));
+
+  return jsonb_build_object('balance', v_new_balance, 'currency', p_currency, 'user_id', p_user_id);
+end;
+$$;

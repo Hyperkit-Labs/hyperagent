@@ -1,0 +1,67 @@
+# infra/registries/erc8004/erc8004.yaml
+# ERC-8004 (Trustless Agents) Registry - Identity, Reputation, Validation per chain
+# agentRegistry format: eip155:{chainId}:{identityRegistry}
+# See: https://eips.ethereum.org/EIPS/eip-8004, https://docs.pinata.cloud/tools/erc-8004/quickstart
+
+apiVersion: hyperagent.io/v1
+kind: ERC8004Registry
+metadata:
+  name: hyperagent-erc8004
+  version: 1.0.0
+spec:
+  chains:
+    # SKALE Base Sepolia (testnet)
+    - chainId: 324705682
+      slug: skalebase-sepolia
+      identityRegistry: "0x8004A818BFB912233c491871b3d84c89A494BD9e"
+      reputationRegistry: "0x8004B663056A597Dffe9eCcC1965A193B7388713"
+      validationRegistry: null
+      agentRegistry: "eip155:324705682:0x8004A818BFB912233c491871b3d84c89A494BD9e"
+      notes:
+        - "Canonical testnet Identity Registry address"
+        - "SKALE Base Sepolia: zero-gas, BITE privacy"
+
+    # SKALE Base (mainnet)
+    - chainId: 1187947933
+      slug: skalebase-mainnet
+      identityRegistry: "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432"
+      reputationRegistry: "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63"
+      validationRegistry: null
+      agentRegistry: "eip155:1187947933:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432"
+      notes:
+        - "Canonical mainnet Identity Registry address"
+        - "SKALE Base: zero-gas, App Chain Pricing"
+
+    # Avalanche Fuji (testnet)
+    - chainId: 43113
+      slug: avalanche-fuji
+      identityRegistry: "0x8004A818BFB912233c491871b3d84c89A494BD9e"
+      reputationRegistry: "0x8004B663056A597Dffe9eCcC1965A193B7388713"
+      validationRegistry: null
+      agentRegistry: "eip155:43113:0x8004A818BFB912233c491871b3d84c89A494BD9e"
+      notes:
+        - "Canonical testnet Identity Registry address"
+
+    # Avalanche C-Chain Mainnet
+    - chainId: 43114
+      slug: avalanche-c
+      identityRegistry: "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432"
+      reputationRegistry: "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63"
+      validationRegistry: null
+      agentRegistry: "eip155:43114:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432"
+      notes:
+        - "Canonical mainnet Identity Registry address"
+
+  # HyperAgent registration on this registry (agentId from Transfer event after register())
+  # paymentWallet: set via setAgentWallet() on-chain; matches MERCHANT_WALLET_ADDRESS
+  hyperagent:
+    paymentWallet: "0xcc6585FB00EE0769fD344f58f1f840319f2c2AF9"
+    agentIds:
+      - chainId: 324705682
+        slug: skale-sepolia
+        agentId: "1"
+        registerTxHash: "0x3e8d62e6770dde2c5320ac92a4ab7bf1d39a1fce9c9ac020fd31b975946de774"
+      - chainId: 43113
+        slug: avalanche-fuji
+        agentId: "60"
+        registerTxHash: "0x410015ec8ca9ca9d4c8bd0cff5ef0d3b43522789a1effdcacad0cb479799c5a6"

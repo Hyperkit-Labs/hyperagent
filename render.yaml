@@ -10,7 +10,7 @@ services:
     runtime: python
     plan: free
     buildCommand: cd services/orchestrator && pip install -r requirements.txt
-    startCommand: cd services/orchestrator && uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: cd services/orchestrator && uvicorn main:app --host 0.0.0.0 --port ${PORT:-9000}
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
@@ -90,7 +90,7 @@ services:
     runtime: python
     plan: free
     buildCommand: cd services/compile && pip install -r requirements.txt
-    startCommand: cd services/compile && uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: cd services/compile && uvicorn main:app --host 0.0.0.0 --port ${PORT:-9000}
     healthCheckPath: /health
     envVars:
       - key: COMPILE_MODE
@@ -105,7 +105,7 @@ services:
     runtime: python
     plan: free
     buildCommand: cd services/audit && pip install -r requirements.txt
-    startCommand: cd services/audit && uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: cd services/audit && uvicorn main:app --host 0.0.0.0 --port ${PORT:-9000}
     healthCheckPath: /health
     envVars:
       - key: AUDIT_MODE
@@ -120,7 +120,7 @@ services:
     runtime: python
     plan: free
     buildCommand: cd services/hyperagent-tools && pip install -r requirements.txt && python -c "import solcx; solcx.install_solc('0.8.24')"
-    startCommand: cd services/hyperagent-tools && uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: cd services/hyperagent-tools && uvicorn main:app --host 0.0.0.0 --port ${PORT:-9000}
     healthCheckPath: /health
     envVars:
       - key: TOOLS_API_KEY

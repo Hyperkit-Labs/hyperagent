@@ -35,4 +35,4 @@ Single policy for where data lives so traces, artifacts, and indexes stay consis
 
 - EigenDA trace writer: `services/orchestrator/trace_writer.py`; migration `006_run_steps_trace.sql`.
 - IPFS/Pinata: `packages/web3-utils` (IpfsPinataToolkit), `services/storage`.
-- Run steps and runs: `platform/supabase/migrations/005_run_steps.sql`, `control-plane-runs-steps.md`.
+- Run steps and runs: `platform/supabase/migrations/run.sql`, `control-plane-runs-steps.md`.

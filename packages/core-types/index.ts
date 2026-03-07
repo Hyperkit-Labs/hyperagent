@@ -75,7 +75,7 @@ export interface StepRecord {
   completed_at?: string | null;
 }
 
-/** Locked Run model for MVP (Phase B). */
+/** Locked Run model for Phase B. */
 export interface Run {
   id: string;
   workflow_id?: string;
@@ -120,7 +120,7 @@ export interface SecurityFinding {
   source_tool?: string;
 }
 
-/** AgentTraceBlob v1 shape for EigenDA / run_steps. */
+/** AgentTraceBlob v1 shape for run_steps trace payload. */
 export interface AgentTraceBlob {
   version: string;
   run_id: string;

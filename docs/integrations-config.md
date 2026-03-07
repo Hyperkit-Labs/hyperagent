@@ -24,3 +24,7 @@ Settings > Integrations shows connection status for Tenderly, Pinata, and Qdrant
 ## How status is determined
 
 The orchestrator fetches `/health` from `AGENT_RUNTIME_URL` and `VECTORDB_URL`. The agent-runtime health endpoint returns `tenderly_configured` and `pinata_configured` based on env vars. The vectordb health endpoint returns `qdrant_configured`.
+
+## Render deployment
+
+The vectordb service (`hyperagent-vectordb`) is in the Render blueprint. It requires `QDRANT_URL` (e.g. Qdrant Cloud) and `OPENAI_API_KEY`. Set `VECTORDB_URL` on the orchestrator to the vectordb service URL. See [RENDER_FULL_STACK.md](RENDER_FULL_STACK.md).

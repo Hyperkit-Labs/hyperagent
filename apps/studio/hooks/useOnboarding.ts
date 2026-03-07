@@ -20,16 +20,21 @@ export interface OnboardingStep {
   cta: string;
 }
 
-function fetchLlmConfigured(): Promise<boolean> {
-  return getConfiguredLLMProviders()
-    .then((r) => Array.isArray(r?.configured_providers) && r.configured_providers.length > 0)
-    .catch(() => false);
-}
-
 function hasSessionKey(): boolean {
   if (typeof window === "undefined") return false;
   const k = getSessionOnlyLLMKey();
   return Boolean(k?.provider && k?.apiKey?.trim());
+}
+
+/** Single batched fetch for LLM config + credits. Reduces parallel calls on mount. */
+async function fetchByokAndCredits(hasSession: boolean): Promise<{ llmConfigured: boolean; hasCredits: boolean }> {
+  const [llmRes, creditsRes] = await Promise.all([
+    getConfiguredLLMProviders()
+      .then((r) => Array.isArray(r?.configured_providers) && r.configured_providers.length > 0)
+      .catch(() => false),
+    hasSession ? getCreditsBalance().then((r) => (r.balance ?? 0) > 0).catch(() => false) : Promise.resolve(false),
+  ]);
+  return { llmConfigured: llmRes, hasCredits: creditsRes };
 }
 
 export function useOnboarding() {
@@ -40,29 +45,28 @@ export function useOnboarding() {
   const [sessionKeyActive, setSessionKeyActive] = useState(false);
   const [hasCredits, setHasCredits] = useState(false);
 
-  const refetchByok = useCallback(() => {
-    fetchLlmConfigured().then(setLlmConfigured);
-  }, []);
+  const refetchByokAndCredits = useCallback(() => {
+    fetchByokAndCredits(!!hasSession).then(({ llmConfigured: l, hasCredits: c }) => {
+      setLlmConfigured(l);
+      setHasCredits(c);
+    });
+  }, [hasSession]);
 
   const refreshSessionKey = useCallback(() => {
     setSessionKeyActive(hasSessionKey());
   }, []);
 
   const refetchCredits = useCallback(() => {
-    if (!hasSession) return;
-    getCreditsBalance()
-      .then((r) => setHasCredits((r.balance ?? 0) > 0))
-      .catch(() => setHasCredits(false));
-  }, [hasSession]);
+    refetchByokAndCredits();
+  }, [refetchByokAndCredits]);
 
   useEffect(() => {
-    refetchByok();
+    refetchByokAndCredits();
     refreshSessionKey();
-    refetchCredits();
-  }, [refetchByok, refreshSessionKey, refetchCredits, hasSession]);
+  }, [refetchByokAndCredits, refreshSessionKey]);
 
   useEffect(() => {
-    const onByok = () => refetchByok();
+    const onByok = () => refetchByokAndCredits();
     const onSession = () => refreshSessionKey();
     window.addEventListener(BYOK_UPDATED_EVENT, onByok);
     window.addEventListener(SESSION_LLM_PASS_THROUGH_UPDATED_EVENT, onSession);
@@ -70,7 +74,7 @@ export function useOnboarding() {
       window.removeEventListener(BYOK_UPDATED_EVENT, onByok);
       window.removeEventListener(SESSION_LLM_PASS_THROUGH_UPDATED_EVENT, onSession);
     };
-  }, [refetchByok, refreshSessionKey]);
+  }, [refetchByokAndCredits, refreshSessionKey]);
 
   const step1 = !!account;
   const step2 = llmConfigured === true || sessionKeyActive;

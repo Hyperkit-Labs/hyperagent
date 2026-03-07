@@ -19,10 +19,6 @@ services:
     envVars:
       - key: DATABASE_URL
         sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: OPENAI_API_KEY
-        sync: false
       - key: THIRDWEB_CLIENT_ID
         sync: false
       - key: THIRDWEB_SECRET_KEY

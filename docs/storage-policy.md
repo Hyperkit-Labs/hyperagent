@@ -6,7 +6,7 @@ Single policy for where data lives so traces, artifacts, and indexes stay consis
 
 ## Rule
 
-- **Traces (verifiable)** → EigenDA. Blob ID (and optional da_cert, reference_block) stored in Supabase.
+- **Traces** → Stub blob IDs stored in Supabase (`run_steps.trace_blob_id`). No external DA layer.
 - **Artifacts (files, IPFS)** → IPFS (e.g. Pinata). CID and gateway URL stored in Supabase or returned in API.
 - **Indexes and relational data** → Supabase (Postgres). Projects, runs, run_steps, deployments, simulations, user_profiles, etc.
 
@@ -16,7 +16,7 @@ Single policy for where data lives so traces, artifacts, and indexes stay consis
 
 | Data | Storage | ID stored |
 |------|---------|-----------|
-| Pipeline step trace (AgentTraceBlob) | EigenDA | `run_steps.trace_blob_id` (and optional `trace_da_cert`, `trace_reference_block`) |
+| Pipeline step trace (AgentTraceBlob) | Stub (in-process) | `run_steps.trace_blob_id` (and optional `trace_da_cert`, `trace_reference_block`) |
 | Pinned JSON/artifacts | IPFS (Pinata) | Returned as `cid` and `gatewayUrl` in API; caller may persist in deployments or run metadata |
 | Run and step metadata | Supabase | `runs`, `run_steps` (no large blobs in Postgres) |
 | Deployment plans | Supabase | `deployments.plan` (JSON); large binaries stay in IPFS or external storage |
@@ -27,12 +27,12 @@ Single policy for where data lives so traces, artifacts, and indexes stay consis
 
 - Store large blobs (raw trace payloads, full artifact bodies) in Postgres. Store only references (blob_id, cid).
 - Duplicate the same artifact in both IPFS and Postgres; store once in IPFS and reference by cid.
-- Emit traces to EigenDA without storing the returned blob_id in `run_steps` (or equivalent) so runs can be verified later.
+- Emit traces without storing the returned blob_id in `run_steps` so runs can be correlated.
 
 ---
 
 ## References
 
-- EigenDA trace writer: `services/orchestrator/trace_writer.py`; migration `006_run_steps_trace.sql`.
+- Trace writer: `services/orchestrator/trace_writer.py`; migration `006_run_steps_trace.sql`.
 - IPFS/Pinata: `packages/web3-utils` (IpfsPinataToolkit), `services/storage`.
 - Run steps and runs: `platform/supabase/migrations/run.sql`, `control-plane-runs-steps.md`.

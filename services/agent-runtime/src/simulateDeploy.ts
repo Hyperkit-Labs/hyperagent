@@ -56,9 +56,14 @@ async function loadChainRegistry(): Promise<Map<number, { rpcUrl: string; explor
     }
     return map;
   }
+  const SKALE_BASE_SEPOLIA = 324705682;
   map.set(1, { rpcUrl: "https://ethereum.publicnode.com", explorerUrl: "https://etherscan.io" });
   map.set(8453, { rpcUrl: "https://mainnet.base.org", explorerUrl: "https://basescan.org" });
   map.set(11155111, { rpcUrl: "https://rpc.sepolia.org", explorerUrl: "https://sepolia.etherscan.io" });
+  map.set(SKALE_BASE_SEPOLIA, {
+    rpcUrl: "https://base-sepolia-testnet.skalenodes.com/v1/jubilant-horrible-ancha",
+    explorerUrl: "https://base-sepolia-testnet-explorer.skalenodes.com/",
+  });
   return map;
 }
 
@@ -79,8 +84,18 @@ function getDeployToolkit(): DeployToolkit {
   if (deployToolkit) return deployToolkit;
   deployToolkit = new DeployToolkit({
     registryLoader: loadChainRegistry,
-    rpcFallback: { 1: "https://ethereum.publicnode.com", 8453: "https://mainnet.base.org", 11155111: "https://rpc.sepolia.org" },
-    explorerFallback: { 1: "https://etherscan.io", 8453: "https://basescan.org", 11155111: "https://sepolia.etherscan.io" },
+    rpcFallback: {
+      1: "https://ethereum.publicnode.com",
+      8453: "https://mainnet.base.org",
+      11155111: "https://rpc.sepolia.org",
+      324705682: "https://base-sepolia-testnet.skalenodes.com/v1/jubilant-horrible-ancha",
+    },
+    explorerFallback: {
+      1: "https://etherscan.io",
+      8453: "https://basescan.org",
+      11155111: "https://sepolia.etherscan.io",
+      324705682: "https://base-sepolia-testnet-explorer.skalenodes.com/",
+    },
     getEnvRpc: (chainId: number) => process.env[`RPC_URL_${chainId}`],
   });
   return deployToolkit;

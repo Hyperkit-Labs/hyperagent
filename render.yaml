@@ -167,6 +167,19 @@ services:
         value: "1"
 
   - type: web
+    name: hyperagent-vectordb
+    runtime: python
+    plan: free
+    buildCommand: cd services/vectordb && pip install -r requirements.txt
+    startCommand: cd services/vectordb && uvicorn main:app --host 0.0.0.0 --port ${PORT:-9000}
+    healthCheckPath: /health
+    envVars:
+      - key: QDRANT_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+
+  - type: web
     name: hyperagent-gateway
     runtime: node
     plan: free

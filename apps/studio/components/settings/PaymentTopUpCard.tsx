@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Coins, Loader2, Wallet } from "lucide-react";
 import { useActiveAccount } from "thirdweb/react";
 import { getContract } from "thirdweb";
 import { transfer } from "thirdweb/extensions/erc20";
 import { sendTransaction, waitForReceipt } from "thirdweb";
 import { getThirdwebClient } from "@/lib/thirdwebClient";
-import { topUpCreditsWithTx, getConfig, getStablecoins, handleApiError } from "@/lib/api";
+import { topUpCreditsWithTx, getStablecoins, handleApiError } from "@/lib/api";
 import { useSession } from "@/hooks/useSession";
+import { useConfig } from "@/components/providers/ConfigProvider";
 import { useNetworks } from "@/hooks/useNetworks";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { toast } from "sonner";
@@ -19,9 +20,13 @@ const DECIMALS = 6;
 
 type Token = "USDC" | "USDT";
 
+export type StablecoinsMap = Record<string, { USDC?: string; USDT?: string }>;
+
 export interface PaymentTopUpCardProps {
   /** Called after a successful on-chain top-up so parent can refresh credits. */
   onTopUpSuccess?: () => void;
+  /** When provided (e.g. from Payments page consolidated fetch), skip internal fetch. */
+  stablecoinsFromParent?: StablecoinsMap;
 }
 
 function getStoredNetworkId(): string | null {
@@ -33,28 +38,29 @@ function getStoredNetworkId(): string | null {
   }
 }
 
-export function PaymentTopUpCard({ onTopUpSuccess }: PaymentTopUpCardProps) {
+export function PaymentTopUpCard({ onTopUpSuccess, stablecoinsFromParent }: PaymentTopUpCardProps) {
   const account = useActiveAccount();
   const { hasSession } = useSession();
   const { networks } = useNetworks();
+  const { config } = useConfig();
   const [amount, setAmount] = useState("");
   const [token, setToken] = useState<Token>("USDC");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [merchantAddress, setMerchantAddress] = useState<string | null>(null);
-  const [creditsPerUsd, setCreditsPerUsd] = useState<number>(10);
-  const [stablecoins, setStablecoins] = useState<Record<string, { USDC?: string; USDT?: string }>>({});
+  const [stablecoinsLocal, setStablecoinsLocal] = useState<StablecoinsMap>({});
 
-  useEffect(() => {
-    getConfig().then((c) => {
-      setMerchantAddress(c.merchant_wallet_address ?? null);
-      setCreditsPerUsd(c.credits_per_usd ?? 10);
-    });
+  const fetchStablecoins = useCallback(() => {
+    getStablecoins().then(setStablecoinsLocal).catch(() => setStablecoinsLocal({}));
   }, []);
 
   useEffect(() => {
-    getStablecoins().then(setStablecoins);
-  }, []);
+    if (stablecoinsFromParent !== undefined) return;
+    if (hasSession) fetchStablecoins();
+  }, [hasSession, stablecoinsFromParent, fetchStablecoins]);
+
+  const merchantAddress = config?.merchant_wallet_address ?? null;
+  const creditsPerUsd = config?.credits_per_usd ?? 10;
+  const stablecoins = stablecoinsFromParent ?? stablecoinsLocal;
 
   const { selectedNetwork, chain, tokenAddress } = useMemo(() => {
     const storedId = getStoredNetworkId();

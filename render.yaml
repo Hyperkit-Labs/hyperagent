@@ -2,7 +2,8 @@
 # Dashboard: https://dashboard.render.com/blueprint/new?repo=<REPO_HTTPS_URL>
 # Blueprint Path: render.yaml (repo root). Link branch: main or feature/justinedevs.
 #
-# Architecture: Entire backend on Render. Local runs only frontend (Studio).
+# Architecture: Entire backend on Render. Production uses real services (no mocks).
+# Set sync: false vars in Render Dashboard. A2A_* and REGISTRIES_PATH optional (defaults from erc8004.yaml).
 #
 services:
   - type: web
@@ -43,13 +44,16 @@ services:
         value: "true"
       - key: CORS_ORIGINS
         sync: false
+      # ERC-8004 A2A identity: optional; when unset, uses infra/registries/erc8004/erc8004.yaml
       - key: A2A_DEFAULT_CHAIN_ID
         sync: false
       - key: A2A_AGENT_ID
         sync: false
+      - key: REGISTRIES_PATH
+        sync: false
       - key: AGENT_RUNTIME_URL
         sync: false
-      - key: ROMA_SERVICE_URL
+      - key: ROMA_URL
         sync: false
       - key: SIMULATION_SERVICE_URL
         sync: false
@@ -72,6 +76,33 @@ services:
       # REGISTRIES_PATH: omit to use orchestrator default (Path from __file__ to infra/registries)
       - key: CREDITS_ENABLED
         value: "true"
+      - key: OPENSANDBOX_ENABLED
+        value: "true"
+      - key: OPENSANDBOX_API_URL
+        sync: false
+      - key: OPENSANDBOX_API_KEY
+        sync: false
+      - key: PASHOV_AUDIT_ENABLED
+        sync: false
+      - key: PASHOV_SKILLS_PATH
+        sync: false
+      # SCRUBD: mandatory RE/UX validation (clone at build/runtime)
+      - key: SCRUBD_PATH
+        sync: false
+      - key: SCRUBD_VERSION
+        sync: false
+      - key: MAX_DEBATE_ROUNDS
+        sync: false
+      - key: VERCEL_SANDBOX_TOKEN
+        sync: false
+      - key: VERCEL_TEAM_ID
+        sync: false
+      - key: VERCEL_PROJECT_ID
+        sync: false
+      - key: DEMO_SANDBOX_SOURCE_URL
+        sync: false
+      - key: DEMO_SANDBOX_SOURCE_TYPE
+        sync: false
 
   - type: web
     name: hyperagent-agent-runtime

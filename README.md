@@ -136,6 +136,6 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) for detai
 
 **Core stack:** [FastAPI](https://fastapi.tiangolo.com/), [Next.js](https://nextjs.org/), [Supabase](https://supabase.com/), [pnpm](https://pnpm.io/), [Turbo](https://turbo.build/).
 
-**Web3:** [Thirdweb](https://thirdweb.com/) (x402, account abstraction), [Mantle](https://www.mantle.xyz/), [EigenDA](https://www.eigenlayer.xyz/), [Pinata](https://www.pinata.cloud/) (IPFS).
+**Web3:** [Thirdweb](https://thirdweb.com/) (x402, account abstraction), [Mantle](https://www.mantle.xyz/), [Pinata](https://www.pinata.cloud/) (IPFS).
 
 **LLM providers (BYOK):** [Anthropic](https://www.anthropic.com/), [OpenAI](https://openai.com/), [Google Gemini](https://deepmind.google/technologies/gemini/), [OpenRouter](https://openrouter.ai/). Keys are user-provided and stored in an isolated, encrypted environment; no server-side LLM keys for user workloads.

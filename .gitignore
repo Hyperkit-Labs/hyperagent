@@ -1,9 +1,9 @@
 # ============================================================
 # AI Agent Directories
 # ============================================================
+.claude/
 .agent/
 .agents/
-.claude/
 .cline/
 .codebuddy/
 .commandcode/
@@ -29,6 +29,7 @@ skills/
 
 # ============================================================
 # SECURITY & CREDENTIALS (CRITICAL - Never commit these!)
+# OWASP A02/A05, security-auditor, security-compliance-audit
 # ============================================================
 # Environment variables and secrets
 .env
@@ -36,12 +37,14 @@ skills/
 !.env.example
 !.env.template
 !.env.*.example
+!.env.render
 .env.local
 .env.*.local
 .env.development
 .env.production
 .env.staging
 .env.test
+.env.issue
 *.env
 # Per-app env files (only .example files are tracked)
 apps/*/.env.local
@@ -107,6 +110,39 @@ config/secrets.*
 config/*.secret
 config/*.key
 config/*.token
+
+# SSH and key files (A02 - sensitive data exposure)
+id_rsa
+id_ed25519
+id_ecdsa
+id_dsa
+*.ppk
+
+# Login/credential files
+.netrc
+.npmrc.local
+.yarnrc.local
+
+# Cloud and third-party credential files
+firebase-adminsdk*.json
+GoogleService-Info.plist
+GoogleServices.json
+.sentryclirc
+
+# Secret managers and vault data
+.vault/
+vault/
+*.vault
+
+# Security scan baselines (can contain path/snippet references)
+.secrets.baseline
+gitleaks-report*
+*-secrets-report.*
+
+# Provisioning and code-signing (can contain credentials)
+*.mobileprovision
+exportOptions.plist
+*.certSigningRequest
 
 # GitHub tokens and keys
 *.gh_token
@@ -364,6 +400,9 @@ coverage.xml
 # Test results
 test-results/
 test-results.xml
+
+# Dogfood QA output (reports, screenshots, videos). Opt-in to commit specific reports.
+dogfood-output/
 junit.xml
 *.test.xml
 
@@ -445,14 +484,31 @@ backup-*/
 # ============================================================
 # DOCUMENTATION & SCRIPTS (Project-specific ignores)
 # ============================================================
+# E2E tests and scripts (local/dev only, not main-level)
+e2e/
+scripts/
 # Planning documents
-docs/plan/
+external/*
 
-# Compliance documentation
-scripts/docs/compliance/
+# Docker environment files (contain secrets)
+infra/docker/.env
+infra/docker/.env.local
+infra/docker/.env.*.local
 
-# GitHub automation documentation
-scripts/docs/github-automation/
+# Kubernetes secrets (never commit)
+infra/k8s/overlays/*/secrets.yaml
+infra/k8s/overlays/*/secrets/*.yaml
+*.sealed-secret.yaml
 
-# GitHub automation scripts
-scripts/github/
+# ============================================================
+# Docker & Kubernetes Secrets (GitOps)
+# ============================================================
+# Docker environment files (contain secrets)
+infra/docker/.env
+infra/docker/.env.local
+infra/docker/.env.*.local
+
+# Kubernetes secrets (never commit)
+infra/k8s/overlays/*/secrets.yaml
+infra/k8s/overlays/*/secrets/*.yaml
+*.sealed-secret.yaml

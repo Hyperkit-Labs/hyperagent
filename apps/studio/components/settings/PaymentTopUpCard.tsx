@@ -1,20 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Coins, Loader2, Wallet } from "lucide-react";
 import { useActiveAccount } from "thirdweb/react";
 import { getContract } from "thirdweb";
-import { base } from "thirdweb/chains";
 import { transfer } from "thirdweb/extensions/erc20";
 import { sendTransaction, waitForReceipt } from "thirdweb";
 import { getThirdwebClient } from "@/lib/thirdwebClient";
-import { topUpCreditsWithTx, getConfig, handleApiError } from "@/lib/api";
+import { topUpCreditsWithTx, getConfig, getStablecoins, handleApiError } from "@/lib/api";
 import { useSession } from "@/hooks/useSession";
+import { useNetworks } from "@/hooks/useNetworks";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { toast } from "sonner";
+import { getChainByChainId } from "@/lib/smartWalletDeploy";
 
-const USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
-const USDT_BASE = "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2";
+const STORAGE_KEY = "hyperkit_selected_network_id";
 const DECIMALS = 6;
 
 type Token = "USDC" | "USDT";
@@ -24,15 +24,26 @@ export interface PaymentTopUpCardProps {
   onTopUpSuccess?: () => void;
 }
 
+function getStoredNetworkId(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
 export function PaymentTopUpCard({ onTopUpSuccess }: PaymentTopUpCardProps) {
   const account = useActiveAccount();
   const { hasSession } = useSession();
+  const { networks } = useNetworks();
   const [amount, setAmount] = useState("");
   const [token, setToken] = useState<Token>("USDC");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [merchantAddress, setMerchantAddress] = useState<string | null>(null);
   const [creditsPerUsd, setCreditsPerUsd] = useState<number>(10);
+  const [stablecoins, setStablecoins] = useState<Record<string, { USDC?: string; USDT?: string }>>({});
 
   useEffect(() => {
     getConfig().then((c) => {
@@ -41,12 +52,34 @@ export function PaymentTopUpCard({ onTopUpSuccess }: PaymentTopUpCardProps) {
     });
   }, []);
 
+  useEffect(() => {
+    getStablecoins().then(setStablecoins);
+  }, []);
+
+  const { selectedNetwork, chain, tokenAddress } = useMemo(() => {
+    const storedId = getStoredNetworkId();
+    const net = networks.find((n) => n.id === storedId || n.network_id === storedId) ?? networks.find((n) => !n.is_mainnet) ?? networks[0];
+    const cid = net?.chain_id;
+    const ch = cid != null ? getChainByChainId(cid) : undefined;
+    const addrs = cid != null ? stablecoins[String(cid)] : undefined;
+    const addr = token === "USDC" ? addrs?.USDC : addrs?.USDT;
+    return {
+      selectedNetwork: net,
+      chain: ch,
+      tokenAddress: addr,
+    };
+  }, [networks, stablecoins, token]);
+
   const handlePayWithStablecoin = async () => {
     const num = parseFloat(amount);
     if (!account || !hasSession || Number.isNaN(num) || num <= 0) return;
     const addr = merchantAddress?.trim();
     if (!addr) {
       setError("Merchant wallet not configured. Set MERCHANT_WALLET_ADDRESS.");
+      return;
+    }
+    if (!chain || !tokenAddress) {
+      setError(`USDC/USDT not supported on ${selectedNetwork?.name ?? "selected network"}. Switch network in the header or use Base.`);
       return;
     }
 
@@ -59,8 +92,7 @@ export function PaymentTopUpCard({ onTopUpSuccess }: PaymentTopUpCardProps) {
       return;
     }
 
-    const tokenAddress = token === "USDC" ? USDC_BASE : USDT_BASE;
-    const contract = getContract({ client, chain: base, address: tokenAddress });
+    const contract = getContract({ client, chain, address: tokenAddress });
     const amountWei = BigInt(Math.floor(num * 10 ** DECIMALS));
 
     try {
@@ -77,7 +109,7 @@ export function PaymentTopUpCard({ onTopUpSuccess }: PaymentTopUpCardProps) {
 
       const receipt = await waitForReceipt({
         client,
-        chain: base,
+        chain,
         transactionHash: result.transactionHash,
       });
 
@@ -119,6 +151,8 @@ export function PaymentTopUpCard({ onTopUpSuccess }: PaymentTopUpCardProps) {
     );
   }
 
+  const canPay = chain && tokenAddress && merchantAddress;
+
   return (
     <div className="rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] p-4 space-y-4">
       <div className="flex items-center gap-2">
@@ -126,8 +160,13 @@ export function PaymentTopUpCard({ onTopUpSuccess }: PaymentTopUpCardProps) {
         <h3 className="text-sm font-medium text-[var(--color-text-primary)]">Add budget (USDC/USDT)</h3>
       </div>
       <p className="text-xs text-[var(--color-text-tertiary)]">
-        Send USDC or USDT to add credits. 1 USD = {creditsPerUsd} credits. Funds go to merchant wallet.
+        Send USDC or USDT on <strong>{selectedNetwork?.name ?? "selected network"}</strong>. 1 USD = {creditsPerUsd} credits. Funds go to merchant wallet.
       </p>
+      {!canPay && selectedNetwork && (
+        <p className="text-xs text-[var(--color-text-muted)]">
+          Select a network with USDC/USDT in the header (e.g. SKALE Base Sepolia, Base).
+        </p>
+      )}
       {error && <ApiErrorBanner error={error} onRetry={() => setError(null)} />}
       <div className="flex flex-wrap items-center gap-2">
         <select
@@ -150,7 +189,7 @@ export function PaymentTopUpCard({ onTopUpSuccess }: PaymentTopUpCardProps) {
         <button
           type="button"
           onClick={handlePayWithStablecoin}
-          disabled={loading || !amount.trim() || !merchantAddress}
+          disabled={loading || !amount.trim() || !canPay}
           className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)] disabled:opacity-50 disabled:pointer-events-none"
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wallet className="w-4 h-4" />}

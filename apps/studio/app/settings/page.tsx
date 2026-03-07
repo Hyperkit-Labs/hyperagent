@@ -8,54 +8,47 @@ import { LLMKeysCard } from "@/components/settings/LLMKeysCard";
 import { SpendingControlCard } from "@/components/settings/SpendingControlCard";
 import { CreditsCard } from "@/components/settings/CreditsCard";
 import { isFeatureEnabled } from "@/config/environment";
-import { getPricingPlans, getPricingResources, getPricingUsage, getConfig, getNetworks } from "@/lib/api";
-import type { PricingPlan, PricingResource, UsageSummary, NetworkConfig, RuntimeConfig } from "@/lib/api";
+import { useConfig } from "@/components/providers/ConfigProvider";
+import { useNetworks } from "@/hooks/useNetworks";
+import { usePlanData } from "@/hooks/usePlanData";
+import { useSettingsX402Data } from "@/hooks/useSettingsX402Data";
 
 type SettingsTab = "workspace" | "byok" | "x402" | "integrations" | "plan";
 
 export default function SettingsPage() {
   const [tab, setTab] = useState<SettingsTab>("byok");
   const x402Enabled = isFeatureEnabled("x402");
-  const [config, setConfig] = useState<RuntimeConfig | null>(null);
-  const [networks, setNetworks] = useState<NetworkConfig[]>([]);
-  const [plans, setPlans] = useState<PricingPlan[]>([]);
-  const [resources, setResources] = useState<PricingResource[]>([]);
-  const [usage, setUsage] = useState<UsageSummary | null>(null);
+  const { config, loading: configLoading } = useConfig();
+  const { networks, loading: networksLoading, error: networksError, refetch: refetchNetworks } = useNetworks();
   const [defaultNetwork, setDefaultNetwork] = useState<string>("");
-  const [configLoading, setConfigLoading] = useState(true);
-  const [configError, setConfigError] = useState<string | null>(null);
-  const [planLoading, setPlanLoading] = useState(false);
-  const [planError, setPlanError] = useState<string | null>(null);
+  const {
+    plans,
+    resources,
+    usage,
+    loading: planLoading,
+    error: planError,
+    refetch: refetchPlan,
+  } = usePlanData({ enabled: tab === "plan" });
+  const {
+    balance: x402Balance,
+    control: x402Control,
+    loading: x402Loading,
+    error: x402Error,
+    refetch: refetchX402,
+  } = useSettingsX402Data({ enabled: tab === "x402" });
+
+  const configError = networksError ?? null;
+  const workspaceLoading = configLoading || networksLoading;
 
   useEffect(() => {
-    setConfigLoading(true);
-    setConfigError(null);
-    Promise.all([
-      getConfig().then(setConfig),
-      getNetworks().then(setNetworks),
-    ])
-      .catch((e) => setConfigError(e instanceof Error ? e.message : "Failed to load settings"))
-      .finally(() => setConfigLoading(false));
     if (typeof window !== "undefined") {
       setDefaultNetwork(localStorage.getItem("hyperagent_default_network") || "");
     }
   }, []);
 
-  const fetchPlanData = () => {
-    setPlanLoading(true);
-    setPlanError(null);
-    Promise.all([
-      getPricingPlans().then((r) => setPlans(r.plans || [])),
-      getPricingResources().then((r) => setResources(r.resources || [])),
-      getPricingUsage().then(setUsage),
-    ])
-      .catch((e) => setPlanError(e instanceof Error ? e.message : "Failed to load plan data"))
-      .finally(() => setPlanLoading(false));
+  const refetchWorkspace = () => {
+    refetchNetworks();
   };
-
-  useEffect(() => {
-    if (tab === "plan") fetchPlanData();
-  }, [tab]);
 
   const tabClass = (t: SettingsTab) =>
     `px-4 py-2 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-2 ${
@@ -91,7 +84,7 @@ export default function SettingsPage() {
 
         {tab === "workspace" && (
           <div className="glass-panel rounded-xl p-6 space-y-6">
-            {configLoading && (
+            {workspaceLoading && (
               <div className="flex items-center gap-2 text-[var(--color-text-muted)] py-4">
                 <Zap className="w-4 h-4 animate-pulse" />
                 <span className="text-sm">Loading workspace settings...</span>
@@ -100,7 +93,7 @@ export default function SettingsPage() {
             {configError && (
               <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 flex items-center justify-between">
                 <p className="text-xs text-red-400">{configError}</p>
-                <button type="button" onClick={() => { setConfigLoading(true); setConfigError(null); Promise.all([getConfig().then(setConfig), getNetworks().then(setNetworks)]).catch((e) => setConfigError(e instanceof Error ? e.message : "Failed to load")).finally(() => setConfigLoading(false)); }} className="text-xs text-red-400 underline">Retry</button>
+                <button type="button" onClick={refetchWorkspace} className="text-xs text-red-400 underline">Retry</button>
               </div>
             )}
             <div>
@@ -165,12 +158,29 @@ export default function SettingsPage() {
 
         {tab === "x402" && (
           <div className="glass-panel rounded-xl p-6 space-y-6">
+            {x402Loading && (
+              <div className="flex items-center gap-2 text-[var(--color-text-muted)] py-4">
+                <Zap className="w-4 h-4 animate-pulse" />
+                <span className="text-sm">Loading credits and spending...</span>
+              </div>
+            )}
+            {x402Error && !x402Loading && (
+              <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 flex items-center justify-between">
+                <p className="text-xs text-red-400">{x402Error}</p>
+                <button type="button" onClick={() => void refetchX402()} className="text-xs text-red-400 underline">Retry</button>
+              </div>
+            )}
+            {!x402Loading && (
+            <>
             <div>
               <h3 className="text-sm font-medium text-[var(--color-text-primary)] mb-2">Credits (workflow runs)</h3>
               <p className="text-sm text-[var(--color-text-tertiary)] mb-3">
                 Top up credits off-chain (fiat, USDC, USDT). Each workflow run consumes credits. x402 is used for external pay-per-call.
               </p>
-              <CreditsCard />
+              <CreditsCard
+                balanceFromParent={x402Balance}
+                onRefetch={refetchX402}
+              />
             </div>
             <div>
               <h3 className="text-sm font-medium text-[var(--color-text-primary)] mb-1">x402 status</h3>
@@ -189,8 +199,13 @@ export default function SettingsPage() {
             </div>
             <div>
               <h3 className="text-sm font-medium text-[var(--color-text-primary)] mb-2">Spending controls</h3>
-              <SpendingControlCard />
+              <SpendingControlCard
+                controlFromParent={x402Control}
+                onRefetch={refetchX402}
+              />
             </div>
+            </>
+            )}
           </div>
         )}
 
@@ -205,7 +220,7 @@ export default function SettingsPage() {
             {planError && (
               <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 flex items-center justify-between">
                 <p className="text-xs text-red-400">{planError}</p>
-                <button type="button" onClick={fetchPlanData} className="text-xs text-red-400 underline">Retry</button>
+                <button type="button" onClick={refetchPlan} className="text-xs text-red-400 underline">Retry</button>
               </div>
             )}
             {usage && (

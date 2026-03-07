@@ -802,8 +802,14 @@ def get_networks_api(skale: bool = False) -> list[dict[str, Any]]:
 
 @app.get("/api/v1/config")
 def get_config_api() -> dict[str, Any]:
-    """Return public runtime config (x402, monitoring) from registries. No auth required for Studio bootstrap."""
-    return {"x402_enabled": get_x402_enabled(), "monitoring_enabled": get_monitoring_enabled()}
+    """Return public runtime config (x402, monitoring, payment) from registries. No auth required for Studio bootstrap."""
+    merchant = os.environ.get("MERCHANT_WALLET_ADDRESS", "").strip()
+    return {
+        "x402_enabled": get_x402_enabled(),
+        "monitoring_enabled": get_monitoring_enabled(),
+        "merchant_wallet_address": merchant or None,
+        "credits_enabled": credits_supabase.is_configured(),
+    }
 
 
 @app.get("/api/v1/pricing/plans")

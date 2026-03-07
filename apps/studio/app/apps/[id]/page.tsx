@@ -9,6 +9,7 @@ import { getWorkflowContracts, getWorkflowDeployments, prepareDeploymentTransact
 import { ArrowLeft, FileCode, ExternalLink, Rocket, Loader2, LayoutGrid, GitBranch, Layers, Activity, MessageSquare, Terminal } from "lucide-react";
 import { Shimmer } from "@/components/ai-elements";
 import { ROUTES } from "@/constants/routes";
+import { FALLBACK_DEFAULT_CHAIN_ID, FALLBACK_DEFAULT_CHAIN_LABEL, getDefaultChainIdFromList } from "@/constants/defaults";
 import { getLogs } from "@/lib/api";
 
 type ContractItem = { bytecode?: string; abi?: unknown; contract_name?: string; [key: string]: unknown };
@@ -29,7 +30,7 @@ export default function AppDetailPage() {
         .map((n) => ({ chainId: n.chain_id as number, label: n.name ?? n.id })),
     [networks]
   );
-  const initialChainId = chainOptions[0]?.chainId ?? 324705682;
+  const initialChainId = getDefaultChainIdFromList(networks);
   const [contracts, setContracts] = useState<ContractItem[]>([]);
   const [deployments, setDeployments] = useState<DeploymentItem[]>([]);
   const [contractsLoading, setContractsLoading] = useState(false);
@@ -194,7 +195,7 @@ export default function AppDetailPage() {
                 onChange={(e) => { setDeployChainId(Number(e.target.value)); setPreparePayload(null); setPrepareError(null); }}
                 className="rounded-lg bg-[var(--color-bg-panel)] border border-[var(--color-border-default)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
               >
-                {chainOptions.length === 0 && <option value={324705682}>SKALE Base Sepolia (324705682)</option>}
+                {chainOptions.length === 0 && <option value={FALLBACK_DEFAULT_CHAIN_ID}>{FALLBACK_DEFAULT_CHAIN_LABEL} ({FALLBACK_DEFAULT_CHAIN_ID})</option>}
                 {chainOptions.map((opt) => (
                   <option key={opt.chainId} value={opt.chainId}>{opt.label} ({opt.chainId})</option>
                 ))}

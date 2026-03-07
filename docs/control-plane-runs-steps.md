@@ -6,7 +6,7 @@ This document describes the phased control-plane design: explicit runs and step-
 
 - **`run_steps` table**  
   One row per pipeline step per run. Columns: `run_id`, `step_index`, `step_type`, `status` (pending | running | completed | failed), `input_summary`, `output_summary`, `error_message`, `started_at`, `completed_at`.  
-  Migration: `platform/supabase/migrations/005_run_steps.sql`.
+  Migration: `platform/supabase/migrations/run.sql`.
 
 - **Writing steps from the pipeline**  
   Each LangGraph node (spec, design, codegen, audit, simulation, deploy, ui_scaffold) writes:

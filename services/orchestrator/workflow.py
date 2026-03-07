@@ -25,6 +25,7 @@ from nodes import (
     audit_agent,
     simulation_agent,
     exploit_simulation_agent,
+    deploy_gate_agent,
     deploy_agent,
     ui_scaffold_agent,
     autofix_agent,
@@ -111,6 +112,7 @@ def create_workflow():
     workflow.add_node("audit", audit_agent)
     workflow.add_node("autofix", autofix_agent)
     workflow.add_node("guardian", guardian_agent)
+    workflow.add_node("deploy_gate", deploy_gate_agent)
     workflow.add_node("simulation", simulation_agent)
     workflow.add_node("exploit_simulation", exploit_simulation_agent)
     workflow.add_node("deploy", deploy_agent)
@@ -140,10 +142,11 @@ def create_workflow():
     })
     workflow.add_edge("autofix", "scrubd_validation")
     workflow.add_conditional_edges("guardian", _after_guardian, {
-        "deploy": "deploy",
+        "deploy": "deploy_gate",
         "autofix": "autofix",
         "failed": END,
     })
+    workflow.add_edge("deploy_gate", "deploy")
     workflow.add_edge("deploy", "simulation")
     workflow.add_conditional_edges("simulation", _after_simulation, {
         "exploit_simulation": "exploit_simulation",
@@ -187,11 +190,12 @@ def run_pipeline(
     request_id: str | None = None,
     initial_state: dict | None = None,
     initial_state_override: dict | None = None,
+    resume_update: dict | None = None,
 ) -> dict:
     import asyncio
     pipeline_id = pipeline_id or get_default_pipeline_id()
     memory = _get_checkpointer()
-    graph = create_workflow().compile(checkpointer=memory)
+    graph = create_workflow().compile(checkpointer=memory, interrupt_before=["deploy"])
     if initial_state is not None:
         initial = initial_state
     else:
@@ -235,12 +239,16 @@ def run_pipeline(
             "invariant_violations": [],
             "estimated_complexity": "",
             "estimated_token_cost": 0,
+            "deploy_approved": False,
+            "needs_deploy_approval": False,
         }
     if initial_state_override:
         initial.update(initial_state_override)
     config = {"configurable": {"thread_id": run_id}}
     try:
-        if checkpoint_id:
+        if checkpoint_id and resume_update:
+            final = asyncio.run(graph.ainvoke(resume_update, config=config))
+        elif checkpoint_id:
             final = asyncio.run(graph.ainvoke(None, config=config))
         else:
             final = asyncio.run(graph.ainvoke(initial, config=config))

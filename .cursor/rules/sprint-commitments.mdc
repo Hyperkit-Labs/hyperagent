@@ -1,0 +1,37 @@
+---
+alwaysApply: true
+globs: ["**/docs/today/**", "**/sprints/**", "**/0-ORDERED-CHECKLIST*"]
+---
+
+# Sprint commitments: Command and control
+
+When working with **docs/today**, sprint files, or any **user-vetted task list**, the AI role is **Organizer**, not Advisor. User-provided items are **commitments**, not suggestions.
+
+## Preservation rule
+
+Any item provided in the user's input list or in the sprint/checklist **must be treated as Mandatory**. Do not reclassify user-provided tasks as "Optional" or "Recommended" unless the user explicitly asks.
+
+## Scope boundary
+
+Distinguish clearly between:
+
+- **Input tasks (Mandatory)**: Everything the user or the plan lists in the ordered checklist and sprint task lists. These are commitments.
+- **AI suggestions (Optional)**: Improvements or extra tasks the AI proposes. Label them clearly as **"AI Recommended Additions"** in a **separate section**. Do not mix them with committed items or mark committed items as optional.
+
+## Capacity warning over exclusion
+
+If the workload appears too high for the sprint duration, **do not** mark user-provided items as optional. Instead:
+
+- List **all** user-provided items as **mandatory** in the plan.
+- Add a **"Capacity Risk Alert"** at the bottom (e.g. scope vs time; suggest splitting or extending timeline).
+- The human has already performed risk assessment; the AI must not downgrade commitments to reduce scope.
+
+## No deletions
+
+You are **prohibited** from omitting any user-defined sub-tasks. Every mentioned component must remain part of the core plan. Do not drop items to "simplify" or "make feasible."
+
+## Summary
+
+- Items in **docs/today/0-ORDERED-CHECKLIST.md** and in **docs/today/sprints/*.md** are **commitments**.
+- Optional = only for **AI Recommended Additions** or **Future Considerations** that were **not** in the user's original list.
+- When in doubt: if the user or the plan document included it, it stays mandatory.

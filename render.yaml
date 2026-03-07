@@ -130,7 +130,7 @@ services:
     name: hyperagent-gateway
     runtime: node
     plan: free
-    buildCommand: cd apps/api-gateway && npm install && npm run build
+    buildCommand: cd apps/api-gateway && npm install --include=dev && npm run build
     startCommand: cd apps/api-gateway && node build/index.js
     healthCheckPath: /health
     envVars:

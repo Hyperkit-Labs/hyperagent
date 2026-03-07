@@ -66,7 +66,30 @@ def upsert(collection: str, point_id: str, vector: list[float], payload: dict[st
         return False
 
 
-def query(collection: str, vector: list[float], limit: int = 10) -> list[dict]:
+def _build_filter(metadata_filter: dict[str, Any] | None) -> Any:
+    """Build Qdrant Filter from metadata_filter dict."""
+    if not metadata_filter:
+        return None
+    try:
+        from qdrant_client.models import Filter, FieldCondition, MatchValue
+        must = [
+            FieldCondition(key=k, match=MatchValue(value=v))
+            for k, v in metadata_filter.items()
+            if v is not None
+        ]
+        if not must:
+            return None
+        return Filter(must=must)
+    except Exception:
+        return None
+
+
+def query(
+    collection: str,
+    vector: list[float],
+    limit: int = 10,
+    metadata_filter: dict[str, Any] | None = None,
+) -> list[dict]:
     """Search by vector; return list of {id, score, payload}."""
     c = _get_client()
     if not c:
@@ -74,11 +97,15 @@ def query(collection: str, vector: list[float], limit: int = 10) -> list[dict]:
     if collection not in (COLLECTION_SPECS, COLLECTION_TEMPLATES):
         return []
     try:
-        results = c.search(
-            collection_name=collection,
-            query_vector=vector,
-            limit=limit,
-        )
+        q_filter = _build_filter(metadata_filter)
+        kwargs: dict[str, Any] = {
+            "collection_name": collection,
+            "query_vector": vector,
+            "limit": limit,
+        }
+        if q_filter is not None:
+            kwargs["query_filter"] = q_filter
+        results = c.search(**kwargs)
         return [
             {"id": str(r.id), "score": r.score, "payload": r.payload or {}}
             for r in results

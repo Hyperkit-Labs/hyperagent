@@ -1,6 +1,6 @@
 """
 ROMA spec logic in-process (collapsed from roma-service).
-When ROMA_API_URL is set, calls external ROMA; otherwise uses agent-runtime local fallback.
+When ROMA_URL is set, calls ROMA service; otherwise uses agent-runtime local fallback.
 ROMA is non-negotiable: always returns a spec.
 """
 
@@ -14,8 +14,12 @@ from registries import get_timeout
 
 logger = logging.getLogger(__name__)
 
-ROMA_API_URL = (os.environ.get("ROMA_API_URL") or "").strip()
-ROMA_SERVICE_URL = (os.environ.get("ROMA_SERVICE_URL") or "").strip()
+ROMA_URL = (
+    os.environ.get("ROMA_URL")
+    or os.environ.get("ROMA_SERVICE_URL")
+    or os.environ.get("ROMA_API_URL")
+    or ""
+).strip()
 ROMA_PROFILE = (os.environ.get("ROMA_PROFILE") or "general").strip() or "general"
 ROMA_SPEC_TIMEOUT = int(os.environ.get("ROMA_SPEC_TIMEOUT", "120"))
 ROMA_MAX_DEPTH = int(os.environ.get("ROMA_MAX_DEPTH", "1"))
@@ -86,14 +90,14 @@ async def invoke_roma_spec(
     agent_session_jwt: str | None = None,
 ) -> dict:
     """
-    ROMA spec generation. Uses ROMA_SERVICE_URL when set; else ROMA_API_URL (external ROMA); else agent-runtime fallback.
+    ROMA spec generation. Uses ROMA_URL when set; else agent-runtime fallback.
     Always returns a valid spec dict; never empty.
     """
-    if ROMA_SERVICE_URL:
+    if ROMA_URL:
         try:
             async with httpx.AsyncClient(timeout=float(ROMA_SPEC_TIMEOUT)) as client:
                 r = await client.post(
-                    f"{ROMA_SERVICE_URL.rstrip('/')}/spec",
+                    f"{ROMA_URL.rstrip('/')}/spec",
                     json={
                         "prompt": prompt,
                         "context": context,
@@ -115,25 +119,6 @@ async def invoke_roma_spec(
                     }
         except Exception as e:
             logger.warning("ROMA service call failed, fallback: %s", e)
-    elif ROMA_API_URL:
-        try:
-            payload = {
-                "goal": _build_roma_goal(prompt),
-                "config_profile": ROMA_PROFILE,
-                "max_depth": min(max(ROMA_MAX_DEPTH, 1), 2),
-            }
-            async with httpx.AsyncClient(timeout=float(ROMA_SPEC_TIMEOUT)) as client:
-                r = await client.post(
-                    f"{ROMA_API_URL.rstrip('/')}/api/v1/executions",
-                    json=payload,
-                )
-                r.raise_for_status()
-                roma_result = r.json()
-            spec_data = _extract_spec_from_roma_result(roma_result)
-            if spec_data:
-                return spec_data
-        except Exception as e:
-            logger.warning("ROMA external call failed, fallback to agent-runtime: %s", e)
 
     try:
         spec_data = await _agent_runtime_spec(prompt, context, agent_session_jwt)

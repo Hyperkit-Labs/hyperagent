@@ -30,7 +30,7 @@ Documentation for onboarding, users, and developers. Use this index to find the 
 | [Render full stack](RENDER_FULL_STACK.md) | All Render services, env vars, VECTORDB_URL, Qdrant setup. |
 | [Control plane: runs and steps](control-plane-runs-steps.md) | Phase 1 step audit trail, run_steps table, and path to async control plane (Phase 2/3). |
 | [Deploy ownership](deploy-ownership.md) | Who owns deploy: Studio (wallet-signed via Thirdweb) vs orchestrator/deploy service (plans and config). |
-| [Storage policy](storage-policy.md) | Traces to EigenDA, artifacts to IPFS, indexes to Supabase; where blob_id/cid are stored. |
+| [Storage policy](storage-policy.md) | Traces (stub), artifacts to IPFS, indexes to Supabase; where blob_id/cid are stored. |
 
 **Runbooks (ops / security):**
 

@@ -26,11 +26,10 @@
 .zencoder/
 skills/
 .cursor/
-.cursor/*
+.cursor/skills/
 CLAUDE.md
 llm.txt
 skills-lock.json
-.gitmodules
 
 # ============================================================
 # SECURITY & CREDENTIALS (CRITICAL - Never commit these!)
@@ -43,6 +42,7 @@ skills-lock.json
 !.env.template
 !.env.*.example
 !.env.render
+.env.deployer
 .env.local
 .env.*.local
 .env.development
@@ -517,3 +517,4 @@ infra/docker/.env.*.local
 infra/k8s/overlays/*/secrets.yaml
 infra/k8s/overlays/*/secrets/*.yaml
 *.sealed-secret.yaml
+.env*.local

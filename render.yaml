@@ -49,6 +49,8 @@ services:
         sync: false
       - key: AGENT_RUNTIME_URL
         sync: false
+      - key: ROMA_SERVICE_URL
+        sync: false
       - key: SIMULATION_SERVICE_URL
         sync: false
       - key: DEPLOY_SERVICE_URL
@@ -139,6 +141,25 @@ services:
     envVars:
       - key: TOOLS_API_KEY
         sync: false
+
+  - type: web
+    name: hyperagent-roma
+    runtime: python
+    plan: free
+    buildCommand: cd services/roma-service && pip install -r requirements.txt
+    startCommand: cd services/roma-service && uvicorn main:app --host 0.0.0.0 --port ${PORT:-9000}
+    healthCheckPath: /health
+    envVars:
+      - key: AGENT_RUNTIME_URL
+        sync: false
+      - key: ROMA_API_URL
+        sync: false
+      - key: ROMA_PROFILE
+        value: general
+      - key: ROMA_SPEC_TIMEOUT
+        value: "120"
+      - key: ROMA_MAX_DEPTH
+        value: "1"
 
   - type: web
     name: hyperagent-gateway

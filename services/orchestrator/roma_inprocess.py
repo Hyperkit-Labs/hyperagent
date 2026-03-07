@@ -15,6 +15,7 @@ from registries import get_timeout
 logger = logging.getLogger(__name__)
 
 ROMA_API_URL = (os.environ.get("ROMA_API_URL") or "").strip()
+ROMA_SERVICE_URL = (os.environ.get("ROMA_SERVICE_URL") or "").strip()
 ROMA_PROFILE = (os.environ.get("ROMA_PROFILE") or "general").strip() or "general"
 ROMA_SPEC_TIMEOUT = int(os.environ.get("ROMA_SPEC_TIMEOUT", "120"))
 ROMA_MAX_DEPTH = int(os.environ.get("ROMA_MAX_DEPTH", "1"))
@@ -85,10 +86,36 @@ async def invoke_roma_spec(
     agent_session_jwt: str | None = None,
 ) -> dict:
     """
-    ROMA spec generation (in-process). External ROMA when ROMA_API_URL set; else agent-runtime fallback.
+    ROMA spec generation. Uses ROMA_SERVICE_URL when set; else ROMA_API_URL (external ROMA); else agent-runtime fallback.
     Always returns a valid spec dict; never empty.
     """
-    if ROMA_API_URL:
+    if ROMA_SERVICE_URL:
+        try:
+            async with httpx.AsyncClient(timeout=float(ROMA_SPEC_TIMEOUT)) as client:
+                r = await client.post(
+                    f"{ROMA_SERVICE_URL.rstrip('/')}/spec",
+                    json={
+                        "prompt": prompt,
+                        "context": context,
+                        "agent_session_jwt": agent_session_jwt,
+                    },
+                )
+                r.raise_for_status()
+                data = r.json()
+                spec = data.get("spec") or {}
+                if spec:
+                    return {
+                        "version": str(spec.get("version", "1.0")),
+                        "chains": list(spec.get("chains") or []),
+                        "token_type": str(spec.get("token_type", "ERC20")),
+                        "features": list(spec.get("features") or []),
+                        "invariants": list(spec.get("invariants") or []),
+                        "risk_profile": str(spec.get("risk_profile", "medium")),
+                        "template_id": spec.get("template_id"),
+                    }
+        except Exception as e:
+            logger.warning("ROMA service call failed, fallback: %s", e)
+    elif ROMA_API_URL:
         try:
             payload = {
                 "goal": _build_roma_goal(prompt),

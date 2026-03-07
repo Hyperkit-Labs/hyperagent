@@ -17,7 +17,14 @@ const REQUIRE_AUTH = process.env.REQUIRE_AUTH === "true" || NODE_ENV === "produc
 
 function isPublicPath(path: string): boolean {
   const p = (path || "").split("?")[0];
-  return p === "/health" || p === "/" || p === "" || p === "/api/v1/auth/siwe" || p === "/api/v1/config";
+  return (
+    p === "/health" ||
+    p === "/" ||
+    p === "" ||
+    p === "/api/v1/auth/siwe" ||
+    p === "/api/v1/config" ||
+    p === "/api/v1/networks"
+  );
 }
 
 /** Trace: log auth path for protected routes so 401s can be diagnosed (missing header vs invalid token). */

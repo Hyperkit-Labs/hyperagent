@@ -89,12 +89,27 @@ export interface DesignProposal {
   usesCommunityContracts?: boolean;
 }
 
-export async function designAgent(spec: Record<string, unknown>, targetChains: unknown[], context: AgentContext): Promise<DesignProposal> {
+export interface SecurityContext {
+  threatsSummary?: string;
+  scvPatterns?: string;
+  owaspConstraints?: string;
+}
+
+export async function designAgent(
+  spec: Record<string, unknown>,
+  targetChains: unknown[],
+  context: AgentContext,
+  securityContext?: SecurityContext | null,
+): Promise<DesignProposal> {
   const { provider, modelId, apiKey } = resolveModel(context, "anthropic");
   const model = getModel(provider, modelId, apiKey);
+  let system = `You are a smart contract design agent. Given a spec and target chains, output a design as JSON: { components: string[], frameworks: { primary: "hardhat"|"foundry" }, chains: [{ chainId: number, deploymentStrategy: string }], usesCommunityContracts: boolean (true only if using OpenZeppelin community-contracts extensions) }. Output only valid JSON.`;
+  if (securityContext?.threatsSummary || securityContext?.scvPatterns || securityContext?.owaspConstraints) {
+    system += `\n\nSECURITY CONSTRAINTS (mandatory):\n- Avoid: ${securityContext.threatsSummary || "N/A"}\n- OWASP Top 10 2025: ${securityContext.owaspConstraints || "Access Control, Reentrancy, Oracle Manipulation, Unchecked External Calls, Front-Running, Signature Replay, Integer Overflow, DoS, Weak Randomness, Upgradeable Risks"}\n- Known SCV patterns to avoid: ${securityContext.scvPatterns || "N/A"}`;
+  }
   const result = await generateText({
     model,
-    system: `You are a smart contract design agent. Given a spec and target chains, output a design as JSON: { components: string[], frameworks: { primary: "hardhat"|"foundry" }, chains: [{ chainId: number, deploymentStrategy: string }], usesCommunityContracts: boolean (true only if using OpenZeppelin community-contracts extensions) }. Output only valid JSON.`,
+    system,
     prompt: `Spec: ${JSON.stringify(spec)}\nTarget chains: ${JSON.stringify(targetChains)}`,
     maxTokens: 2048,
   });
@@ -105,12 +120,21 @@ export async function designAgent(spec: Record<string, unknown>, targetChains: u
   }
 }
 
-export async function codegenAgent(spec: Record<string, unknown>, design: DesignProposal, context: AgentContext): Promise<Record<string, string>> {
+export async function codegenAgent(
+  spec: Record<string, unknown>,
+  design: DesignProposal,
+  context: AgentContext,
+  securityContext?: SecurityContext | null,
+): Promise<Record<string, string>> {
   const { provider, modelId, apiKey } = resolveModel(context, "anthropic");
   const model = getModel(provider, modelId, apiKey);
+  let system = `You are a Solidity codegen agent. Generate production-ready Solidity. Use SPDX, pragma ^0.8.0, NatSpec, events, access control. Use only imports from @openzeppelin/contracts and @openzeppelin/community-contracts; do not edit OpenZeppelin source; add custom logic in separate contracts or composition. Output only code, no markdown.`;
+  if (securityContext?.threatsSummary || securityContext?.scvPatterns) {
+    system += `\n\nMUST AVOID: ${securityContext.threatsSummary || "N/A"}\n- Reentrancy: use checks-effects-interactions, nonReentrant modifier\n- Unhandled exceptions: check return values of call/transfer/send\n- Known SCV patterns: ${securityContext.scvPatterns || "N/A"}`;
+  }
   const result = await generateText({
     model,
-    system: `You are a Solidity codegen agent. Generate production-ready Solidity. Use SPDX, pragma ^0.8.0, NatSpec, events, access control. Use only imports from @openzeppelin/contracts and @openzeppelin/community-contracts; do not edit OpenZeppelin source; add custom logic in separate contracts or composition. Output only code, no markdown.`,
+    system,
     prompt: `Spec: ${JSON.stringify(spec)}\nDesign: ${JSON.stringify(design)}\nGenerate one main contract.`,
     maxTokens: 8192,
   });
@@ -169,6 +193,26 @@ Generate the corrected contract(s). Output only Solidity code.`,
   return { "Contract.sol": result.text };
 }
 
+
+export interface PashovAuditInput {
+  systemPrompt: string;
+  userPrompt: string;
+  context: AgentContext;
+}
+
+export async function pashovAuditAgent(input: PashovAuditInput): Promise<{ text: string }> {
+  const { provider, modelId, apiKey } = resolveModel(input.context, "anthropic");
+  const model = getModel(provider, modelId, apiKey);
+
+  const result = await generateText({
+    model,
+    system: input.systemPrompt,
+    prompt: input.userPrompt,
+    maxTokens: 8192,
+  });
+
+  return { text: result.text };
+}
 
 export async function estimateAgent(prompt: string, context: AgentContext): Promise<{ complexity: string; estimatedTokens: number; riskFactors: string[] }> {
   const { provider, modelId, apiKey } = resolveModel(context, "anthropic");

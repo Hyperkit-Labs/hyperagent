@@ -1,12 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import {
-  getPaymentHistory,
-  getPaymentSummary,
-  getSpendingControlWithBudget,
-} from "@/lib/api";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { PaymentHistoryTable } from "@/components/analytics/PaymentHistoryTable";
 import { SpendingTrends } from "@/components/analytics/SpendingTrends";
@@ -15,6 +10,7 @@ import { CreditsCard } from "@/components/settings/CreditsCard";
 import { PaymentTopUpCard } from "@/components/settings/PaymentTopUpCard";
 import { ROUTES } from "@/constants/routes";
 import { DollarSign, ArrowRight, CreditCard, TrendingUp } from "lucide-react";
+import { usePaymentsDashboard } from "@/hooks/usePaymentsDashboard";
 
 type PaymentItem = {
   id: string;
@@ -37,6 +33,7 @@ function normalizeItem(item: {
   network?: string;
   transaction_hash?: string;
   created_at?: string;
+  timestamp?: string;
   status?: string;
   [key: string]: unknown;
 }): PaymentItem {
@@ -58,42 +55,23 @@ function normalizeItem(item: {
 }
 
 export default function PaymentsPage() {
-  const [history, setHistory] = useState<PaymentItem[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [summary, setSummary] = useState<{ total?: string; currency?: string; total_count?: number }>({});
-  const [control, setControl] = useState<{ budget?: string; spent?: string; currency?: string } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [creditsRefetchTrigger, setCreditsRefetchTrigger] = useState(0);
   const pageSize = 20;
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    Promise.all([
-      getPaymentHistory({ limit: pageSize, offset: (page - 1) * pageSize }),
-      getPaymentSummary(),
-      getSpendingControlWithBudget(),
-    ])
-      .then(([historyRes, summaryRes, controlRes]) => {
-        if (cancelled) return;
-        setHistory((historyRes.items ?? []).map(normalizeItem));
-        setTotal(historyRes.total ?? 0);
-        setSummary(summaryRes);
-        setControl(controlRes);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load payments");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [page]);
+  const { data, loading, error, refetch } = usePaymentsDashboard({
+    page,
+    pageSize,
+    enabled: true,
+  });
+
+  const history = (data?.history.items ?? []).map(normalizeItem);
+  const total = data?.history.total ?? 0;
+  const summary = data?.summary ?? {};
+  const control = data?.control ?? null;
+  const balance = data
+    ? { balance: data.balance.balance ?? 0, currency: data.balance.currency ?? "USD" }
+    : null;
+  const stablecoins = data?.stablecoins ?? undefined;
 
   return (
     <div className="p-6 lg:p-8">
@@ -116,14 +94,20 @@ export default function PaymentsPage() {
           </Link>
         </div>
 
-        <ApiErrorBanner error={error} onRetry={() => setPage((p) => p)} />
+        <ApiErrorBanner error={error} onRetry={refetch} />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="glass-panel rounded-xl p-5">
-            <CreditsCard refetchTrigger={creditsRefetchTrigger} />
+            <CreditsCard
+              balanceFromParent={balance}
+              onRefetch={refetch}
+            />
           </div>
           <div className="glass-panel rounded-xl p-5">
-            <PaymentTopUpCard onTopUpSuccess={() => setCreditsRefetchTrigger((t) => t + 1)} />
+            <PaymentTopUpCard
+              stablecoinsFromParent={stablecoins}
+              onTopUpSuccess={refetch}
+            />
           </div>
           <div className="glass-panel rounded-xl p-5">
             <div className="flex items-center gap-2 text-[var(--color-text-tertiary)] text-xs font-medium">
@@ -134,7 +118,7 @@ export default function PaymentsPage() {
               {loading ? "..." : `${summary.total ?? "0"} ${summary.currency ?? "USD"}`}
             </div>
             <div className="text-[11px] text-[var(--color-text-dim)] mt-1">
-              {summary.total_count ?? 0} payments
+              {typeof summary.total_count === "number" ? summary.total_count : 0} payments
             </div>
           </div>
           <div className="glass-panel rounded-xl p-5">
@@ -169,7 +153,10 @@ export default function PaymentsPage() {
             <h2 className="font-medium text-[var(--color-text-primary)] flex items-center gap-2 text-sm mb-4">
               Spending controls
             </h2>
-            <SpendingControlCard />
+            <SpendingControlCard
+              controlFromParent={control}
+              onRefetch={refetch}
+            />
           </div>
         </div>
 

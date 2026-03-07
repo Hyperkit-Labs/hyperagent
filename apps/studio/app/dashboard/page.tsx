@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useConnectModal } from "thirdweb/react";
-import { Code, HardDrive, Package, Activity, Info, List, Rocket, GitBranch, ArrowRight } from "lucide-react";
+import { Code, HardDrive, Package, Activity, Info, List, Rocket, GitBranch, ArrowRight, Loader2, ExternalLink } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
+import { createQuickDemo } from "@/lib/api";
 import { getThirdwebClient } from "@/lib/thirdwebClient";
 import { CONNECT_WALLETS } from "@/lib/connectWallets";
 import { useMetrics } from "@/hooks/useMetrics";
@@ -18,6 +20,8 @@ import { RequireApiSession } from "@/components/auth/RequireApiSession";
 export default function DashboardPage() {
   const router = useRouter();
   const client = getThirdwebClient();
+  const [quickDemoLoading, setQuickDemoLoading] = useState(false);
+  const [quickDemoError, setQuickDemoError] = useState<string | null>(null);
   const { connect } = useConnectModal();
   const { metrics, loading: metricsLoading, error: metricsError, refetch: refetchMetrics } = useMetrics();
   const { workflows, total: workflowsTotal, loading: workflowsLoading, error: workflowsError, refetch: refetchWorkflows } = useWorkflows({ filters: { limit: 10 } });
@@ -43,11 +47,24 @@ export default function DashboardPage() {
     <RequireApiSession title="Sign in to view dashboard" description="Sign in with your wallet to see workflows, deployments, and metrics.">
     <div className="p-6 lg:p-8">
       <div className="max-w-[1200px] mx-auto space-y-6 animate-enter">
-        <ApiErrorBanner error={apiError ?? null} onRetry={refetchAll} />
+        <ApiErrorBanner error={apiError ?? quickDemoError ?? null} onRetry={() => { refetchAll(); setQuickDemoError(null); }} />
         <OnboardingChecklist
           onConnectClick={() => { if (client) void connect({ client, wallets: CONNECT_WALLETS }); }}
           onByokClick={() => router.push(ROUTES.SETTINGS)}
           onPaymentClick={() => router.push(ROUTES.PAYMENTS)}
+          onTryItNowClick={async () => {
+            setQuickDemoLoading(true);
+            setQuickDemoError(null);
+            try {
+              const res = await createQuickDemo();
+              if (res.url) window.open(res.url, "_blank", "noopener,noreferrer");
+              else setQuickDemoError("No sandbox URL returned");
+            } catch (e) {
+              setQuickDemoError(e instanceof Error ? e.message : "Quick demo failed");
+            } finally {
+              setQuickDemoLoading(false);
+            }
+          }}
         />
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-2">
           <div>
@@ -58,6 +75,34 @@ export default function DashboardPage() {
             <h1 className="text-2xl font-semibold text-[var(--color-text-primary)] tracking-tight">Project Overview</h1>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={async () => {
+                setQuickDemoLoading(true);
+                setQuickDemoError(null);
+                try {
+                  const res = await createQuickDemo();
+                  if (res.url) {
+                    window.open(res.url, "_blank", "noopener,noreferrer");
+                  } else {
+                    setQuickDemoError("No sandbox URL returned");
+                  }
+                } catch (e) {
+                  setQuickDemoError(e instanceof Error ? e.message : "Quick demo failed");
+                } finally {
+                  setQuickDemoLoading(false);
+                }
+              }}
+              disabled={quickDemoLoading}
+              className="px-4 py-2 rounded-lg border border-[var(--color-border-default)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] text-xs font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
+            >
+              {quickDemoLoading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <ExternalLink className="w-3.5 h-3.5" />
+              )}
+              Try it Now
+            </button>
             <Link
               href={ROUTES.CHAT}
               className="px-4 py-2 rounded-lg btn-primary-gradient text-[var(--color-text-primary)] text-xs font-medium transition-all flex items-center gap-2"

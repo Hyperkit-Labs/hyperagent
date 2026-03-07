@@ -1,0 +1,83 @@
+---
+alwaysApply: false
+description: BlueprintKit Plugin - Complete planning framework with all 14 planning sections plus 9 Claude Skills automatically available
+globs:
+  - "**/*.md"
+  - ".claude/skills/blueprintkit/planning/**"
+  - ".claude/skills/blueprintkit/planning/*.md"
+  - ".claude/skills/blueprintkit/**"
+  - ".claude/skills/blueprintkit/*/SKILL-INTERNAL.md"
+related_docs:
+  - ".claude/skills/blueprintkit/planning/0-Master-Index.md"
+  - ".claude/skills/blueprintkit/planning/1-Executive-Summary.md"
+  - ".claude/skills/blueprintkit/planning/2-Objectives-Success-Metrics.md"
+  - ".claude/skills/blueprintkit/planning/3-Scope-Definition.md"
+  - ".claude/skills/blueprintkit/planning/4-System-Architecture-Design.md"
+  - ".claude/skills/blueprintkit/planning/5-Technical-Execution-Workflow.md"
+  - ".claude/skills/blueprintkit/planning/6-Project-Phases-Timeline.md"
+  - ".claude/skills/blueprintkit/planning/7-Resource-Planning.md"
+  - ".claude/skills/blueprintkit/planning/8-Risk-Management.md"
+  - ".claude/skills/blueprintkit/planning/9-Execution-Strategy.md"
+  - ".claude/skills/blueprintkit/planning/10-Monitoring-Reporting.md"
+  - ".claude/skills/blueprintkit/planning/11-ROI-Value-Realization.md"
+  - ".claude/skills/blueprintkit/planning/12-Governance-Decision-Making.md"
+  - ".claude/skills/blueprintkit/planning/13-Lessons-Learned-Continuous-Improvement.md"
+  - ".claude/skills/blueprintkit/tech-stack-selector/"
+  - ".claude/skills/blueprintkit/architecture-decisions/"
+  - ".claude/skills/blueprintkit/code-standards-enforcer/"
+  - ".claude/skills/blueprintkit/ci-cd-pipeline-builder/"
+  - ".claude/skills/blueprintkit/agile-executor/"
+  - ".claude/skills/blueprintkit/project-risk-identifier/"
+  - ".claude/skills/blueprintkit/automation-orchestrator/"
+  - ".claude/skills/blueprintkit/webapp-testing/"
+  - ".claude/skills/blueprintkit/web-artifacts-builder/"
+  - ".claude/skills/blueprintkit/SKILL.md"
+---
+
+# Project Planning Starter Pack Plugin Configuration
+
+This MDC file configures the Project Planning Starter Pack Plugin for Claude Code.
+
+## Plugin Metadata
+
+- **Name**: blueprintkit-plugin
+- **Type**: Complete Planning Framework Plugin
+- **Version**: 1.0.0
+- **License**: MIT
+
+## Activation Rules
+
+The plugin activates when:
+- User queries relate to project planning, technology selection, architecture, code quality, CI/CD, agile execution, risk management, automation, testing, or artifact building
+- Files in `.claude/skills/blueprintkit/planning/` directory are accessed
+- Skills in `.claude/skills/blueprintkit/` are referenced
+
+## File Patterns
+
+The plugin monitors:
+- All markdown files (`**/*.md`)
+- Planning sections (`.claude/skills/blueprintkit/planning/**`)
+- Claude skills directory (`.claude/skills/blueprintkit/**`)
+
+## Related Documentation
+
+The plugin references:
+- `.claude/skills/blueprintkit/` - Individual skill definitions
+- `.claude/skills/blueprintkit/planning/` - Planning framework templates
+- `docs/reference/` - Technical documentation
+- `.claude/skills/blueprintkit/SKILL.md` - Consolidated skill definition
+
+## Skill Integration
+
+This plugin bundles the following skills:
+1. tech-stack-selector
+2. architecture-decisions
+3. code-standards-enforcer
+4. ci-cd-pipeline-builder
+5. agile-executor
+6. project-risk-identifier
+7. automation-orchestrator
+8. webapp-testing
+9. web-artifacts-builder
+
+Each skill can be accessed individually or through the unified plugin interface.

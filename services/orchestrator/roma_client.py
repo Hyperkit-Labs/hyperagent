@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def _roma_base_url() -> str | None:
-    url = (os.environ.get("ROMA_API_URL") or os.environ.get("ROMA_URL") or "").strip()
+    url = (os.environ.get("ROMA_URL") or os.environ.get("ROMA_SERVICE_URL") or "").strip()
     return url.rstrip("/") if url else None
 
 

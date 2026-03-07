@@ -6,7 +6,12 @@ import { getCreditsBalance, topUpCredits, handleApiError } from "@/lib/api";
 import { useSession } from "@/hooks/useSession";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 
-export function CreditsCard() {
+export interface CreditsCardProps {
+  /** Increment to trigger a refetch (e.g. after on-chain top-up). */
+  refetchTrigger?: number;
+}
+
+export function CreditsCard({ refetchTrigger = 0 }: CreditsCardProps) {
   const [balance, setBalance] = useState<{ balance: number; currency: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +33,7 @@ export function CreditsCard() {
   useEffect(() => {
     if (hasSession) fetchBalance();
     else setLoading(false);
-  }, [hasSession, fetchBalance]);
+  }, [hasSession, fetchBalance, refetchTrigger]);
 
   const handleTopUp = () => {
     const amount = parseFloat(topUpAmount);

@@ -9,9 +9,13 @@ import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 export interface CreditsCardProps {
   /** Increment to trigger a refetch (e.g. after on-chain top-up). */
   refetchTrigger?: number;
+  /** When provided (e.g. from Payments page consolidated fetch), skip internal fetch. */
+  balanceFromParent?: { balance: number; currency: string } | null;
+  /** Called when parent should refetch (e.g. after top-up). */
+  onRefetch?: () => void;
 }
 
-export function CreditsCard({ refetchTrigger = 0 }: CreditsCardProps) {
+export function CreditsCard({ refetchTrigger = 0, balanceFromParent, onRefetch }: CreditsCardProps) {
   const [balance, setBalance] = useState<{ balance: number; currency: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,9 +35,16 @@ export function CreditsCard({ refetchTrigger = 0 }: CreditsCardProps) {
   }, []);
 
   useEffect(() => {
+    if (balanceFromParent !== undefined) {
+      setBalance(balanceFromParent);
+      setLoading(false);
+      return;
+    }
     if (hasSession) fetchBalance();
     else setLoading(false);
-  }, [hasSession, fetchBalance, refetchTrigger]);
+  }, [hasSession, fetchBalance, refetchTrigger, balanceFromParent]);
+
+  const handleRefetch = onRefetch ?? fetchBalance;
 
   const handleTopUp = () => {
     const amount = parseFloat(topUpAmount);
@@ -44,6 +55,7 @@ export function CreditsCard({ refetchTrigger = 0 }: CreditsCardProps) {
       .then((res) => {
         setBalance({ balance: res.balance ?? 0, currency: res.currency ?? "USD" });
         setTopUpAmount("");
+        onRefetch?.();
       })
       .catch((e) => setError(handleApiError(e)))
       .finally(() => setToppingUp(false));
@@ -70,7 +82,7 @@ export function CreditsCard({ refetchTrigger = 0 }: CreditsCardProps) {
       <p className="text-xs text-[var(--color-text-tertiary)]">
         Top up with fiat or stablecoins (USDC/USDT). Each workflow run consumes credits. x402 is used for external pay-per-call.
       </p>
-      {error && <ApiErrorBanner error={error} onRetry={fetchBalance} />}
+      {error && <ApiErrorBanner error={error} onRetry={handleRefetch} />}
       {loading ? (
         <div className="flex items-center gap-2 text-[var(--color-text-muted)]">
           <Loader2 className="w-4 h-4 animate-spin" />

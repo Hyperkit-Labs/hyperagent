@@ -10,7 +10,7 @@ HyperAgent is an AI-powered smart contract development platform that transforms 
 - All development follows agent-oriented design patterns
 - Services communicate via A2A (Agent-to-Agent) protocol
 - ERC-8004 for agent identity and reputation
-- Verifiable by design with EigenDA provenance
+- Verifiable by design with trace provenance (stub blob IDs in run_steps)
 
 ### 2. MVP Scope and Multi-Chain Roadmap
 - **Phase 1 (MVP)**: single primary chain and one fully supported, end-to-end pipeline (spec → design/codegen → audit → simulation → deploy) as described in `docs/control-plane-runs-steps.md`.
@@ -38,7 +38,7 @@ HyperAgent is an AI-powered smart contract development platform that transforms 
 - **Phase 1 BYOK surface** is intentionally minimal, as described in `docs/byok-and-run-flow.md`: per-user, per-workspace encrypted keys with a single write path and a single read-for-run path, and short-lived agent-session JWTs where configured. Richer rotation and recovery tooling is a later-phase concern.
 
 ### 6. Data Ownership and Storage Policy
-- Follow the storage and data-availability policy in `docs/storage-policy.md`: traces in EigenDA, artifacts in IPFS/Pinata (or equivalent), indices and metadata in Supabase, and minimal large blobs in Postgres.
+- Follow the storage and data-availability policy in `docs/storage-policy.md`: traces (stub blob IDs), artifacts in IPFS/Pinata (or equivalent), indices and metadata in Supabase, and minimal large blobs in Postgres.
 - Every stored artifact or trace must have an explicit hash/version and clear source-of-truth.
 
 ## Technology Stack

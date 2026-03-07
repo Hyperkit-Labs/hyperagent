@@ -12,3 +12,9 @@ def set_request_id(value: str | None) -> None:
 
 def get_request_id() -> str | None:
     return _request_id.get()
+
+
+def get_trace_headers() -> dict[str, str]:
+    """Headers to propagate for trace correlation (x-request-id)."""
+    rid = _request_id.get()
+    return {"x-request-id": rid} if rid else {}

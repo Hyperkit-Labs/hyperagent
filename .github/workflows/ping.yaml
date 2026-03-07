@@ -1,0 +1,28 @@
+# Daily ping to Render services to prevent sleep (free tier spins down after ~15 min inactivity).
+# Add PING_URLS secret: comma-separated URLs, e.g. https://your-api.onrender.com/health,https://your-gateway.onrender.com/health
+name: Ping Render Services
+
+on:
+  schedule:
+    # Every 10 minutes (keeps Render free-tier services awake)
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Curl
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render URLs
+        run: |
+          urls="${{ secrets.PING_URLS }}"
+          if [ -z "$urls" ]; then
+            echo "PING_URLS secret not set. Add comma-separated URLs in repo Settings > Secrets."
+            exit 1
+          fi
+          for url in $(echo "$urls" | tr ',' '\n' | tr -d ' '); do
+            if [ -n "$url" ]; then
+              echo "Pinging $url"
+              curl -sf --max-time 30 -o /dev/null "$url" && echo "  OK" || echo "  FAIL"
+            fi
+          done

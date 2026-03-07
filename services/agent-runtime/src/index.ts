@@ -255,7 +255,13 @@ app.post("/ipfs/unpin", async (req, res) => {
   }
 });
 
-app.get("/health", (_req, res) => res.json({ status: "ok" }));
+app.get("/health", (_req, res) =>
+  res.json({
+    status: "ok",
+    tenderly_configured: Boolean(process.env.TENDERLY_API_KEY),
+    pinata_configured: Boolean(process.env.PINATA_JWT),
+  })
+);
 
 const port = Number(process.env.PORT) || 4001;
 app.listen(port, "0.0.0.0", () => console.log(`[Agent Runtime] listening on ${port}`));

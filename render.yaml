@@ -120,7 +120,7 @@ services:
     runtime: python
     plan: free
     buildCommand: cd services/hyperagent-tools && pip install -r requirements.txt && python -c "import solcx; solcx.install_solc('0.8.24')"
-    startCommand: cd services/hyperagent-tools && uvicorn main:app --host 0.0.0.0 --port ${PORT:-9000}
+    startCommand: sh services/hyperagent-tools/start.sh
     healthCheckPath: /health
     envVars:
       - key: TOOLS_API_KEY

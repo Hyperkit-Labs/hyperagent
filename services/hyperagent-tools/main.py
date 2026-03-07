@@ -1,10 +1,14 @@
 """
 HyperAgent Tools Service
-Unified compile and audit API. Compile via py-solc-x; audit stubbed until Slither/Mythril added.
+Unified compile and audit API. Compile via py-solc-x; audit via Slither.
 """
 
+import json
 import os
 import re
+import subprocess
+import tempfile
+from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
@@ -18,9 +22,6 @@ def _require_api_key(x_tools_api_key: str | None = Header(None, alias="X-TOOLS-A
     """When TOOLS_API_KEY is set, require X-TOOLS-API-KEY header on requests."""
     if TOOLS_API_KEY and x_tools_api_key != TOOLS_API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing X-TOOLS-API-KEY")
-
-
-# --- Compile ---
 
 
 class CompileRequest(BaseModel):
@@ -96,7 +97,53 @@ def _compile_solcx(contract_name: str, contract_code: str) -> tuple[bool, str | 
     return False, None, None, ["Contract not found in compiled output"]
 
 
-# --- Audit ---
+def _run_slither(workdir: Path, files: dict[str, str], entry: str) -> list[dict]:
+    """Run Slither on contract files. Returns list of {severity, title, description, location, category}."""
+    for path, content in files.items():
+        if ".." in path or path.startswith("/"):
+            continue
+        dst = workdir / path
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        code = content.strip()
+        if "pragma solidity" not in code.lower():
+            code = "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n" + code
+        dst.write_text(code)
+    (workdir / "foundry.toml").write_text('[profile.default]\nsolc = "0.8.24"\n')
+    target = workdir / "contracts" if (workdir / "contracts").exists() else workdir
+    if not any(target.rglob("*.sol")):
+        target = workdir
+    try:
+        result = subprocess.run(
+            ["slither", str(target), "--json", "-"],
+            cwd=workdir,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except FileNotFoundError:
+        return [{"severity": "info", "title": "Slither not installed", "description": "Install: pip install slither-analyzer", "location": None, "category": None}]
+    out: list[dict] = []
+    if result.stdout:
+        try:
+            data = json.loads(result.stdout)
+            for d in data.get("results", {}).get("detectors", []):
+                loc = None
+                if d.get("markdown"):
+                    loc = d.get("markdown", "").split("\n")[0]
+                elif d.get("elements"):
+                    el = d["elements"][0] if isinstance(d["elements"], list) else None
+                    if isinstance(el, dict) and el.get("source_mapping"):
+                        loc = str(el.get("source_mapping", {}).get("filename_short", ""))
+                out.append({
+                    "severity": (d.get("impact") or "unknown").lower() if isinstance(d.get("impact"), str) else "medium",
+                    "title": d.get("check", "Finding"),
+                    "description": d.get("description", ""),
+                    "location": loc,
+                    "category": d.get("check"),
+                })
+        except json.JSONDecodeError:
+            out.append({"severity": "high", "title": "Slither failed", "description": (result.stderr or result.stdout[:500]) or "Unknown error", "location": None, "category": None})
+    return out
 
 
 class AuditRequest(BaseModel):
@@ -116,9 +163,6 @@ class AuditResponse(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     artifacts: AuditArtifacts = Field(default_factory=lambda: AuditArtifacts())
     logs: str = ""
-
-
-# --- Routes ---
 
 
 @app.post("/compile", response_model=CompileResponse)
@@ -162,7 +206,16 @@ def audit_contract(
     x_tools_api_key: str | None = Header(None, alias="X-TOOLS-API-KEY"),
 ) -> AuditResponse:
     _require_api_key(x_tools_api_key)
-    return AuditResponse(success=True, artifacts=AuditArtifacts(issues=[]))
+    if req.tool == "mythril":
+        return AuditResponse(
+            success=True,
+            artifacts=AuditArtifacts(issues=[{"severity": "info", "title": "Mythril", "description": "Mythril not available in hyperagent-tools; use Slither or run audit service locally.", "location": None, "category": None}]),
+        )
+    if req.tool != "slither":
+        return AuditResponse(success=True, artifacts=AuditArtifacts(issues=[]))
+    with tempfile.TemporaryDirectory(prefix="audit_") as tmp:
+        issues = _run_slither(Path(tmp), req.files, req.entry)
+    return AuditResponse(success=True, artifacts=AuditArtifacts(issues=issues))
 
 
 @app.get("/health")

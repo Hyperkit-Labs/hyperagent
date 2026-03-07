@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useActiveAccount } from "thirdweb/react";
-import { getConfiguredLLMProviders } from "@/lib/api";
+import { getConfiguredLLMProviders, getCreditsBalance } from "@/lib/api";
 import { useWorkflows } from "@/hooks/useWorkflows";
 import { useSession } from "@/hooks/useSession";
 import { ROUTES } from "@/constants/routes";
@@ -38,6 +38,7 @@ export function useOnboarding() {
   const { workflows } = useWorkflows({ filters: { limit: 1 } });
   const [llmConfigured, setLlmConfigured] = useState<boolean | null>(null);
   const [sessionKeyActive, setSessionKeyActive] = useState(false);
+  const [hasCredits, setHasCredits] = useState(false);
 
   const refetchByok = useCallback(() => {
     fetchLlmConfigured().then(setLlmConfigured);
@@ -47,10 +48,18 @@ export function useOnboarding() {
     setSessionKeyActive(hasSessionKey());
   }, []);
 
+  const refetchCredits = useCallback(() => {
+    if (!hasSession) return;
+    getCreditsBalance()
+      .then((r) => setHasCredits((r.balance ?? 0) > 0))
+      .catch(() => setHasCredits(false));
+  }, [hasSession]);
+
   useEffect(() => {
     refetchByok();
     refreshSessionKey();
-  }, [refetchByok, refreshSessionKey, hasSession]);
+    refetchCredits();
+  }, [refetchByok, refreshSessionKey, refetchCredits, hasSession]);
 
   useEffect(() => {
     const onByok = () => refetchByok();
@@ -65,16 +74,18 @@ export function useOnboarding() {
 
   const step1 = !!account;
   const step2 = llmConfigured === true || sessionKeyActive;
-  const step3 = (workflows?.length ?? 0) > 0;
+  const step3 = hasCredits;
+  const step4 = (workflows?.length ?? 0) > 0;
 
   const steps: OnboardingStep[] = [
     { id: "connect", label: "Connect wallet", done: step1, href: ROUTES.LOGIN, cta: "Connect wallet" },
     { id: "byok", label: "Add LLM keys", done: step2, href: ROUTES.SETTINGS, cta: "Add keys in Settings" },
-    { id: "workflow", label: "Create first workflow", done: step3, href: ROUTES.HOME, cta: "Create workflow" },
+    { id: "payment", label: "Add budget (USDC/USDT)", done: step3, href: ROUTES.PAYMENTS, cta: "Add budget in Payment" },
+    { id: "workflow", label: "Create first workflow", done: step4, href: ROUTES.HOME, cta: "Create workflow" },
   ];
 
   const nextStep = steps.find((s) => !s.done) ?? null;
   const completed = steps.every((s) => s.done);
 
-  return { steps, nextStep, completed };
+  return { steps, nextStep, completed, refetchCredits };
 }

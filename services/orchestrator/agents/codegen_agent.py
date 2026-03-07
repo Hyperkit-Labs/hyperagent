@@ -16,6 +16,7 @@ async def generate_contracts(
     run_id: str,
     api_keys: dict,
     agent_session_jwt: str | None = None,
+    security_context: dict | None = None,
 ) -> dict:
     context: dict = {
         "userId": user_id,
@@ -26,10 +27,13 @@ async def generate_contracts(
     headers: dict[str, str] = {}
     if agent_session_jwt:
         headers["X-Agent-Session"] = agent_session_jwt
+    body: dict = {"spec": spec, "design": design, "context": context}
+    if security_context:
+        body["securityContext"] = security_context
     async with httpx.AsyncClient(timeout=get_timeout("codegen")) as client:
         r = await client.post(
             f"{AGENT_RUNTIME_URL.rstrip('/')}/agents/codegen",
-            json={"spec": spec, "design": design, "context": context},
+            json=body,
             headers=headers,
         )
         r.raise_for_status()

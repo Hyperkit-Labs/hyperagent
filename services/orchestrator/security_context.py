@@ -21,9 +21,10 @@ OWASP_TOP10_2025 = [
 ]
 
 
-async def build_security_context(prompt: str) -> dict[str, Any]:
+async def build_security_context(prompt: str, user_id: str | None = None) -> dict[str, Any]:
     """Build security context for design and codegen prompts.
-    Returns threatsSummary, scvPatterns, owaspConstraints."""
+    Returns threatsSummary, scvPatterns, owaspConstraints.
+    When user_id is set, RAG queries may prioritize tenant-scoped advisories."""
     threats_summary = ""
     scv_patterns = ""
     owasp_constraints = "; ".join(OWASP_TOP10_2025)
@@ -35,7 +36,7 @@ async def build_security_context(prompt: str) -> dict[str, Any]:
         pass
 
     try:
-        advisories = await rag_client.query_security_advisories(prompt, limit=5)
+        advisories = await rag_client.query_security_advisories(prompt, limit=5, user_id=user_id)
         if advisories and not threats_summary:
             parts = []
             for r in advisories[:5]:
@@ -50,7 +51,7 @@ async def build_security_context(prompt: str) -> dict[str, Any]:
         pass
 
     try:
-        scv_results = await rag_client.query_scv_patterns(prompt, limit=5)
+        scv_results = await rag_client.query_scv_patterns(prompt, limit=5, user_id=user_id)
         if scv_results:
             parts = []
             for r in scv_results[:5]:

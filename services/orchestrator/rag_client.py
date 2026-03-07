@@ -49,6 +49,46 @@ async def query_specs(
         return []
 
 
+async def query_security_advisories(prompt: str, limit: int = 5) -> list[dict[str, Any]]:
+    """Query vectordb for security advisories (type=security_advisory)."""
+    if not is_configured():
+        return []
+    try:
+        payload: dict[str, Any] = {
+            "query": prompt,
+            "collection": "specs",
+            "limit": limit,
+            "metadata_filter": {"type": "security_advisory", "status": "verified"},
+        }
+        async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
+            r = await client.post(f"{VECTORDB_URL}/query", json=payload)
+            r.raise_for_status()
+            return r.json().get("results", [])
+    except Exception as e:
+        logger.warning("[rag] query_security_advisories failed: %s", e)
+        return []
+
+
+async def query_scv_patterns(prompt: str, limit: int = 5) -> list[dict[str, Any]]:
+    """Query vectordb for SCV vulnerability patterns (type=scv_pattern)."""
+    if not is_configured():
+        return []
+    try:
+        payload: dict[str, Any] = {
+            "query": prompt,
+            "collection": "specs",
+            "limit": limit,
+            "metadata_filter": {"type": "scv_pattern", "status": "verified"},
+        }
+        async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
+            r = await client.post(f"{VECTORDB_URL}/query", json=payload)
+            r.raise_for_status()
+            return r.json().get("results", [])
+    except Exception as e:
+        logger.warning("[rag] query_scv_patterns failed: %s", e)
+        return []
+
+
 async def query_templates(
     prompt: str,
     limit: int = 5,
@@ -81,15 +121,18 @@ async def index_spec(
     if not is_configured():
         return False
     try:
+        meta: dict[str, Any] = {
+            "library_version": library_version or spec.get("version", "1.0"),
+            "status": status,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        if spec.get("type"):
+            meta["type"] = spec["type"]
         payload: dict[str, Any] = {
             "spec_id": spec_id,
             "spec": spec,
             "text": text,
-            "metadata": {
-                "library_version": library_version or spec.get("version", "1.0"),
-                "status": status,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            },
+            "metadata": meta,
         }
         async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
             r = await client.post(f"{VECTORDB_URL}/index/spec", json=payload)

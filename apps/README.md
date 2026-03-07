@@ -5,8 +5,7 @@ This directory contains the main applications for the HyperAgent platform.
 ## Structure
 
 - **web/**: Next.js + React frontend application
-- **api/**: Python/FastAPI agent orchestration service
-- **worker/**: Background jobs and schedulers
+- **api-gateway/**: API gateway (auth, routing, x402)
 
 ## Development
 

@@ -1,0 +1,100 @@
+# Token / template registry (GitOps). Canonical templates: ERC20/721 variants, governance
+# modules; source (openzeppelin-wizard | custom); wizard options for OZ-backed templates.
+# Community-contracts templates: riskProfile high, requiresHumanApproval true.
+apiVersion: hyperagent.io/v1
+kind: TokenTemplateRegistry
+metadata:
+  name: evm-token-templates
+  version: "1"
+spec:
+  templates:
+    - id: erc20-standard
+      name: Standard ERC20
+      standards: ["ERC20"]
+      features: ["mintable", "burnable"]
+      riskProfile: low
+      defaultChains: [1187947933, 324705682]
+      auditRequired: true
+      allowedInClosedBeta: true
+      source: openzeppelin-wizard
+      wizard:
+        kind: erc20
+        options:
+          name: "MyToken"
+          symbol: "MTK"
+          mintable: true
+          burnable: true
+          pausable: false
+          permit: false
+          votes: false
+          flashMinting: false
+    - id: erc20-upgradeable
+      name: Upgradeable ERC20 (UUPS)
+      standards: ["ERC20", "UUPS"]
+      features: ["mintable", "pausable", "upgradeable"]
+      riskProfile: high
+      requiresHumanApproval: true
+      allowedInClosedBeta: false
+      source: openzeppelin-wizard
+      wizard:
+        kind: erc20
+        options:
+          name: "MyTokenUpgradeable"
+          symbol: "MTK"
+          mintable: true
+          burnable: false
+          pausable: true
+          permit: false
+          votes: false
+          flashMinting: false
+          upgradeable: true
+    - id: erc721-standard
+      name: Standard ERC721
+      standards: ["ERC721"]
+      features: ["mintable"]
+      riskProfile: low
+      defaultChains: [1187947933, 324705682]
+      auditRequired: true
+      allowedInClosedBeta: true
+      source: openzeppelin-wizard
+      wizard:
+        kind: erc721
+        options:
+          name: "MyToken"
+          symbol: "MTK"
+          baseUri: ""
+          mintable: true
+          burnable: true
+          pausable: false
+          permit: false
+          votes: false
+          upgradeable: false
+    - id: erc721-community
+      name: ERC721 with Community extensions
+      standards: ["ERC721"]
+      features: ["mintable", "enumerable", "community"]
+      riskProfile: high
+      requiresHumanApproval: true
+      allowedInClosedBeta: false
+      source: openzeppelin-wizard
+      usesCommunityContracts: true
+      wizard:
+        kind: erc721
+        options:
+          name: "MyNFT"
+          symbol: "MNFT"
+          baseUri: ""
+          mintable: true
+          burnable: true
+          pausable: false
+          permit: false
+          votes: false
+          upgradeable: false
+    - id: erc4626-vault
+      name: ERC4626 Vault
+      standards: ["ERC4626"]
+      features: ["vault", "shares"]
+      riskProfile: high
+      requiresHumanApproval: true
+      allowedInClosedBeta: false
+      source: custom

@@ -1,0 +1,40 @@
+# LLM model registry (GitOps). Provider → models, context window, cost, recommended use
+# (spec, audit, quick edit), BYOK env mapping, and routing hints.
+apiVersion: hyperagent.io/v1
+kind: ModelRegistry
+metadata:
+  name: llm-models
+  version: "1"
+spec:
+  # BYOK: keys are user-provided; env vars below are hints for which env holds which provider key (operator/workspace).
+  byokEnvMapping:
+    openai: OPENAI_API_KEY
+    anthropic: ANTHROPIC_API_KEY
+    google: GOOGLE_GENERATIVE_AI_API_KEY
+    openrouter: OPENROUTER_API_KEY
+  models:
+    - provider: openai
+      id: gpt-4o
+      contextWindow: 128000
+      recommendedUse: [spec, design, codegen]
+      routingHint: frontier
+    - provider: anthropic
+      id: claude-3-7-sonnet
+      contextWindow: 200000
+      recommendedUse: [spec, design, codegen, audit]
+      routingHint: frontier
+    - provider: google
+      id: gemini-2.0-flash
+      contextWindow: 1000000
+      recommendedUse: [spec, codegen, quick-edit]
+      routingHint: cheap
+    - provider: openrouter
+      id: openai/gpt-4o
+      contextWindow: 128000
+      recommendedUse: [spec, codegen]
+      routingHint: frontier
+  routing:
+    # Under X token budget, prefer cheap (e.g. gemini-flash).
+    cheapThresholdTokens: 10000
+    defaultFrontier: anthropic/claude-3-7-sonnet
+    defaultCheap: google/gemini-2.0-flash

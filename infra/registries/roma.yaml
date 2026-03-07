@@ -1,0 +1,18 @@
+# ROMA trigger and complexity (GitOps). Tuning ROMA usage without code change.
+apiVersion: hyperagent.io/v1
+kind: RomaRegistry
+metadata:
+  name: roma-spec
+  version: "1"
+spec:
+  complexityThreshold: 7
+  complexityIndicators:
+    - multi-chain
+    - cross-chain
+    - governance
+    - upgradeable
+    - staking
+    - vesting
+    - oracle
+    - liquidation
+    - auction

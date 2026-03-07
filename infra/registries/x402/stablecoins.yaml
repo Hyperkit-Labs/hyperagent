@@ -1,0 +1,76 @@
+# USDC/USDT network and address registry (GitOps). Canonical contract addresses per chain
+# for x402 payments, gasless paymaster, and merchant settlement. Update via PR; verify
+# addresses from Circle (USDC) and Tether (USDT) before changing.
+apiVersion: hyperagent.io/v1
+kind: StablecoinRegistry
+metadata:
+  name: usdc-usdt-addresses
+  version: "1"
+spec:
+  tokens:
+    - symbol: USDC
+      name: USD Coin
+      decimals: 6
+      issuer: Circle
+      byChain:
+        - chainId: 1
+          address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+          native: true
+        - chainId: 8453
+          address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+          native: true
+        - chainId: 42161
+          address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"
+          native: true
+        - chainId: 137
+          address: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"
+          native: true
+        - chainId: 43114
+          address: "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E"
+          native: true
+        - chainId: 56
+          address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
+          native: true
+        - chainId: 324705682
+          address: "0x2e08028E3C4c2356572E096d8EF835cD5C6030bD"
+          native: true
+        - chainId: 1187947933
+          address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+          native: true
+    - symbol: USDT
+      name: Tether USD
+      decimals: 6
+      issuer: Tether
+      byChain:
+        - chainId: 1
+          address: "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+          native: true
+        - chainId: 8453
+          address: "0xfde4c96c8593536e31f229ea8f37b2ada2699bb2"
+          native: false
+        - chainId: 42161
+          address: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9"
+          native: true
+        - chainId: 137
+          address: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
+          native: false
+        - chainId: 43114
+          address: "0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7"
+          native: false
+        - chainId: 56
+          address: "0x55d398326f99059fF775485246999027B3197955"
+          native: false
+        - chainId: 324705682
+          address: "0x3Ca0A49f511c2c89c4DCbbf1731120d8919050Bf"
+          native: false
+        - chainId: 1187947933
+          address: "0x0eda7df37785f570560dA74ceCFD435AB60D84a8"
+          native: false
+  # Default payment token per chain for x402 (when not specified by client)
+  defaultPaymentTokenByChain:
+    1: USDC
+    8453: USDC
+    42161: USDC
+    137: USDC
+    43114: USDC
+    56: USDC

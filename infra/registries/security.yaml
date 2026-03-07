@@ -1,0 +1,49 @@
+# Security & policy registry (GitOps). Mandatory tools per network/risk level, severity
+# thresholds that block deploy, allowed upgrade patterns, time-lock defaults.
+apiVersion: hyperagent.io/v1
+kind: SecurityPolicyRegistry
+metadata:
+  name: evm-security-policies
+  version: "1"
+spec:
+  policies:
+    - id: default
+      name: Default EVM
+      mandatoryTools:
+        - slither
+        - mythril
+        - mythx
+        - echidna
+        - tenderly
+      deployBlockSeverity: critical
+      maxAllowedSeverityForDeploy: high
+      requireSimulationSuccess: true
+      allowedUpgradePatterns:
+        - timelock
+        - multisig
+      timeLockDefaultHours: 48
+    - id: testnet
+      name: Testnet
+      mandatoryTools:
+        - slither
+        - tenderly
+      deployBlockSeverity: critical
+      maxAllowedSeverityForDeploy: high
+      requireSimulationSuccess: true
+      timeLockDefaultHours: 0
+    - id: high-value
+      name: High-value / mainnet
+      mandatoryTools:
+        - slither
+        - mythril
+        - mythx
+        - echidna
+        - tenderly
+      deployBlockSeverity: high
+      maxAllowedSeverityForDeploy: medium
+      requireSimulationSuccess: true
+      requireHumanApproval: true
+      allowedUpgradePatterns:
+        - timelock
+        - multisig
+      timeLockDefaultHours: 168

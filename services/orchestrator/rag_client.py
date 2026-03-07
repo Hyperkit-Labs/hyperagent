@@ -25,12 +25,34 @@ async def query_specs(
     limit: int = 5,
     library_version: str | None = None,
     status_filter: str | None = None,
+    user_id: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Query vectordb for similar specs with optional metadata filtering."""
+    """Query vectordb for similar specs. When user_id is set, prioritizes tenant-scoped fixes (The Vault)."""
     if not is_configured():
         return []
+    seen: set[str] = set()
+    results: list[dict[str, Any]] = []
     try:
-        payload: dict[str, Any] = {"query": prompt, "collection": "specs", "limit": limit}
+        if user_id:
+            payload_user: dict[str, Any] = {
+                "query": prompt,
+                "collection": "specs",
+                "limit": min(limit, 3),
+                "metadata_filter": {"user_id": user_id, "status": "verified"},
+            }
+            if library_version:
+                payload_user["metadata_filter"]["library_version"] = library_version
+            if status_filter:
+                payload_user["metadata_filter"]["status"] = status_filter
+            async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
+                r = await client.post(f"{VECTORDB_URL}/query", json=payload_user)
+                r.raise_for_status()
+                for item in r.json().get("results", []):
+                    sid = item.get("id") or item.get("payload", {}).get("spec_id", "")
+                    if sid and sid not in seen:
+                        seen.add(sid)
+                        results.append(item)
+        payload_global: dict[str, Any] = {"query": prompt, "collection": "specs", "limit": limit}
         metadata_filter: dict[str, str] = {}
         if library_version:
             metadata_filter["library_version"] = library_version
@@ -39,17 +61,24 @@ async def query_specs(
         else:
             metadata_filter["status"] = "verified"
         if metadata_filter:
-            payload["metadata_filter"] = metadata_filter
+            payload_global["metadata_filter"] = metadata_filter
         async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
-            r = await client.post(f"{VECTORDB_URL}/query", json=payload)
+            r = await client.post(f"{VECTORDB_URL}/query", json=payload_global)
             r.raise_for_status()
-            return r.json().get("results", [])
+            for item in r.json().get("results", []):
+                sid = item.get("id") or item.get("payload", {}).get("spec_id", "")
+                if sid and sid not in seen:
+                    seen.add(sid)
+                    results.append(item)
+        return results[:limit]
     except Exception as e:
         logger.warning("[rag] query_specs failed: %s", e)
         return []
 
 
-async def query_security_advisories(prompt: str, limit: int = 5) -> list[dict[str, Any]]:
+async def query_security_advisories(
+    prompt: str, limit: int = 5, user_id: str | None = None
+) -> list[dict[str, Any]]:
     """Query vectordb for security advisories (type=security_advisory)."""
     if not is_configured():
         return []
@@ -69,7 +98,9 @@ async def query_security_advisories(prompt: str, limit: int = 5) -> list[dict[st
         return []
 
 
-async def query_scv_patterns(prompt: str, limit: int = 5) -> list[dict[str, Any]]:
+async def query_scv_patterns(
+    prompt: str, limit: int = 5, user_id: str | None = None
+) -> list[dict[str, Any]]:
     """Query vectordb for SCV vulnerability patterns (type=scv_pattern)."""
     if not is_configured():
         return []
@@ -93,6 +124,7 @@ async def query_templates(
     prompt: str,
     limit: int = 5,
     library_version: str | None = None,
+    user_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """Query vectordb for similar templates with optional version filtering."""
     if not is_configured():

@@ -33,6 +33,7 @@ interface SimulateBody {
   to?: string;
   data: string;
   value?: string;
+  design_rationale?: string;
 }
 
 function validateSimulateBody(body: SimulateBody): string | null {

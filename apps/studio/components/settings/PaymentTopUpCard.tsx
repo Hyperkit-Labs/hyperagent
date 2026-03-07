@@ -32,9 +32,13 @@ export function PaymentTopUpCard({ onTopUpSuccess }: PaymentTopUpCardProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [merchantAddress, setMerchantAddress] = useState<string | null>(null);
+  const [creditsPerUsd, setCreditsPerUsd] = useState<number>(10);
 
   useEffect(() => {
-    getConfig().then((c) => setMerchantAddress(c.merchant_wallet_address ?? null));
+    getConfig().then((c) => {
+      setMerchantAddress(c.merchant_wallet_address ?? null);
+      setCreditsPerUsd(c.credits_per_usd ?? 10);
+    });
   }, []);
 
   const handlePayWithStablecoin = async () => {
@@ -63,7 +67,7 @@ export function PaymentTopUpCard({ onTopUpSuccess }: PaymentTopUpCardProps) {
       const tx = transfer({
         contract,
         to: addr as `0x${string}`,
-        amount: amountWei,
+        amount: amountWei.toString(),
       });
 
       const result = await sendTransaction({
@@ -81,17 +85,19 @@ export function PaymentTopUpCard({ onTopUpSuccess }: PaymentTopUpCardProps) {
         throw new Error("Transaction failed");
       }
 
+      const refType = token === "USDC" ? "usdc_transfer" : "usdt_transfer";
       await topUpCreditsWithTx({
         amount: num,
         currency: "USD",
-        reference_type: "usdc_transfer",
+        reference_type: refType,
         reference_id: result.transactionHash,
         tx_hash: result.transactionHash,
       });
 
+      const creditsAdded = Math.floor(num * creditsPerUsd);
       setAmount("");
       onTopUpSuccess?.();
-      toast.success(`Added ${num} credits. Tx: ${result.transactionHash.slice(0, 10)}...`);
+      toast.success(`Added ${creditsAdded} credits (${num} USD). Tx: ${result.transactionHash.slice(0, 10)}...`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Transfer failed";
       setError(handleApiError(e));
@@ -120,7 +126,7 @@ export function PaymentTopUpCard({ onTopUpSuccess }: PaymentTopUpCardProps) {
         <h3 className="text-sm font-medium text-[var(--color-text-primary)]">Add budget (USDC/USDT)</h3>
       </div>
       <p className="text-xs text-[var(--color-text-tertiary)]">
-        Send USDC or USDT to add credits. 1:1 conversion. Funds go to merchant wallet.
+        Send USDC or USDT to add credits. 1 USD = {creditsPerUsd} credits. Funds go to merchant wallet.
       </p>
       {error && <ApiErrorBanner error={error} onRetry={() => setError(null)} />}
       <div className="flex flex-wrap items-center gap-2">

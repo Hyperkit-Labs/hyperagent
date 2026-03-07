@@ -12,9 +12,10 @@ logger = logging.getLogger(__name__)
 from workflow_state import AgentState, MAX_AUTOFIX_CYCLES
 from step_trace import step_span
 from registries import get_default_pipeline_id, get_audit_max_severity, get_template
+from registries import get_slither_to_swc, get_high_severity_swc
 from registries import get_roma_complexity_threshold, get_roma_complexity_indicators
 
-STEP_ORDER = ("spec", "design", "codegen", "audit", "simulation", "deploy", "ui_scaffold")
+STEP_ORDER = ("spec", "design", "codegen", "scrubd", "audit", "debate", "simulation", "exploit_sim", "deploy", "ui_scaffold")
 
 
 def _step_index(step_type: str) -> int:
@@ -52,12 +53,17 @@ from agents.design_agent import generate_design
 from agents.codegen_agent import generate_contracts
 from agents.oz_wizard_client import generate_contracts_oz
 from agents.audit_agent import run_security_audits
+from agents.pashov_audit_agent import run_pashov_audit
+from agents.scrubd_agent import run_scrubd_validation, get_scrubd_fix_hints
+from agents.debate_agent import run_debate
 from agents.simulation_agent import run_tenderly_simulations
+from agents.exploit_simulation_agent import run_exploit_simulation
 from agents.deploy_agent import deploy_contracts
 from agents.ui_scaffold_agent import generate_ui_schema
 from roma_inprocess import invoke_roma_spec
 import rag_client
 import ipfs_client
+from security_context import build_security_context
 
 
 def _estimate_complexity(prompt: str) -> int:
@@ -130,7 +136,11 @@ async def design_agent(state: AgentState) -> AgentState:
             api_keys = state.get("api_keys") or {}
             agent_session_jwt = state.get("agent_session_jwt") or None
             target_chains = spec.get("chains", [])
-            design = await generate_design(spec, target_chains, user_id, project_id, run_id, api_keys, agent_session_jwt)
+            security_ctx = await build_security_context(state.get("user_prompt", ""))
+            design = await generate_design(
+                spec, target_chains, user_id, project_id, run_id, api_keys, agent_session_jwt,
+                security_context=security_ctx,
+            )
             state["design_proposal"] = design
             state["design_rationale"] = design.get("rationale", "") or f"Design for {spec.get('token_type', 'contract')} with {len(design.get('components', []))} components"
             state["current_stage"] = "design_review"
@@ -176,13 +186,17 @@ async def codegen_agent(state: AgentState) -> AgentState:
         rag_snippets = await rag_client.query_specs(state.get("user_prompt", ""), limit=3)
         if rag_snippets:
             state.setdefault("rag_context", {})["codegen_snippets"] = rag_snippets
+        security_ctx = await build_security_context(state.get("user_prompt", ""))
         if state.get("use_oz_wizard") and state.get("oz_wizard_options"):
             opts = state["oz_wizard_options"]
             kind = opts.get("kind", "erc20")
             options = opts.get("options") or {}
             contracts = await generate_contracts_oz(kind, options, agent_session_jwt)
         else:
-            contracts = await generate_contracts(spec, design, framework, user_id, project_id, run_id, api_keys, agent_session_jwt)
+            contracts = await generate_contracts(
+                spec, design, framework, user_id, project_id, run_id, api_keys, agent_session_jwt,
+                security_context=security_ctx,
+            )
         state["contracts"] = contracts
         state["current_stage"] = "audit"
         from store import update_workflow
@@ -205,6 +219,38 @@ async def codegen_agent(state: AgentState) -> AgentState:
         raise
 
 
+async def scrubd_validation_agent(state: AgentState) -> AgentState:
+    """Mandatory SCRUBD validation: RE/UX pattern checks before audit."""
+    contracts = state.get("contracts", {})
+    framework = state.get("framework", "hardhat")
+    run_id = state.get("run_id") or ""
+    _step_start(run_id, "scrubd")
+    try:
+        passed, findings = await run_scrubd_validation(contracts, run_id, framework)
+        state["scrubd_validation_passed"] = passed
+        state["scrubd_findings"] = findings
+        state["current_stage"] = "audit" if passed else "scrubd_failed"
+        from store import update_workflow
+        scrubd_status = "completed" if passed else "failed"
+        update_workflow(run_id, status="building", stages=[
+            {"stage": "spec", "status": "completed"},
+            {"stage": "design", "status": "completed"},
+            {"stage": "codegen", "status": "completed"},
+            {"stage": "scrubd", "status": scrubd_status},
+        ])
+        state["messages"] = list(state.get("messages", [])) + [
+            AIMessage(content=f"SCRUBD: {'passed' if passed else 'failed'} ({len(findings)} findings)")
+        ]
+        _step_complete(run_id, "scrubd", output_summary=f"passed={passed} findings={len(findings)}")
+        return state
+    except Exception as e:
+        _step_complete(run_id, "scrubd", error_message=str(e))
+        state["scrubd_validation_passed"] = False
+        state["scrubd_findings"] = [{"error": str(e), "type": "scrubd_error"}]
+        state["current_stage"] = "scrubd_failed"
+        raise
+
+
 def _severity_fails_gate(severity: str, max_allowed: str) -> bool:
     order = ("info", "low", "medium", "high", "critical")
     try:
@@ -217,15 +263,36 @@ async def audit_agent(state: AgentState) -> AgentState:
     contracts = state.get("contracts", {})
     framework = state.get("framework", "hardhat")
     run_id = state.get("run_id") or ""
+    api_keys = state.get("api_keys") or {}
     _step_start(run_id, "audit")
     try:
         findings = await run_security_audits(contracts, framework, run_id=run_id)
+        pashov_findings, _ = await run_pashov_audit(contracts, api_keys, run_id=run_id)
+        if pashov_findings:
+            import db
+            for f in pashov_findings:
+                findings.append(f)
+                if db.is_configured() and run_id:
+                    db.insert_security_finding(
+                        run_id=run_id,
+                        tool=f.get("tool", "pashov-auditor"),
+                        severity=f.get("severity", "medium"),
+                        title=f.get("title", ""),
+                        description=f.get("description"),
+                        location=f.get("location"),
+                        category=f.get("category"),
+                    )
+        high_swc = set(get_high_severity_swc())
+        for f in findings:
+            swc = get_slither_to_swc(f.get("category") or "")
+            if swc and swc in high_swc:
+                f["matches_known_exploit"] = True
         state["audit_findings"] = findings
         pipeline_id = state.get("pipeline_id") or get_default_pipeline_id()
         max_severity = get_audit_max_severity(pipeline_id)
-        state["audit_passed"] = not any(
-            _severity_fails_gate(f.get("severity", "info"), max_severity) for f in findings
-        )
+        severity_fail = any(_severity_fails_gate(f.get("severity", "info"), max_severity) for f in findings)
+        exploit_fail = any(f.get("matches_known_exploit") for f in findings)
+        state["audit_passed"] = not (severity_fail or exploit_fail)
         state["current_stage"] = "simulation" if state["audit_passed"] else "audit_failed"
         from store import update_workflow
         audit_status = "completed" if state["audit_passed"] else "failed"
@@ -277,6 +344,42 @@ async def simulation_agent(state: AgentState) -> AgentState:
         return state
     except Exception as e:
         _step_complete(run_id, "simulation", error_message=str(e))
+        raise
+
+
+async def exploit_simulation_agent(state: AgentState) -> AgentState:
+    """Run DeFiHackLabs PoC tests against generated contracts. Optional; enabled via EXPLOIT_SIM_ENABLED."""
+    run_id = state.get("run_id") or ""
+    _step_start(run_id, "exploit_sim")
+    try:
+        passed, findings = await run_exploit_simulation(
+            state.get("contracts", {}),
+            state.get("spec", {}),
+            state.get("design_proposal", {}),
+            run_id=run_id,
+        )
+        state["exploit_simulation_passed"] = passed
+        state["exploit_simulation_findings"] = findings
+        state["current_stage"] = "ui_scaffold" if passed else "exploit_sim_failed"
+        from store import update_workflow
+        status = "completed" if passed else "failed"
+        update_workflow(run_id, status="building", stages=[
+            {"stage": "spec", "status": "completed"},
+            {"stage": "design", "status": "completed"},
+            {"stage": "codegen", "status": "completed"},
+            {"stage": "audit", "status": "completed"},
+            {"stage": "simulation", "status": "completed"},
+            {"stage": "exploit_sim", "status": status},
+        ])
+        state["messages"] = list(state.get("messages", [])) + [
+            AIMessage(content=f"Exploit sim: {'passed' if passed else 'failed'} ({len(findings)} findings)")
+        ]
+        _step_complete(run_id, "exploit_sim", output_summary=f"passed={passed} findings={len(findings)}")
+        return state
+    except Exception as e:
+        _step_complete(run_id, "exploit_sim", error_message=str(e))
+        state["exploit_simulation_passed"] = False
+        state["exploit_simulation_findings"] = [{"error": str(e)}]
         raise
 
 
@@ -350,17 +453,15 @@ async def ui_scaffold_agent(state: AgentState) -> AgentState:
 
 
 # ---------------------------------------------------------------------------
-# Autofix Agent: takes audit/simulation failures and re-routes to codegen
+# Debate Agent (Proposer + Auditor): replaces autofix with iterative refinement
 # ---------------------------------------------------------------------------
 
 async def autofix_agent(state: AgentState) -> AgentState:
-    """Self-healing loop: take audit/sim errors, ask codegen to fix, then re-audit.
-    Capped at MAX_AUTOFIX_CYCLES to prevent infinite loops and token drainage."""
+    """Proposer + Auditor debate subgraph. Proposer suggests fixes; Auditor (pashov-audit) verifies.
+    Converges when Auditor finds no state-breaking path. Discussion trace persisted as stub."""
     run_id = state.get("run_id") or ""
-    cycle = state.get("autofix_cycle", 0) + 1
-    state["autofix_cycle"] = cycle
-    history = list(state.get("autofix_history") or [])
-    logger.info("[autofix] run_id=%s cycle=%d/%d", run_id, cycle, MAX_AUTOFIX_CYCLES)
+    _step_start(run_id, "debate")
+    logger.info("[debate] run_id=%s starting Proposer+Auditor debate", run_id)
 
     from store import update_workflow
     update_workflow(run_id, status="building", stages=[
@@ -368,88 +469,54 @@ async def autofix_agent(state: AgentState) -> AgentState:
         {"stage": "design", "status": "completed"},
         {"stage": "codegen", "status": "completed"},
         {"stage": "audit", "status": "failed"},
-        {"stage": "autofix", "status": "processing"},
+        {"stage": "debate", "status": "processing"},
     ])
 
-    error_context_parts: list[str] = []
-    if state.get("audit_findings"):
-        findings_summary = []
-        for f in state["audit_findings"]:
-            sev = f.get("severity", "info")
-            desc = f.get("description", f.get("message", ""))
-            findings_summary.append(f"[{sev}] {desc}")
-        error_context_parts.append("Audit findings:\n" + "\n".join(findings_summary[:10]))
-    if state.get("simulation_results"):
-        sim = state["simulation_results"]
-        if sim.get("error"):
-            error_context_parts.append(f"Simulation error: {sim['error']}")
-        if sim.get("revert_reason"):
-            error_context_parts.append(f"Revert reason: {sim['revert_reason']}")
-
-    error_context = "\n\n".join(error_context_parts) or "Unknown failure"
-    design_rationale = state.get("design_rationale", "")
-
-    history.append({
-        "cycle": cycle,
-        "error_context": error_context[:500],
-        "previous_contracts_count": len(state.get("contracts", {})),
-    })
-    state["autofix_history"] = history
-
     try:
-        api_keys = state.get("api_keys") or {}
-        agent_session_jwt = state.get("agent_session_jwt") or None
+        result = await run_debate(dict(state))
+        for k, v in result.items():
+            state[k] = v
 
-        correction_prompt = (
-            f"The following Solidity contracts failed security audit or simulation.\n\n"
-            f"Design rationale: {design_rationale}\n\n"
-            f"Errors to fix:\n{error_context}\n\n"
-            f"Previous code:\n"
-        )
-        for fname, source in (state.get("contracts") or {}).items():
-            if isinstance(source, str):
-                correction_prompt += f"\n// {fname}\n{source[:2000]}\n"
-        correction_prompt += (
-            f"\nFix cycle {cycle}/{MAX_AUTOFIX_CYCLES}. "
-            f"Fix ALL identified issues. Preserve the contract's purpose and design rationale. "
-            f"Output corrected Solidity code."
-        )
+        discussion_trace = state.get("discussion_trace") or []
+        converged = state.get("debate_converged", False)
+        cycle = state.get("autofix_cycle", 1)
 
-        contracts = await generate_contracts(
-            state.get("spec", {}),
-            state.get("design_proposal", {}),
-            state.get("framework", "hardhat"),
-            state.get("user_id", ""),
-            state.get("project_id", ""),
+        from trace_writer import write_trace
+        blob_id, da_cert, ref_block = write_trace(
             run_id,
-            api_keys,
-            agent_session_jwt,
+            "debate",
+            _step_index("debate"),
+            "completed" if converged else "failed",
+            output_summary=f"rounds={len(discussion_trace)//2} converged={converged}",
+            extra={"discussion_trace": discussion_trace} if discussion_trace else None,
         )
+        import db
+        status = "completed" if converged else "failed"
+        if db.is_configured() and run_id:
+            db.update_step(
+                run_id, "debate", status,
+                output_summary=f"rounds={len(discussion_trace)//2} converged={converged}",
+                trace_blob_id=blob_id, trace_da_cert=da_cert, trace_reference_block=ref_block,
+            )
 
-        state["contracts"] = contracts
-        state["audit_passed"] = False
-        state["simulation_passed"] = False
-        state["audit_findings"] = []
-        state["simulation_results"] = {}
-        state["current_stage"] = "audit"
-
-        update_workflow(run_id, status="building", contracts=contracts, stages=[
+        update_workflow(run_id, status="building", contracts=state.get("contracts"), stages=[
             {"stage": "spec", "status": "completed"},
             {"stage": "design", "status": "completed"},
             {"stage": "codegen", "status": "completed"},
-            {"stage": "autofix", "status": "completed"},
+            {"stage": "debate", "status": "completed" if converged else "failed"},
             {"stage": "audit", "status": "processing"},
         ])
 
         state["messages"] = list(state.get("messages", [])) + [
-            AIMessage(content=f"[Autofix cycle {cycle}] Re-generated {len(contracts)} files. Re-auditing...")
+            AIMessage(content=f"[Debate cycle {cycle}] {'Converged' if converged else 'Partial'} after {len(discussion_trace)//2} rounds. Re-auditing...")
         ]
-        logger.info("[autofix] run_id=%s cycle=%d contracts_regenerated=%d", run_id, cycle, len(contracts))
+        logger.info("[debate] run_id=%s cycle=%d converged=%s", run_id, cycle, converged)
         return state
     except Exception as e:
-        logger.error("[autofix] run_id=%s cycle=%d error=%s", run_id, cycle, e)
-        state["error"] = f"Autofix cycle {cycle} failed: {e}"
+        logger.error("[debate] run_id=%s error=%s", run_id, e)
+        state["error"] = f"Debate failed: {e}"
         state["current_stage"] = "failed"
+        _step_complete(run_id, "debate", error_message=str(e))
         return state
 
 

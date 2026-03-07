@@ -63,6 +63,8 @@ services:
         sync: false
       - key: TOOLS_BASE_URL
         sync: false
+      - key: VECTORDB_URL
+        sync: false
       - key: INTERNAL_SERVICE_TOKEN
         sync: false
       - key: AGENT_SESSION_PAYLOAD_KEY

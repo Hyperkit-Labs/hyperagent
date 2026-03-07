@@ -22,6 +22,7 @@ class IndexSpecBody(BaseModel):
     spec_id: str | None = None
     spec: dict = Field(default_factory=dict)
     text: str | None = None
+    metadata: dict | None = None
 
 
 class IndexTemplateBody(BaseModel):
@@ -34,6 +35,7 @@ class QueryBody(BaseModel):
     query: str = Field(..., min_length=1)
     collection: str = Field("specs", pattern="^(specs|templates)$")
     limit: int = Field(10, ge=1, le=50)
+    metadata_filter: dict | None = None
 
 
 @app.post("/index/spec")
@@ -44,7 +46,14 @@ def index_spec(body: IndexSpecBody) -> dict:
     if not vector or len(vector) != 1536:
         return {"ok": False, "reason": "embedding not available (set OPENAI_API_KEY and QDRANT_URL)"}
     id = body.spec_id or str(uuid.uuid4())
-    ok = upsert(COLLECTION_SPECS, id, vector, {"spec_id": id, "text_preview": text[:200]})
+    payload: dict = {"spec_id": id, "text_preview": text[:200]}
+    meta = dict(body.metadata or {})
+    if body.spec and "type" in body.spec:
+        meta["type"] = body.spec["type"]
+    else:
+        meta.setdefault("type", "spec")
+    payload.update(meta)
+    ok = upsert(COLLECTION_SPECS, id, vector, payload)
     return {"ok": ok, "id": id}
 
 
@@ -66,7 +75,7 @@ def rag_query(body: QueryBody) -> dict:
     vector = embed(body.query)
     if not vector:
         return {"results": [], "reason": "embedding not available"}
-    results = query(body.collection, vector, limit=body.limit)
+    results = query(body.collection, vector, limit=body.limit, metadata_filter=body.metadata_filter)
     return {"results": results}
 
 

@@ -9,9 +9,7 @@ import { ROUTES } from "@/constants/routes";
 import { createQuickDemo } from "@/lib/api";
 import { getThirdwebClient } from "@/lib/thirdwebClient";
 import { CONNECT_WALLETS } from "@/lib/connectWallets";
-import { useMetrics } from "@/hooks/useMetrics";
-import { useWorkflows } from "@/hooks/useWorkflows";
-import { useDeployments } from "@/hooks/useDeployments";
+import { useDashboardData } from "@/hooks/useDashboardData";
 import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { MetricCard } from "@/components/ui";
@@ -23,16 +21,18 @@ export default function DashboardPage() {
   const [quickDemoLoading, setQuickDemoLoading] = useState(false);
   const [quickDemoError, setQuickDemoError] = useState<string | null>(null);
   const { connect } = useConnectModal();
-  const { metrics, loading: metricsLoading, error: metricsError, refetch: refetchMetrics } = useMetrics();
-  const { workflows, total: workflowsTotal, loading: workflowsLoading, error: workflowsError, refetch: refetchWorkflows } = useWorkflows({ filters: { limit: 10 } });
-  const { deployments, loading: deploymentsLoading, error: deploymentsError, refetch: refetchDeployments } = useDeployments();
+  const {
+    metrics,
+    workflows,
+    workflowsTotal,
+    deployments,
+    loading: dashboardLoading,
+    error: dashboardError,
+    refetch: refetchDashboard,
+  } = useDashboardData({ workflowsLimit: 10 });
   const recentDeployments = deployments.slice(0, 5);
-  const apiError = metricsError || workflowsError || deploymentsError;
-  const refetchAll = () => {
-    refetchMetrics();
-    refetchWorkflows();
-    refetchDeployments();
-  };
+  const apiError = dashboardError;
+  const refetchAll = refetchDashboard;
   const barValues = [
     metrics?.workflows?.total ?? 0,
     metrics?.workflows?.completed ?? 0,
@@ -129,7 +129,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
             label="Workflows"
-            value={workflowsLoading ? "..." : (workflowsTotal ?? workflows?.length ?? 0)}
+            value={dashboardLoading ? "..." : (workflowsTotal ?? workflows?.length ?? 0)}
             sublabel="Total in list"
             icon={<div className="w-2 h-2 rounded-full bg-[var(--color-semantic-success)] shadow-[0_0_8px_var(--color-semantic-success)]" />}
           />
@@ -141,7 +141,7 @@ export default function DashboardPage() {
           />
           <MetricCard
             label="Metrics"
-            value={metricsLoading ? "..." : (typeof metrics?.workflows?.total === "number" ? metrics.workflows.total : "-")}
+            value={dashboardLoading ? "..." : (typeof metrics?.workflows?.total === "number" ? metrics.workflows.total : "-")}
             sublabel="From API"
             icon={<HardDrive className="w-4 h-4 text-[var(--color-semantic-violet)]" />}
           />
@@ -225,7 +225,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="text-xs divide-y divide-[var(--color-border-subtle)]">
-                {deploymentsLoading ? (
+                {dashboardLoading ? (
                   <tr>
                     <td colSpan={3} className="px-6 py-8 text-center text-[var(--color-text-muted)]">
                       Loading deployments...

@@ -83,8 +83,8 @@ async def spec_agent(state: AgentState) -> AgentState:
             api_keys = state.get("api_keys") or {}
             agent_session_jwt = state.get("agent_session_jwt") or None
             template_id_from_state = (state.get("template_id") or "").strip()
-            rag_context = await rag_client.query_specs(prompt, limit=3)
-            rag_templates = await rag_client.query_templates(prompt, limit=3)
+            rag_context = await rag_client.query_specs(prompt, limit=3, user_id=user_id)
+            rag_templates = await rag_client.query_templates(prompt, limit=3, user_id=user_id)
             if rag_context or rag_templates:
                 state["rag_context"] = {"specs": rag_context, "templates": rag_templates}
             roma_context = {"apiKeys": api_keys, "userId": user_id, "projectId": project_id, "runId": run_id}
@@ -136,7 +136,7 @@ async def design_agent(state: AgentState) -> AgentState:
             api_keys = state.get("api_keys") or {}
             agent_session_jwt = state.get("agent_session_jwt") or None
             target_chains = spec.get("chains", [])
-            security_ctx = await build_security_context(state.get("user_prompt", ""))
+            security_ctx = await build_security_context(state.get("user_prompt", ""), user_id=user_id)
             design = await generate_design(
                 spec, target_chains, user_id, project_id, run_id, api_keys, agent_session_jwt,
                 security_context=security_ctx,
@@ -183,10 +183,12 @@ async def codegen_agent(state: AgentState) -> AgentState:
     try:
         api_keys = state.get("api_keys") or {}
         agent_session_jwt = state.get("agent_session_jwt") or None
-        rag_snippets = await rag_client.query_specs(state.get("user_prompt", ""), limit=3)
+        rag_snippets = await rag_client.query_specs(
+            state.get("user_prompt", ""), limit=3, user_id=user_id
+        )
         if rag_snippets:
             state.setdefault("rag_context", {})["codegen_snippets"] = rag_snippets
-        security_ctx = await build_security_context(state.get("user_prompt", ""))
+        security_ctx = await build_security_context(state.get("user_prompt", ""), user_id=user_id)
         if state.get("use_oz_wizard") and state.get("oz_wizard_options"):
             opts = state["oz_wizard_options"]
             kind = opts.get("kind", "erc20")
@@ -326,6 +328,7 @@ async def simulation_agent(state: AgentState) -> AgentState:
             state.get("spec", {}).get("chains", []),
             deployments=state.get("deployments"),
             run_id=run_id,
+            design_rationale=state.get("design_rationale", "") or "",
         )
         state["simulation_results"] = results
         state["simulation_passed"] = results.get("passed", True)
@@ -381,6 +384,21 @@ async def exploit_simulation_agent(state: AgentState) -> AgentState:
         state["exploit_simulation_passed"] = False
         state["exploit_simulation_findings"] = [{"error": str(e)}]
         raise
+
+
+async def deploy_gate_agent(state: AgentState) -> AgentState:
+    """Set current_stage to awaiting_deploy_approval before interrupt. No-op when deploy_approved."""
+    if state.get("deploy_approved"):
+        return state
+    state["current_stage"] = "awaiting_deploy_approval"
+    state["needs_deploy_approval"] = True
+    run_id = state.get("run_id") or ""
+    from store import update_workflow
+    update_workflow(run_id, status="building", current_stage="awaiting_deploy_approval", stages=[
+        {"stage": "guardian", "status": "completed"},
+        {"stage": "deploy", "status": "pending"},
+    ])
+    return state
 
 
 async def deploy_agent(state: AgentState) -> AgentState:

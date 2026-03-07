@@ -1076,10 +1076,17 @@ def delete_llm_keys(
     wid = x_workspace_id or DEFAULT_WORKSPACE
     if x_user_id and llm_keys_supabase._is_configured():
         _log_byok_event("byok_access", x_user_id, "delete_keys")
-        llm_keys_supabase.delete_keys_for_user(x_user_id)
+        ok = llm_keys_supabase.delete_keys_for_user(x_user_id)
+        if not ok:
+            _trace_llm_keys(request, "DELETE", x_user_id, x_workspace_id, "error_no_row_updated")
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to clear LLM keys. No matching user found. Sign out and sign in again, then try Remove all keys.",
+            )
         _trace_llm_keys(request, "DELETE", x_user_id, x_workspace_id, "success")
         return {"success": True}
     if llm_keys_supabase._is_configured():
+        _trace_llm_keys(request, "DELETE", x_user_id, x_workspace_id, "skipped_no_user_id")
         return {"success": True}
     delete_keys(wid)
     _trace_llm_keys(request, "DELETE", x_user_id, x_workspace_id, "success")

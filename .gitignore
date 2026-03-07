@@ -25,7 +25,8 @@
 .windsurf/
 .zencoder/
 skills/
-!.cursor/skills/
+.cursor/
+.cursor/*
 
 # ============================================================
 # SECURITY & CREDENTIALS (CRITICAL - Never commit these!)

@@ -55,6 +55,31 @@ export function useLogs(options: UseLogsOptions = {}): UseLogsReturn {
     pageSizeRef.current = page_size;
   }, [page_size]);
 
+  const fetchAll = useCallback(async () => {
+    try {
+      setError(null);
+      const [response, servicesList, hostsList] = await Promise.all([
+        getLogs({
+          ...filtersRef.current,
+          page: pageRef.current,
+          page_size: pageSizeRef.current,
+        }),
+        getLogServices().catch(() => []),
+        getLogHosts().catch(() => []),
+      ]);
+      setLogs(response.logs);
+      setTotal(response.total);
+      setPage(response.page);
+      setPageSize(response.page_size);
+      setServices(Array.isArray(servicesList) ? servicesList : []);
+      setHosts(Array.isArray(hostsList) ? hostsList : []);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to fetch logs'));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const fetchLogs = useCallback(async () => {
     try {
       setError(null);
@@ -72,36 +97,14 @@ export function useLogs(options: UseLogsOptions = {}): UseLogsReturn {
     } finally {
       setLoading(false);
     }
-  }, []); // No dependencies - uses refs
-
-  const fetchServices = useCallback(async () => {
-    try {
-      const servicesList = await getLogServices();
-      setServices(servicesList);
-    } catch (err) {
-      console.error('Error fetching services:', err);
-      // Don't throw - just log and continue
-    }
   }, []);
 
-  const fetchHosts = useCallback(async () => {
-    try {
-      const hostsList = await getLogHosts();
-      setHosts(hostsList);
-    } catch (err) {
-      console.error('Error fetching hosts:', err);
-      // Don't throw - just log and continue
-    }
-  }, []);
-
-  // Initial fetch
+  // Initial fetch: single batched request for logs + services + hosts
   useEffect(() => {
     setLoading(true);
-    fetchLogs();
-    fetchServices();
-    fetchHosts();
+    fetchAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount
+  }, []);
 
   // Auto-refresh for logs only
   useEffect(() => {

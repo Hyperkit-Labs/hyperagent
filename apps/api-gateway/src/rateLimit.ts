@@ -42,11 +42,16 @@ async function getRedis(): Promise<typeof redis> {
   try {
     const mod = await import("ioredis");
     const RedisClient = (mod as unknown as { default: new (url: string, opts?: object) => { incr(key: string): Promise<number>; expire(key: string, sec: number): Promise<string>; disconnect?: () => void; on?(event: string, fn: (err: Error) => void): void } }).default;
-    const client = new RedisClient(url, {
-      maxRetriesPerRequest: 0,
+    const opts: Record<string, unknown> = {
+      maxRetriesPerRequest: 3,
       enableReadyCheck: true,
-      connectTimeout: 5000,
-    });
+      connectTimeout: 15000,
+      retryStrategy: (times: number) => (times <= 3 ? Math.min(times * 500, 2000) : null),
+    };
+    if (url.startsWith("rediss://")) {
+      opts.tls = { rejectUnauthorized: process.env.REDIS_TLS_VERIFY !== "false" };
+    }
+    const client = new RedisClient(url, opts);
     client.on?.("error", () => {
       lastRedisFailure = Date.now();
       redis = null;
@@ -59,7 +64,8 @@ async function getRedis(): Promise<typeof redis> {
     if (NODE_ENV === "development") {
       console.warn("[rate-limit] Redis unreachable, skipping rate limit. Set REDIS_URL to empty for quiet mode.");
     } else {
-      console.error("[rate-limit] Redis connection failed:", err instanceof Error ? err.message : err);
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[rate-limit] Redis connection failed:", msg, "URL format: use rediss:// for TLS (Supabase/Redis Cloud)");
     }
     return null;
   }
@@ -106,7 +112,7 @@ export async function rateLimitMiddleware(
       logSecurityEvent("rate_limit_unavailable", 503, req.path, req.requestId, req.userId);
       res.status(503).json({
         error: "Service Unavailable",
-        message: "Rate limiting required. REDIS_URL must be set.",
+        message: "Rate limiting required. REDIS_URL must be set in production.",
         requestId: req.requestId,
       });
       return;
@@ -124,7 +130,7 @@ export async function rateLimitMiddleware(
       logSecurityEvent("rate_limit_unavailable", 503, req.path, req.requestId, req.userId);
       res.status(503).json({
         error: "Service Unavailable",
-        message: "Rate limiting unavailable. Redis is required.",
+        message: "Rate limiting unavailable. Redis connection failed. Ensure REDIS_URL is set and reachable (use rediss:// for TLS).",
         requestId: req.requestId,
       });
       return;

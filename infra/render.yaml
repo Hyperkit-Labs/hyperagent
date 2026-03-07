@@ -1,9 +1,21 @@
+# Render Blueprint for production. See docs/RENDER_FULL_STACK.md.
+# Dashboard deeplink: https://dashboard.render.com/blueprint/new?repo=<REPO_HTTPS_URL>
+#
+# Architecture: Entire backend on Render. Local runs only frontend (Studio), connects via HTTP.
+# - Tools (solcx, Foundry, Hardhat, Slither, Mythril): hyperagent-tools
+# - Workflow (Roma, Codegen, Orchestrator, Agent-Runtime): hyperagent-api, hyperagent-agent-runtime
+# - Compile/Audit proxy to hyperagent-tools when TOOLS_BASE_URL is set.
+# - After deploy, set cross-service URLs in Dashboard (see docs/RENDER_FULL_STACK.md).
+#
 services:
   - type: web
     name: hyperagent-api
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn hyperagent.api.main:app --host 0.0.0.0 --port $PORT
+    runtime: python
+    plan: free
+    # Orchestrator: services/orchestrator
+    buildCommand: cd services/orchestrator && pip install -r requirements.txt
+    startCommand: cd services/orchestrator && uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
         sync: false
@@ -19,16 +31,14 @@ services:
         sync: false
       - key: MERCHANT_WALLET_ADDRESS
         sync: false
-      - key: USDC_ADDRESS_FUJI
+      - key: JWT_SECRET_KEY
         sync: false
-      - key: USDC_ADDRESS_AVALANCHE
+      - key: SUPABASE_URL
         sync: false
-      - key: X402_ENABLED
-        value: "true"
+      - key: SUPABASE_PASSWORD
+        sync: false
       - key: X402_ENABLED_NETWORKS
         value: "avalanche_fuji,avalanche_mainnet"
-      - key: X402_SERVICE_URL
-        sync: false
       - key: REDIS_URL
         sync: false
       - key: NODE_ENV
@@ -41,4 +51,116 @@ services:
         value: "true"
       - key: CORS_ORIGINS
         sync: false
+      - key: A2A_DEFAULT_CHAIN_ID
+        sync: false
+      - key: A2A_AGENT_ID
+        sync: false
+      - key: AGENT_RUNTIME_URL
+        sync: false
+      - key: COMPILE_SERVICE_URL
+        sync: false
+      - key: AUDIT_SERVICE_URL
+        sync: false
+      - key: TOOLS_BASE_URL
+        sync: false
+      - key: INTERNAL_SERVICE_TOKEN
+        sync: false
+      - key: AGENT_SESSION_PAYLOAD_KEY
+        sync: false
 
+  - type: web
+    name: hyperagent-agent-runtime
+    runtime: node
+    plan: free
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter hyperagent-agent-runtime... build
+    startCommand: cd services/agent-runtime && node build/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: AUDIT_SERVICE_URL
+        sync: false
+      - key: COMPILE_SERVICE_URL
+        sync: false
+      - key: CHAIN_REGISTRY_PATH
+        value: ../../infra/registries/network/chains.yaml
+      - key: CORS_ORIGINS
+        sync: false
+      - key: INTERNAL_SERVICE_TOKEN
+        sync: false
+      - key: AGENT_SESSION_PAYLOAD_KEY
+        sync: false
+      - key: PINATA_JWT
+        sync: false
+
+  - type: web
+    name: hyperagent-compile
+    runtime: python
+    plan: free
+    buildCommand: cd services/compile && pip install -r requirements.txt
+    startCommand: cd services/compile && uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: COMPILE_MODE
+        value: lite
+      - key: TOOLS_BASE_URL
+        sync: false
+      - key: TOOLS_API_KEY
+        sync: false
+
+  - type: web
+    name: hyperagent-audit
+    runtime: python
+    plan: free
+    buildCommand: cd services/audit && pip install -r requirements.txt
+    startCommand: cd services/audit && uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: AUDIT_MODE
+        value: mythx
+      - key: TOOLS_BASE_URL
+        sync: false
+      - key: TOOLS_API_KEY
+        sync: false
+
+  - type: web
+    name: hyperagent-tools
+    runtime: python
+    plan: free
+    # Tools: solcx, Foundry, Hardhat, Slither, Mythril (compile + audit)
+    buildCommand: cd services/hyperagent-tools && pip install -r requirements.txt && python -c "import solcx; solcx.install_solc('0.8.24')"
+    startCommand: cd services/hyperagent-tools && uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: TOOLS_API_KEY
+        sync: false
+
+  - type: web
+    name: hyperagent-gateway
+    runtime: node
+    plan: free
+    # Monorepo: run from apps/api-gateway (or set rootDirectory if your Render supports it)
+    buildCommand: cd apps/api-gateway && npm install && npm run build
+    startCommand: cd apps/api-gateway && node build/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: ORCHESTRATOR_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: REDIS_URL
+        sync: false
+
+# Optional: add databases in Render Dashboard or uncomment below.
+# databases:
+#   - name: postgres
+#     databaseName: hyperagent_db
+#     plan: free
+#   - name: redis
+#     plan: free

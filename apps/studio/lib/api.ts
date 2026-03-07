@@ -449,11 +449,18 @@ interface NetworkApiItem {
   is_mainnet?: boolean;
 }
 
+export interface IntegrationsStatus {
+  tenderly_configured?: boolean;
+  pinata_configured?: boolean;
+  qdrant_configured?: boolean;
+}
+
 export interface RuntimeConfig {
   x402_enabled: boolean;
   monitoring_enabled?: boolean;
   merchant_wallet_address?: string | null;
   credits_enabled?: boolean;
+  integrations?: IntegrationsStatus;
 }
 
 export async function getConfig(): Promise<RuntimeConfig> {
@@ -462,6 +469,7 @@ export async function getConfig(): Promise<RuntimeConfig> {
     monitoring_enabled: false,
     merchant_wallet_address: null,
     credits_enabled: false,
+    integrations: { tenderly_configured: false, pinata_configured: false, qdrant_configured: false },
   }));
 }
 

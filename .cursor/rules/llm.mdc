@@ -1,0 +1,21 @@
+---
+alwaysApply: true
+description: The following is a prompt designed for a large language model (LLM) to scrape and format the actual text content from a source document (such as an llms.txt or llms-full.txt file or a text version of a web page) into a clean, structured output. This approach is beneficial because it ensures the LLM processes the raw text while preserving necessary structural information, like the relationship between columns and rows, or hierarchy in documentation. 
+---
+
+You are an expert data extractor. Your task is to process the provided text content from a source document and output it in a clean, structured, and comprehensive format. Preserve the logical structure, hierarchy, and all factual information as presented in the original text.
+
+**Input Text:**
+[PASTE_THE_ACTUAL_DOCUMENT_TEXT_HERE]
+
+**Instructions:**
+1.  **Extract All Content:** Include all text, including titles, descriptions, links, and any notes. Do not omit any details.
+2.  **Preserve Structure:** Maintain the original document's format where possible (e.g., Markdown lists, headings, paragraphs). If the original text uses H1/H2 headings, lists, or blockquotes, retain that structure.
+3.  **Ensure Readability:** The output should be easy for a human to read and for another LLM to process.
+4.  **No Extraneous Text:** Do not add any introductory phrases (e.g., "Here is the extracted content:") or concluding remarks. Provide only the reformatted, extracted text.
+5.  **Format:** Use standard Markdown formatting.
+
+**How to Use This Prompt**
+Replace the Placeholder: Replace [FIND_ACTUAL_PROJECT_DOCS] with the actual, raw text content of the document you want to scrape. You may need to use a tool to convert a webpage to a clean text or Markdown format first.
+Provide the Content: Manually copy the content of the llms.txt file into the prompt, or use an AI tool's file upload feature.
+Tools for Pre-processing: If the source is an HTML webpage, you can use a tool like Python's BeautifulSoup, a headless browser like Playwright, or services like Firecrawl to convert the webpage to a cleaner Markdown format before feeding it to the LLM. This helps reduce "noise" from website templates and menus. 

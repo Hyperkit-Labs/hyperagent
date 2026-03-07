@@ -1,4 +1,4 @@
-"""Security Feed: cron-compatible stub for zero-day resilience.
+"""Security Feed: cron-compatible zero-day resilience.
 Scrapes high-signal security feeds (Immunefi, PeckShield, BlockSec) and
 injects recent exploit patterns into the DesignAgent system prompt.
 
@@ -17,9 +17,7 @@ import rag_client
 logger = logging.getLogger(__name__)
 
 FEED_SOURCES: list[dict[str, str]] = [
-    {"name": "immunefi", "url": os.environ.get("IMMUNEFI_FEED_URL", "")},
-    {"name": "peckshield", "url": os.environ.get("PECKSHIELD_FEED_URL", "")},
-    {"name": "blocksec", "url": os.environ.get("BLOCKSEC_FEED_URL", "")},
+    {"name": "defillama", "url": os.environ.get("DEFILLAMA_FEED_URL", "https://api.llama.fi/hacks")},
 ]
 
 FEED_TIMEOUT = float(os.environ.get("SECURITY_FEED_TIMEOUT", "10"))
@@ -41,14 +39,25 @@ async def fetch_recent_exploits() -> list[dict[str, Any]]:
                 r.raise_for_status()
                 data = r.json()
                 items = data if isinstance(data, list) else data.get("exploits", data.get("items", []))
+                ts_key = "date"
+                if items and isinstance(items[0].get(ts_key), (int, float)):
+                    items = sorted(items, key=lambda x: x.get(ts_key, 0), reverse=True)
                 for item in items[:MAX_RECENT_EXPLOITS]:
+                    title = item.get("title", item.get("name", ""))
+                    desc = item.get("description", item.get("summary", ""))
+                    if not desc and item.get("technique"):
+                        desc = f"{item.get('technique', '')} | {item.get('classification', '')}".strip(" |")
+                    url_val = item.get("url", item.get("source", ""))
+                    date_val = item.get("date", datetime.now(timezone.utc).isoformat())
+                    if isinstance(date_val, (int, float)):
+                        date_val = datetime.fromtimestamp(date_val, tz=timezone.utc).isoformat()
                     exploits.append({
                         "source": source["name"],
-                        "title": item.get("title", ""),
-                        "description": item.get("description", item.get("summary", "")),
+                        "title": title,
+                        "description": desc,
                         "severity": item.get("severity", "high"),
-                        "date": item.get("date", datetime.now(timezone.utc).isoformat()),
-                        "url": item.get("url", ""),
+                        "date": date_val,
+                        "url": url_val,
                     })
         except Exception as e:
             logger.warning("[security_feed] %s fetch failed: %s", source["name"], e)

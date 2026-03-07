@@ -19,6 +19,7 @@ import { StatusBadge } from "@/components/ui";
 import { needsSpecApproval, hasAuditOrSimFailure } from "@/lib/types";
 import type { Workflow } from "@/lib/types";
 import { useNetworks } from "@/hooks/useNetworks";
+import { useConfig } from "@/components/providers/ConfigProvider";
 import { useWorkflows } from "@/hooks/useWorkflows";
 import {
   LayoutGrid,
@@ -152,9 +153,18 @@ function ChatPageContent() {
   }, []);
 
   const { networks } = useNetworks();
+  const { defaultNetworkId: configDefaultNetwork } = useConfig();
   const testnets = (networks ?? []).filter((n) => n.is_mainnet === false);
-  const defaultNetwork = testnets[0]?.id ?? DEFAULT_NETWORK;
+  const defaultNetwork = configDefaultNetwork ?? testnets[0]?.id ?? DEFAULT_NETWORK;
   const [buildNetwork, setBuildNetwork] = useState<string>(defaultNetwork);
+  const configNetworkAppliedRef = useRef(false);
+
+  useEffect(() => {
+    if (configDefaultNetwork && !configNetworkAppliedRef.current) {
+      configNetworkAppliedRef.current = true;
+      setBuildNetwork(configDefaultNetwork);
+    }
+  }, [configDefaultNetwork]);
 
   const {
     messages: sdkMessages,
@@ -562,6 +572,12 @@ function ChatPageContent() {
                 </div>
               ) : shellView === "code" ? (
                 <div className="space-y-4">
+                  {selectedWorkflowId && workflow && (workflow.status === "running" || workflow.status === "building" || workflow.status === "spec_review" || workflow.status === "design_review") && (
+                    <div className="rounded-xl border border-[var(--color-semantic-warning)]/20 bg-[var(--color-semantic-warning)]/5 px-4 py-3 mb-2">
+                      <p className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">Pipeline in progress</p>
+                      <WorkflowStages workflow={workflow} contractData={contractData} />
+                    </div>
+                  )}
                   {showCelebration && workflow && (
                     <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 mb-4 flex flex-wrap items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-500">
                       <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 shrink-0">
@@ -650,7 +666,7 @@ function ChatPageContent() {
                       )}
                     </div>
                   )}
-                  {workflow && (
+                  {workflow && (workflow.status === "completed" || workflow.status === "success" || workflow.status === "failed" || workflow.status === "cancelled") && (
                     <div className="mt-6">
                       <WorkflowStages workflow={workflow} contractData={contractData} />
                     </div>
@@ -810,10 +826,17 @@ function ChatPageContent() {
                 setInput(prompt);
               }}
             />
-            {selectedWorkflowId && workflow && (
+            {selectedWorkflowId && (
               <div className="shrink-0 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] rounded-lg p-3 mb-3">
                 <p className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">Pipeline</p>
-                <WorkflowStages workflow={workflow} contractData={contractData} />
+                {workflow ? (
+                  <WorkflowStages workflow={workflow} contractData={contractData} />
+                ) : (
+                  <div className="flex items-center gap-2 py-2 text-[var(--color-text-tertiary)]">
+                    <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                    <span className="text-xs">Loading pipeline status...</span>
+                  </div>
+                )}
               </div>
             )}
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">

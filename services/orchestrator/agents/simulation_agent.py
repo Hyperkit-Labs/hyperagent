@@ -11,6 +11,7 @@ async def run_tenderly_simulations(
     chains: list,
     deployments: list | None = None,
     run_id: str = "",
+    design_rationale: str = "",
 ) -> dict:
     """
     For each deployment with a plan, simulate contract creation; persist to Supabase.
@@ -36,6 +37,7 @@ async def run_tenderly_simulations(
                 from_address=SIM_FROM_ADDRESS,
                 data=data,
                 value="0",
+                design_rationale=design_rationale,
             )
         except Exception as e:
             result = {"success": False, "error": str(e), "gasUsed": 0}

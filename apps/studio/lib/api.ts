@@ -5,7 +5,7 @@
  */
 
 import { getServiceUrl } from '@/config/environment';
-import { FALLBACK_DEFAULT_NETWORK_ID } from '@/constants/defaults';
+import { FALLBACK_DEFAULT_NETWORK_ID, FALLBACK_DEFAULT_CHAIN_ID } from '@/constants/defaults';
 import type { Workflow } from '@/lib/types';
 import { getStoredSession } from '@/lib/session-store';
 
@@ -465,6 +465,16 @@ export interface RuntimeConfig {
   /** Credits consumed per workflow run. Default 7. */
   credits_per_run?: number;
   integrations?: IntegrationsStatus;
+  /** Default network slug from registry (e.g. skalebase-sepolia). */
+  default_network_id?: string;
+  /** Default chain ID from registry (e.g. 324705682). */
+  default_chain_id?: number;
+  /** A2A agent ID from ERC-8004 registry. */
+  a2a_agent_id?: string | null;
+  /** A2A default chain ID. */
+  a2a_default_chain_id?: number | null;
+  /** A2A agent identity (address, chainId, etc.). */
+  a2a_identity?: Record<string, unknown> | null;
 }
 
 export async function getConfig(): Promise<RuntimeConfig> {
@@ -474,7 +484,18 @@ export async function getConfig(): Promise<RuntimeConfig> {
     merchant_wallet_address: null,
     credits_enabled: false,
     integrations: { tenderly_configured: false, pinata_configured: false, qdrant_configured: false },
+    default_network_id: FALLBACK_DEFAULT_NETWORK_ID,
+    default_chain_id: FALLBACK_DEFAULT_CHAIN_ID,
   }));
+}
+
+/**
+ * GET /networks. Returns list from chain registry (backend normalizes to NetworkConfig[]).
+ * Raw API may return { networks: [...] } or array; this function always returns NetworkConfig[].
+ */
+/** GET /tokens/stablecoins. Returns { chainId: { USDC: addr, USDT: addr } }. */
+export async function getStablecoins(): Promise<Record<string, { USDC?: string; USDT?: string }>> {
+  return fetchJson<Record<string, { USDC?: string; USDT?: string }>>('/tokens/stablecoins').catch(() => ({}));
 }
 
 /**
@@ -503,6 +524,16 @@ export async function getNetworks(
     category: n.category,
     is_mainnet: n.is_mainnet,
   }));
+}
+
+export interface QuickDemoResponse {
+  sandbox_id?: string;
+  url?: string;
+  status?: string;
+}
+
+export async function createQuickDemo(): Promise<QuickDemoResponse> {
+  return fetchJson<QuickDemoResponse>('/quick-demo', { method: 'POST' });
 }
 
 export async function getMetrics(signal?: AbortSignal): Promise<Metrics> {
@@ -642,7 +673,7 @@ export async function prepareDeploymentTransaction(
   workflowId: string,
   params?: PrepareDeployParams
 ): Promise<unknown> {
-  const chainId = params?.chainId ?? 8453;
+  const chainId = params?.chainId ?? FALLBACK_DEFAULT_CHAIN_ID;
   const mainnet_confirm = params?.mainnet_confirm ?? false;
   const qs = new URLSearchParams({ chain_id: String(chainId) });
   return fetchJson(`/workflows/${workflowId}/deploy/prepare?${qs}`, {

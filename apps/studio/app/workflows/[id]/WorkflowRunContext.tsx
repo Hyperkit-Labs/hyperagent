@@ -3,8 +3,7 @@
 import React, { createContext, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ROUTES } from "@/constants/routes";
-import { useWorkflow } from "@/hooks/useWorkflow";
-import { approveSpec, getWorkflowContracts } from "@/lib/api";
+import { approveSpec, getWorkflow, getWorkflowContracts } from "@/lib/api";
 import type { Workflow } from "@/lib/types";
 import { hasAuditOrSimFailure } from "@/lib/types";
 import { WorkflowStages } from "./WorkflowStages";
@@ -38,20 +37,39 @@ export function WorkflowRunProvider({
   workflowId: string;
   children: React.ReactNode;
 }) {
-  const { workflow, loading, error, refetch } = useWorkflow(workflowId);
+  const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [contractData, setContractData] = useState<WorkflowRunState["contractData"]>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [approving, setApproving] = useState(false);
   const [approveError, setApproveError] = useState<string | null>(null);
 
+  const refetch = useCallback(async () => {
+    if (!workflowId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const [wf, list] = await Promise.all([
+        getWorkflow(workflowId),
+        getWorkflowContracts(workflowId).catch(() => []),
+      ]);
+      setWorkflow(wf);
+      const first = Array.isArray(list) && list.length > 0 ? list[0] : null;
+      setContractData(first ? { bytecode: first.bytecode as string | undefined, source_code: first.source_code as string | undefined, ...first } : null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load workflow");
+    } finally {
+      setLoading(false);
+    }
+  }, [workflowId]);
+
   useEffect(() => {
-    if (!workflow?.workflow_id) return;
-    getWorkflowContracts(workflow.workflow_id)
-      .then((list) => {
-        const first = Array.isArray(list) && list.length > 0 ? list[0] : null;
-        setContractData(first ? { bytecode: first.bytecode as string | undefined, source_code: first.source_code as string | undefined, ...first } : null);
-      })
-      .catch(() => setContractData(null));
-  }, [workflow?.workflow_id]);
+    if (!workflowId) {
+      setLoading(false);
+      return;
+    }
+    void refetch();
+  }, [workflowId, refetch]);
 
   const approve = useCallback(async () => {
     if (!workflow?.workflow_id) return;

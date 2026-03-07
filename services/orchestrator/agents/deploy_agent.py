@@ -7,7 +7,8 @@ import httpx
 
 from providers import get_deploy_provider
 from db import insert_deployment, is_configured
-from registries import get_timeout
+from registries import get_timeout, get_default_chain_id
+from trace_context import get_trace_headers
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +28,12 @@ def _strip_markdown_fences(source: str) -> str:
 async def _compile_contract(source: str, contract_name: str, framework: str = "hardhat") -> dict | None:
     """Return { bytecode, abi } or None on failure."""
     clean_source = _strip_markdown_fences(source)
+    headers = get_trace_headers()
     async with httpx.AsyncClient(timeout=get_timeout("deploy")) as client:
         r = await client.post(
             f"{COMPILE_SERVICE_URL}/compile",
             json={"contractCode": clean_source, "framework": framework},
+            headers=headers,
         )
         if r.status_code != 200:
             logger.warning("[deploy] compile HTTP %s for %s", r.status_code, contract_name)
@@ -45,7 +48,7 @@ async def _compile_contract(source: str, contract_name: str, framework: str = "h
 
 
 def _chain_ids_from_spec(chains: list) -> list[int]:
-    """Extract chain_id list from spec chains (e.g. [{"chain_id": 8453}, {"id": 1}])."""
+    """Extract chain_id list from spec chains."""
     out = []
     for c in chains or []:
         if isinstance(c, dict):
@@ -54,7 +57,7 @@ def _chain_ids_from_spec(chains: list) -> list[int]:
                 out.append(int(cid))
         elif isinstance(c, int):
             out.append(c)
-    return out if out else [8453]
+    return out if out else [get_default_chain_id()]
 
 
 async def deploy_contracts(

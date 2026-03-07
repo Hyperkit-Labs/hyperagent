@@ -1,7 +1,7 @@
 /**
- * Thirdweb chain definitions for Mantle, SKALE, Filecoin (not in thirdweb/chains package).
- * Supported networks list and metadata come from GET /api/v1/networks (chain registry); use useNetworks() for UI.
- * This file is only for wallet/RPC execution via thirdweb where the registry chain is not in thirdweb/chains.
+ * Thirdweb chain definitions for Mantle, SKALE Base, Filecoin (not in thirdweb/chains package).
+ * Supported networks and metadata from GET /api/v1/networks; use useNetworks() for UI.
+ * Chain IDs and RPCs must match infra/registries/network/chains.yaml.
  */
 
 import { defineChain } from 'thirdweb/chains';
@@ -21,11 +21,12 @@ export const mantleSepoliaTestnet = defineChain({
   testnet: true,
 });
 
-export const skaleChaosTestnet = defineChain({
-  id: 1351057230,
-  name: 'SKALE Chaos Testnet',
-  nativeCurrency: { decimals: 18, name: 'sFUEL', symbol: 'sFUEL' },
-  blockExplorers: [{ name: 'SKALE Explorer', url: 'https://chaos-testnet-explorer.skale.network' }],
+export const skaleBaseSepolia = defineChain({
+  id: 324705682,
+  name: 'SKALE Base Sepolia',
+  nativeCurrency: { decimals: 18, name: 'CREDIT', symbol: 'CREDIT' },
+  rpc: 'https://base-sepolia-testnet.skalenodes.com/v1/jubilant-horrible-ancha',
+  blockExplorers: [{ name: 'SKALE Explorer', url: 'https://base-sepolia-testnet-explorer.skalenodes.com/' }],
   testnet: true,
 });
 

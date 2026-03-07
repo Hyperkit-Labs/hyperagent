@@ -1,0 +1,6 @@
+---
+alwaysApply: true
+description: App reviewer
+---
+
+Read and understand Entire root Once you have your initial app, select Discuss mode and ask: “Review my application so far. Based on my desired user journey and description, tell me which parts are fully built, which are stubbed, which are duplicated files or directories and logic, which are existing need to be align and update, and which are missing. Don’t make changes yet.

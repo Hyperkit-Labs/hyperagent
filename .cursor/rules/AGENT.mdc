@@ -1,54 +1,251 @@
 ---
 alwaysApply: true
+description: HyperAgent AI agent configuration and instructions. Connects to LLM context, project rules, and installed skills for comprehensive agent capabilities.
 ---
 
-# Agent Resource Requirements
+# HyperAgent Agent Configuration
 
-## Mandatory Pre-Action Resource Check
+## Overview
 
-Before taking any action, decision, or implementing any feature, you MUST:
+This file defines the AI agent configuration for the HyperAgent platform. HyperAgent is an AI-native, multi-agent platform that transforms natural-language specifications into production-ready, audited, simulated, and deployed smart contracts across multiple EVM networks.
 
-1. **Check `.cursor/skills/` directory first**
-   - Review all available skills and their documentation
-   - Read relevant `SKILL.md` files in each skill subdirectory
-   - Check `references/` folders for templates and guidelines
-   - Identify applicable skills for the current task
-   - Follow the patterns and best practices defined in these skills
+## Context Connections
 
-2. **Check `.cursor/llm/` directory second**
-   - Review all LLM-related resources and configurations
-   - Read any documentation, prompts, or guidelines
-   - Understand LLM usage patterns and constraints
-   - Apply LLM-specific rules and configurations
+### LLM Context
 
-3. **Apply Resources Before Action**
-   - Do not proceed with implementation until you have reviewed relevant resources
-   - Incorporate patterns, templates, and guidelines from these directories
-   - Ensure your actions align with the established practices
-   - Reference specific skills or LLM resources when applicable
+Reference: `.cursor/llm/llm.txt`
 
-## Resource Discovery Process
+The LLM context file provides structured, AI-friendly summaries and indexes of key project information. It helps agents understand, summarize, and cite content efficiently.
 
-1. **Identify Task Type**: Determine what kind of task you're handling
-2. **Search Skills**: Look for relevant skills in `.cursor/skills/` that match the task
-3. **Read Documentation**: Read the `SKILL.md` and any reference files
-4. **Check LLM Resources**: Review `.cursor/llm/` for any relevant configurations
-5. **Apply Learnings**: Use the patterns and guidelines before taking action
+### Project Rules
 
-## Example Workflow
+Reference: `.cursor/rules/`
+
+The following rules are available and should be applied:
+
+- **Project_Manager.mdc**: Expert project management and Scrum Master guidance for planning, tracking, and delivering projects using Agile methodologies
+- **README.mdc**: Professional README standards for GitHub OSS projects
+- **rules.mdc**: Clean code implementation techniques and project management best practices
+- **production.mdc**: Production-ready code standards
+- **maintainer.mdc**: Code maintenance and quality standards
+- **llm.mdc**: Data extraction and formatting guidelines
+- **AI Text Humanizer Specialist.mdc**: Text humanization guidelines
+- **App_reviewer.mdc**: Application review guidelines
+- **sprint-commitments.mdc**: Sprint and docs/today planning: user-vetted items are commitments (mandatory); do not reclassify as optional. Role is Organizer, not Advisor. See Preservation rule, Scope boundary, Capacity warning, No deletions.
+- **development-blocks.mdc**: Task-type to SDK/skills/blocks mapping and blocks-first development. For new page, route, component, or API: which `.cursor/llm/docs/` and skills to use; prefer registry and existing components. See that rule for task mapping and globs.
+
+### Installed Skills
+
+Reference: `.cursor/skills/`, `skills/`, and `docs/planning/INSTALLED_SKILLS.md`
+
+The following skills are installed and available:
+
+**Project Skills** (installed locally in `skills/` and accessible via `.cursor/skills/`):
+
+**LangChain & Multi-Agent**:
+- **langchain-architecture**: LangChain architecture patterns
+- **langgraph**: LangGraph workflow orchestration
+- **langgraph-docs**: LangGraph documentation patterns
+- **multi-agent-orchestration**: Multi-agent system orchestration
+- **agent-memory-mcp**: Persistent agent memory with MCP
+
+**Smart Contract Development**:
+- **smart-contract-security**: Smart contract security audit patterns
+- **solidity-development**: Solidity development best practices
+- **solidity-security**: Smart contract security patterns
+- **web3-testing**: Web3 and blockchain testing
+
+**Backend & API**:
+- **fastapi**: FastAPI development patterns
+- **fastapi-templates**: FastAPI project templates
+- **supabase-postgres-best-practices**: Supabase/PostgreSQL patterns
+- **database-schema-designer**: Database schema design
+- **database-schema-documentation**: Schema documentation
+
+**Frontend & UI**:
+- **nextjs-react-typescript**: Next.js, React, TypeScript patterns
+- **better-icons**: Better Icons library
+- **morphing-icons**: Morphing icon patterns
+- **implement-design**: Figma design implementation
+- **playwright**: E2E testing framework
+
+**DevOps & Infrastructure**:
+- **gitops-workflow**: GitOps workflow patterns
+- **gitops-principles-skill**: GitOps core principles
+- **devops-engineer**: Comprehensive DevOps patterns
+- **github-actions-templates**: GitHub Actions templates
+- **prometheus-configuration**: Prometheus monitoring
+- **mcp-builder**: MCP server builder
+- **mcp-cli**: MCP CLI tooling
+
+**Architecture & Diagrams**:
+- **c4-architecture**: C4 model architecture
+- **c4-component**: C4 component diagrams
+- **architecture-diagrams**: Architecture diagram generation
+- **beautiful-mermaid**: Beautiful Mermaid diagrams
+- **mermaid-diagrams**: Advanced Mermaid patterns
+- **structural-design-principles**: Structural design
+
+**Data & Visualization**:
+- **data-visualization**: Data visualization patterns
+- **infographic-creator**: Infographic creation
+
+**Product Design**:
+- **behavioral-product-design**: Behavioral product design
+- **behavioral-modes**: Behavioral design modes
+- **implement-design**: Design implementation
+
+**Documentation**:
+- **api-documentation-generator**: API documentation generation
+- **database-schema-documentation**: Schema documentation
+
+**Planning & Organization**:
+- **blueprintkit**: Project planning framework (14 sections + 9 skills)
+- **planning-with-files**: File-based planning
+- **file-organizer**: File organization patterns
+- **find-skills**: Skill discovery and installation
+
+**Git & Workflow**:
+- **pr-workflow**: Pull request workflows
+- **branch-finalization**: Branch finalization
+- **branch-discipline**: Git branch discipline
+
+**Development Tools**:
+- **debugging-strategies**: Comprehensive debugging
+
+See `docs/planning/INSTALLED_SKILLS.md` for complete documentation of all 50+ installed skills.
+
+## Important Notes — Mandatory Requirements
+
+**Requirement: Leverage all installed skills.** Before taking action (e.g. creating or changing PR/issue templates, CI/CD workflows, code, or docs), the agent **must**:
+
+1. **Read** the relevant skills under `.cursor/skills/` (and `docs/planning/INSTALLED_SKILLS.md` for the full list).
+2. **Apply** those skills: follow their patterns, templates, and best practices for the task at hand.
+3. **Cite or align** outputs with the skill(s) used (e.g. github-actions-templates for workflows, github-issues for issue/PR structure).
+
+**If this requirement is not met, do not proceed.** Work that does not leverage the applicable installed skills is out of scope until the skills are consulted and applied.
+
+For PR/issue templates and GitHub Actions specifically, read at least: `github-actions-templates`, `github-issues` (and its `references/templates.md`), and `github-workflow-automation` where relevant.
+
+## HyperAgent Platform Context
+
+### Platform Architecture
+
+HyperAgent uses a microservice and service-oriented architecture with three major layers:
+
+1. **Client Shells**: Web app (Next.js), desktop app (OpenClaw-style), CLI tool
+2. **Orchestration/Agents**: Central orchestrator (Python/FastAPI + LangGraph) and specialized agent services
+3. **Core Services**: Project service, data/memory layer, blockchain gateway
+
+### Agent Pipeline
+
+The canonical EVM pipeline consists of seven specialized agents:
+
+1. **SpecAgent**: Natural language to structured specification
+2. **DesignAgent**: Architecture and design proposals
+3. **CodegenAgent**: Solidity code generation with streaming guardrails
+4. **AuditAgent**: Static analysis and fuzzing (Slither, Mythril, MythX, Echidna)
+5. **TenderlySimAgent**: Simulation-first validation using Tenderly
+6. **DeployAgent**: Multi-chain deployment
+7. **MonitorAgent**: Post-deployment monitoring
+
+### Key Technologies
+
+- **Backend**: Python 3.11+, FastAPI 0.100+, LangGraph
+- **Frontend**: Next.js 14, React, TypeScript 5.x, Tailwind CSS 3.x
+- **Blockchain**: Hardhat, Foundry, Thirdweb SDK, Tenderly
+- **Data**: Supabase (PostgreSQL), VectorDB (Pinecone), Redis, Acontext
+- **Infrastructure**: Docker, Kubernetes, IPFS/Pinata, Arweave, Filecoin
+
+### Documentation Structure
+
+- **Planning**: `docs/planning/` - 14 comprehensive planning documents
+- **Reference**: `docs/reference/spec/` - Platform blueprint and execution strategy
+- **ADRs**: `docs/adrs/` - Architecture Decision Records
+
+### Agents vs Core Agents
+
+- **`hyperagent.agents`**: API- and domain-facing agents (SpecAgent, generation, audit, deployment, testing) used by routes and high-level flows. New logic that touches HTTP endpoints or workflow entry points belongs here or in the corresponding `hyperagent.core.services.*` implementations that these agents wrap.
+- **`hyperagent.core.agents`**: Orchestration and internal pipeline agents (ErrorAnalyzer, FixGenerator, RequirementsAgent, DesignAgent, CapabilityChecker, DesignDocumentGenerator, ReflectionAgent) used inside the orchestrator and design pipeline. Use these for design, analysis, and fix-generation steps that are not directly exposed as API agents.
+
+When adding or changing agent behavior, choose the layer that matches the call site: routes and workflow entry points use `hyperagent.agents` and `hyperagent.core.services`; orchestration and design steps use `hyperagent.core.agents`.
+
+## Agent Instructions
+
+### When Working on HyperAgent
+
+1. **Understand Context**: Review relevant planning documents in `docs/planning/` and specifications in `docs/reference/spec/`
+2. **Task-type and blocks**: When adding a new page, route, component, or API, apply `.cursor/rules/development-blocks.mdc`: list applicable SDK/LLM docs (from `.cursor/llm/docs/`), skills, and existing components; prefer registry and project blocks; then implement using those.
+3. **Sprint and docs/today**: When working with `docs/today/`, ordered checklists, or sprint task lists, apply `.cursor/rules/sprint-commitments.mdc`. Treat all user-vetted or plan-listed items as mandatory commitments; do not mark them optional or recommended. Put any AI-only suggestions in a separate "AI Recommended Additions" or "Future Considerations" section.
+4. **Follow Standards**: Apply coding standards from `.cursor/rules/rules.mdc` and production standards from `.cursor/rules/production.mdc`
+5. **Use Skills** (mandatory): Leverage **all** relevant installed skills from `.cursor/skills/` for the task (e.g. smart contract security, FastAPI, Next.js/TypeScript, GitHub Actions, PR/issue workflows). See **Important Notes — Mandatory Requirements** above; do not proceed without consulting and applying the applicable skills.
+6. **Maintain Quality**: Follow clean code principles, write tests (80%+ coverage), and ensure code reviews
+7. **Document Decisions**: Create ADRs in `docs/adrs/` for major architectural decisions
+
+### Code Generation Guidelines
+
+- **Smart Contracts**: Use Solidity security best practices, follow ERC standards, implement proper access controls
+- **Backend Services**: Follow FastAPI patterns, implement proper error handling, use type hints
+- **Frontend Components**: Use Next.js 14 App Router, TypeScript strict mode, Tailwind CSS, shadcn/ui components
+- **Testing**: Write unit tests (80%+ coverage), integration tests, and E2E tests
+
+### Project Structure
+
+The project follows a monorepo structure:
 
 ```
-Task: Create a GitHub workflow
-1. Check .cursor/skills/github-workflow-automation/
-2. Read SKILL.md and any references
-3. Check .cursor/llm/ for any LLM-related guidelines
-4. Apply the patterns and templates found
-5. Proceed with implementation
+apps/
+  hyperagent-web/        # Next.js UI
+  hyperagent-desktop/    # OpenClaw-style shell
+  hyperagent-cli/        # Node/TS CLI
+
+services/
+  orchestrator/          # Python/FastAPI + LangGraph
+  agent-spec/
+  agent-codegen/
+  agent-audit/
+  agent-tenderly-sim/
+  agent-deploy/
+  agent-verify/
+  agent-monitor/
+  blockchain-gateway/
+
+libs/
+  sdk-ts/
+  spec-dictionary/
+  rag-kb/
+  chain-registry/
+  sdk-registry/
 ```
 
-## Enforcement
+### Security Considerations
 
-- These resources are authoritative and must be followed
-- Ignoring these resources may result in inconsistent or incorrect implementations
-- Always prioritize resources from these directories over generic approaches
-- When in doubt, consult these directories before making decisions
+- Always run security audits (Slither, Mythril, MythX) for smart contracts
+- Use Tenderly simulation before deployment
+- Implement streaming guardrails for code generation
+- Follow least privilege principles
+- Scan dependencies for vulnerabilities
+
+### MCP (Model Context Protocol) Configuration
+
+HyperAgent can use MCP servers to extend agent capabilities with external services. MCP configuration is managed through Cursor's MCP settings.
+
+**Available MCP Integrations** (when configured):
+- **GitHub**: Repository management, issues, pull requests
+- **Supabase**: Database and storage operations
+- **Vercel**: Deployments, project management
+- **Figma**: Design file access, asset export
+
+**Note**: MCP servers are configured through Cursor's settings. Refer to Cursor documentation for MCP setup and configuration.
+
+## References
+
+- Platform Blueprint: `docs/reference/spec/draft.md`
+- Execution Strategy: `docs/reference/spec/execute.md`
+- Planning Documents: `docs/planning/0-Master-Index.md`
+- LLM Context: `.cursor/llm/llm.txt` and `.cursor/llm/docs/`
+- Project Rules: `.cursor/rules/`
+- Task-type and blocks (SDK/skills/blocks first): `.cursor/rules/development-blocks.mdc`
+- Sprint commitments (docs/today): `.cursor/rules/sprint-commitments.mdc`, `.cursor/wiki/sprint-commitments.md`, `.cursor/commands/sprint-reset.md`
+- Installed Skills: `.cursor/skills/` and `skills/`
+- Skills Documentation: `docs/planning/INSTALLED_SKILLS.md`

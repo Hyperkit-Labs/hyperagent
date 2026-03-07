@@ -31,7 +31,7 @@ def _trace_headers() -> dict[str, str]:
 # ---------------------------------------------------------------------------
 
 class SimulationProvider(Protocol):
-    """Protocol: simulate(network, from_addr, data, to_addr?, value?) -> SimulateTxResult."""
+    """Protocol: simulate(network, from_addr, data, to_addr?, value?, design_rationale?) -> SimulateTxResult."""
 
     async def simulate(
         self,
@@ -40,6 +40,7 @@ class SimulationProvider(Protocol):
         data: str,
         to_address: str | None = None,
         value: str = "0",
+        design_rationale: str = "",
     ) -> dict[str, Any]:
         """Run simulation; returns SimulateTxResult-shaped dict."""
         ...
@@ -58,19 +59,23 @@ class SimulationHttpProvider:
         data: str,
         to_address: str | None = None,
         value: str = "0",
+        design_rationale: str = "",
     ) -> dict[str, Any]:
         headers = _trace_headers()
+        payload: dict[str, Any] = {
+            "network": network,
+            "from": from_address,
+            "to": to_address or "",
+            "data": data,
+            "value": value,
+        }
+        if design_rationale:
+            payload["design_rationale"] = design_rationale
         async with httpx.AsyncClient(timeout=get_timeout("simulation")) as client:
             r = await client.post(
                 f"{self.base_url}/simulate",
                 headers=headers,
-                json={
-                    "network": network,
-                    "from": from_address,
-                    "to": to_address or "",
-                    "data": data,
-                    "value": value,
-                },
+                json=payload,
             )
             if r.status_code == 503:
                 return {"success": False, "error": "Tenderly not configured", "gasUsed": 0}

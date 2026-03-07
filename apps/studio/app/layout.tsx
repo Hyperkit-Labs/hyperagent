@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ApiAuthProvider } from "@/components/providers/ApiAuthProvider";
-import { ConfigLoader } from "@/components/providers/ConfigLoader";
+import { ConfigProvider } from "@/components/providers/ConfigProvider";
 import { ThirdwebProviderWrapper } from "@/components/providers/ThirdwebProviderWrapper";
 import { Toaster } from "sonner";
 import { LayoutSwitcher } from "@/components/layout/LayoutSwitcher";
@@ -21,7 +21,7 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Hyperkit - AI-Powered Smart Contract Platform",
-  description: "Production-ready smart contract development in under 2 minutes. x402 Native | Mantle SDK | Thirdweb | EigenDA",
+  description: "Production-ready smart contract development in under 2 minutes. x402 Native | Mantle SDK | Thirdweb",
 };
 
 export default function RootLayout({
@@ -33,13 +33,14 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body className="antialiased min-h-screen flex flex-col bg-[var(--color-bg-base)] text-[var(--color-text-secondary)] font-sans">
         <div className="flex flex-col flex-1 min-h-0 min-w-0 w-full">
-          <ConfigLoader />
+          <ConfigProvider>
           <ThirdwebProviderWrapper>
             <ApiAuthProvider>
               <LayoutSwitcher>{children}</LayoutSwitcher>
               <Toaster position="top-right" richColors />
             </ApiAuthProvider>
           </ThirdwebProviderWrapper>
+          </ConfigProvider>
         </div>
       </body>
     </html>

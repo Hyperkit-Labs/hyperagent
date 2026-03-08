@@ -8,6 +8,7 @@ from typing import Any
 
 import httpx
 
+from agents.agent_http import agent_runtime_headers
 from agents.codegen_agent import generate_contracts
 from agents.scrubd_agent import get_scrubd_fix_hints
 
@@ -69,6 +70,7 @@ async def _run_auditor(
     )
     user = f"Bundle ({len(bundle)} chars):\n\n{bundle[:120000]}"
     try:
+        headers = agent_runtime_headers()
         async with httpx.AsyncClient(timeout=180) as client:
             r = await client.post(
                 f"{AGENT_RUNTIME_URL}/agents/pashov-audit",
@@ -82,6 +84,7 @@ async def _run_auditor(
                         "apiKeys": api_keys or {},
                     },
                 },
+                headers=headers,
             )
             if r.status_code != 200:
                 logger.warning("[debate] auditor returned %s: %s", r.status_code, r.text[:200])

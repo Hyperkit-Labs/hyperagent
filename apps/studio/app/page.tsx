@@ -8,7 +8,10 @@ import { useWorkflowPolling } from "@/hooks/useWorkflowPolling";
 import { createWorkflow, DEFAULT_NETWORK, getErrorMessage, handleApiError, requireLLMKeys, LLM_KEYS_REQUIRED_MESSAGE, isByokStorageOrMigrationError, BYOK_SAVE_AGAIN_HINT, isCreditsError } from "@/lib/api";
 import { getSessionOnlyLLMKey, SESSION_LLM_PASS_THROUGH_UPDATED_EVENT } from "@/lib/session-store";
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
-import { Suggestions, PromptInput } from "@/components/ai-elements";
+import { StarterGrid } from "@/components/chat/StarterGrid";
+import { PipelineStepper } from "@/components/chat/PipelineStepper";
+import { ChatCommandBar } from "@/components/chat/ChatCommandBar";
+import { WorkflowActivityList } from "@/components/chat/WorkflowActivityList";
 import { ContractViewer } from "@/components/contracts/ContractViewer";
 import { WorkflowStages } from "@/app/workflows/[id]/WorkflowStages";
 import { CodeBlockShimmer } from "@/components/ai-elements";
@@ -16,7 +19,6 @@ import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist";
 import { ROUTES } from "@/constants/routes";
 import type { ChatMessage, ToolInvocation } from "@/components/chat/ChatMessageList";
-import { StatusBadge } from "@/components/ui";
 import { needsSpecApproval, needsDeployApproval, hasAuditOrSimFailure } from "@/lib/types";
 import type { Workflow } from "@/lib/types";
 import { useNetworks } from "@/hooks/useNetworks";
@@ -29,6 +31,8 @@ import {
   Bot,
   Plus,
   Clock,
+  ChevronRight,
+  ChevronLeft,
   FileCode,
   Loader2,
   Settings,
@@ -154,6 +158,7 @@ function ChatPageContent() {
   const searchParams = useSearchParams();
   const account = useActiveAccount();
   const [shellView, setShellView] = useState<ShellView>("code");
+  const [workflowsSidebarOpen, setWorkflowsSidebarOpen] = useState(true);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(
     searchParams.get("workflow") || null
   );
@@ -165,7 +170,6 @@ function ChatPageContent() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const celebrationShownRef = useRef(false);
-  const scrollToChatRef = useRef<HTMLElement | null>(null);
   const [llmPassThrough, setLlmPassThrough] = useState<{ provider: "openai" | "google" | "anthropic"; apiKey: string } | null>(null);
   const prefillAppliedRef = useRef(false);
 
@@ -427,7 +431,7 @@ function ChatPageContent() {
             onClick={() => setSettingsOpen(true)}
             className="p-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)] transition-colors"
             title="Settings (LLM API keys)"
-            aria-label="Open settings"
+            aria-label="Open settings (LLM API keys)"
           >
             <Settings className="w-4 h-4" />
           </button>
@@ -535,24 +539,44 @@ function ChatPageContent() {
           )}
         </aside>
 
-        <main className="flex-1 flex flex-col overflow-hidden bg-[var(--color-bg-base)]">
-          <div className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 flex flex-col overflow-hidden bg-[var(--color-bg-base)] min-w-0">
+          <div className="flex-1 overflow-y-auto min-h-0">
+            <div className="px-6 py-4">
+              <ChatMessageList
+                messages={allMessages}
+                isLoading={isLoading}
+                streamingContent={streamingContent}
+              />
+            </div>
+            {selectedWorkflowId && workflow && (
+              <div className="shrink-0 px-4 pt-2">
+                <PipelineStepper
+                  workflow={workflow}
+                  onErrorClick={(stageName, error) => {
+                    setInput(`Explain why the ${stageName} step failed. Error: ${error ?? "unknown"}`);
+                  }}
+                />
+              </div>
+            )}
+            <div className="p-6">
             <div className="max-w-5xl mx-auto space-y-6">
               {!selectedWorkflowId ? (
-                <div className="flex flex-col items-center justify-center py-24 text-[var(--color-text-muted)] gap-4">
-                  <Code2 className="w-8 h-8 opacity-40" />
-                  <p className="text-sm">Create a workflow to view contracts and pipeline results here.</p>
-                  <p className="text-xs text-[var(--color-text-tertiary)]">
-                    Use the chat on the right or click below to focus the input.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => scrollToChatRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" })}
-                    className="inline-flex items-center gap-2 rounded-lg btn-primary-gradient px-4 py-2 text-xs font-medium text-white"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Create workflow
-                  </button>
+                <div className="flex flex-col items-center justify-center py-16 gap-8">
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-[var(--color-text-primary)] mb-1">What would you like to build?</p>
+                    <p className="text-xs text-[var(--color-text-tertiary)] mb-2">Choose a starter or describe your contract below.</p>
+                    <p className="text-xs text-[var(--color-text-muted)]">Try: &quot;Deploy an ERC20 token&quot; or &quot;Audit my vault contract&quot;</p>
+                  </div>
+                  <StarterGrid
+                    onSelect={(prompt) => {
+                      if (!hasActiveByokKey()) {
+                        setSettingsOpen(true);
+                        setInput(prompt);
+                        return;
+                      }
+                      setInput(prompt);
+                    }}
+                  />
                 </div>
               ) : workflowError && !workflow ? (
                 <div className="flex flex-col items-center justify-center py-24 text-[var(--color-text-muted)] gap-3">
@@ -761,196 +785,153 @@ function ChatPageContent() {
               ) : null}
             </div>
           </div>
-        </main>
-
-        <aside ref={scrollToChatRef} className="w-96 bg-[var(--color-bg-elevated)] border-l border-[var(--color-border-subtle)] flex flex-col shrink-0 z-20">
-          <div className="h-14 border-b border-[var(--color-border-subtle)] flex items-center justify-between px-4 bg-[var(--color-bg-elevated)]">
-            <div className="flex gap-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setMessages([]);
-                  setSelectedWorkflowId(null);
-                  setCreateError(null);
-                  window.history.replaceState(null, "", ROUTES.HOME);
-                }}
-                className="p-1.5 hover:bg-[var(--color-bg-panel)] rounded transition-colors"
-                title="New chat"
-              >
-                <Plus className="w-4 h-4 text-[var(--color-text-tertiary)]" />
-              </button>
-              <button
-                type="button"
-                onClick={() => router.push(ROUTES.WORKFLOWS)}
-                className="p-1.5 hover:bg-[var(--color-bg-panel)] rounded transition-colors"
-                title="All workflows"
-              >
-                <Clock className="w-4 h-4 text-[var(--color-text-tertiary)]" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setSettingsOpen(true)}
-                className="p-1.5 hover:bg-[var(--color-bg-panel)] rounded transition-colors"
-                title="Settings"
-              >
-                <Settings className="w-4 h-4 text-[var(--color-text-tertiary)]" />
-              </button>
-            </div>
           </div>
-
-          <OnboardingChecklist
-            className="shrink-0 border-b border-[var(--color-border-subtle)]"
-            onByokClick={() => setSettingsOpen(true)}
-            onPaymentClick={() => router.push(ROUTES.PAYMENTS)}
-            onTryItNowClick={() => router.push(ROUTES.DASHBOARD)}
-          />
-
-          <div className="shrink-0 border-b border-[var(--color-border-subtle)] p-3">
-            <p className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">Activity</p>
-            {workflowsLoading && !workflows?.length ? (
-              <div className="text-[11px] text-[var(--color-text-muted)] py-2">Loading...</div>
-            ) : workflows?.length ? (
-              <ul className="space-y-1 max-h-[180px] overflow-y-auto">
-                {(workflows ?? []).map((w: Workflow) => (
-                  <li key={w.workflow_id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedWorkflowId(w.workflow_id);
-                        router.replace(`${ROUTES.HOME}?workflow=${w.workflow_id}`, { scroll: false });
-                      }}
-                      className={`w-full text-left px-2 py-1.5 rounded-md transition-colors text-[11px] truncate block ${
-                        selectedWorkflowId === w.workflow_id
-                          ? "bg-[var(--color-bg-panel)] text-[var(--color-text-primary)]"
-                          : "text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)]"
-                      }`}
-                      title={w.intent || w.workflow_id}
-                    >
-                      <motion.span layoutId={`workflow-title-${w.workflow_id}`} className="font-medium truncate block">{w.name || w.intent || w.workflow_id}</motion.span>
-                      <span className="flex flex-wrap items-center gap-1 mt-0.5">
-                        <StatusBadge status={w.status} />
-                        {needsSpecApproval(w) && <StatusBadge status="Spec" variant="spec" title="Spec ready for approval" />}
-                        {needsDeployApproval(w) && <StatusBadge status="Deploy" variant="spec" title="Deploy ready for approval" />}
-                        {hasAuditOrSimFailure(w) && <StatusBadge status="Audit/Sim failed" variant="audit-failed" />}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-[11px] text-[var(--color-text-muted)] py-2">No workflows yet. Create one below.</p>
-            )}
-          </div>
-
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <Suggestions
-              onSelect={(prompt) => {
-                if (!hasActiveByokKey()) {
-                  setSettingsOpen(true);
-                  setInput(prompt);
-                  return;
-                }
-                setInput(prompt);
-              }}
-            />
-            {selectedWorkflowId && (
-              <div className="shrink-0 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] rounded-lg p-3 mb-3">
-                <p className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">Pipeline</p>
-                {workflow ? (
-                  <WorkflowStages workflow={workflow} contractData={contractData} />
-                ) : (
-                  <div className="flex items-center gap-2 py-2 text-[var(--color-text-tertiary)]">
-                    <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                    <span className="text-xs">Loading pipeline status...</span>
-                  </div>
-                )}
-              </div>
-            )}
-            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-              <ChatMessageList
-                messages={allMessages}
-                isLoading={isLoading}
-                streamingContent={streamingContent}
-              />
-            </div>
-            <div className="border-t border-[var(--color-border-subtle)] p-3 space-y-3">
-              {llmPassThrough ? (
-                <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  <span className="text-[10px] text-emerald-400 font-medium">
-                    {llmPassThrough.provider === "google" ? "Gemini" : llmPassThrough.provider === "openai" ? "OpenAI" : "Anthropic"} key active
-                  </span>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setSettingsOpen(true)}
-                  className="flex items-center gap-2 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/15 transition-colors w-full text-left"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                  <span className="text-[10px] text-amber-400 font-medium">
-                    No LLM key set. Click to add one in Settings.
-                  </span>
-                </button>
-              )}
-              <PromptInput
+          <div className="shrink-0 flex flex-col items-center gap-3 px-4 pb-4 pt-2">
+            <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-black/30 backdrop-blur-xl shadow-[0_0_40px_rgba(124,58,237,0.08)] focus-within:shadow-[0_0_40px_rgba(124,58,237,0.15)] transition-shadow overflow-hidden">
+              <ChatCommandBar
                 value={input}
                 onChange={setInput}
                 onSubmit={handleSubmit}
                 disabled={isLoading}
-                placeholder={llmPassThrough ? "Describe your contract or ask a question..." : "Add an LLM key in Settings to start chatting..."}
-                className="!p-0 !bg-transparent !border-t-0"
-              />
-              <div className="flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={handleCreateWorkflowFromChat}
-                  disabled={!canCreateWorkflow}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] px-3 py-1.5 text-[11px] font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)] disabled:opacity-50 disabled:pointer-events-none"
-                >
-                  {creatingWorkflow ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                placeholder={llmPassThrough ? "Ask HyperAgent to build..." : "Add an LLM key in Settings to start chatting..."}
+                onCreateWorkflow={handleCreateWorkflowFromChat}
+                canCreateWorkflow={canCreateWorkflow}
+                creatingWorkflow={creatingWorkflow}
+                className="border-t-0 bg-transparent"
+                statusIndicator={
+                  llmPassThrough ? (
+                    <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      <span className="text-[10px] text-emerald-400 font-medium">
+                        {llmPassThrough.provider === "google" ? "Gemini" : llmPassThrough.provider === "openai" ? "OpenAI" : "Anthropic"} key active
+                      </span>
+                    </div>
                   ) : (
-                    <Code2 className="w-3.5 h-3.5" />
-                  )}
-                  {creatingWorkflow ? "Creating workflow..." : "Create workflow and run pipeline"}
-                </button>
-                {selectedWorkflowId && (
-                  <span className="text-[11px] text-[var(--color-text-tertiary)]">
-                    Workflow selected
-                  </span>
+                    <button
+                      type="button"
+                      onClick={() => setSettingsOpen(true)}
+                      className="flex items-center gap-2 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/15 transition-colors w-full text-left"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      <span className="text-[10px] text-amber-400 font-medium">No LLM key set. Click to add one in Settings.</span>
+                    </button>
+                  )
+                }
+              />
+            </div>
+            {createError && (
+              <div className="w-full max-w-2xl space-y-2">
+                <ApiErrorBanner
+                  error={createError}
+                  onRetry={isByokStorageOrMigrationError(createError) ? () => { setCreateError(null); setSettingsOpen(true); } : undefined}
+                />
+                {isCreditsError(lastCreateErrorRef.current) && (
+                  <Link href={ROUTES.PAYMENTS} className="text-xs text-[var(--color-primary-light)] hover:underline">
+                    Top up credits in Payments
+                  </Link>
+                )}
+                {isByokStorageOrMigrationError(createError) && (
+                  <p className="text-[11px] text-[var(--color-text-muted)]">{BYOK_SAVE_AGAIN_HINT} Open Settings (header) to save keys.</p>
                 )}
               </div>
-              {createError && (
-                <div className="space-y-2">
-                  <ApiErrorBanner
-                    error={createError}
-                    onRetry={isByokStorageOrMigrationError(createError) ? () => { setCreateError(null); setSettingsOpen(true); } : undefined}
-                  />
-                  {isCreditsError(lastCreateErrorRef.current) && (
-                    <Link
-                      href={ROUTES.PAYMENTS}
-                      className="text-xs text-[var(--color-primary-light)] hover:underline"
-                    >
-                      Top up credits in Payments
-                    </Link>
-                  )}
-                  {isByokStorageOrMigrationError(createError) && (
-                    <p className="text-[11px] text-[var(--color-text-muted)]">
-                      {BYOK_SAVE_AGAIN_HINT} Open Settings (header) to save keys.
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
+            )}
           </div>
-
           {error && (
             <ApiErrorBanner
               error={getErrorMessage(error, "Chat request failed. Check your API key in Settings and try again.")}
               onRetry={() => { reload(); }}
-              className="rounded-none border-t border-x-0"
+              className="rounded-none border-t border-x-0 shrink-0 mx-4 mb-4"
             />
+          )}
+        </main>
+
+        <aside
+          className={`border-l border-[var(--color-border-subtle)] flex flex-col shrink-0 bg-[var(--color-bg-elevated)] transition-all duration-300 ${
+            workflowsSidebarOpen ? "w-64" : "w-12"
+          }`}
+        >
+          <div className="h-11 border-b border-[var(--color-border-subtle)] flex items-center justify-between px-3 min-w-0">
+            {workflowsSidebarOpen ? (
+              <>
+                <span className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider truncate">Workflows</span>
+                <div className="flex gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMessages([]);
+                      setSelectedWorkflowId(null);
+                      setCreateError(null);
+                      window.history.replaceState(null, "", ROUTES.HOME);
+                    }}
+                className="p-1.5 hover:bg-[var(--color-bg-panel)] rounded transition-colors"
+                title="New chat"
+                aria-label="New chat"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-[var(--color-text-tertiary)]" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push(ROUTES.WORKFLOWS)}
+                    className="p-1.5 hover:bg-[var(--color-bg-panel)] rounded transition-colors"
+                    title="All workflows"
+                    aria-label="All workflows"
+                  >
+                    <Clock className="w-3.5 h-3.5 text-[var(--color-text-tertiary)]" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWorkflowsSidebarOpen(false)}
+                    className="p-1.5 hover:bg-[var(--color-bg-panel)] rounded transition-colors"
+                    title="Collapse workflows"
+                    aria-label="Collapse workflows panel"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5 text-[var(--color-text-tertiary)]" />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center w-full py-2 gap-1">
+                <button
+                  type="button"
+                  onClick={() => setWorkflowsSidebarOpen(true)}
+                  className="p-1.5 hover:bg-[var(--color-bg-panel)] rounded transition-colors"
+                  title="Expand workflows"
+                  aria-label="Expand workflows panel"
+                >
+                  <ChevronLeft className="w-4 h-4 text-[var(--color-text-tertiary)]" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push(ROUTES.WORKFLOWS)}
+                  className="p-1.5 hover:bg-[var(--color-bg-panel)] rounded transition-colors"
+                  title="All workflows"
+                  aria-label="View all workflows"
+                >
+                  <Plus className="w-4 h-4 text-[var(--color-text-tertiary)]" />
+                </button>
+              </div>
+            )}
+          </div>
+          {workflowsSidebarOpen && (
+            <>
+              <OnboardingChecklist
+                className="shrink-0 m-2 rounded-lg"
+                onByokClick={() => setSettingsOpen(true)}
+                onPaymentClick={() => router.push(ROUTES.PAYMENTS)}
+                onTryItNowClick={() => router.push(ROUTES.DASHBOARD)}
+              />
+              <div className="flex-1 overflow-y-auto p-2 min-h-0">
+                <WorkflowActivityList
+                  workflows={workflows ?? []}
+                  selectedWorkflowId={selectedWorkflowId}
+                  onSelectWorkflow={(id) => {
+                    setSelectedWorkflowId(id);
+                    router.replace(`${ROUTES.HOME}?workflow=${id}`, { scroll: false });
+                  }}
+                  loading={workflowsLoading}
+                />
+              </div>
+            </>
           )}
         </aside>
       </div>

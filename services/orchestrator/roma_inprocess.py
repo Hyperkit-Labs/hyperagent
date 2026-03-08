@@ -73,7 +73,7 @@ async def _agent_runtime_spec(
     chains = data.get("chains") or []
     if chains and isinstance(chains[0], dict):
         chains = [c.get("network_name") or str(c.get("chain_id", "")) for c in chains if c]
-    return {
+    out: dict[str, Any] = {
         "version": str(data.get("version", "1.0")),
         "chains": chains,
         "token_type": str(data.get("token_type", "ERC20")),
@@ -82,6 +82,9 @@ async def _agent_runtime_spec(
         "risk_profile": str(data.get("risk_profile", "medium")),
         "template_id": data.get("template_id"),
     }
+    if isinstance(data.get("wizard_options"), dict):
+        out["wizard_options"] = data["wizard_options"]
+    return out
 
 
 async def invoke_roma_spec(
@@ -108,7 +111,7 @@ async def invoke_roma_spec(
                 data = r.json()
                 spec = data.get("spec") or {}
                 if spec:
-                    return {
+                    result: dict[str, Any] = {
                         "version": str(spec.get("version", "1.0")),
                         "chains": list(spec.get("chains") or []),
                         "token_type": str(spec.get("token_type", "ERC20")),
@@ -117,6 +120,9 @@ async def invoke_roma_spec(
                         "risk_profile": str(spec.get("risk_profile", "medium")),
                         "template_id": spec.get("template_id"),
                     }
+                    if isinstance(spec.get("wizard_options"), dict):
+                        result["wizard_options"] = spec["wizard_options"]
+                    return result
         except Exception as e:
             logger.warning("ROMA service call failed, fallback: %s", e)
 

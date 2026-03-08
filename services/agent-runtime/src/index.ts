@@ -5,7 +5,7 @@
 
 import cors from "cors";
 import express from "express";
-import { specAgent, designAgent, codegenAgent, autofixAgent, estimateAgent, pashovAuditAgent, type AgentContext, type DesignProposal, type AutofixInput } from "./agents.js";
+import { specAgent, designAgent, codegenAgent, testAgent, autofixAgent, estimateAgent, pashovAuditAgent, type AgentContext, type DesignProposal, type AutofixInput } from "./agents.js";
 import { resolveAgentSession } from "./agentSession.js";
 import { generateFromWizard } from "./ozWizard.js";
 import { simulate, getDeployPlan, pin, unpin } from "./simulateDeploy.js";
@@ -100,6 +100,19 @@ app.post("/agents/codegen", async (req, res) => {
   } catch (e: unknown) {
     console.error("[codegen]", e instanceof Error ? e.message : "Codegen failed");
     res.status(500).json({ error: e instanceof Error ? e.message : "Codegen failed" });
+  }
+});
+
+app.post("/agents/test", async (req, res) => {
+  try {
+    const { contracts, spec, design } = req.body as { contracts: Record<string, string>; spec: Record<string, unknown>; design: DesignProposal; context?: AgentContext };
+    const context = getContext(req, req.body);
+    if (!contracts || !spec || !context) return res.status(400).json({ error: "contracts, spec and context.apiKeys or X-Agent-Session required" });
+    const tests = await testAgent(contracts, spec, design || { components: [], frameworks: { primary: "hardhat" }, chains: [] }, context);
+    res.json(tests);
+  } catch (e: unknown) {
+    console.error("[test]", e instanceof Error ? e.message : "Test generation failed");
+    res.status(500).json({ error: e instanceof Error ? e.message : "Test generation failed" });
   }
 });
 

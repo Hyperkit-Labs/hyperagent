@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { Server, Globe, Shield, Container, Settings } from "lucide-react";
 import { EmptyState } from "@/components/ui";
+import { PageTitle } from "@/components/layout/PageTitle";
 
 type InfraTab = "domains" | "certificates" | "deployments";
 
@@ -22,14 +24,13 @@ export default function DomainsPage() {
           <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
             <Server className="w-5 h-5 text-blue-400" />
           </div>
-          <div>
-            <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">Infrastructure</h1>
-            <p className="text-xs text-[var(--color-text-tertiary)]">Manage domains, certificates, and deployment infrastructure</p>
-          </div>
+          <PageTitle title="Infrastructure" subtitle="Manage domains, certificates, and deployment infrastructure" />
         </div>
         <button
           type="button"
+          onClick={() => toast.info("Domain configuration coming soon. Deploy a dApp first to configure a custom URL.")}
           className="btn-primary-gradient text-xs px-4 py-2 rounded-lg flex items-center gap-2"
+          title="Domain configuration coming soon"
         >
           <Settings className="w-3.5 h-3.5" />
           Configure
@@ -66,7 +67,12 @@ export default function DomainsPage() {
             title="No custom domains"
             description="Custom domains allow users to access your deployed dApps at a branded URL. Deploy a dApp first, then configure a domain."
             action={
-              <button type="button" className="btn-primary-gradient text-xs px-4 py-1.5 rounded-lg">
+              <button
+                type="button"
+                onClick={() => toast.info("Domain configuration coming soon. Deploy a dApp first to configure a custom URL.")}
+                className="btn-primary-gradient text-xs px-4 py-1.5 rounded-lg"
+                title="Domain configuration coming soon"
+              >
                 Add domain
               </button>
             }

@@ -14,6 +14,8 @@ export interface TerminalProps {
   lines: TerminalLine[];
   /** Optional: on clear (registry-style). */
   onClear?: () => void;
+  /** When true, hide scrollbar and prevent scrolling. */
+  noScroll?: boolean;
   className?: string;
 }
 
@@ -25,7 +27,7 @@ function formatLine(entry: TerminalLine): string {
   return parts.join(' ');
 }
 
-export function Terminal({ lines, onClear, className = '' }: TerminalProps) {
+export function Terminal({ lines, onClear, noScroll = false, className = '' }: TerminalProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -63,7 +65,7 @@ export function Terminal({ lines, onClear, className = '' }: TerminalProps) {
           </button>
         )}
       </div>
-      <div className="overflow-y-auto divide-y divide-[var(--color-border-subtle)] flex-1 min-h-0">
+      <div className={`divide-y divide-[var(--color-border-subtle)] flex-1 min-h-0 ${noScroll ? "overflow-hidden" : "overflow-y-auto"}`}>
         {lines.map((entry, i) => (
           <div
             key={i}

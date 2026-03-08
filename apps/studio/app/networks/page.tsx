@@ -4,7 +4,7 @@ import { useNetworks } from "@/hooks/useNetworks";
 import { Globe } from "lucide-react";
 import { ShimmerTableRows } from "@/components/ai-elements";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
-import { DataTable, EmptyState } from "@/components/ui";
+import { DataTable, EmptyState, NetworkTopologyMap } from "@/components/ui";
 
 export default function NetworksPage() {
   const { networks, loading, error, refetch } = useNetworks();
@@ -19,6 +19,17 @@ export default function NetworksPage() {
         </div>
 
         <ApiErrorBanner error={error} onRetry={refetch} />
+
+        {list.length > 0 && (
+          <div className="glass-panel rounded-xl p-6">
+            <h3 className="text-sm font-medium text-[var(--color-text-primary)] mb-4">Network Topology</h3>
+            <NetworkTopologyMap
+              centralLabel="Contract"
+              networks={list.map((n: { id: string; name?: string }) => ({ id: n.id, name: n.name ?? n.id }))}
+            />
+          </div>
+        )}
+
         <DataTable
           headers={["Network", "Name", "Chain ID", "Currency"]}
           isEmpty={!loading && list.length === 0}

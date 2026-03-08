@@ -7,6 +7,12 @@ import { useHealth } from "@/hooks/useHealth";
 import { FileText, Heart } from "lucide-react";
 import { Shimmer, Terminal } from "@/components/ai-elements";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
+import { PageTitle } from "@/components/layout/PageTitle";
+import {
+  MonitoringFilterBar,
+  useMonitoringFilters,
+  filterLogsByParams,
+} from "@/components/monitoring/MonitoringFilterBar";
 
 const TYPE_LABELS: Record<string, string> = {
   contracts: "Smart Contracts",
@@ -17,20 +23,24 @@ function MonitoringContent() {
   const searchParams = useSearchParams();
   const typeParam = searchParams.get("type") ?? "";
   const typeLabel = TYPE_LABELS[typeParam] ?? "";
-  const { logs, loading: logsLoading, error: logsError, refetch: refetchLogs } = useLogs();
+  const { logs, loading: logsLoading, error: logsError, refetch: refetchLogs, services } = useLogs();
   const { health, loading: healthLoading, error: healthError } = useHealth();
   const healthStatus = health?.status;
-  const logList = logs ?? [];
+  const filters = useMonitoringFilters();
+  const logList = filterLogsByParams(
+    logs ?? [],
+    filters.level,
+    filters.timeRange,
+    filters.service
+  );
 
   return (
     <div className="p-6 lg:p-8">
       <div className="max-w-[1200px] mx-auto space-y-6 animate-enter">
-        <div>
-          <h1 className="text-2xl font-semibold text-white tracking-tight">Logs & Monitoring</h1>
-          <p className="text-[var(--color-text-tertiary)] text-sm mt-1">
-            {typeLabel ? `${typeLabel} logs and health.` : "Health and log entries."}
-          </p>
-        </div>
+        <PageTitle
+          title="Logs & Monitoring"
+          subtitle={typeLabel ? `${typeLabel} logs and health.` : "Health and log entries."}
+        />
 
         {healthError && (
           <ApiErrorBanner error={healthError} />
@@ -46,9 +56,20 @@ function MonitoringContent() {
         </div>
 
         <div className="glass-panel rounded-xl overflow-hidden">
-          <div className="p-5 border-b border-[var(--color-border-subtle)] flex items-center gap-2">
-            <FileText className="w-4 h-4 text-[var(--color-semantic-violet)]" />
-            <h3 className="font-medium text-white text-sm">Logs</h3>
+          <div className="p-5 border-b border-[var(--color-border-subtle)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-[var(--color-semantic-violet)]" />
+              <h3 className="font-medium text-white text-sm">Logs</h3>
+            </div>
+            <MonitoringFilterBar
+              services={services}
+              level={filters.level}
+              timeRange={filters.timeRange}
+              service={filters.service}
+              onLevelChange={filters.onLevelChange}
+              onTimeRangeChange={filters.onTimeRangeChange}
+              onServiceChange={filters.onServiceChange}
+            />
           </div>
           <ApiErrorBanner error={logsError} onRetry={refetchLogs} className="m-5 mb-0" />
           {!logsError && logsLoading && !logList.length && (
@@ -59,7 +80,9 @@ function MonitoringContent() {
             </div>
           )}
           {!logsLoading && !logsError && logList.length === 0 && (
-            <div className="p-6 text-center text-[var(--color-text-tertiary)]">No log entries.</div>
+            <div className="p-6 text-center text-[var(--color-text-tertiary)]">
+              {logs && logs.length > 0 ? "No log entries match your filters." : "No log entries."}
+            </div>
           )}
           {!logsLoading && logList.length > 0 && (
             <Terminal

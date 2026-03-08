@@ -6,9 +6,9 @@ Single policy for where data lives so traces, artifacts, and indexes stay consis
 
 ## Rule
 
-- **Traces** → Stub blob IDs stored in Supabase (`run_steps.trace_blob_id`). No external DA layer.
-- **Artifacts (files, IPFS)** → IPFS (e.g. Pinata). CID and gateway URL stored in Supabase or returned in API.
-- **Indexes and relational data** → Supabase (Postgres). Projects, runs, run_steps, deployments, simulations, user_profiles, etc.
+- **Traces** – Stub blob IDs stored in Supabase (`run_steps.trace_blob_id`). No external DA layer.
+- **Artifacts (files, IPFS)** – IPFS (e.g. Pinata). CID and gateway URL stored in Supabase or returned in API.
+- **Indexes and relational data** – Supabase (Postgres). Projects, runs, run_steps, deployments, simulations, user_profiles, etc.
 
 ---
 
@@ -33,6 +33,6 @@ Single policy for where data lives so traces, artifacts, and indexes stay consis
 
 ## References
 
-- Trace writer: `services/orchestrator/trace_writer.py`; migration `006_run_steps_trace.sql`.
+- Trace writer: `services/orchestrator/trace_writer.py`; migration `006_run_steps_trace.sql` (if present).
 - IPFS/Pinata: `packages/web3-utils` (IpfsPinataToolkit), `services/storage`.
-- Run steps and runs: `platform/supabase/migrations/run.sql`, `control-plane-runs-steps.md`.
+- Run steps and runs: `platform/supabase/migrations/run.sql`, [control-plane-runs-steps.md](control-plane-runs-steps.md).

@@ -42,6 +42,7 @@ from store import (
     append_deployment,
     MAX_INTENT_LENGTH,
 )
+from input_guardrail import validate_input as guardrail_validate_input
 from workflow import run_pipeline
 from trace_context import set_request_id, get_trace_headers
 import db
@@ -255,14 +256,14 @@ def _run_workflow_pipeline_job(
         if auto_approve and current_stage == "awaiting_deploy_approval":
             logger.info("[orchestrator] auto_approve: resuming deploy for workflow_id=%s", workflow_id)
             final = run_pipeline(
-                "",
+                nlp_input,
                 user_id,
                 project_id,
                 workflow_id,
                 api_keys,
                 pipeline_id,
                 checkpoint_id=workflow_id,
-                resume_update={"deploy_approved": True},
+                resume_update={"deploy_approved": True, "user_prompt": nlp_input},
             )
             current_stage = final.get("current_stage") or "unknown"
         status = "completed" if current_stage in ("deployed", "deploy", "ui_scaffold") else (
@@ -390,6 +391,9 @@ def workflows_generate(
             status_code=422,
             detail="LLM API keys are required to run the pipeline. Add keys in Settings (workspace LLM keys).",
         )
+    passed, violation = guardrail_validate_input(body.nlp_input)
+    if not passed:
+        raise HTTPException(status_code=400, detail=violation or "Security policy violation")
     agent_session_jwt = _create_agent_session_jwt_if_configured(user_id, workflow_id, api_keys)
     if db.is_configured():
         effective_user = user_id if db._is_uuid(user_id) else os.environ.get("SUPABASE_SYSTEM_USER_ID")
@@ -813,15 +817,18 @@ def _resume_deploy_approval_job(workflow_id: str, user_id: str, project_id: str,
     set_request_id(None)
     final = None
     try:
+        from store import get_workflow
+        w = get_workflow(workflow_id)
+        user_prompt = (w or {}).get("intent", "") if w else ""
         try:
             final = run_pipeline(
-                "",
+                user_prompt,
                 user_id,
                 project_id,
                 workflow_id,
                 api_keys,
                 checkpoint_id=workflow_id,
-                resume_update={"deploy_approved": True},
+                resume_update={"deploy_approved": True, "user_prompt": user_prompt},
             )
         except (KeyError, Exception) as e:
             if "user_prompt" in str(e) or "KeyError" in type(e).__name__:
@@ -1650,6 +1657,9 @@ def create_run_legacy(req: RunRequest) -> dict[str, Any]:
     """Legacy POST /run; returns run_id. Prefer POST /api/v1/workflows/generate."""
     workflow_id = str(uuid.uuid4())
     project_id = req.project_id or workflow_id
+    passed, violation = guardrail_validate_input(req.user_prompt)
+    if not passed:
+        raise HTTPException(status_code=400, detail=violation or "Security policy violation")
     api_keys = req.api_keys or _get_keys_for_run(req.user_id or "", DEFAULT_WORKSPACE)
     if not api_keys:
         raise HTTPException(

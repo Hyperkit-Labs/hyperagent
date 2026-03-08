@@ -3,6 +3,7 @@ export {
   ShimmerCard,
   ShimmerTableRows,
   ShimmerGrid,
+  CodeBlockShimmer,
 } from './Shimmer';
 
 export { Message, MessageContent, MessageResponse } from './Message';

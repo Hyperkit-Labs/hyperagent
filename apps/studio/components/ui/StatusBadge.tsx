@@ -17,7 +17,8 @@ export type StatusBadgeVariant =
   | "audit-failed"
   | "active"
   | "running"
-  | "idle";
+  | "idle"
+  | "urgent";
 
 function getStatusPillClass(status: string): string {
   const s = status.toLowerCase();
@@ -40,6 +41,8 @@ function getVariantClass(variant: StatusBadgeVariant): string {
     case "high-risk":
     case "audit-failed":
       return "status-pill-failed";
+    case "urgent":
+      return "bg-red-500/20 text-red-400 border border-red-500/30 shadow-[0_0_6px_rgba(239,68,68,0.2)]";
     case "building":
     case "analyzing":
     case "pending":
@@ -69,7 +72,7 @@ export interface StatusBadgeProps {
 
 const VARIANT_KEYS: Set<string> = new Set([
   "success", "completed", "failed", "building", "pending", "queued", "warning",
-  "spec", "roma", "high-risk", "audit-failed", "active", "running", "idle", "analyzing",
+  "spec", "roma", "high-risk", "audit-failed", "active", "running", "idle", "analyzing", "urgent",
 ]);
 
 const LIVE_STATES: Set<string> = new Set([

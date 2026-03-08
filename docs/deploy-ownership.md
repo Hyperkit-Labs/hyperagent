@@ -8,7 +8,7 @@ This doc clarifies where deploy logic lives and how it aligns with the "thin Stu
 
 | Flow | Owner | Where | Purpose |
 |------|--------|--------|---------|
-| **Deploy plan (RPC/explorer URLs, bytecode, ABI)** | Orchestrator / deploy service | `services/deploy`, `services/orchestrator` | Server builds deploy plan; Studio receives it via API. |
+| **Deploy plan (RPC/explorer URLs, bytecode, ABI)** | Orchestrator / deploy service | `services/orchestrator`, `services/agent-runtime` | Server builds deploy plan; Studio receives it via API. |
 | **Wallet-signed deploy (user signs in browser)** | Studio | `apps/studio/lib/eoaDeploy.ts`, `lib/smartWalletDeploy.ts` | User connects wallet; Studio uses Thirdweb SDK to prepare and send the transaction. |
 
 So:

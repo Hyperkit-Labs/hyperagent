@@ -158,6 +158,11 @@ async def design_agent(state: AgentState) -> AgentState:
             agent_session_jwt = state.get("agent_session_jwt") or None
             logger.info("[pipeline] design_agent run_id=%s api_keys_providers=%s agent_session_jwt=%s", run_id, list(api_keys.keys()) if api_keys else [], "yes" if agent_session_jwt else "no")
             target_chains = spec.get("chains", [])
+            from agents.live_spec_validation import run_live_spec_validation
+
+            live_ok, live_msg = await run_live_spec_validation(spec)
+            if not live_ok:
+                state["live_spec_validation_warning"] = live_msg
             security_ctx = await build_security_context(state.get("user_prompt", ""), user_id=user_id)
             design = await generate_design(
                 spec, target_chains, user_id, project_id, run_id, api_keys, agent_session_jwt,
@@ -361,6 +366,20 @@ async def simulation_agent(state: AgentState) -> AgentState:
         state["simulation_results"] = results
         state["simulation_passed"] = results.get("passed", True)
         state["current_stage"] = "simulation" if state["simulation_passed"] else "simulation_failed"
+        if os.environ.get("OPENSANDBOX_ENABLED", "").strip().lower() in ("1", "true", "yes"):
+            try:
+                from execution_backend import get_execution_backend
+
+                backend = get_execution_backend()
+                if hasattr(backend, "run_gas_benchmark") and state.get("contracts"):
+                    for name, code in (state.get("contracts") or {}).items():
+                        if isinstance(code, str) and name.endswith(".sol"):
+                            bench = await backend.run_gas_benchmark(code, name.replace(".sol", ""))
+                            state["gas_benchmark_score"] = bench.score
+                            state["gas_benchmark_configs"] = bench.configs
+                            break
+            except Exception as gb_err:
+                logger.warning("[simulation] gas_benchmark skipped: %s", gb_err)
         try:
             cid = await ipfs_client.pin_artifact(run_id, "simulation", results)
             if cid:

@@ -18,8 +18,11 @@ def _log_byok_event(event: str, user_id: str, action: str) -> None:
     logger.warning("[security] %s", json.dumps({"event": event, "byok_action": action, "user_id": user_id}))
 
 import httpx
+import io
+import tarfile
+
 from fastapi import BackgroundTasks, Body, FastAPI, HTTPException, Header, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from llm_keys_store import (
@@ -486,6 +489,53 @@ def get_workflow_contracts_api(workflow_id: str, request: Request = None) -> lis
         for name, code in contracts.items()
         if isinstance(code, str)
     ]
+
+
+def _build_workflow_tarball(workflow_id: str) -> bytes:
+    """Build a minimal Hardhat project tarball from workflow contracts. For Vercel Sandbox dynamic source."""
+    w = get_workflow(workflow_id)
+    if not w:
+        return b""
+    contracts = w.get("contracts") or {}
+    if not contracts:
+        return b""
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tf:
+        for name, code in contracts.items():
+            if isinstance(code, str) and name.endswith(".sol"):
+                name = name if "/" in name else f"contracts/{name}"
+                data = code.encode("utf-8")
+                ti = tarfile.TarInfo(name=name)
+                ti.size = len(data)
+                tf.addfile(ti, io.BytesIO(data))
+        pkg = json.dumps({
+            "name": "hyperagent-demo",
+            "scripts": {"compile": "npx hardhat compile", "start": "npx hardhat node"},
+            "devDependencies": {"hardhat": "^2.19.0"},
+        }, indent=2).encode("utf-8")
+        ti = tarfile.TarInfo(name="package.json")
+        ti.size = len(pkg)
+        tf.addfile(ti, io.BytesIO(pkg))
+        hc = 'require("hardhat"); module.exports = { solidity: "0.8.24" };'
+        hc_data = hc.encode("utf-8")
+        ti = tarfile.TarInfo(name="hardhat.config.js")
+        ti.size = len(hc_data)
+        tf.addfile(ti, io.BytesIO(hc_data))
+    return buf.getvalue()
+
+
+@app.get("/api/v1/workflows/{workflow_id}/tarball")
+def get_workflow_tarball_api(workflow_id: str, request: Request = None) -> Response:
+    """Return workflow as tarball for Vercel Sandbox dynamic source."""
+    w = get_workflow(workflow_id)
+    if not w:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    if request:
+        _assert_workflow_owner(w, request)
+    data = _build_workflow_tarball(workflow_id)
+    if not data:
+        raise HTTPException(status_code=400, detail="No contracts to package")
+    return Response(content=data, media_type="application/gzip")
 
 
 CHUNK_SIZE = 512
@@ -1821,17 +1871,33 @@ def _ensure_vercel_sandbox_env() -> None:
         os.environ["VERCEL_PROJECT_ID"] = VERCEL_PROJECT_ID
 
 
+class QuickDemoBody(BaseModel):
+    """Optional body for quick-demo. When workflow_id is set, use generated code as sandbox source."""
+
+    workflow_id: str | None = None
+
+
 @app.post("/api/v1/quick-demo")
-async def quick_demo_api() -> dict[str, Any]:
-    """Create a Vercel Sandbox from the demo template using the official SDK.
-    Returns sandbox URL for Try it Now. Requires VERCEL_SANDBOX_TOKEN or VERCEL_TOKEN.
-    For non-Vercel hosting, also set VERCEL_TEAM_ID and VERCEL_PROJECT_ID.
-    Local dev: run `vercel link` and `vercel env pull` to get .env.local with VERCEL_OIDC_TOKEN."""
+async def quick_demo_api(request: Request, body: QuickDemoBody | None = None) -> dict[str, Any]:
+    """Create a Vercel Sandbox from the demo template or workflow-generated code.
+    When body.workflow_id is provided, uses dynamic source (tarball of generated contracts).
+    Returns sandbox URL for Try it Now. Requires VERCEL_SANDBOX_TOKEN or VERCEL_TOKEN."""
     if not VERCEL_SANDBOX_TOKEN and not os.environ.get("VERCEL_TOKEN") and not os.environ.get("VERCEL_OIDC_TOKEN"):
         raise HTTPException(status_code=503, detail="Quick demo not configured: set VERCEL_SANDBOX_TOKEN, VERCEL_TOKEN, or run vercel env pull")
     _ensure_vercel_sandbox_env()
-    source_type = "tarball" if DEMO_SANDBOX_SOURCE_TYPE == "tarball" else "git"
-    source: dict[str, Any] = {"type": source_type, "url": DEMO_SANDBOX_SOURCE_URL}
+    workflow_id = (body and body.workflow_id) or None
+    if workflow_id:
+        w = get_workflow(workflow_id)
+        if not w:
+            raise HTTPException(status_code=404, detail="Workflow not found")
+        if request:
+            _assert_workflow_owner(w, request)
+        base = (os.environ.get("ORCHESTRATOR_PUBLIC_URL") or str(request.base_url)).rstrip("/")
+        tarball_url = f"{base}/api/v1/workflows/{workflow_id}/tarball"
+        source = {"type": "tarball", "url": tarball_url}
+    else:
+        source_type = "tarball" if DEMO_SANDBOX_SOURCE_TYPE == "tarball" else "git"
+        source = {"type": source_type, "url": DEMO_SANDBOX_SOURCE_URL}
     create_kwargs: dict[str, Any] = {
         "source": source,
         "runtime": "node24",
@@ -1860,7 +1926,7 @@ async def quick_demo_api() -> dict[str, Any]:
         }
     except (ImportError, AttributeError) as e:
         logger.info("[quick-demo] SDK unavailable (%s), using REST API fallback", e)
-        return await _quick_demo_via_rest()
+        return await _quick_demo_via_rest(source=source)
     except HTTPException:
         raise
     except Exception as e:
@@ -1868,13 +1934,52 @@ async def quick_demo_api() -> dict[str, Any]:
         raise HTTPException(status_code=502, detail=str(e)[:200])
 
 
-async def _quick_demo_via_rest() -> dict[str, Any]:
-    """Fallback: create sandbox via REST API when SDK is unavailable (e.g. Windows)."""
+@app.post("/api/v1/workflows/{workflow_id}/debug-sandbox")
+async def debug_sandbox_api(workflow_id: str, request: Request) -> dict[str, Any]:
+    """Create a Vercel Sandbox pre-loaded with the workflow's generated code and failing audit.
+    Use when audit fails so user can fix in a browser-based IDE. Requires VERCEL_SANDBOX_TOKEN."""
+    w = get_workflow(workflow_id)
+    if not w:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    _assert_workflow_owner(w, request)
+    if not VERCEL_SANDBOX_TOKEN and not os.environ.get("VERCEL_TOKEN"):
+        raise HTTPException(status_code=503, detail="Debug sandbox not configured: set VERCEL_SANDBOX_TOKEN")
+    _ensure_vercel_sandbox_env()
+    base = (os.environ.get("ORCHESTRATOR_PUBLIC_URL") or str(request.base_url)).rstrip("/")
+    tarball_url = f"{base}/api/v1/workflows/{workflow_id}/tarball"
+    source = {"type": "tarball", "url": tarball_url}
+    create_kwargs: dict[str, Any] = {
+        "source": source,
+        "runtime": "node24",
+        "ports": [3000],
+        "timeout": 300000,
+    }
+    if VERCEL_PROJECT_ID:
+        create_kwargs["project_id"] = VERCEL_PROJECT_ID
+    if VERCEL_TEAM_ID:
+        create_kwargs["team_id"] = VERCEL_TEAM_ID
+    try:
+        from vercel.sandbox import AsyncSandbox
+
+        sandbox = await AsyncSandbox.create(**create_kwargs)
+        sandbox_id = getattr(sandbox, "sandbox_id", None) or getattr(sandbox, "sandboxId", None) or getattr(sandbox, "id", None)
+        url: str | None = None
+        try:
+            url = sandbox.domain(3000)
+        except Exception:
+            pass
+        return {"sandbox_id": sandbox_id, "url": url, "status": "running", "workflow_id": workflow_id}
+    except (ImportError, AttributeError):
+        out = await _quick_demo_via_rest_with_source(source)
+        out["workflow_id"] = workflow_id
+        return out
+
+
+async def _quick_demo_via_rest_with_source(source: dict[str, Any]) -> dict[str, Any]:
+    """Create sandbox via REST with given source."""
     token = VERCEL_SANDBOX_TOKEN or os.environ.get("VERCEL_TOKEN", "").strip()
     if not token:
-        raise HTTPException(status_code=503, detail="Quick demo not configured: VERCEL_SANDBOX_TOKEN or VERCEL_TOKEN required")
-    source_type = "tarball" if DEMO_SANDBOX_SOURCE_TYPE == "tarball" else "git"
-    source = {"type": source_type, "url": DEMO_SANDBOX_SOURCE_URL}
+        raise HTTPException(status_code=503, detail="Quick demo not configured")
     body: dict[str, Any] = {
         "runtime": "node24",
         "source": source,
@@ -1892,18 +1997,20 @@ async def _quick_demo_via_rest() -> dict[str, Any]:
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
         )
         if r.status_code != 200:
-            err = r.text[:500] if r.text else str(r.status_code)
-            logger.warning("[quick-demo] Vercel API %s: %s", r.status_code, err)
-            raise HTTPException(status_code=502, detail=f"Sandbox creation failed: {err}")
+            raise HTTPException(status_code=502, detail=r.text[:500] or str(r.status_code))
         data = r.json()
         routes = data.get("routes") or []
         sandbox = data.get("sandbox") or {}
         url = routes[0].get("url") if routes else None
-        return {
-            "sandbox_id": sandbox.get("id"),
-            "url": url,
-            "status": sandbox.get("status", "pending"),
-        }
+        return {"sandbox_id": sandbox.get("id"), "url": url, "status": sandbox.get("status", "pending")}
+
+
+async def _quick_demo_via_rest(source: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Fallback: create sandbox via REST API when SDK is unavailable (e.g. Windows)."""
+    if source is None:
+        source_type = "tarball" if DEMO_SANDBOX_SOURCE_TYPE == "tarball" else "git"
+        source = {"type": source_type, "url": DEMO_SANDBOX_SOURCE_URL}
+    return await _quick_demo_via_rest_with_source(source)
 
 
 @app.get("/health")

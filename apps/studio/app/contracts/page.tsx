@@ -9,6 +9,7 @@ import Link from "next/link";
 import { ShimmerGrid } from "@/components/ai-elements";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { EmptyState, GlassCard } from "@/components/ui";
+import { PageTitle } from "@/components/layout/PageTitle";
 
 type ContractEntry = { id: string; workflowId?: string; address?: string; network?: string; name?: string; abi?: unknown[] };
 
@@ -118,10 +119,7 @@ export default function ContractsPage() {
     <div className="p-6 lg:p-8">
       <div className="max-w-[1200px] mx-auto space-y-6 animate-enter">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-[var(--color-text-primary)] tracking-tight">Contracts</h1>
-            <p className="text-[var(--color-text-tertiary)] text-sm mt-1">Contract addresses and read/write interactions.</p>
-          </div>
+          <PageTitle title="Contracts" subtitle="Contract addresses and read/write interactions." />
         </div>
         <ApiErrorBanner error={error} onRetry={refetch} />
         {loading && !list.length && <ShimmerGrid count={6} />}
@@ -130,6 +128,7 @@ export default function ContractsPage() {
             icon={<FileCode className="w-8 h-8 text-[var(--color-text-muted)]" />}
             title="No contracts yet"
             description="When you deploy a workflow, contract addresses and read/write actions will appear here."
+            suggestions={["Deploy an ERC20 token", "Create a simple NFT contract"]}
             action={
               <Link href={ROUTES.HOME} className="px-4 py-2 rounded-lg btn-primary-gradient text-white text-xs font-medium">
                 Create workflow

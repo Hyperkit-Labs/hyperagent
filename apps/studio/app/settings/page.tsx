@@ -175,11 +175,14 @@ export default function SettingsPage() {
             <div>
               <h3 className="text-sm font-medium text-[var(--color-text-primary)] mb-2">Credits (workflow runs)</h3>
               <p className="text-sm text-[var(--color-text-tertiary)] mb-3">
-                Top up credits off-chain (fiat, USDC, USDT). Each workflow run consumes credits. x402 is used for external pay-per-call.
+                Top up credits off-chain (fiat, USDC, USDT).
+                {config?.credits_per_run != null && config.credits_per_run > 0 ? ` Each run costs ${config.credits_per_run} credits.` : " Each workflow run consumes credits."}
+                {" "}x402 is used for external pay-per-call.
               </p>
               <CreditsCard
                 balanceFromParent={x402Balance}
                 onRefetch={refetchX402}
+                creditsPerRun={config?.credits_per_run}
               />
             </div>
             <div>

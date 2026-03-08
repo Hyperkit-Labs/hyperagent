@@ -60,13 +60,13 @@ jobs:
           pip install flake8 black isort mypy bandit
       
       - name: Run Black formatter check
-        run: black --check apps/hyperagent-api/hyperagent/
+        run: black --check services/orchestrator/
       
       - name: Run isort import check
-        run: isort --check-only apps/hyperagent-api/hyperagent/
+        run: isort --check-only services/orchestrator/
       
       - name: Run MyPy type checking
-        run: mypy apps/hyperagent-api/hyperagent/
+        run: mypy services/orchestrator/
         continue-on-error: true
 
   # ============================================================================
@@ -79,13 +79,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Run Bandit security linter
+      - name: Run Bandit security linter (orchestrator)
         run: |
           pip install bandit
-          bandit -r apps/hyperagent-api/hyperagent/ -f json -o bandit-report.json || true
-          bandit -r apps/hyperagent-api/hyperagent/ || true
+          bandit -r services/orchestrator/ -f json -o bandit-report.json -x '*/data/*' || true
+          bandit -r services/orchestrator/ -x '*/data/*' || true
       
-      - name: Run Trivy vulnerability scanner
+      - name: Run Trivy vulnerability scanner (fail on CRITICAL)
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
@@ -93,6 +93,7 @@ jobs:
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
+          exit-code: '1'
       
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
@@ -178,47 +179,15 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r apps/hyperagent-api/requirements.txt
-          pip install pytest pytest-asyncio pytest-cov pytest-mock
+          pip install -r services/orchestrator/requirements.txt
+          pip install pytest pytest-asyncio
       
-      - name: Set up database
+      - name: Run orchestrator integration tests
+        working-directory: services/orchestrator
         run: |
-          PGPASSWORD=test_password psql -h localhost -U test_user -d hyperagent_test -c "CREATE EXTENSION IF NOT EXISTS vector;" || echo "Vector extension not available, skipping"
+          pytest tests/ -v
         env:
-          PGHOST: localhost
-          PGPORT: 5432
-          PGUSER: test_user
-          PGDATABASE: hyperagent_test
-        continue-on-error: true
-      
-      - name: Run unit tests
-        working-directory: apps/hyperagent-api
-        run: |
-          pytest tests/unit/ -v --cov=hyperagent --cov-report=xml --cov-report=term --cov-report=html -p no:web3.tools.pytest_ethereum
-        env:
-          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/hyperagent_test
           REDIS_URL: redis://localhost:6379/0
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      
-      - name: Check coverage threshold
-        working-directory: apps/hyperagent-api
-        run: |
-          coverage report --fail-under=60 || true
-      
-      - name: Upload coverage HTML
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage-report
-          path: apps/hyperagent-api/htmlcov/
-      
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          file: apps/hyperagent-api/coverage.xml
-          flags: unittests
-          name: codecov-umbrella
-        continue-on-error: true
 
   # ============================================================================
   # STAGE 3.5: FRONTEND CODE QUALITY & TESTS
@@ -245,10 +214,10 @@ jobs:
         run: pnpm install --frozen-lockfile
       
       - name: Run ESLint
-        run: pnpm --filter hyperagent-web run lint
+        run: pnpm --filter hyperagent-studio run lint
       
       - name: Check code formatting
-        run: pnpm --filter hyperagent-web run format 2>/dev/null || echo "Format check skipped"
+        run: pnpm --filter hyperagent-studio run format 2>/dev/null || echo "Format check skipped"
         continue-on-error: true
   
   frontend-tests:
@@ -272,7 +241,7 @@ jobs:
         run: pnpm install --frozen-lockfile
       
       - name: Run tests
-        run: pnpm --filter hyperagent-web run test
+        run: pnpm --filter hyperagent-studio run test
         continue-on-error: true
 
   e2e-tests:
@@ -321,7 +290,7 @@ jobs:
         run: pnpm install --frozen-lockfile
       
       - name: Install Playwright browsers
-        working-directory: apps/hyperagent-web
+        working-directory: apps/studio
         run: pnpm exec playwright install --with-deps chromium
       
       - name: Set up Python (for backend)
@@ -331,28 +300,26 @@ jobs:
       
       - name: Install Python dependencies
         run: |
-          pip install -r apps/hyperagent-api/requirements.txt
+          pip install -r services/orchestrator/requirements.txt
       
-      - name: Start backend server
-        working-directory: apps/hyperagent-api
+      - name: Start orchestrator
+        working-directory: services/orchestrator
         run: |
-          uvicorn hyperagent.api.main:app --host 0.0.0.0 --port 8000 &
+          uvicorn main:app --host 0.0.0.0 --port 8000 &
         env:
-          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/hyperagent_test
           REDIS_URL: redis://localhost:6379/0
         continue-on-error: true
       
-      - name: Wait for backend
+      - name: Wait for orchestrator
         run: |
-          timeout 30 bash -c 'until curl -f http://localhost:8000/api/v1/health/; do sleep 2; done'
+          timeout 30 bash -c 'until curl -f http://localhost:8000/health; do sleep 2; done'
         continue-on-error: true
       
       - name: Run E2E tests
-        working-directory: apps/hyperagent-web
+        working-directory: apps/studio
         run: pnpm exec playwright test
         env:
-          NEXT_PUBLIC_API_URL: http://localhost:4000
-          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/hyperagent_test
+          NEXT_PUBLIC_API_URL: http://localhost:8000
           REDIS_URL: redis://localhost:6379/0
         continue-on-error: true
       
@@ -361,7 +328,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: apps/hyperagent-web/playwright-report/
+          path: apps/studio/playwright-report/
           retention-days: 30
 
   # ============================================================================
@@ -406,17 +373,15 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install -r apps/hyperagent-api/requirements.txt
+          pip install -r services/orchestrator/requirements.txt
           pip install pytest pytest-asyncio
       
       - name: Run integration tests
-        working-directory: apps/hyperagent-api
+        working-directory: services/orchestrator
         run: |
-          pytest tests/integration/ -v -p no:web3.tools.pytest_ethereum
+          pytest tests/ -v
         env:
-          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/hyperagent_test
           REDIS_URL: redis://localhost:6379/0
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
   # ============================================================================
   # STAGE 5: BUILD DOCKER IMAGE

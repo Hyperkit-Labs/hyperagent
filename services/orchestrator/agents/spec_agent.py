@@ -2,6 +2,7 @@
 import os
 import httpx
 
+from agents.agent_http import agent_runtime_headers
 from registries import get_timeout
 
 AGENT_RUNTIME_URL = os.environ.get("AGENT_RUNTIME_URL", "http://localhost:4001")
@@ -21,9 +22,7 @@ async def generate_spec(
         "runId": run_id,
         "apiKeys": api_keys or {},
     }
-    headers: dict[str, str] = {}
-    if agent_session_jwt:
-        headers["X-Agent-Session"] = agent_session_jwt
+    headers = agent_runtime_headers(agent_session_jwt)
     async with httpx.AsyncClient(timeout=get_timeout("spec")) as client:
         r = await client.post(
             f"{AGENT_RUNTIME_URL.rstrip('/')}/agents/spec",

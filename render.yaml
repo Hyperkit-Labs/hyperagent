@@ -146,7 +146,7 @@ services:
     name: hyperagent-agent-runtime
     runtime: node
     plan: free
-    buildCommand: corepack enable pnpm && pnpm install --frozen-lockfile && pnpm --filter hyperagent-agent-runtime... build
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter hyperagent-agent-runtime... build
     startCommand: cd services/agent-runtime && node build/index.js
     healthCheckPath: /health
     buildFilter:
@@ -271,7 +271,7 @@ services:
     name: hyperagent-gateway
     runtime: node
     plan: free
-    buildCommand: corepack enable pnpm && pnpm install --frozen-lockfile && pnpm --filter hyperagent-api-gateway run build
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter hyperagent-api-gateway run build
     startCommand: cd apps/api-gateway && node build/index.js
     healthCheckPath: /health
     buildFilter:

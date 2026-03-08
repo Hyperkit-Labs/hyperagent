@@ -5,6 +5,7 @@ import { Globe } from "lucide-react";
 import { ShimmerTableRows } from "@/components/ai-elements";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { DataTable, EmptyState, NetworkTopologyMap } from "@/components/ui";
+import { PageTitle } from "@/components/layout/PageTitle";
 
 export default function NetworksPage() {
   const { networks, loading, error, refetch } = useNetworks();
@@ -13,10 +14,7 @@ export default function NetworksPage() {
   return (
     <div className="p-6 lg:p-8">
       <div className="max-w-[1200px] mx-auto space-y-6 animate-enter">
-        <div>
-          <h1 className="text-2xl font-semibold text-[var(--color-text-primary)] tracking-tight">Networks</h1>
-          <p className="text-[var(--color-text-tertiary)] text-sm mt-1">Supported chains and network configuration.</p>
-        </div>
+        <PageTitle title="Networks" subtitle="Supported chains and network configuration." />
 
         <ApiErrorBanner error={error} onRetry={refetch} />
 

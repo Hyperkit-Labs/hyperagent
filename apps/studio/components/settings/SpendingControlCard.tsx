@@ -9,6 +9,8 @@ export interface SpendingControlCardProps {
   controlFromParent?: SpendingControlWithBudget | null;
   /** Called after save so parent can refetch. */
   onRefetch?: () => void;
+  /** Called when budget or period changes for live projection. */
+  onValuesChange?: (budget: string, period: "daily" | "weekly" | "monthly") => void;
 }
 
 function initFromControl(data: SpendingControlWithBudget | null) {
@@ -19,7 +21,7 @@ function initFromControl(data: SpendingControlWithBudget | null) {
   };
 }
 
-export function SpendingControlCard({ controlFromParent, onRefetch }: SpendingControlCardProps) {
+export function SpendingControlCard({ controlFromParent, onRefetch, onValuesChange }: SpendingControlCardProps) {
   const { hasSession } = useSession();
   const [control, setControl] = useState<SpendingControlWithBudget | null>(null);
   const [loading, setLoading] = useState(true);
@@ -107,7 +109,11 @@ export function SpendingControlCard({ controlFromParent, onRefetch }: SpendingCo
             min="0"
             step="0.01"
             value={budgetAmount}
-            onChange={(e) => setBudgetAmount(e.target.value)}
+            onChange={(e) => {
+              const v = e.target.value;
+              setBudgetAmount(v);
+              onValuesChange?.(v, period);
+            }}
             className="w-full max-w-[200px] px-3 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] text-[var(--color-text-primary)] text-sm"
           />
           <span className="ml-2 text-xs text-[var(--color-text-muted)]">USD</span>
@@ -119,7 +125,11 @@ export function SpendingControlCard({ controlFromParent, onRefetch }: SpendingCo
           <select
             id="period"
             value={period}
-            onChange={(e) => setPeriod(e.target.value as "daily" | "weekly" | "monthly")}
+            onChange={(e) => {
+              const v = e.target.value as "daily" | "weekly" | "monthly";
+              setPeriod(v);
+              onValuesChange?.(budgetAmount, v);
+            }}
             className="w-full max-w-[200px] px-3 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] text-[var(--color-text-primary)] text-sm"
           >
             <option value="daily">Daily</option>

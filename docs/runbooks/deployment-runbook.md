@@ -1,5 +1,22 @@
 # Deployment Runbook
 
+Public deployment and operations guide for HyperAgent.
+
+---
+
+## Build History Persistence
+
+Workflows and runs persist in Supabase. Set these on the orchestrator service (e.g. `hyperagent-api` on Render):
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `SUPABASE_URL` | Yes | Database connection |
+| `SUPABASE_SERVICE_KEY` | Yes | Service role for writes |
+
+Without both, the store falls back to in-memory only; data is lost on restart.
+
+---
+
 ## Security Feed (Zero-Day Resilience)
 
 The security feed fetches recent exploit advisories and indexes them for the DesignAgent. When configured, it improves spec generation by avoiding known exploit patterns.
@@ -7,7 +24,7 @@ The security feed fetches recent exploit advisories and indexes them for the Des
 ### Environment Variables
 
 | Variable | Description |
-|----------|-------------|
+|----------|--------------|
 | `DEFILLAMA_FEED_URL` | DeFiLlama hacks API (default: https://api.llama.fi/hacks). Public, no auth. |
 | `SECURITY_FEED_TIMEOUT` | Request timeout in seconds (default: 10) |
 | `SECURITY_FEED_MAX_EXPLOITS` | Max exploits to fetch per source (default: 5) |
@@ -24,6 +41,8 @@ The security feed fetches recent exploit advisories and indexes them for the Des
 # Every 6 hours
 0 */6 * * * cd /app && python -m services.orchestrator.security_feed
 ```
+
+---
 
 ## SCV Sync (Weekly Vulnerability Dataset)
 

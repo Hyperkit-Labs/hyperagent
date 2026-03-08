@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { X, FileCode, ExternalLink } from "lucide-react";
+import { motion } from "framer-motion";
+import { ExternalLink, Loader2, Bug } from "lucide-react";
 import {
   Search,
   Activity,
@@ -16,8 +17,9 @@ import {
 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import { useWorkflows } from "@/hooks/useWorkflows";
-import { cancelWorkflow } from "@/lib/api";
+import { cancelWorkflow, createQuickDemo, createDebugSandbox } from "@/lib/api";
 import type { Workflow } from "@/lib/types";
+import { hasAuditOrSimFailure } from "@/lib/types";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { ShimmerGrid } from "@/components/ai-elements";
 import { EmptyState } from "@/components/ui";
@@ -75,6 +77,9 @@ export default function WorkflowsPage() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortField>("updated_at");
   const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(null);
+  const [quickDemoLoading, setQuickDemoLoading] = useState<string | null>(null);
+  const [debugSandboxLoading, setDebugSandboxLoading] = useState<string | null>(null);
+  const [sandboxError, setSandboxError] = useState<string | null>(null);
   const { workflows, loading, error, refetch } = useWorkflows({
     filters: { limit: 100, status: statusFilter || undefined },
   });
@@ -112,7 +117,7 @@ export default function WorkflowsPage() {
             </div>
           </div>
 
-          <ApiErrorBanner error={error} onRetry={refetch} />
+          <ApiErrorBanner error={error ?? sandboxError ?? null} onRetry={() => { refetch(); setSandboxError(null); }} />
 
           <div className="flex flex-wrap items-center gap-3 pb-2 border-b border-[var(--color-border-subtle)] pb-4">
             <div className="relative w-64 group">
@@ -194,10 +199,13 @@ export default function WorkflowsPage() {
                           {iconForWorkflow(w)}
                         </div>
                         <div>
-                          <h3 className="text-sm font-semibold text-[var(--color-text-primary)] truncate max-w-[140px]">
+                          <motion.h3
+                            layoutId={`workflow-title-${w.workflow_id}`}
+                            className="text-sm font-semibold text-[var(--color-text-primary)] truncate max-w-[140px]"
+                          >
                             {w.intent?.slice(0, 32) || w.name || "Untitled"}
                             {(w.intent?.length || 0) > 32 ? "..." : ""}
-                          </h3>
+                          </motion.h3>
                           <div className="text-[10px] text-[var(--color-text-tertiary)]">{formatUpdatedAt(w.updated_at)}</div>
                         </div>
                       </div>
@@ -231,11 +239,61 @@ export default function WorkflowsPage() {
                         {w.status || "Unknown"}
                       </span>
                     </div>
-                    <div className="mt-auto flex items-center justify-between pt-4 border-t border-[var(--color-border-subtle)]">
-                      <div className="flex -space-x-2" />
+                    <div className="mt-auto flex flex-col gap-2 pt-4 border-t border-[var(--color-border-subtle)]">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            setSandboxError(null);
+                            setQuickDemoLoading(w.workflow_id);
+                            try {
+                              const res = await createQuickDemo(w.workflow_id);
+                              if (res.url) window.open(res.url, "_blank", "noopener,noreferrer");
+                              else setSandboxError("No sandbox URL returned");
+                            } catch (err) {
+                              setSandboxError(err instanceof Error ? err.message : "Quick demo failed");
+                            } finally {
+                              setQuickDemoLoading(null);
+                            }
+                          }}
+                          disabled={quickDemoLoading !== null}
+                          className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-[var(--color-border-subtle)] text-[10px] font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] disabled:opacity-50"
+                          title="Try in sandbox"
+                        >
+                          {quickDemoLoading === w.workflow_id ? <Loader2 className="w-3 h-3 animate-spin" /> : <ExternalLink className="w-3 h-3" />}
+                          Try it Now
+                        </button>
+                        {hasAuditOrSimFailure(w) && (
+                          <button
+                            type="button"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              setSandboxError(null);
+                              setDebugSandboxLoading(w.workflow_id);
+                              try {
+                                const res = await createDebugSandbox(w.workflow_id);
+                                if (res.url) window.open(res.url, "_blank", "noopener,noreferrer");
+                                else setSandboxError("No sandbox URL returned");
+                              } catch (err) {
+                                setSandboxError(err instanceof Error ? err.message : "Debug sandbox failed");
+                              } finally {
+                                setDebugSandboxLoading(null);
+                              }
+                            }}
+                            disabled={debugSandboxLoading !== null}
+                            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-amber-500/30 text-[10px] font-medium text-amber-400 hover:bg-amber-500/10 disabled:opacity-50"
+                            title="Debug in sandbox"
+                          >
+                            {debugSandboxLoading === w.workflow_id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Bug className="w-3 h-3" />}
+                            Debug sandbox
+                          </button>
+                        )}
+                      </div>
                       <Link
                         href={ROUTES.WORKFLOW_ID(w.workflow_id)}
-                        className="btn-primary-gradient px-4 py-1.5 rounded-full text-xs font-medium text-white transition-all hover:scale-105"
+                        className="btn-primary-gradient px-4 py-1.5 rounded-full text-xs font-medium text-white transition-all hover:scale-105 w-fit"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         Open in Studio
                       </Link>

@@ -1,10 +1,13 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
+
 export type StatusBadgeVariant =
   | "success"
   | "completed"
   | "failed"
   | "building"
+  | "analyzing"
   | "pending"
   | "queued"
   | "warning"
@@ -38,9 +41,10 @@ function getVariantClass(variant: StatusBadgeVariant): string {
     case "audit-failed":
       return "status-pill-failed";
     case "building":
+    case "analyzing":
     case "pending":
     case "queued":
-      return variant === "building" ? "status-pill-building" : "status-pill-queued";
+      return variant === "building" || variant === "analyzing" ? "status-pill-building" : "status-pill-queued";
     case "warning":
       return "bg-[var(--color-semantic-warning)]/20 text-[var(--color-semantic-warning)] border border-[var(--color-semantic-warning)]/30";
     case "spec":
@@ -59,22 +63,55 @@ export interface StatusBadgeProps {
   variant?: StatusBadgeVariant;
   title?: string;
   className?: string;
+  /** Show spinner for live/analyzing states (building, running, generating). */
+  showSpinner?: boolean;
 }
 
 const VARIANT_KEYS: Set<string> = new Set([
   "success", "completed", "failed", "building", "pending", "queued", "warning",
-  "spec", "roma", "high-risk", "audit-failed", "active", "running", "idle",
+  "spec", "roma", "high-risk", "audit-failed", "active", "running", "idle", "analyzing",
 ]);
 
-export function StatusBadge({ status, variant, title, className = "" }: StatusBadgeProps) {
+const LIVE_STATES: Set<string> = new Set([
+  "building", "running", "generating", "deploying", "analyzing", "active", "scanning",
+]);
+
+const GLOW_COLORS: Record<string, string> = {
+  building: "bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.8)]",
+  deploying: "bg-blue-400 shadow-[0_0_6px_rgba(96,165,250,0.8)]",
+  scanning: "bg-purple-400 shadow-[0_0_6px_rgba(192,132,252,0.8)]",
+  analyzing: "bg-purple-400 shadow-[0_0_6px_rgba(192,132,252,0.8)]",
+  running: "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]",
+  active: "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]",
+  generating: "bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.8)]",
+};
+
+function GlowingDot({ status }: { status: string }) {
+  const s = status.toLowerCase();
+  const colorClass = GLOW_COLORS[s] ?? "bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)]";
+  return (
+    <span
+      className={`inline-block w-1.5 h-1.5 rounded-full animate-pulse ${colorClass}`}
+      aria-hidden
+    />
+  );
+}
+
+export function StatusBadge({ status, variant, title, className = "", showSpinner }: StatusBadgeProps) {
   const pillClass = variant
     ? getVariantClass(variant)
     : (VARIANT_KEYS.has(status.toLowerCase()) ? getVariantClass(status as StatusBadgeVariant) : getStatusPillClass(status));
+  const isLive = showSpinner ?? LIVE_STATES.has(status.toLowerCase());
+  const useGlow = isLive && !showSpinner;
   return (
     <span
       className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium ${pillClass} ${className}`.trim()}
       title={title ?? status}
     >
+      {isLive && showSpinner && (
+        <Loader2 className="w-3 h-3 shrink-0 animate-spin" aria-hidden />
+      )}
+      {useGlow && <GlowingDot status={status} />}
       {status}
     </span>
   );

@@ -5,12 +5,13 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useAppDetailData } from "@/hooks/useAppDetailData";
 import { useNetworks } from "@/hooks/useNetworks";
-import { prepareDeploymentTransaction, completeDeployment } from "@/lib/api";
-import { ArrowLeft, FileCode, ExternalLink, Rocket, Loader2, LayoutGrid, GitBranch, Layers, Activity, MessageSquare, Terminal } from "lucide-react";
+import { prepareDeploymentTransaction, completeDeployment, createQuickDemo, createDebugSandbox } from "@/lib/api";
+import { ArrowLeft, FileCode, ExternalLink, Rocket, Loader2, LayoutGrid, GitBranch, Layers, Activity, MessageSquare, Terminal, Bug } from "lucide-react";
 import { Shimmer } from "@/components/ai-elements";
 import { ROUTES } from "@/constants/routes";
 import { FALLBACK_DEFAULT_CHAIN_ID, FALLBACK_DEFAULT_CHAIN_LABEL, getDefaultChainIdFromList } from "@/constants/defaults";
 import { getLogs } from "@/lib/api";
+import { hasAuditOrSimFailure } from "@/lib/types";
 
 type ContractItem = { bytecode?: string; abi?: unknown; contract_name?: string; [key: string]: unknown };
 type DeploymentItem = { contract_address?: string; network?: string; [key: string]: unknown };
@@ -50,6 +51,9 @@ export default function AppDetailPage() {
   const [prepareLoading, setPrepareLoading] = useState(false);
   const [prepareError, setPrepareError] = useState<string | null>(null);
   const [preparePayload, setPreparePayload] = useState<unknown>(null);
+  const [quickDemoLoading, setQuickDemoLoading] = useState(false);
+  const [debugSandboxLoading, setDebugSandboxLoading] = useState(false);
+  const [sandboxError, setSandboxError] = useState<string | null>(null);
   const [activityLogs, setActivityLogs] = useState<Array<{ timestamp?: string; step_type?: string; status?: string; output_summary?: string; error_message?: string; service?: string; [key: string]: unknown }>>([]);
   const [activityLoading, setActivityLoading] = useState(false);
 
@@ -111,14 +115,65 @@ export default function AppDetailPage() {
             <ArrowLeft className="w-4 h-4" />
             Apps
           </Link>
-          <Link
-            href={chatHref}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)]"
-          >
-            <MessageSquare className="w-4 h-4" />
-            Open chat for this app
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {contracts.length > 0 && (
+              <button
+                type="button"
+                disabled={quickDemoLoading}
+                onClick={async () => {
+                  setSandboxError(null);
+                  setQuickDemoLoading(true);
+                  try {
+                    const res = await createQuickDemo(id);
+                    if (res.url) window.open(res.url, "_blank", "noopener,noreferrer");
+                    else setSandboxError("No sandbox URL returned");
+                  } catch (err) {
+                    setSandboxError(err instanceof Error ? err.message : "Quick demo failed");
+                  } finally {
+                    setQuickDemoLoading(false);
+                  }
+                }}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)] disabled:opacity-50"
+              >
+                {quickDemoLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
+                Try it Now
+              </button>
+            )}
+            {hasAuditOrSimFailure(workflow) && (
+              <button
+                type="button"
+                disabled={debugSandboxLoading}
+                onClick={async () => {
+                  setSandboxError(null);
+                  setDebugSandboxLoading(true);
+                  try {
+                    const res = await createDebugSandbox(id);
+                    if (res.url) window.open(res.url, "_blank", "noopener,noreferrer");
+                    else setSandboxError("No sandbox URL returned");
+                  } catch (err) {
+                    setSandboxError(err instanceof Error ? err.message : "Debug sandbox failed");
+                  } finally {
+                    setDebugSandboxLoading(false);
+                  }
+                }}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-500/30 bg-amber-500/5 text-sm font-medium text-amber-400 hover:bg-amber-500/10 disabled:opacity-50"
+              >
+                {debugSandboxLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bug className="w-4 h-4" />}
+                Debug in sandbox
+              </button>
+            )}
+            <Link
+              href={chatHref}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)]"
+            >
+              <MessageSquare className="w-4 h-4" />
+              Open chat for this app
+            </Link>
+          </div>
         </div>
+        {sandboxError && (
+          <p className="text-sm text-[var(--color-semantic-error)]">{sandboxError}</p>
+        )}
         <div>
           <h1 className="text-2xl font-semibold text-white tracking-tight">
             {workflow.name || workflow.intent || "App"}

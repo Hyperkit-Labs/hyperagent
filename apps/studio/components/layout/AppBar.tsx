@@ -77,13 +77,17 @@ export function AppBar() {
         >
           <Menu className="w-5 h-5" />
         </button>
-        <Link href={ROUTES.HOME} className="flex items-center gap-2 shrink-0">
+        <Link
+          href={ROUTES.HOME}
+          className="flex items-center gap-2 shrink-0"
+          title="Current project"
+        >
           <Image
             src="/hyperkit-header-white.svg"
             alt="Hyperkit"
-            width={140}
-            height={47}
-            className="h-9 w-auto object-contain"
+            width={100}
+            height={34}
+            className="h-7 w-auto object-contain"
           />
         </Link>
         <div className="h-5 w-px bg-[var(--color-border-default)] hidden sm:block" />

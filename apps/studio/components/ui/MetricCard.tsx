@@ -29,7 +29,7 @@ export function MetricCard({ label, value, sublabel, icon, className = "", hover
       transition={{ duration: 0.2 }}
       className="origin-center"
     >
-      <GlassCard className={`p-5 flex flex-col justify-between min-h-[120px] transition-all duration-200 ${isHovered && hover ? "border-[var(--color-primary-alpha-30)] shadow-[0_0_20px_rgba(124,58,237,0.1)]" : ""} ${className}`.trim()} hover={false}>
+      <GlassCard className={`p-5 flex flex-col justify-between min-h-[180px] transition-all duration-200 ${isHovered && hover ? "border-[var(--color-primary-alpha-30)] shadow-[0_0_20px_rgba(124,58,237,0.1)]" : ""} ${className}`.trim()} hover={false}>
         <div className="flex items-center justify-between">
           <span className="text-[var(--color-text-tertiary)] text-xs font-medium">{label}</span>
           {icon}

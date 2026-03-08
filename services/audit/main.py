@@ -56,16 +56,31 @@ class AuditResponse(BaseModel):
     tools_failed: list[str] = Field(default_factory=list)
 
 
+EXPLOIT_DETECTORS = "reentrancy,reentrancy-eth,reentrancy-no-eth,reentrancy-benign,unchecked-transfer,unchecked-lowlevel"
+
+
 def _run_slither(workdir: Path, contract_name: str, code: str) -> list[dict]:
+    return _run_slither_impl(workdir, contract_name, code, detectors=None)
+
+
+def _run_slither_exploit(workdir: Path, contract_name: str, code: str) -> list[dict]:
+    """Run Slither with exploit-focused detectors only."""
+    return _run_slither_impl(workdir, contract_name, code, detectors=EXPLOIT_DETECTORS)
+
+
+def _run_slither_impl(workdir: Path, contract_name: str, code: str, detectors: str | None = None) -> list[dict]:
     src = workdir / "src"
     src.mkdir(parents=True, exist_ok=True)
     if "pragma solidity" not in code.strip().lower():
         code = "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n" + code
     (src / f"{contract_name}.sol").write_text(code)
     (workdir / "foundry.toml").write_text('[profile.default]\nsolc = "0.8.24"\n')
+    cmd = ["slither", str(src), "--json", "-"]
+    if detectors:
+        cmd.extend(["--detect", detectors])
     try:
         result = subprocess.run(
-            ["slither", str(src), "--json", "-"],
+            cmd,
             cwd=workdir,
             capture_output=True,
             text=True,
@@ -219,6 +234,16 @@ def audit_echidna(req: AuditRequest) -> list[Finding]:
     with tempfile.TemporaryDirectory(prefix="audit_") as tmp:
         out = _run_echidna(Path(tmp), name, req.contractCode)
     return [Finding(severity=_normalize_severity(f["severity"]), title=f["title"], description=f["description"], location=f.get("location"), category=f.get("category")) for f in out]
+
+
+@app.post("/audit/exploit")
+def audit_exploit(req: AuditRequest) -> dict:
+    """Run Slither with exploit-focused detectors (reentrancy, unchecked-transfer, etc). Used by exploit_sim agent."""
+    name = _safe_contract_name(req.contractName)
+    with tempfile.TemporaryDirectory(prefix="audit_") as tmp:
+        out = _run_slither_exploit(Path(tmp), name, req.contractCode)
+    findings = [{"severity": _normalize_severity(f["severity"]), "title": f["title"], "description": f["description"], "location": f.get("location"), "category": f.get("category")} for f in out]
+    return {"findings": findings, "tools_run": ["slither-exploit"]}
 
 
 def _run_audit_via_tools(tool: str, req: AuditRequest) -> tuple[list[dict], bool] | None:

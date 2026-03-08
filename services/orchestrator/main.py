@@ -2,6 +2,19 @@
 HyperAgent Orchestrator
 FastAPI app: workflows CRUD, runs, networks, metrics, BYOK, deploy, UI schema. Studio contract for E2E.
 """
+from pathlib import Path
+
+# Load .env from repo root so X402_ENABLED, CREDITS_ENABLED, etc. are available when running locally.
+# Docker passes env via env_file; dotenv is a no-op when vars are already set.
+try:
+    from dotenv import load_dotenv
+    _repo_root = Path(__file__).resolve().parent.parent.parent
+    _env_path = _repo_root / ".env"
+    if _env_path.exists():
+        load_dotenv(_env_path)
+except ImportError:
+    pass
+
 import asyncio
 import json
 import logging
@@ -305,6 +318,7 @@ def _run_workflow_pipeline_job(
             {"stage": "spec", "status": "completed"},
             {"stage": "design", "status": "completed" if final.get("design_proposal") else "pending"},
             {"stage": "codegen", "status": "completed" if final.get("contracts") else "pending"},
+            {"stage": "test_generation", "status": "completed" if final.get("test_files") else "pending"},
             {"stage": "audit", "status": "completed" if final.get("audit_passed") else ("failed" if final.get("audit_findings") else "pending")},
         ]
         if autofix_cycle > 0:
@@ -325,6 +339,7 @@ def _run_workflow_pipeline_job(
             stages=stages,
             contracts=final.get("contracts") or {},
             deployments=final.get("deployments") or [],
+            test_files=final.get("test_files") or {},
             ui_schema=final.get("ui_schema"),
             error=final.get("error"),
             codegen_mode=codegen_mode,
@@ -525,6 +540,7 @@ def _build_workflow_tarball(workflow_id: str) -> bytes:
     contracts = w.get("contracts") or {}
     if not contracts:
         return b""
+    test_files = w.get("test_files") or {}
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tf:
         for name, code in contracts.items():
@@ -532,6 +548,13 @@ def _build_workflow_tarball(workflow_id: str) -> bytes:
                 name = name if "/" in name else f"contracts/{name}"
                 data = code.encode("utf-8")
                 ti = tarfile.TarInfo(name=name)
+                ti.size = len(data)
+                tf.addfile(ti, io.BytesIO(data))
+        for name, code in test_files.items():
+            if isinstance(code, str) and (name.endswith(".sol") or name.endswith(".t.sol")):
+                test_path = name if "/" in name else f"test/{name}"
+                data = code.encode("utf-8")
+                ti = tarfile.TarInfo(name=test_path)
                 ti.size = len(data)
                 tf.addfile(ti, io.BytesIO(data))
         pkg = json.dumps({
@@ -781,7 +804,12 @@ def _build_viem_wagmi_zip(
     zf.writestr("next.config.mjs", '/** @type {import("next").NextConfig} */\nconst nextConfig = {};\nexport default nextConfig;\n')
     files_written.extend(["tailwind.config.ts", "next.config.mjs"])
 
-    zf.writestr("src/lib/contract.ts", f'''export const CONTRACT_ADDRESS = "{contract_addr}" as const;
+    contracts_list = schema.get("contracts") or []
+    if not contracts_list:
+        contracts_list = [{"address": contract_addr, "name": "Contract"}]
+    contracts_json = json.dumps([{"address": c.get("address", ""), "name": c.get("name", "Contract")} for c in contracts_list])
+    zf.writestr("src/lib/contract.ts", f'''export const CONTRACTS = {contracts_json} as const;
+export const CONTRACT_ADDRESS = "{contract_addr}" as const;
 export const CHAIN_ID = {chain_id};
 export const RPC_URL = "{rpc_url.replace('"', '\\"')}";
 export const EXPLORER_URL = "{explorer_url.rstrip("/").replace('"', '\\"')}";
@@ -952,6 +980,17 @@ function AppContent() {{
         <p className="text-zinc-400 text-sm">
           Contract: <code className="text-xs">{{CONTRACT_ADDRESS}}</code> on {chain_name}
         </p>
+        {{CONTRACTS.length > 1 ? (
+          <div className="p-4 bg-zinc-800/50 rounded-lg border border-zinc-700 space-y-2">
+            <h2 className="text-sm font-medium text-zinc-300">Contracts</h2>
+            {{CONTRACTS.map((c, i) => (
+              <div key={i} className="flex justify-between items-center text-sm">
+                <span className="text-zinc-400">{{c.name}}</span>
+                <a href={__HREF_EXPLORER_ADDRESS__} target="_blank" rel="noopener noreferrer" className="text-sky-400 hover:underline font-mono text-xs">{{c.address?.slice(0, 10)}}...</a>
+              </div>
+            ))}}
+          </div>
+        ) : null}}
         {{!isConnected ? (
           <button onClick={{() => connect({{ connector: connectors[0] }})}} disabled={{isConnectPending}} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
             {{isConnectPending ? "Connecting..." : "Connect MetaMask"}}
@@ -982,6 +1021,7 @@ export default function Home() {{
 }}
 '''
     page_content = page_content.replace("schema.get(\"name\", \"dApp\")", json.dumps(schema.get("name", "dApp")))
+    page_content = page_content.replace("__HREF_EXPLORER_ADDRESS__", "EXPLORER_URL + \"/address/\" + c.address")
     zf.writestr("src/app/page.tsx", page_content)
     files_written.append("src/app/page.tsx")
 
@@ -1072,7 +1112,14 @@ def export_ui_app_api(workflow_id: str, body: UiAppExportBody | None = None, req
                 zf, schema, app_name, chain_id, contract_addr, abi,
                 read_actions, write_actions, rpc_url, explorer_url, chain_name,
             )
-        else:
+        test_files = w.get("test_files") or {}
+        for name, code in test_files.items():
+            if isinstance(code, str) and (name.endswith(".sol") or name.endswith(".t.sol")):
+                path = name if "/" in name else f"test/{name}"
+                zf.writestr(path, code)
+                files_list.append(path)
+
+        if template != "viem-wagmi":
             zf.writestr("package.json", json.dumps({
                 "name": app_name,
                 "version": "0.1.0",
@@ -1288,6 +1335,7 @@ def _build_hybrid_deploy_state(workflow_id: str, user_id: str, project_id: str, 
         "design_proposal": {},
         "design_approved": True,
         "contracts": w.get("contracts") or {},
+        "test_files": w.get("test_files") or {},
         "framework": "hardhat",
         "audit_findings": w.get("audit_findings") or [],
         "audit_passed": w.get("audit_passed", True),
@@ -1352,6 +1400,7 @@ def _resume_deploy_approval_job(workflow_id: str, user_id: str, project_id: str,
                 {"stage": "spec", "status": "completed"},
                 {"stage": "design", "status": "completed" if final.get("design_proposal") else "pending"},
                 {"stage": "codegen", "status": "completed" if final.get("contracts") else "pending"},
+                {"stage": "test_generation", "status": "completed" if final.get("test_files") else "pending"},
                 {"stage": "audit", "status": "completed" if final.get("audit_passed") else ("failed" if final.get("audit_findings") else "pending")},
                 {"stage": "guardian", "status": "completed" if final.get("invariants") else "pending"},
                 {"stage": "deploy", "status": "completed" if current_stage in ("deployed", "ui_scaffold") else "pending"},
@@ -1365,6 +1414,7 @@ def _resume_deploy_approval_job(workflow_id: str, user_id: str, project_id: str,
                 stages=stages,
                 contracts=final.get("contracts") or {},
                 deployments=final.get("deployments") or [],
+                test_files=final.get("test_files") or {},
                 ui_schema=final.get("ui_schema"),
                 error=final.get("error"),
                 simulation_passed=final.get("simulation_passed"),

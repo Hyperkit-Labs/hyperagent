@@ -10,6 +10,7 @@ from langchain_core.messages import AIMessage
 logger = logging.getLogger(__name__)
 
 from workflow_state import AgentState, MAX_AUTOFIX_CYCLES
+from store import _ensure_contracts_dict
 from step_trace import step_span
 from registries import get_default_pipeline_id, get_audit_max_severity, get_template
 from registries import get_slither_to_swc, get_high_severity_swc
@@ -177,9 +178,13 @@ async def design_agent(state: AgentState) -> AgentState:
             if template and (template.get("source") == "openzeppelin-wizard") and template.get("wizard"):
                 state["use_oz_wizard"] = True
                 w = template["wizard"]
+                base_opts = dict(w.get("options") or {})
+                spec_overrides = spec.get("wizard_options")
+                if isinstance(spec_overrides, dict):
+                    base_opts.update(spec_overrides)
                 state["oz_wizard_options"] = {
                     "kind": w.get("kind", "erc20"),
-                    "options": w.get("options") or {},
+                    "options": base_opts,
                 }
             else:
                 state["use_oz_wizard"] = False
@@ -232,6 +237,7 @@ async def codegen_agent(state: AgentState) -> AgentState:
                 spec, design, framework, user_id, project_id, run_id, api_keys, agent_session_jwt,
                 security_context=security_ctx,
             )
+        contracts = _ensure_contracts_dict(contracts)
         state["contracts"] = contracts
         state["current_stage"] = "audit"
         from store import update_workflow
@@ -256,7 +262,7 @@ async def codegen_agent(state: AgentState) -> AgentState:
 
 async def scrubd_validation_agent(state: AgentState) -> AgentState:
     """Mandatory SCRUBD validation: RE/UX pattern checks before audit."""
-    contracts = state.get("contracts", {})
+    contracts = _ensure_contracts_dict(state.get("contracts"))
     framework = state.get("framework", "hardhat")
     run_id = state.get("run_id") or ""
     _step_start(run_id, "scrubd")
@@ -295,7 +301,7 @@ def _severity_fails_gate(severity: str, max_allowed: str) -> bool:
 
 
 async def audit_agent(state: AgentState) -> AgentState:
-    contracts = state.get("contracts", {})
+    contracts = _ensure_contracts_dict(state.get("contracts"))
     framework = state.get("framework", "hardhat")
     run_id = state.get("run_id") or ""
     api_keys = state.get("api_keys") or {}
@@ -355,8 +361,9 @@ async def simulation_agent(state: AgentState) -> AgentState:
     run_id = state.get("run_id") or ""
     _step_start(run_id, "simulation")
     try:
+        contracts = _ensure_contracts_dict(state.get("contracts"))
         results = await run_tenderly_simulations(
-            state.get("contracts", {}),
+            contracts,
             state.get("spec", {}),
             state.get("spec", {}).get("chains", []),
             deployments=state.get("deployments"),
@@ -371,8 +378,8 @@ async def simulation_agent(state: AgentState) -> AgentState:
                 from execution_backend import get_execution_backend
 
                 backend = get_execution_backend()
-                if hasattr(backend, "run_gas_benchmark") and state.get("contracts"):
-                    for name, code in (state.get("contracts") or {}).items():
+                if hasattr(backend, "run_gas_benchmark") and contracts:
+                    for name, code in contracts.items():
                         if isinstance(code, str) and name.endswith(".sol"):
                             bench = await backend.run_gas_benchmark(code, name.replace(".sol", ""))
                             state["gas_benchmark_score"] = bench.score
@@ -409,7 +416,7 @@ async def exploit_simulation_agent(state: AgentState) -> AgentState:
     _step_start(run_id, "exploit_sim")
     try:
         passed, findings = await run_exploit_simulation(
-            state.get("contracts", {}),
+            _ensure_contracts_dict(state.get("contracts")),
             state.get("spec", {}),
             state.get("design_proposal", {}),
             run_id=run_id,
@@ -468,11 +475,12 @@ async def deploy_agent(state: AgentState) -> AgentState:
                 if resolved_id:
                     chains = [{"chain_id": resolved_id}]
         deployments = await deploy_contracts(
-            state.get("contracts", {}),
+            _ensure_contracts_dict(state.get("contracts")),
             chains,
             state.get("spec", {}),
             run_id=run_id,
             project_id=project_id,
+            oz_wizard_options=state.get("oz_wizard_options") or {},
         )
         state["deployments"] = deployments
         state["current_stage"] = "deployed"
@@ -499,7 +507,7 @@ async def ui_scaffold_agent(state: AgentState) -> AgentState:
     _step_start(run_id, "ui_scaffold")
     try:
         deployments = state.get("deployments") or []
-        contracts = state.get("contracts") or {}
+        contracts = _ensure_contracts_dict(state.get("contracts"))
         network = state.get("network") or ""
         schema = await generate_ui_schema(deployments, contracts, network)
         state["ui_schema"] = schema or {}
@@ -570,7 +578,7 @@ async def autofix_agent(state: AgentState) -> AgentState:
                 trace_blob_id=blob_id, trace_da_cert=da_cert, trace_reference_block=ref_block,
             )
 
-        update_workflow(run_id, status="building", contracts=state.get("contracts"), stages=[
+        update_workflow(run_id, status="building", contracts=_ensure_contracts_dict(state.get("contracts")), stages=[
             {"stage": "spec", "status": "completed"},
             {"stage": "design", "status": "completed"},
             {"stage": "codegen", "status": "completed"},
@@ -615,7 +623,7 @@ async def guardian_agent(state: AgentState) -> AgentState:
     violations: list[dict] = []
     audit_findings = state.get("audit_findings") or []
     contracts_text = ""
-    for fname, source in (state.get("contracts") or {}).items():
+    for fname, source in _ensure_contracts_dict(state.get("contracts")).items():
         if isinstance(source, str):
             contracts_text += source.lower()
 

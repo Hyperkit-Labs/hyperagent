@@ -26,23 +26,30 @@ def _strip_markdown_fences(source: str) -> str:
     return s.strip()
 
 
-async def _compile_contract(source: str, contract_name: str, framework: str = "hardhat") -> dict | None:
-    """Return { bytecode, abi } or None on failure."""
+async def _compile_contract(
+    source: str,
+    contract_name: str,
+    framework: str = "hardhat",
+    all_files: dict[str, str] | None = None,
+) -> dict | None:
+    """Return { bytecode, abi } or None on failure. When all_files has multiple contracts, use multi-file compile."""
     clean_source = _strip_markdown_fences(source)
     headers = get_trace_headers()
+    payload: dict = {"framework": framework}
+    if all_files and len(all_files) > 1:
+        payload["files"] = {n: _strip_markdown_fences(s) for n, s in all_files.items() if isinstance(s, str)}
+        payload["entryContract"] = contract_name
+    else:
+        payload["contractCode"] = clean_source
     async with httpx.AsyncClient(timeout=get_timeout("deploy")) as client:
-        r = await client.post(
-            f"{COMPILE_SERVICE_URL}/compile",
-            json={"contractCode": clean_source, "framework": framework},
-            headers=headers,
-        )
+        r = await client.post(f"{COMPILE_SERVICE_URL}/compile", json=payload, headers=headers)
         if r.status_code != 200:
             logger.warning("[deploy] compile HTTP %s for %s", r.status_code, contract_name)
             return None
         data = r.json()
         if not data.get("success") or not data.get("bytecode"):
             errors = data.get("errors") or []
-            msgs = [e.get("message", "")[:200] for e in errors[:3]] if errors else ["unknown"]
+            msgs = [e.get("message", "")[:200] if isinstance(e, dict) else str(e)[:200] for e in errors[:3]]
             logger.warning("[deploy] compile failed for %s: %s", contract_name, "; ".join(msgs))
             return None
         return {"bytecode": data["bytecode"], "abi": data.get("abi") or []}
@@ -98,10 +105,11 @@ async def deploy_contracts(
 
     contracts = _ensure_contracts_dict(contracts)
     contract_items = [(n, s) for n, s in contracts.items() if n.endswith(".sol") and isinstance(s, str)]
+    all_files = dict(contract_items) if len(contract_items) > 1 else None
     logger.info("[deploy] chain_ids=%s contracts=%s", chain_ids, [n for n, _ in contract_items])
     for order, (name, source) in enumerate(contract_items):
         contract_name = name.replace(".sol", "")
-        compiled = await _compile_contract(source, contract_name, framework)
+        compiled = await _compile_contract(source, contract_name, framework, all_files=all_files)
         if not compiled:
             logger.warning("[deploy] skipping %s: compile returned None", contract_name)
             continue
@@ -119,6 +127,8 @@ async def deploy_contracts(
             except Exception as exc:
                 logger.warning("[deploy] deploy plan failed chain=%s contract=%s: %s", chain_id, contract_name, exc)
                 continue
+            if order > 0 and spec.get("multi_contract"):
+                plan["priorAddressParams"] = [{"paramIndex": 0, "deploymentIndex": 0}]
             network_name = str(chain_id)
             if isinstance(plan.get("explorerUrl"), str):
                 network_name = plan.get("network_name", network_name)

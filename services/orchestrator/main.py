@@ -83,9 +83,26 @@ def _create_agent_session_jwt_if_configured(user_id: str, run_id: str, api_keys:
 app = FastAPI(title="HyperAgent Orchestrator", version="0.1.0")
 
 
+def _is_production() -> bool:
+    """True when RENDER=true or NODE_ENV=production or similar production indicators."""
+    return (
+        os.environ.get("RENDER", "").strip().lower() in ("1", "true", "yes")
+        or os.environ.get("NODE_ENV", "").strip().lower() == "production"
+        or os.environ.get("ENVIRONMENT", "").strip().lower() == "production"
+    )
+
+
 @app.on_event("startup")
 def _validate_critical_services() -> None:
-    """Log missing critical service URLs. Full lifecycle requires compile, audit, agent-runtime."""
+    """Log missing critical service URLs. Full lifecycle requires compile, audit, agent-runtime.
+    In production, REDIS_URL is required for checkpoint persistence."""
+    if _is_production():
+        redis_url = os.environ.get("REDIS_URL", "").strip()
+        if not redis_url:
+            raise RuntimeError(
+                "[orchestrator] REDIS_URL is required in production for checkpoint persistence. "
+                "Set REDIS_URL to a Redis instance (e.g. Redis Cloud)."
+            )
     required = [
         ("COMPILE_SERVICE_URL", COMPILE_SERVICE_URL),
         ("AUDIT_SERVICE_URL", AUDIT_SERVICE_URL),
@@ -378,6 +395,8 @@ def workflows_generate(
         effective_user = user_id if db._is_uuid(user_id) else os.environ.get("SUPABASE_SYSTEM_USER_ID")
         if effective_user and db.ensure_project(project_id, effective_user):
             db.insert_run(workflow_id, project_id, status="running", workflow_version="0.1.0")
+        if user_id and db._is_uuid(user_id):
+            db.ensure_user_profile(user_id)
     create_workflow(
         workflow_id=workflow_id,
         intent=body.nlp_input,

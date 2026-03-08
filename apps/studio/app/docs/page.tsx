@@ -4,54 +4,22 @@ import Link from "next/link";
 import { getDocsUrl } from "@/lib/api";
 import { ROUTES } from "@/constants/routes";
 import { BookOpen, ExternalLink, FileText, Zap, Shield, Globe, Code2, Terminal, Key } from "lucide-react";
+import { PageTitle } from "@/components/layout/PageTitle";
 
-const GUIDES = [
-  {
-    icon: Zap,
-    title: "Quick start",
-    desc: "Create your first smart contract in under 2 minutes",
-    href: ROUTES.HOME,
-    external: false,
-  },
-  {
-    icon: Key,
-    title: "BYOK setup",
-    desc: "Add your LLM API keys to power the pipeline",
-    href: ROUTES.SETTINGS,
-    external: false,
-  },
-  {
-    icon: Code2,
-    title: "Templates",
-    desc: "Browse pre-built contract templates and presets",
-    href: ROUTES.TEMPLATES,
-    external: false,
-  },
-  {
-    icon: Shield,
-    title: "Security pipeline",
-    desc: "How audits and simulations protect your contracts",
-    href: ROUTES.SECURITY,
-    external: false,
-  },
-  {
-    icon: Globe,
-    title: "Multi-chain deploy",
-    desc: "Deploy across EVM networks with one click",
-    href: ROUTES.NETWORKS,
-    external: false,
-  },
-  {
-    icon: Terminal,
-    title: "CLI reference",
-    desc: "Use Hyperkit from the command line",
-    href: "#",
-    external: false,
-  },
-];
+function buildGuides(cliHref: string | null) {
+  return [
+    { icon: Zap, title: "Quick start", desc: "Create your first smart contract in under 2 minutes", href: ROUTES.HOME, external: false },
+    { icon: Key, title: "BYOK setup", desc: "Add your LLM API keys to power the pipeline", href: ROUTES.SETTINGS, external: false },
+    { icon: Code2, title: "Templates", desc: "Browse pre-built contract templates and presets", href: ROUTES.TEMPLATES, external: false },
+    { icon: Shield, title: "Security pipeline", desc: "How audits and simulations protect your contracts", href: ROUTES.SECURITY, external: false },
+    { icon: Globe, title: "Multi-chain deploy", desc: "Deploy across EVM networks with one click", href: ROUTES.NETWORKS, external: false },
+    { icon: Terminal, title: "CLI reference", desc: "Use Hyperkit from the command line", href: cliHref, external: true },
+  ];
+}
 
 export default function DocsPage() {
   const apiDocsUrl = getDocsUrl();
+  const cliHref = apiDocsUrl ? `${apiDocsUrl.replace(/\/$/, "")}/cli` : null;
 
   return (
     <div className="p-6 lg:p-8">
@@ -60,10 +28,7 @@ export default function DocsPage() {
           <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
             <BookOpen className="w-5 h-5 text-purple-400" />
           </div>
-          <div>
-            <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">Documentation</h1>
-            <p className="text-xs text-[var(--color-text-tertiary)]">Guides, API reference, and platform resources</p>
-          </div>
+          <PageTitle title="Documentation" subtitle="Guides, API reference, and platform resources" />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -106,17 +71,25 @@ export default function DocsPage() {
         <div>
           <h2 className="text-sm font-semibold text-[var(--color-text-primary)] mb-3">Guides</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {GUIDES.map((g) => {
+            {buildGuides(cliHref).map((g) => {
               const Icon = g.icon;
               const inner = (
-                <div className="glass-panel rounded-lg p-4 glass-panel-hover transition-all flex items-start gap-3 h-full">
+                <div className={`glass-panel rounded-lg p-4 flex items-start gap-3 h-full ${g.href ? "glass-panel-hover transition-all" : "opacity-70"}`}>
                   <Icon className="w-5 h-5 text-[var(--color-text-tertiary)] shrink-0 mt-0.5" />
                   <div>
-                    <h3 className="text-sm font-medium text-[var(--color-text-primary)]">{g.title}</h3>
+                    <h3 className="text-sm font-medium text-[var(--color-text-primary)] flex items-center gap-2">
+                      {g.title}
+                      {!g.href && g.title === "CLI reference" && (
+                        <span className="text-[10px] font-normal text-[var(--color-text-muted)]">(Coming soon)</span>
+                      )}
+                    </h3>
                     <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{g.desc}</p>
                   </div>
                 </div>
               );
+              if (!g.href) {
+                return <div key={g.title} className="pointer-events-none">{inner}</div>;
+              }
               return g.external ? (
                 <a key={g.title} href={g.href} target="_blank" rel="noopener noreferrer">{inner}</a>
               ) : (

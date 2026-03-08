@@ -40,6 +40,31 @@ def _is_uuid(s: str) -> bool:
         return False
 
 
+def is_uuid(s: str) -> bool:
+    """Public helper for UUID validation."""
+    return _is_uuid(s)
+
+
+def ensure_user_profile(user_id: str, wallet_address: str | None = None, display_name: str | None = None) -> bool:
+    """Ensure user_profiles row exists for auth user. No-op for SIWE (wallet_users)."""
+    if not _is_uuid(user_id):
+        return False
+    client = _client()
+    if not client:
+        return False
+    try:
+        payload = {"id": user_id}
+        if wallet_address is not None:
+            payload["wallet_address"] = wallet_address
+        if display_name is not None:
+            payload["display_name"] = display_name
+        client.table("user_profiles").upsert(payload, on_conflict="id").execute()
+        return True
+    except Exception as e:
+        logger.warning("[db] ensure_user_profile failed: %s", e)
+        return False
+
+
 def ensure_project(project_id: str, user_id: str) -> bool:
     """Ensure project exists (for run FK). Uses project_id and user_id.
     When SIWE: user_id is wallet_users.id; upsert sets wallet_user_id and user_id=null (or SUPABASE_SYSTEM_USER_ID).
@@ -198,13 +223,14 @@ def insert_security_finding(
     description: str | None = None,
     location: str | None = None,
     category: str | None = None,
+    artifact_id: str | None = None,
 ) -> dict[str, Any] | None:
-    """Insert a security finding. Returns row or None."""
+    """Insert a security finding. Returns row or None. Links to project_artifacts when artifact_id provided."""
     client = _client()
     if not client:
         return None
     try:
-        r = client.table("security_findings").insert({
+        row = {
             "run_id": run_id,
             "tool": tool,
             "severity": severity,
@@ -212,10 +238,44 @@ def insert_security_finding(
             "description": description or "",
             "location": location,
             "category": category,
-        }).execute()
+        }
+        if artifact_id and _is_uuid(artifact_id):
+            row["artifact_id"] = artifact_id
+        r = client.table("security_findings").insert(row).execute()
         return r.data[0] if r.data else None
     except Exception as e:
         logger.warning("[db] insert_security_finding failed: %s", e)
+        return None
+
+
+def insert_project_artifact(
+    project_id: str,
+    run_id: str | None,
+    artifact_type: str,
+    name: str,
+    content: str | None = None,
+    ipfs_cid: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> str | None:
+    """Insert a project_artifacts row. Returns artifact id or None.
+    artifact_type: spec, design_doc, contract, audit_report, simulation_report, deployment_record."""
+    client = _client()
+    if not client or not _is_uuid(project_id):
+        return None
+    try:
+        row = {
+            "project_id": project_id,
+            "run_id": run_id if _is_uuid(run_id or "") else None,
+            "type": artifact_type,
+            "name": name,
+            "content": (content[:65535] if content and len(content) > 65535 else content) if content else None,
+            "ipfs_cid": ipfs_cid,
+            "metadata": metadata or {},
+        }
+        r = client.table("project_artifacts").insert(row).execute()
+        return str(r.data[0]["id"]) if r.data else None
+    except Exception as e:
+        logger.warning("[db] insert_project_artifact failed: %s", e)
         return None
 
 

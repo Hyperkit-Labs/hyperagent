@@ -185,7 +185,7 @@ create table if not exists public.run_steps (
   constraint run_steps_pkey primary key (id),
   constraint run_steps_run_id_fkey foreign key (run_id) references public.runs (id) on delete cascade,
   constraint run_steps_status_check check (status = any (array['pending','running','completed','failed'])),
-  constraint run_steps_step_type_check check (step_type = any (array['spec','design','codegen','audit','simulation','deploy','ui_scaffold']))
+  constraint run_steps_step_type_check check (step_type = any (array['spec','design','codegen','scrubd','audit','debate','simulation','exploit_sim','deploy','ui_scaffold','guardian']))
 );
 create unique index if not exists idx_run_steps_run_type on public.run_steps using btree (run_id, step_type);
 create index if not exists idx_run_steps_run_id on public.run_steps using btree (run_id);

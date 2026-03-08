@@ -219,6 +219,35 @@ def insert_security_finding(
         return None
 
 
+def insert_agent_log(
+    run_id: str,
+    agent_name: str,
+    stage: str,
+    message: str,
+    log_level: str = "info",
+    metadata: dict[str, Any] | None = None,
+) -> bool:
+    """Insert a row into agent_logs. Used by pipeline steps. Returns True if inserted."""
+    client = _client()
+    if not client or not run_id or not agent_name or not stage or not message:
+        return False
+    if log_level not in ("debug", "info", "warning", "error"):
+        log_level = "info"
+    try:
+        client.table("agent_logs").insert({
+            "run_id": run_id,
+            "agent_name": agent_name,
+            "stage": stage,
+            "message": message[:4096] if len(message) > 4096 else message,
+            "log_level": log_level,
+            "metadata": metadata or {},
+        }).execute()
+        return True
+    except Exception as e:
+        logger.warning("[db] insert_agent_log failed: %s", e)
+        return False
+
+
 def insert_step(
     run_id: str,
     step_index: int,

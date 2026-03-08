@@ -37,6 +37,8 @@ export interface Workflow {
   simulation_passed?: boolean;
   simulation_results?: unknown;
   auto_approve?: boolean;
+  /** Pipeline stage from backend (e.g. awaiting_deploy_approval). */
+  current_stage?: string;
   autofix_cycle?: number;
   autofix_history?: Array<{ cycle: number; error_context: string }>;
   invariant_violations?: Array<{ invariant: string; severity: string }>;
@@ -55,8 +57,13 @@ export function needsSpecApproval(w: Workflow): boolean {
   );
 }
 
+/** True when workflow is paused at Guardian gate and needs user to approve deploy. */
+export function needsDeployApproval(w: Workflow): boolean {
+  return (w.status === 'building' || w.status === 'running') && w.current_stage === 'awaiting_deploy_approval';
+}
+
 /** True when any stage named audit or simulation has status failed. */
-export function hasAuditOrSimFailure(w: Workflow): boolean {
+export function hasAuditOrSimFailure(w: { stages?: Array<{ name?: string; stage?: string; status?: string }> }): boolean {
   const stages = w.stages ?? [];
   return stages.some(
     (s) =>

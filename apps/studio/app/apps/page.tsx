@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Loader2, Plus, Layers } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
+import { PageTitle } from "@/components/layout/PageTitle";
 import { useWorkflows } from "@/hooks/useWorkflows";
 
 export default function AppsListPage() {
@@ -12,12 +13,10 @@ export default function AppsListPage() {
     <div className="p-6 lg:p-8">
       <div className="max-w-[1200px] mx-auto space-y-6 animate-enter">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold text-[var(--color-text-primary)] tracking-tight">Apps</h1>
-            <p className="text-sm text-[var(--color-text-tertiary)] mt-1">
-              Apps are built from workflows. Create a workflow from Chat or the wizard, then view it here.
-            </p>
-          </div>
+          <PageTitle
+            title="Apps"
+            subtitle="Apps are built from workflows. Create a workflow from Chat or the wizard, then view it here."
+          />
           <Link
             href={ROUTES.APPS_NEW}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg btn-primary-gradient text-[var(--color-text-primary)] text-sm font-medium"

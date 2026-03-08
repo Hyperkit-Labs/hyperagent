@@ -35,7 +35,9 @@ from nodes import (
 
 
 def _start_router(state: AgentState) -> str:
-    """Route to design when resuming after spec approval; else to estimate."""
+    """Route to design when resuming after spec approval; to deploy when resuming deploy approval (hybrid state); else estimate."""
+    if state.get("deploy_approved") and state.get("contracts"):
+        return "deploy"
     if state.get("spec_approved") and state.get("spec"):
         return "design"
     return "estimate"
@@ -122,6 +124,7 @@ def create_workflow():
     workflow.add_conditional_edges("start", _start_router, {
         "estimate": "estimate",
         "design": "design",
+        "deploy": "deploy",
     })
     workflow.add_edge("estimate", "spec")
     workflow.add_conditional_edges("spec", _should_approve_spec, {

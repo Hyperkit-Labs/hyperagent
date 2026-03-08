@@ -139,7 +139,13 @@ def get_timeout(agent: str) -> float:
 
 
 def get_da_backend() -> str:
-    """DA backend for traces. Always none (stub mode)."""
+    """DA backend for traces. Returns ipfs when IPFS/storage configured; else none (stub)."""
+    try:
+        from ipfs_client import is_configured
+        if is_configured():
+            return "ipfs"
+    except Exception:
+        pass
     return "none"
 
 

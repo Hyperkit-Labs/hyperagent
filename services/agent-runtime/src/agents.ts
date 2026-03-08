@@ -144,7 +144,15 @@ export async function codegenAgent(
 ): Promise<Record<string, string>> {
   const { provider, modelId, apiKey } = resolveModel(context, "anthropic");
   const model = getModel(provider, modelId, apiKey);
-  let system = `You are a Solidity codegen agent. Generate production-ready Solidity. Use SPDX, pragma ^0.8.0, NatSpec, events, access control. Use only imports from @openzeppelin/contracts and @openzeppelin/community-contracts; do not edit OpenZeppelin source; add custom logic in separate contracts or composition. Output only code, no markdown.`;
+  let system = `You are a Solidity codegen agent. Generate production-ready Solidity. Use SPDX, pragma ^0.8.0, events, access control. Use only imports from @openzeppelin/contracts and @openzeppelin/community-contracts; do not edit OpenZeppelin source; add custom logic in separate contracts or composition. Output only code, no markdown.
+
+MANDATORY NatSpec documentation: Add high-level documentation comments to every contract and public/external function.
+- For each contract: /// @title ContractName - one-line purpose
+- For each contract: /// @notice One or two sentences describing what the contract does
+- For each public/external function: /// @notice Brief description of behavior
+- For each function with params: /// @param paramName Description
+- For each function with return value: /// @return Description of return value
+- For events: /// @param paramName Description`;
   if (securityContext?.threatsSummary || securityContext?.scvPatterns) {
     system += `\n\nMUST AVOID: ${securityContext.threatsSummary || "N/A"}\n- Reentrancy: use checks-effects-interactions, nonReentrant modifier\n- Unhandled exceptions: check return values of call/transfer/send\n- Known SCV patterns: ${securityContext.scvPatterns || "N/A"}`;
   }
@@ -153,6 +161,17 @@ export async function codegenAgent(
   if (multiContract) {
     system += `\n\nWhen design has multiple components, generate ALL contracts needed. Start each contract with a file marker on its own line: // FILE: ComponentName.sol (e.g. // FILE: Token.sol, // FILE: Vault.sol). Output each contract in full with its marker.`;
   }
+  const oracles = (spec as { oracles?: unknown[] })?.oracles;
+  const templateId = (spec as { template_id?: string })?.template_id;
+  const needsChainlink = (Array.isArray(oracles) && oracles.length > 0) || templateId === "lending-basic";
+  if (needsChainlink) {
+    system += `\n\nORACLE (Chainlink): When spec.oracles is present or template is lending-basic, integrate Chainlink price feeds for collateral valuation.
+- Import interface: interface AggregatorV3Interface { function latestRoundData() external view returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound); }
+- Store price feed address per collateral (e.g. mapping(address => address) public priceFeeds)
+- Use latestRoundData() to get price (answer is 8 decimals for USD pairs)
+- For lending: compute collateral value in USD, debt value in USD, health factor = (collateralValue * LTV) / debtValue
+- Common mainnet feeds: ETH/USD 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419, BTC/USD 0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c`;
+  }
   const prompt = multiContract
     ? `Spec: ${JSON.stringify(spec)}\nDesign: ${JSON.stringify(design)}\nGenerate all contracts needed for the design (${components.join(", ")}). Use // FILE: Name.sol before each contract.`
     : `Spec: ${JSON.stringify(spec)}\nDesign: ${JSON.stringify(design)}\nGenerate one main contract.`;
@@ -160,6 +179,28 @@ export async function codegenAgent(
     model,
     system,
     prompt,
+    maxTokens: 8192,
+  });
+  return parseMultiFileOutput(result.text);
+}
+
+export async function testAgent(
+  contracts: Record<string, string>,
+  spec: Record<string, unknown>,
+  design: DesignProposal,
+  context: AgentContext,
+): Promise<Record<string, string>> {
+  const { provider, modelId, apiKey } = resolveModel(context, "anthropic");
+  const model = getModel(provider, modelId, apiKey);
+  const contractSummary = Object.entries(contracts)
+    .map(([name, code]) => `// ${name}\n${typeof code === "string" ? code.slice(0, 4000) : ""}`)
+    .join("\n\n");
+  const result = await generateText({
+    model,
+    system: `You are a Solidity test agent. Generate Foundry (forge test) or Hardhat tests for the given contracts.
+Output only test code. Use forge-std for Foundry or Hardhat's expect. Include: deployment setup, basic unit tests for main functions, edge cases.
+Use // FILE: Contract.t.sol before each test file. Output only code with file markers.`,
+    prompt: `Spec: ${JSON.stringify(spec)}\nDesign: ${JSON.stringify(design)}\n\nContracts:\n${contractSummary}\n\nGenerate comprehensive tests.`,
     maxTokens: 8192,
   });
   return parseMultiFileOutput(result.text);

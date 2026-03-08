@@ -35,6 +35,8 @@ services:
         sync: false
       - key: SUPABASE_URL
         sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
       - key: SUPABASE_PASSWORD
         sync: false
       - key: X402_ENABLED
@@ -116,6 +118,8 @@ services:
         sync: false
       - key: OPENSANDBOX_API_KEY
         sync: false
+      - key: ORCHESTRATOR_PUBLIC_URL
+        sync: false
       - key: PASHOV_AUDIT_ENABLED
         sync: false
       - key: PASHOV_SKILLS_PATH
@@ -127,15 +131,7 @@ services:
         value: V6.0
       - key: MAX_DEBATE_ROUNDS
         sync: false
-      - key: VERCEL_SANDBOX_TOKEN
-        sync: false
-      - key: VERCEL_TEAM_ID
-        sync: false
-      - key: VERCEL_PROJECT_ID
-        sync: false
-      - key: DEMO_SANDBOX_SOURCE_URL
-        sync: false
-      - key: DEMO_SANDBOX_SOURCE_TYPE
+      - key: SANDBOX_API_URL
         sync: false
 
   - type: web

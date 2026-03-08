@@ -71,6 +71,7 @@ def _new_record(
         "simulation_passed": False,
         "simulation_results": [],
         "audit_findings": [],
+        "test_files": {},
     }
 
 
@@ -107,6 +108,7 @@ def update_workflow(
     simulation_passed: bool | None = None,
     simulation_results: list[dict[str, Any]] | dict[str, Any] | None = None,
     audit_findings: list[dict[str, Any]] | None = None,
+    test_files: dict[str, Any] | None = None,
     metadata_merge: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Update an existing workflow record; persist to Supabase when configured."""
@@ -149,6 +151,8 @@ def update_workflow(
         rec["simulation_results"] = simulation_results
     if audit_findings is not None:
         rec["audit_findings"] = audit_findings
+    if test_files is not None:
+        rec["test_files"] = test_files
     if metadata_merge is not None:
         rec["metadata"] = {**(rec.get("metadata") or {}), **metadata_merge}
     rec["updated_at"] = now

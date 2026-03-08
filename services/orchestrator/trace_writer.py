@@ -1,10 +1,14 @@
 """
-Trace writer: build AgentTraceBlob-shaped payload, return stub blob_id for run_steps.
-Stub IDs ensure run_steps.trace_blob_id is always set (storage policy).
+Trace writer: build AgentTraceBlob-shaped payload, pin to IPFS when configured.
+Returns real CID as blob_id when IPFS configured; otherwise stub for run_steps.
 """
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 def build_trace_payload(
@@ -39,7 +43,7 @@ def build_trace_payload(
     return payload
 
 
-def write_trace(
+async def write_trace(
     run_id: str,
     step_type: str,
     step_index: int,
@@ -49,14 +53,52 @@ def write_trace(
     extra: dict[str, Any] | None = None,
 ) -> tuple[str | None, str | None, str | None]:
     """
-    Return stub blob_id for run_steps. Caller stores blob_id in run_steps via update_step.
+    Pin trace payload to IPFS when configured; return (blob_id, da_cert, reference_block).
+    blob_id: IPFS CID when pinned, else stub. Caller stores in run_steps via update_step.
     extra: optional dict merged into payload (e.g. discussion_trace for debate steps).
     """
-    _ = build_trace_payload(run_id, step_type, step_index, status, output_summary, error_message, extra)
-    stub_id = _stub_trace_id(run_id, step_type, step_index)
-    return stub_id, None, None
+    payload = build_trace_payload(run_id, step_type, step_index, status, output_summary, error_message, extra)
+    try:
+        from ipfs_client import pin_json, is_configured
+        if is_configured():
+            name = f"trace/{run_id}/{step_type}/{step_index}.json"
+            cid = await pin_json(payload, name, {"run_id": run_id, "step_type": step_type})
+            if cid:
+                return cid, None, None
+    except Exception as e:
+        logger.warning("[trace_writer] IPFS pin failed: %s", e)
+    return _stub_trace_id(run_id, step_type, step_index), None, None
+
+
+def write_trace_sync(
+    run_id: str,
+    step_type: str,
+    step_index: int,
+    status: str,
+    output_summary: str | None = None,
+    error_message: str | None = None,
+    extra: dict[str, Any] | None = None,
+) -> tuple[str | None, str | None, str | None]:
+    """Synchronous wrapper for write_trace. Runs async in event loop."""
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                fut = pool.submit(
+                    asyncio.run,
+                    write_trace(run_id, step_type, step_index, status, output_summary, error_message, extra),
+                )
+                return fut.result(timeout=15)
+        else:
+            return loop.run_until_complete(
+                write_trace(run_id, step_type, step_index, status, output_summary, error_message, extra)
+            )
+    except Exception as e:
+        logger.warning("[trace_writer] write_trace_sync failed: %s", e)
+        return _stub_trace_id(run_id, step_type, step_index), None, None
 
 
 def _stub_trace_id(run_id: str, step_type: str, step_index: int) -> str:
-    """Deterministic stub blob_id; ensures run_steps.trace_blob_id is always set."""
+    """Deterministic stub blob_id when IPFS not configured."""
     return f"stub:{run_id}:{step_type}:{step_index}"

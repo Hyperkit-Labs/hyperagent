@@ -23,6 +23,7 @@ function isPublicPath(path: string): boolean {
     p === "" ||
     p === "/api/v1/auth/siwe" ||
     p === "/api/v1/config" ||
+    p === "/api/v1/config/integrations-debug" ||
     p === "/api/v1/networks" ||
     p === "/api/v1/tokens/stablecoins"
   );

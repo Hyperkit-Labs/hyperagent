@@ -9,6 +9,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getNetworks, getMetrics, getErrorMessage, isAbortError, type NetworkConfig } from '@/lib/api';
 import { POLLING } from '@/constants/defaults';
+import { useNetworksContext } from '@/components/providers/NetworksProvider';
 
 export interface NetworkStats {
   chainId: number;
@@ -41,6 +42,8 @@ export function useNetworks(options: UseNetworksOptions = {}): UseNetworksReturn
     autoRefresh = false,
     refreshInterval = POLLING.NETWORKS_MS,
   } = options;
+
+  const ctx = useNetworksContext();
 
   const [networks, setNetworks] = useState<NetworkConfig[]>([]);
   const [networkStats, setNetworkStats] = useState<NetworkStats[]>([]);
@@ -119,20 +122,19 @@ export function useNetworks(options: UseNetworksOptions = {}): UseNetworksReturn
     return networks.find(n => n.id === id);
   }, [networks]);
 
-  // Initial fetch
+  // Initial fetch (skip when using shared context)
   useEffect(() => {
+    if (ctx && !includeStats) return;
     isMounted.current = true;
     fetchController.current = new AbortController();
-    
     fetchNetworks(fetchController.current.signal);
-
     return () => {
       isMounted.current = false;
       if (fetchController.current) {
         fetchController.current.abort();
       }
     };
-  }, [fetchNetworks]);
+  }, [fetchNetworks, ctx, includeStats]);
 
   // Auto-refresh
   useEffect(() => {
@@ -146,6 +148,18 @@ export function useNetworks(options: UseNetworksOptions = {}): UseNetworksReturn
 
     return () => clearInterval(interval);
   }, [autoRefresh, refreshInterval, loading, refetch]);
+
+  if (ctx && !includeStats) {
+    return {
+      networks: ctx.networks,
+      networkStats: [],
+      loading: ctx.loading,
+      error: ctx.error,
+      refetch: ctx.refetch,
+      getNetworkByChainId: ctx.getNetworkByChainId,
+      getNetworkById: ctx.getNetworkById,
+    };
+  }
 
   return {
     networks,

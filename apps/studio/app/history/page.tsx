@@ -2,11 +2,12 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { History, Search, Filter, Loader2, ChevronRight } from "lucide-react";
+import { History, Search, Filter, Loader2, ChevronRight, ExternalLink, Bug } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
-import { getWorkflows, getLogs } from "@/lib/api";
+import { getWorkflows, getLogs, createQuickDemo, createDebugSandbox } from "@/lib/api";
 import { StatusBadge, EmptyState } from "@/components/ui";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
+import { hasAuditOrSimFailure } from "@/lib/types";
 
 interface LogEntry {
   id?: string;
@@ -19,10 +20,12 @@ interface LogEntry {
 interface WorkflowItem {
   workflow_id: string;
   id?: string;
+  intent?: string;
   prompt?: string;
   status?: string;
   network?: string;
   created_at?: string;
+  stages?: Array<{ name?: string; stage?: string; status?: string }>;
 }
 
 type HistoryTab = "workflows" | "logs";
@@ -34,6 +37,8 @@ export default function HistoryPage() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [quickDemoLoading, setQuickDemoLoading] = useState<string | null>(null);
+  const [debugSandboxLoading, setDebugSandboxLoading] = useState<string | null>(null);
 
   const fetchData = useCallback(() => {
     setLoading(true);
@@ -58,7 +63,7 @@ export default function HistoryPage() {
   const filteredWorkflows = search.trim()
     ? workflows.filter(
         (w) =>
-          (w.prompt || "").toLowerCase().includes(search.toLowerCase()) ||
+          (w.intent || w.prompt || "").toLowerCase().includes(search.toLowerCase()) ||
           (w.workflow_id || "").toLowerCase().includes(search.toLowerCase()) ||
           (w.status || "").toLowerCase().includes(search.toLowerCase())
       )
@@ -144,14 +149,14 @@ export default function HistoryPage() {
                   <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-[var(--color-text-tertiary)] uppercase">Status</th>
                   <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-[var(--color-text-tertiary)] uppercase">Network</th>
                   <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-[var(--color-text-tertiary)] uppercase">Created</th>
-                  <th scope="col" className="px-4 py-3 w-10" />
+                  <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-[var(--color-text-tertiary)] uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--color-border)]">
                 {filteredWorkflows.map((w) => (
                   <tr key={w.workflow_id} className="hover:bg-[var(--color-bg-panel)] transition-colors">
                     <td className="px-4 py-3 text-sm text-[var(--color-text-primary)] max-w-xs truncate">
-                      {w.prompt || w.workflow_id}
+                      {w.intent || w.prompt || w.workflow_id}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={w.status || "unknown"} />
@@ -161,9 +166,47 @@ export default function HistoryPage() {
                       {w.created_at ? new Date(w.created_at).toLocaleString() : "-"}
                     </td>
                     <td className="px-4 py-3">
-                      <Link href={`${ROUTES.HOME}?workflow=${w.workflow_id}`} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]">
-                        <ChevronRight className="w-4 h-4" />
-                      </Link>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setQuickDemoLoading(w.workflow_id);
+                            try {
+                              const res = await createQuickDemo(w.workflow_id);
+                              if (res.url) window.open(res.url, "_blank", "noopener,noreferrer");
+                            } finally {
+                              setQuickDemoLoading(null);
+                            }
+                          }}
+                          disabled={quickDemoLoading !== null}
+                          className="p-1.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)] disabled:opacity-50"
+                          title="Try in sandbox"
+                        >
+                          {quickDemoLoading === w.workflow_id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
+                        </button>
+                        {hasAuditOrSimFailure(w) && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setDebugSandboxLoading(w.workflow_id);
+                              try {
+                                const res = await createDebugSandbox(w.workflow_id);
+                                if (res.url) window.open(res.url, "_blank", "noopener,noreferrer");
+                              } finally {
+                                setDebugSandboxLoading(null);
+                              }
+                            }}
+                            disabled={debugSandboxLoading !== null}
+                            className="p-1.5 rounded text-amber-400 hover:bg-amber-500/10 disabled:opacity-50"
+                            title="Debug in sandbox"
+                          >
+                            {debugSandboxLoading === w.workflow_id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bug className="w-3.5 h-3.5" />}
+                          </button>
+                        )}
+                        <Link href={`${ROUTES.HOME}?workflow=${w.workflow_id}`} className="p-1.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]" title="Open workflow">
+                          <ChevronRight className="w-4 h-4" />
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))}

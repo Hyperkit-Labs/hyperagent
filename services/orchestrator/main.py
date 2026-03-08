@@ -235,6 +235,19 @@ def _run_workflow_pipeline_job(
             initial_state_override=initial_override or None,
         )
         current_stage = final.get("current_stage") or "unknown"
+        if auto_approve and current_stage == "awaiting_deploy_approval":
+            logger.info("[orchestrator] auto_approve: resuming deploy for workflow_id=%s", workflow_id)
+            final = run_pipeline(
+                "",
+                user_id,
+                project_id,
+                workflow_id,
+                api_keys,
+                pipeline_id,
+                checkpoint_id=workflow_id,
+                resume_update={"deploy_approved": True},
+            )
+            current_stage = final.get("current_stage") or "unknown"
         status = "completed" if current_stage in ("deployed", "deploy", "ui_scaffold") else (
             "failed" if current_stage in ("audit_failed", "simulation_failed", "failed") else "building"
         )
@@ -794,8 +807,17 @@ def _resume_deploy_approval_job(workflow_id: str, user_id: str, project_id: str,
             pass
 
 
+class DeployApproveBody(BaseModel):
+    api_keys: dict[str, str] | None = Field(None, description="Optional LLM keys for resume; when omitted, uses workspace keys.")
+
+
 @app.post("/api/v1/workflows/{workflow_id}/deploy/approve")
-def deploy_approve_api(workflow_id: str, background_tasks: BackgroundTasks, request: Request = None) -> dict[str, Any]:
+def deploy_approve_api(
+    workflow_id: str,
+    background_tasks: BackgroundTasks,
+    body: DeployApproveBody = Body(DeployApproveBody()),
+    request: Request = None,
+) -> dict[str, Any]:
     """Approve deploy after Guardian; resume pipeline to create deploy plans."""
     w = get_workflow(workflow_id)
     if not w:
@@ -810,11 +832,11 @@ def deploy_approve_api(workflow_id: str, background_tasks: BackgroundTasks, requ
         )
     user_id = w.get("user_id") or "anonymous"
     project_id = w.get("project_id") or workflow_id
-    api_keys = _get_keys_for_run(user_id, DEFAULT_WORKSPACE)
+    api_keys = (body.api_keys if body.api_keys else None) or _get_keys_for_run(user_id, DEFAULT_WORKSPACE)
     if not api_keys:
         raise HTTPException(
             status_code=422,
-            detail="LLM API keys required to resume. Add keys in Settings.",
+            detail="LLM API keys required to resume. Add keys in Settings or pass api_keys in request body.",
         )
     background_tasks.add_task(_resume_deploy_approval_job, workflow_id, user_id, project_id, dict(api_keys))
     return {"workflow_id": workflow_id, "status": "resuming", "message": "Deploy approved; pipeline resuming."}

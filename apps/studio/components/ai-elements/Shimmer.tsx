@@ -105,3 +105,23 @@ export function ShimmerGrid({ count = 6, className = '' }: ShimmerGridProps) {
     </div>
   );
 }
+
+/** Skeleton for code block during codegen. Shows "thinking" state. */
+export function CodeBlockShimmer({ className = '' }: { className?: string }) {
+  return (
+    <div
+      className={`rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] overflow-hidden ${className}`}
+      aria-hidden
+    >
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)]">
+        <Shimmer height="h-2" width="w-16" rounded="sm" />
+        <Shimmer height="h-2" width="w-2" rounded="full" />
+      </div>
+      <div className="p-4 space-y-2">
+        {['w-2/3', 'w-full', 'w-1/2', 'w-1/3', 'w-5/6', 'w-4/5', 'w-1/2'].map((width, i) => (
+          <Shimmer key={i} height="h-3" width={width} rounded="sm" className="max-w-full" />
+        ))}
+      </div>
+    </div>
+  );
+}

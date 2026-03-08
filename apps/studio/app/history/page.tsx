@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { History, Search, Filter, Loader2, ChevronRight, ExternalLink, Bug } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
+import { PageTitle } from "@/components/layout/PageTitle";
 import { getWorkflows, getLogs, createQuickDemo, createDebugSandbox } from "@/lib/api";
 import { StatusBadge, EmptyState } from "@/components/ui";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
@@ -84,10 +85,7 @@ export default function HistoryPage() {
           <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
             <History className="w-5 h-5 text-purple-400" />
           </div>
-          <div>
-            <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">History</h1>
-            <p className="text-xs text-[var(--color-text-tertiary)]">Browse past workflows, runs, and log entries</p>
-          </div>
+          <PageTitle title="History" subtitle="Browse past workflows, runs, and log entries" />
         </div>
       </div>
 

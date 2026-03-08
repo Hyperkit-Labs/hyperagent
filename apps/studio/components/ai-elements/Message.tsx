@@ -40,7 +40,7 @@ export function Message({ role: roleProp, from, content, label, children }: Mess
   if (role === 'user') {
     return (
       <div className="flex flex-col gap-1 items-end">
-        <div className="bg-[var(--color-bg-panel)] text-[var(--color-text-primary)] px-4 py-2.5 rounded-2xl rounded-tr-sm border border-[var(--color-border-subtle)] max-w-[90%] text-sm leading-relaxed">
+        <div className="bg-[var(--color-primary-alpha-15)] text-[var(--color-text-primary)] px-4 py-2.5 rounded-2xl rounded-tr-sm border border-[var(--color-primary-alpha-25)] max-w-[90%] text-sm leading-relaxed shadow-sm">
           {content}
         </div>
       </div>
@@ -58,15 +58,17 @@ export function Message({ role: roleProp, from, content, label, children }: Mess
   return (
     <div className="flex flex-col items-start gap-2 max-w-full w-full">
       <div className="flex items-center gap-2 mb-1">
-        <div className="w-4 h-4 rounded bg-[var(--color-primary-alpha-20)] flex items-center justify-center">
-          <Bot className="w-2.5 h-2.5 text-[var(--color-primary-light)]" />
+        <div className="w-4 h-4 rounded bg-indigo-500/30 flex items-center justify-center">
+          <Bot className="w-2.5 h-2.5 text-indigo-400" />
         </div>
-        <span className="text-[11px] font-semibold text-[var(--color-primary-light)]">
+        <span className="text-[11px] font-semibold text-indigo-400">
           {label ?? 'HyperAgent'}
         </span>
       </div>
-      <MessageResponse content={content} />
-      {children}
+      <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/10 backdrop-blur-sm px-4 py-2.5 shadow-sm max-w-[90%]">
+        <MessageResponse content={content} />
+        {children}
+      </div>
     </div>
   );
 }

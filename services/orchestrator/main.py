@@ -230,6 +230,7 @@ def _run_workflow_pipeline_job(
 ) -> None:
     """Background job: run LangGraph pipeline and persist workflow + run status."""
     set_request_id(request_id)
+    logger.info("[pipeline] job start workflow_id=%s api_keys_providers=%s agent_session_jwt=%s", workflow_id, list(api_keys.keys()) if api_keys else [], "yes" if agent_session_jwt else "no")
     if request_id:
         logger.info("[orchestrator] pipeline start workflow_id=%s request_id=%s", workflow_id, request_id)
     if api_keys and user_id:
@@ -410,13 +411,14 @@ def workflows_generate(
         template_id=body.template_id,
     )
     request_id = (request.headers.get("x-request-id") or request.headers.get("X-Request-Id") or "").strip() or None
+    logger.info("[generate] pipeline job queued workflow_id=%s api_keys_providers=%s agent_session_jwt=%s", workflow_id, list(api_keys.keys()) if api_keys else [], "yes" if agent_session_jwt else "no")
     background_tasks.add_task(
         _run_workflow_pipeline_job,
         workflow_id,
         user_id,
         project_id,
         body.nlp_input,
-        api_keys,
+        dict(api_keys),
         body.pipeline_id,
         agent_session_jwt,
         body.template_id,

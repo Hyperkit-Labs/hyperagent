@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useState } from "react";
 import { CommandPalette } from "@/components/layout/CommandPalette";
-import { ContextSidebar } from "@/components/layout/ContextSidebar";
+import { MobileNavDrawer } from "@/components/layout/MobileNavDrawer";
 
 interface LayoutContextValue {
   contextSidebarOpen: boolean;
@@ -11,6 +11,9 @@ interface LayoutContextValue {
   commandPaletteOpen: boolean;
   setCommandPaletteOpen: (v: boolean) => void;
   openCommandPalette: () => void;
+  mobileNavOpen: boolean;
+  setMobileNavOpen: (v: boolean) => void;
+  toggleMobileNav: () => void;
 }
 
 const LayoutContext = createContext<LayoutContextValue | null>(null);
@@ -24,6 +27,7 @@ export function useLayout() {
 export function LayoutProvider({ children }: { children: React.ReactNode }) {
   const [contextSidebarOpen, setContextSidebarOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const toggleContextSidebar = useCallback(() => {
     setContextSidebarOpen((v) => !v);
@@ -33,6 +37,10 @@ export function LayoutProvider({ children }: { children: React.ReactNode }) {
     setCommandPaletteOpen(true);
   }, []);
 
+  const toggleMobileNav = useCallback(() => {
+    setMobileNavOpen((v) => !v);
+  }, []);
+
   const value: LayoutContextValue = {
     contextSidebarOpen,
     setContextSidebarOpen,
@@ -40,12 +48,16 @@ export function LayoutProvider({ children }: { children: React.ReactNode }) {
     commandPaletteOpen,
     setCommandPaletteOpen,
     openCommandPalette,
+    mobileNavOpen,
+    setMobileNavOpen,
+    toggleMobileNav,
   };
 
   return (
     <LayoutContext.Provider value={value}>
       {children}
       <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
+      <MobileNavDrawer open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
     </LayoutContext.Provider>
   );
 }

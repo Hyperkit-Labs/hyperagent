@@ -247,6 +247,8 @@ def run_pipeline(
         }
     if initial_state_override:
         initial.update(initial_state_override)
+    import logging
+    logging.getLogger(__name__).info("[pipeline] run_pipeline start run_id=%s api_keys_providers=%s agent_session_jwt=%s", run_id, list(initial.get("api_keys") or {}).keys(), "yes" if initial.get("agent_session_jwt") else "no")
     config = {"configurable": {"thread_id": run_id}}
     try:
         if checkpoint_id and resume_update:

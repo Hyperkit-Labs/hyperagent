@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2, ArrowLeft } from "lucide-react";
@@ -13,6 +13,7 @@ import {
   handleApiError,
   isByokStorageOrMigrationError,
   BYOK_SAVE_AGAIN_HINT,
+  isCreditsError,
 } from "@/lib/api";
 
 export default function NewAppPage() {
@@ -21,6 +22,7 @@ export default function NewAppPage() {
   const [intent, setIntent] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const lastErrorRef = useRef<unknown>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +42,7 @@ export default function NewAppPage() {
       });
       router.push(ROUTES.WORKFLOW_ID(workflow_id));
     } catch (err) {
+      lastErrorRef.current = err;
       setError(handleApiError(err));
     } finally {
       setLoading(false);
@@ -92,6 +95,11 @@ export default function NewAppPage() {
           {error && (
             <div className="space-y-2">
               <p className="text-sm text-[var(--color-semantic-error)]">{error}</p>
+              {isCreditsError(lastErrorRef.current) && (
+                <Link href={ROUTES.PAYMENTS} className="text-xs text-[var(--color-primary-light)] hover:underline">
+                  Top up credits in Payments
+                </Link>
+              )}
               {isByokStorageOrMigrationError(error) && (
                 <p className="text-xs text-[var(--color-text-muted)]">
                   {BYOK_SAVE_AGAIN_HINT}{" "}

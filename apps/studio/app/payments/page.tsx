@@ -11,6 +11,7 @@ import { PaymentTopUpCard } from "@/components/settings/PaymentTopUpCard";
 import { ROUTES } from "@/constants/routes";
 import { DollarSign, ArrowRight, CreditCard, TrendingUp } from "lucide-react";
 import { usePaymentsDashboard } from "@/hooks/usePaymentsDashboard";
+import { useConfig } from "@/components/providers/ConfigProvider";
 
 type PaymentItem = {
   id: string;
@@ -57,6 +58,7 @@ function normalizeItem(item: {
 export default function PaymentsPage() {
   const [page, setPage] = useState(1);
   const pageSize = 20;
+  const { config } = useConfig();
 
   const { data, loading, error, refetch } = usePaymentsDashboard({
     page,
@@ -101,6 +103,7 @@ export default function PaymentsPage() {
             <CreditsCard
               balanceFromParent={balance}
               onRefetch={refetch}
+              creditsPerRun={config?.credits_per_run}
             />
           </div>
           <div className="glass-panel rounded-xl p-5">

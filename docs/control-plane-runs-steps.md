@@ -5,13 +5,16 @@ This document describes the phased control-plane design: explicit runs and step-
 ## Phase 1 (implemented)
 
 - **`run_steps` table**  
-  One row per pipeline step per run. Columns: `run_id`, `step_index`, `step_type`, `status` (pending | running | completed | failed), `input_summary`, `output_summary`, `error_message`, `started_at`, `completed_at`.  
+  One row per pipeline step per run. Columns: `run_id`, `step_index`, `step_type`, `status` (pending | running | completed | failed), `input_summary`, `output_summary`, `error_message`, `started_at`, `completed_at`, `trace_blob_id`, `trace_da_cert`, `trace_reference_block`.  
   Migration: `platform/supabase/migrations/run.sql`.
 
 - **Writing steps from the pipeline**  
-  Each LangGraph node (spec, design, codegen, scrubd_validation, audit, simulation, deploy, ui_scaffold) writes:
+  Each LangGraph node writes steps via `db.insert_step` and `db.update_step`:
   - At node start: insert/upsert step with `status=running`, `started_at=now`.
-  - At node end: update step to `status=completed` or `status=failed`, with `output_summary` or `error_message`, `completed_at=now`.
+  - At node end: update step to `status=completed` or `status=failed`, with `output_summary` or `error_message`, `completed_at=now`, and optional trace blob IDs.
+
+- **Step order**  
+  `spec`, `design`, `codegen`, `scrubd`, `audit`, `debate`, `simulation`, `exploit_sim`, `deploy`, `ui_scaffold`. Defined in `services/orchestrator/nodes.py` (`STEP_ORDER`).
 
 - **No change to Studio or API contract**  
   The existing "single blocking POST" flow is unchanged. Steps are written only when Supabase is configured (`db.is_configured()`).
@@ -39,4 +42,5 @@ This document describes the phased control-plane design: explicit runs and step-
 ## References
 
 - DB helpers: `services/orchestrator/db.py` (`insert_step`, `update_step`, `get_steps`).
-- Node wiring: `services/orchestrator/nodes.py` (`_step_start`, `_step_complete`). All eight nodes (spec, design, codegen, scrubd_validation, audit, simulation, deploy, ui_scaffold) write steps.
+- Node wiring: `services/orchestrator/nodes.py` (`_step_start`, `_step_complete`). All nodes write steps.
+- Trace writer: `services/orchestrator/trace_writer.py`; migration `006_run_steps_trace.sql` (if present).

@@ -1,5 +1,6 @@
 'use client';
 
+import { motion } from 'framer-motion';
 import { CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
 
 export type PlanStepStatus = 'pending' | 'processing' | 'completed' | 'failed';
@@ -26,7 +27,7 @@ export function Plan({ title, steps, className = '' }: PlanProps) {
         <h2 className="text-xl font-bold text-[var(--color-text-primary)] mb-4">{title}</h2>
       )}
       <div className="space-y-3">
-        {steps.map((step) => {
+        {steps.map((step, index) => {
           const isCompleted = step.status === 'completed';
           const isFailed = step.status === 'failed';
           const isProcessing = step.status === 'processing';
@@ -64,9 +65,12 @@ export function Plan({ title, steps, className = '' }: PlanProps) {
                 : 'text-[var(--color-text-muted)]';
 
           return (
-            <div
+            <motion.div
               key={step.id}
-              className={`p-4 bg-[var(--color-bg-elevated)] border rounded-lg ${borderClass}`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, delay: index * 0.03 }}
+              className={`p-4 bg-[var(--color-bg-elevated)] border rounded-lg transition-colors duration-300 ${borderClass} ${isCompleted ? 'ring-1 ring-[var(--color-semantic-success)]/30' : ''}`}
             >
               <div className="flex items-center gap-4">
                 <div
@@ -103,7 +107,7 @@ export function Plan({ title, steps, className = '' }: PlanProps) {
                   <Clock className="w-5 h-5 text-[var(--color-text-muted)]" />
                 )}
               </div>
-            </div>
+            </motion.div>
           );
         })}
       </div>

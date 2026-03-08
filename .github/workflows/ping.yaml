@@ -1,10 +1,9 @@
-# Daily ping to Render services to prevent sleep (free tier spins down after ~15 min inactivity).
-# Add PING_URLS secret: comma-separated URLs, e.g. https://your-api.onrender.com/health,https://your-gateway.onrender.com/health
+# Ping Render services to prevent sleep (free tier spins down after ~15 min inactivity).
+# Pings all services from render.yaml. Override with PING_URLS secret (comma-separated) if needed.
 name: Ping Render Services
 
 on:
   schedule:
-    # Every 10 minutes (keeps Render free-tier services awake)
     - cron: '*/10 * * * *'
   workflow_dispatch:
 
@@ -14,15 +13,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping Render URLs
+        env:
+          PING_URLS: ${{ secrets.PING_URLS }}
         run: |
-          urls="${{ secrets.PING_URLS }}"
-          if [ -z "$urls" ]; then
-            echo "PING_URLS secret not set. Add comma-separated URLs in repo Settings > Secrets."
-            exit 1
-          fi
-          for url in $(echo "$urls" | tr ',' '\n' | tr -d ' '); do
-            if [ -n "$url" ]; then
-              echo "Pinging $url"
-              curl -sf --max-time 30 -o /dev/null "$url" && echo "  OK" || echo "  FAIL"
+          # Default: all Render services from render.yaml
+          DEFAULT_URLS="https://hyperagent-api.onrender.com/health,https://hyperagent-agent-runtime.onrender.com/health,https://hyperagent-compile.onrender.com/health,https://hyperagent-audit.onrender.com/health,https://hyperagent-tools.onrender.com/health,https://hyperagent-roma.onrender.com/health,https://hyperagent-vectordb.onrender.com/health,https://hyperagent-gateway.onrender.com/health"
+          urls="${PING_URLS:-$DEFAULT_URLS}"
+          urls=$(echo "$urls" | tr ',' '\n' | tr -d ' ' | grep -v '^$')
+
+          failed=0
+          for url in $urls; do
+            echo -n "Pinging $url ... "
+            if curl -sf --max-time 30 -o /dev/null "$url"; then
+              echo "OK"
+            else
+              echo "FAIL"
+              failed=$((failed + 1))
             fi
           done
+
+          if [ "$failed" -gt 0 ]; then
+            echo "::warning::$failed URL(s) failed (Render cold start or transient error)"
+          fi

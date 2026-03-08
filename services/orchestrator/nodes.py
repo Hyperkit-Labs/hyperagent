@@ -75,10 +75,27 @@ def _estimate_complexity(prompt: str) -> int:
     return min(sum(2 for w in indicators if w in lower), 10)
 
 
+def _resolve_user_prompt(state: AgentState) -> str:
+    """Resolve user_prompt from state or workflow store (for resume when checkpoint lacks it)."""
+    prompt = state.get("user_prompt", "")
+    if prompt:
+        return prompt
+    run_id = state.get("run_id")
+    if run_id:
+        try:
+            from store import get_workflow
+            w = get_workflow(run_id)
+            if w:
+                return w.get("intent", "") or ""
+        except Exception:
+            pass
+    return ""
+
+
 async def spec_agent(state: AgentState) -> AgentState:
-    prompt = state["user_prompt"]
-    user_id = state["user_id"]
-    project_id = state["project_id"]
+    prompt = _resolve_user_prompt(state)
+    user_id = state.get("user_id", "")
+    project_id = state.get("project_id", "")
     run_id = state.get("run_id") or project_id
     _step_start(run_id, "spec")
     async with step_span(run_id, "spec", _step_index("spec")):
@@ -129,9 +146,9 @@ async def spec_agent(state: AgentState) -> AgentState:
 
 
 async def design_agent(state: AgentState) -> AgentState:
-    spec = state["spec"]
-    user_id = state["user_id"]
-    project_id = state["project_id"]
+    spec = state.get("spec") or {}
+    user_id = state.get("user_id", "")
+    project_id = state.get("project_id", "")
     run_id = state.get("run_id") or project_id
     _step_start(run_id, "design")
     async with step_span(run_id, "design", _step_index("design")):
@@ -182,11 +199,11 @@ async def design_agent(state: AgentState) -> AgentState:
 
 
 async def codegen_agent(state: AgentState) -> AgentState:
-    spec = state["spec"]
-    design = state["design_proposal"]
+    spec = state.get("spec") or {}
+    design = state.get("design_proposal") or {}
     framework = state.get("framework", "hardhat")
-    user_id = state["user_id"]
-    project_id = state["project_id"]
+    user_id = state.get("user_id", "")
+    project_id = state.get("project_id", "")
     run_id = state.get("run_id") or project_id
     _step_start(run_id, "codegen")
     try:
@@ -199,7 +216,7 @@ async def codegen_agent(state: AgentState) -> AgentState:
             state.setdefault("rag_context", {})["codegen_snippets"] = rag_snippets
         security_ctx = await build_security_context(state.get("user_prompt", ""), user_id=user_id)
         if state.get("use_oz_wizard") and state.get("oz_wizard_options"):
-            opts = state["oz_wizard_options"]
+            opts = state.get("oz_wizard_options") or {}
             kind = opts.get("kind", "erc20")
             options = opts.get("options") or {}
             contracts = await generate_contracts_oz(kind, options, agent_session_jwt)

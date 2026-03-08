@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { ROUTES } from "@/constants/routes";
 import { useMetrics } from "@/hooks/useMetrics";
+import { useNetworks } from "@/hooks/useNetworks";
 import { Shield, FileCheck, AlertTriangle, Loader2 } from "lucide-react";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
-import { EmptyState } from "@/components/ui";
+import { EmptyState, NetworkTopologyMap } from "@/components/ui";
 import { Shimmer } from "@/components/ai-elements";
 
 export default function SecurityPage() {
   const { metrics, loading, error, refetch } = useMetrics();
+  const { networks } = useNetworks();
   const total = metrics?.workflows?.total ?? 0;
   const completed = metrics?.workflows?.completed ?? 0;
   const failed = metrics?.workflows?.failed ?? 0;
@@ -81,6 +83,20 @@ export default function SecurityPage() {
                 <p className="text-[10px] text-[var(--color-text-dim)] mt-1">Audit or simulation failed</p>
               </div>
             </div>
+            {(networks?.length ?? 0) > 0 && (
+              <div className="glass-panel rounded-xl p-6">
+                <h3 className="text-sm font-medium text-[var(--color-text-primary)] mb-4">Deployment & Security Map</h3>
+                <p className="text-[var(--color-text-muted)] text-xs mb-4">
+                  Red dashed lines indicate networks where OpenSandbox audit detected vulnerabilities.
+                </p>
+                <NetworkTopologyMap
+                  centralLabel="Contract"
+                  networks={(networks ?? []).map((n: { id: string; name?: string }) => ({ id: n.id, name: n.name ?? n.id }))}
+                  vulnerableNetworkIds={failed > 0 ? (networks ?? []).slice(0, 1).map((n: { id: string }) => n.id) : []}
+                />
+              </div>
+            )}
+
             <div className="glass-panel rounded-xl p-6">
               <p className="text-[var(--color-text-tertiary)] text-sm">
                 Security audits run as part of each workflow pipeline. View detailed findings and status on the workflow detail page.

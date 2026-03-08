@@ -23,9 +23,30 @@ import {
 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 
-const mainNavItems = [
+function SidebarBackToProject() {
+  const pathname = usePathname();
+  const isHome = pathname === "/" || pathname === ROUTES.HOME;
+  return (
+    <Link
+      href={ROUTES.CHAT}
+      className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10 transition-colors group text-left w-full min-h-[44px]"
+    >
+      <div className={`w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400 shrink-0 ${!isHome ? "animate-pulse" : ""}`}>
+        <Blocks className="w-4 h-4" />
+      </div>
+      <span className="text-[13px] font-medium text-white group-hover:text-purple-200">
+        {isHome ? "Project" : "Back to Project"}
+      </span>
+    </Link>
+  );
+}
+
+const coreNavItems = [
   { href: ROUTES.DASHBOARD, label: "Overview", icon: LayoutDashboard },
   { href: ROUTES.WORKFLOWS, label: "Projects", icon: Folder },
+];
+
+const toolsNavItems = [
   { href: ROUTES.AGENTS, label: "Agents", icon: Bot },
   { href: ROUTES.DEPLOYMENTS, label: "Deployments", icon: Rocket },
   { href: ROUTES.CONTRACTS, label: "Contracts", icon: FileCode },
@@ -81,21 +102,23 @@ function SidebarNav() {
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-1.5">
-        {mainNavItems.map(({ href, label, icon }) => (
+      <div className="space-y-1">
+        <span className="px-3 py-2 text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider block">Core</span>
+        {coreNavItems.map(({ href, label, icon }) => (
           <NavLink key={href + label} href={href} label={label} icon={icon} pathname={pathname} fullPath={fullPath} />
         ))}
       </div>
-
-      <div className="pt-3">
-        <div className="px-3 py-2">
-          <span className="text-[11px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">Resources</span>
-        </div>
-        <div className="pl-2 space-y-0.5">
-          {resourceItems.map(({ href, label, icon }) => (
-            <NavLink key={href} href={href} label={label} icon={icon} pathname={pathname} fullPath={fullPath} />
-          ))}
-        </div>
+      <div className="pt-3 space-y-1">
+        <span className="px-3 py-2 text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider block">Tools</span>
+        {toolsNavItems.map(({ href, label, icon }) => (
+          <NavLink key={href + label} href={href} label={label} icon={icon} pathname={pathname} fullPath={fullPath} />
+        ))}
+      </div>
+      <div className="pt-3 space-y-1">
+        <span className="px-3 py-2 text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider block">Resources</span>
+        {resourceItems.map(({ href, label, icon }) => (
+          <NavLink key={href} href={href} label={label} icon={icon} pathname={pathname} fullPath={fullPath} />
+        ))}
       </div>
     </>
   );
@@ -107,20 +130,23 @@ function SidebarNavFallback() {
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-2">
-        {mainNavItems.map(({ href, label, icon }) => (
+      <div className="space-y-1">
+        <span className="px-3 py-2 text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider block">Core</span>
+        {coreNavItems.map(({ href, label, icon }) => (
           <NavLink key={href + label} href={href} label={label} icon={icon} pathname={pathname} fullPath={fullPath} />
         ))}
       </div>
-      <div className="pt-3">
-        <div className="px-3 py-2">
-          <span className="text-[11px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">Resources</span>
-        </div>
-        <div className="pl-2 space-y-0.5">
-          {resourceItems.map(({ href, label, icon }) => (
-            <NavLink key={href} href={href} label={label} icon={icon} pathname={pathname} fullPath={fullPath} />
-          ))}
-        </div>
+      <div className="pt-3 space-y-1">
+        <span className="px-3 py-2 text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider block">Tools</span>
+        {toolsNavItems.map(({ href, label, icon }) => (
+          <NavLink key={href + label} href={href} label={label} icon={icon} pathname={pathname} fullPath={fullPath} />
+        ))}
+      </div>
+      <div className="pt-3 space-y-1">
+        <span className="px-3 py-2 text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider block">Resources</span>
+        {resourceItems.map(({ href, label, icon }) => (
+          <NavLink key={href} href={href} label={label} icon={icon} pathname={pathname} fullPath={fullPath} />
+        ))}
       </div>
     </>
   );
@@ -133,17 +159,7 @@ export function Sidebar() {
         <h2 className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-widest mb-3">
           What would you like to build?
         </h2>
-        <Link
-          href={ROUTES.CHAT}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10 transition-colors group text-left w-full min-h-[44px]"
-        >
-          <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
-            <Blocks className="w-4 h-4" />
-          </div>
-          <span className="text-[13px] font-medium text-white group-hover:text-purple-200">
-            Back to Project
-          </span>
-        </Link>
+        <SidebarBackToProject />
       </div>
 
       <nav className="flex-1 min-h-0 py-4 px-3 overflow-y-auto hide-scrollbar">

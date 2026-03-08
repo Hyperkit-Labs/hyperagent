@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
-import { Settings, PanelRightOpen, ChevronRight } from "lucide-react";
+import { Settings, PanelRightOpen, ChevronRight, Menu } from "lucide-react";
 import { ConnectWalletNav } from "@/components/wallet/ConnectWalletNav";
 import { NetworkSelector } from "@/components/layout/NetworkSelector";
 import { NotificationsDropdown } from "@/components/layout/NotificationsDropdown";
@@ -64,11 +64,19 @@ function Breadcrumb() {
 }
 
 export function AppBar() {
-  const { contextSidebarOpen, toggleContextSidebar, openCommandPalette } = useLayout();
+  const { contextSidebarOpen, toggleContextSidebar, openCommandPalette, toggleMobileNav } = useLayout();
 
   return (
-    <header className="h-16 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)]/90 backdrop-blur-md flex items-center justify-between px-6 z-40 shrink-0">
-      <div className="flex items-center gap-4 min-w-0">
+    <header className="h-16 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)]/90 backdrop-blur-md flex items-center justify-between px-4 sm:px-6 z-40 shrink-0">
+      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+        <button
+          type="button"
+          onClick={toggleMobileNav}
+          className="md:hidden p-2 rounded-lg text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)] transition-colors"
+          aria-label="Open navigation menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
         <Link href={ROUTES.HOME} className="flex items-center gap-2 shrink-0">
           <Image
             src="/hyperkit-header-white.svg"

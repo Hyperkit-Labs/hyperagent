@@ -339,6 +339,11 @@ export function isAuthError(message: string): boolean {
   return message === AUTH_ERROR_MESSAGE || message.includes('401') || message.includes('Unauthorized');
 }
 
+/** True when the error is 402 (insufficient credits). Use to show top-up CTA. */
+export function isCreditsError(error: unknown): boolean {
+  return (error as ApiErrorWithStatus)?.status === 402;
+}
+
 export async function getWorkflows(
   params?: { limit?: number; status?: string },
   signal?: AbortSignal
@@ -404,6 +409,14 @@ export async function getRunSteps(runId: string): Promise<{ run_id: string; step
 /** Approve spec and resume pipeline from design. Call when workflow is at spec_review with spec present. */
 export async function approveSpec(runId: string): Promise<{ run_id: string; status: string; current_stage: string; message?: string }> {
   return fetchJson<{ run_id: string; status: string; current_stage: string; message?: string }>(`/runs/${runId}/approve_spec`, { method: 'PATCH' });
+}
+
+/** Approve deploy after Guardian. Call when workflow.current_stage is awaiting_deploy_approval. Resumes pipeline to create deploy plans. */
+export async function approveDeploy(workflowId: string, apiKeys?: Record<string, string>): Promise<{ workflow_id: string; status: string; message?: string }> {
+  return fetchJson<{ workflow_id: string; status: string; message?: string }>(
+    `/workflows/${workflowId}/deploy/approve`,
+    { method: 'POST', body: JSON.stringify(apiKeys ? { api_keys: apiKeys } : {}) }
+  );
 }
 
 export interface CreateWorkflowBody {
@@ -532,8 +545,26 @@ export interface QuickDemoResponse {
   status?: string;
 }
 
-export async function createQuickDemo(): Promise<QuickDemoResponse> {
-  return fetchJson<QuickDemoResponse>('/quick-demo', { method: 'POST' });
+/** Create a sandbox from workflow-generated code. Requires workflow_id (Docker sandbox on Contabo). */
+export async function createQuickDemo(workflowId: string): Promise<QuickDemoResponse> {
+  return fetchJson<QuickDemoResponse>('/quick-demo', {
+    method: 'POST',
+    body: JSON.stringify({ workflow_id: workflowId }),
+  });
+}
+
+export interface DebugSandboxResponse {
+  sandbox_id?: string;
+  url?: string;
+  status?: string;
+  workflow_id?: string;
+}
+
+/** Create a debug sandbox pre-loaded with workflow code and failing audit. Use when audit fails. */
+export async function createDebugSandbox(workflowId: string): Promise<DebugSandboxResponse> {
+  return fetchJson<DebugSandboxResponse>(`/workflows/${workflowId}/debug-sandbox`, {
+    method: 'POST',
+  });
 }
 
 export async function getMetrics(signal?: AbortSignal): Promise<Metrics> {

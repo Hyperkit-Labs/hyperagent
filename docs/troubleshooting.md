@@ -4,6 +4,16 @@ Common issues and fixes for HyperAgent Studio and backend.
 
 ---
 
+## Build history not persisting
+
+**Symptom:** Workflows disappear after refresh or new session.
+
+**Cause:** Build history is stored in Supabase (`runs.workflow_state`). If `SUPABASE_URL` or `SUPABASE_SERVICE_KEY` is not set on the orchestrator, the store falls back to in-memory only; data is lost on restart.
+
+**Fix:** Set both `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` on the `hyperagent-api` service (Render Dashboard). See [Deployment Runbook](runbooks/deployment-runbook.md).
+
+---
+
 ## Frontend failing to connect
 
 **Common causes:**

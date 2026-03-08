@@ -134,7 +134,7 @@ export async function rateLimitMiddleware(
   }
   const isLightweightRead =
     req.method === "GET" &&
-    (req.path === "/api/v1/config" || req.path === "/api/v1/networks" || req.path === "/api/v1/tokens/stablecoins");
+    (req.path === "/api/v1/config" || req.path === "/api/v1/config/integrations-debug" || req.path === "/api/v1/networks" || req.path === "/api/v1/tokens/stablecoins");
   if (isLightweightRead) {
     const lightKey = `rl:ip:${(req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown"}:light`;
     const lightOk = await checkLimit(lightKey, RATE_LIMIT_LIGHT_MAX_IP, RATE_LIMIT_WINDOW_SEC);

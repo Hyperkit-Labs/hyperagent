@@ -72,12 +72,17 @@ async def _run_audit_via_execution_backend(
     code: str,
     run_id: str,
 ) -> tuple[list[dict], bool]:
-    """Run audit via ExecutionBackend (OpenSandbox when enabled). Returns (findings, success)."""
+    """Run audit via ExecutionBackend (OpenSandbox when enabled).
+    When OPENSANDBOX_ENABLED, uses run_multi_engine_audit (3 parallel sandboxes: Slither, Mythril, Echidna).
+    Returns (findings, success)."""
     try:
         from execution_backend import get_execution_backend
 
         backend = get_execution_backend()
-        result = await backend.run_audit(code, contract_name, tools=list(AUDIT_TOOLS))
+        if OPENSANDBOX_ENABLED and hasattr(backend, "run_multi_engine_audit"):
+            result = await backend.run_multi_engine_audit(code, contract_name)
+        else:
+            result = await backend.run_audit(code, contract_name, tools=list(AUDIT_TOOLS))
         tool_label = ",".join(result.tools_run) or "audit"
         findings = []
         for f in result.findings:

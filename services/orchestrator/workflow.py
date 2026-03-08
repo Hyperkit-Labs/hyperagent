@@ -21,6 +21,7 @@ from nodes import (
     spec_agent,
     design_agent,
     codegen_agent,
+    test_generation_agent,
     scrubd_validation_agent,
     audit_agent,
     simulation_agent,
@@ -110,6 +111,7 @@ def create_workflow():
     workflow.add_node("spec", spec_agent)
     workflow.add_node("design", design_agent)
     workflow.add_node("codegen", codegen_agent)
+    workflow.add_node("test_generation", test_generation_agent)
     workflow.add_node("scrubd_validation", scrubd_validation_agent)
     workflow.add_node("audit", audit_agent)
     workflow.add_node("autofix", autofix_agent)
@@ -132,7 +134,8 @@ def create_workflow():
         "design": "design",
     })
     workflow.add_edge("design", "codegen")
-    workflow.add_edge("codegen", "scrubd_validation")
+    workflow.add_edge("codegen", "test_generation")
+    workflow.add_edge("test_generation", "scrubd_validation")
     workflow.add_conditional_edges("scrubd_validation", _after_scrubd, {
         "audit": "audit",
         "autofix": "autofix",
@@ -222,6 +225,7 @@ def run_pipeline(
             "design_approved": False,
             "design_rationale": "",
             "contracts": {},
+            "test_files": {},
             "framework": "hardhat",
             "audit_findings": [],
             "audit_passed": False,

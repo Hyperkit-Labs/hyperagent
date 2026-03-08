@@ -6,10 +6,10 @@ Get HyperAgent running and find help. For detailed usage, see the [user guide](u
 
 ## What you need
 
-- **Node.js** 18 or higher  
-- **pnpm** 8 or higher ([install pnpm](https://pnpm.io/installation))  
-- **Git**  
-- (Optional) **Python** 3.11+ and **Docker** if you run the backend locally  
+- **Node.js** 18 or higher
+- **pnpm** 8 or higher ([install pnpm](https://pnpm.io/installation))
+- **Git**
+- (Optional) **Python** 3.11+ and **Docker** if you run the backend locally
 
 ---
 
@@ -27,12 +27,18 @@ Get HyperAgent running and find help. For detailed usage, see the [user guide](u
    ```
 
 3. **Configure environment**
-   - Copy `.env.example` to `.env` in the repo root (if present).
+   - Copy `.env.example` to `.env` in the repo root.
    - Set at least:
      - `NEXT_PUBLIC_THIRDWEB_CLIENT_ID` (for wallet connect and x402).
-     - `NEXT_PUBLIC_API_URL` (e.g. `http://localhost:8000` if you run the backend locally).
+     - `NEXT_PUBLIC_API_URL` (e.g. `http://localhost:4000` when using the gateway; see below).
 
-4. **Start the frontend (Studio)**
+4. **Start the backend (Docker)**
+   ```bash
+   make up
+   ```
+   This starts the API gateway (port 4000), orchestrator, agent-runtime, compile, and audit services. Requires `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, and `REDIS_URL` in `.env` for full functionality.
+
+5. **Start the frontend (Studio)**
    ```bash
    pnpm --filter hyperagent-studio dev
    ```
@@ -42,17 +48,16 @@ Get HyperAgent running and find help. For detailed usage, see the [user guide](u
    ```
    Open [http://localhost:3000](http://localhost:3000).
 
-5. **Backend (optional)**  
-   If you have a backend (e.g. API service) and Docker:
-   - Use the project’s backend run instructions (e.g. `make up` or docker-compose) so the API is available at the URL you set in `NEXT_PUBLIC_API_URL`.  
-   - The web app will call that URL for workflows and data.
+6. **Verify**
+   - `curl -s http://localhost:4000/health` returns `{"status":"ok","gateway":true}`.
+   - Connect wallet in Studio and add LLM keys in Settings (BYOK).
 
 ---
 
 ## Get help
 
-- **Bugs and features:** [GitHub Issues](https://github.com/Hyperkit-Labs/hyperagent/issues)  
-- **Questions:** [GitHub Discussions](https://github.com/Hyperkit-Labs/hyperagent/discussions)  
-- **Product usage:** [User guide](user-guide.md)  
-- **Code and setup:** [Developer guide](developer-guide.md)  
+- **Bugs and features:** [GitHub Issues](https://github.com/Hyperkit-Labs/hyperagent/issues)
+- **Questions:** [GitHub Discussions](https://github.com/Hyperkit-Labs/hyperagent/discussions)
+- **Product usage:** [User guide](user-guide.md)
+- **Code and setup:** [Developer guide](developer-guide.md)
 - **"Failed to fetch" / Settings (BYOK):** [Troubleshooting](troubleshooting.md)

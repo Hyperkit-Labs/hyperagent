@@ -5,18 +5,19 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useActiveAccount } from "thirdweb/react";
 import { useAppChat, hasActiveByokKey } from "@/hooks/useAppChat";
 import { useWorkflowPolling } from "@/hooks/useWorkflowPolling";
-import { createWorkflow, DEFAULT_NETWORK, getErrorMessage, handleApiError, requireLLMKeys, LLM_KEYS_REQUIRED_MESSAGE, isByokStorageOrMigrationError, BYOK_SAVE_AGAIN_HINT } from "@/lib/api";
+import { createWorkflow, DEFAULT_NETWORK, getErrorMessage, handleApiError, requireLLMKeys, LLM_KEYS_REQUIRED_MESSAGE, isByokStorageOrMigrationError, BYOK_SAVE_AGAIN_HINT, isCreditsError } from "@/lib/api";
 import { getSessionOnlyLLMKey, SESSION_LLM_PASS_THROUGH_UPDATED_EVENT } from "@/lib/session-store";
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
 import { Suggestions, PromptInput } from "@/components/ai-elements";
 import { ContractViewer } from "@/components/contracts/ContractViewer";
 import { WorkflowStages } from "@/app/workflows/[id]/WorkflowStages";
+import { CodeBlockShimmer } from "@/components/ai-elements";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist";
 import { ROUTES } from "@/constants/routes";
 import type { ChatMessage, ToolInvocation } from "@/components/chat/ChatMessageList";
 import { StatusBadge } from "@/components/ui";
-import { needsSpecApproval, hasAuditOrSimFailure } from "@/lib/types";
+import { needsSpecApproval, needsDeployApproval, hasAuditOrSimFailure } from "@/lib/types";
 import type { Workflow } from "@/lib/types";
 import { useNetworks } from "@/hooks/useNetworks";
 import { useConfig } from "@/components/providers/ConfigProvider";
@@ -35,12 +36,45 @@ import {
   Check,
 } from "lucide-react";
 import Image from "next/image";
+import { motion } from "framer-motion";
 import Link from "next/link";
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
 import { LLMKeysCard } from "@/components/settings/LLMKeysCard";
 import { ConnectWalletNav } from "@/components/wallet/ConnectWalletNav";
 
 type ShellView = "code" | "data" | "agents";
+
+function DeployApprovalPanel({ workflow, onApproved, onError }: { workflow: Workflow; onApproved: () => void; onError: (msg: string) => void }) {
+  const [sending, setSending] = useState(false);
+  return (
+    <div className="mt-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4 space-y-3">
+      <p className="text-sm font-medium text-emerald-400">Deploy approval required</p>
+      <p className="text-xs text-[var(--color-text-tertiary)]">
+        Guardian passed. Approve to continue and create deploy plans.
+      </p>
+      <button
+        type="button"
+        disabled={sending}
+        onClick={async () => {
+          setSending(true);
+          try {
+            const { approveDeploy } = await import("@/lib/api");
+            await approveDeploy(workflow.workflow_id);
+            onApproved();
+          } catch (err) {
+            onError(err instanceof Error ? err.message : "Deploy approval failed");
+          } finally {
+            setSending(false);
+          }
+        }}
+        className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+      >
+        {sending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+        Approve and continue
+      </button>
+    </div>
+  );
+}
 
 function SpecReviewPanel({ workflow, onApproved, onError }: { workflow: Workflow; onApproved: () => void; onError: (msg: string) => void }) {
   const [clarification, setClarification] = useState("");
@@ -126,6 +160,7 @@ function ChatPageContent() {
   const [selectedContractIndex, setSelectedContractIndex] = useState<number>(0);
   const [creatingWorkflow, setCreatingWorkflow] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const lastCreateErrorRef = useRef<unknown>(null);
   const [systemMessages, setSystemMessages] = useState<ChatMessage[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
@@ -335,6 +370,7 @@ function ChatPageContent() {
       ]);
       router.replace(`${ROUTES.HOME}?workflow=${workflow_id}`, { scroll: false });
     } catch (e) {
+      lastCreateErrorRef.current = e;
       setCreateError(handleApiError(e));
     } finally {
       setCreatingWorkflow(false);
@@ -627,22 +663,25 @@ function ChatPageContent() {
                       </button>
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center py-16 text-[var(--color-text-muted)] gap-2">
+                    <div className="flex flex-col gap-4">
                       {workflowLoading ? (
-                        <>
+                        <div className="flex flex-col items-center justify-center py-16 text-[var(--color-text-muted)] gap-2">
                           <Loader2 className="w-5 h-5 animate-spin" />
                           <p className="text-sm">Loading contract code...</p>
-                        </>
+                        </div>
                       ) : workflow?.status === "running" || workflow?.status === "building" ? (
                         <>
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                          <p className="text-sm">Pipeline is running. Waiting for contracts...</p>
+                          <CodeBlockShimmer className="min-h-[200px]" />
+                          <p className="text-xs text-[var(--color-text-muted)] flex items-center gap-2">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Pipeline is running. Waiting for contracts...
+                          </p>
                         </>
                       ) : (
-                        <>
+                        <div className="flex flex-col items-center justify-center py-16 text-[var(--color-text-muted)] gap-2">
                           <FileCode className="w-6 h-6 opacity-40" />
                           <p className="text-sm">Waiting for the pipeline to generate contracts.</p>
-                        </>
+                        </div>
                       )}
                     </div>
                   )}
@@ -653,6 +692,13 @@ function ChatPageContent() {
                   )}
                   {workflow && needsSpecApproval(workflow) && (
                     <SpecReviewPanel
+                      workflow={workflow}
+                      onApproved={() => fetchWorkflow()}
+                      onError={(msg) => setCreateError(msg)}
+                    />
+                  )}
+                  {workflow && needsDeployApproval(workflow) && (
+                    <DeployApprovalPanel
                       workflow={workflow}
                       onApproved={() => fetchWorkflow()}
                       onError={(msg) => setCreateError(msg)}
@@ -756,6 +802,7 @@ function ChatPageContent() {
             className="shrink-0 border-b border-[var(--color-border-subtle)]"
             onByokClick={() => setSettingsOpen(true)}
             onPaymentClick={() => router.push(ROUTES.PAYMENTS)}
+            onTryItNowClick={() => router.push(ROUTES.DASHBOARD)}
           />
 
           <div className="shrink-0 border-b border-[var(--color-border-subtle)] p-3">
@@ -779,10 +826,11 @@ function ChatPageContent() {
                       }`}
                       title={w.intent || w.workflow_id}
                     >
-                      <span className="font-medium truncate block">{w.name || w.intent || w.workflow_id}</span>
+                      <motion.span layoutId={`workflow-title-${w.workflow_id}`} className="font-medium truncate block">{w.name || w.intent || w.workflow_id}</motion.span>
                       <span className="flex flex-wrap items-center gap-1 mt-0.5">
                         <StatusBadge status={w.status} />
                         {needsSpecApproval(w) && <StatusBadge status="Spec" variant="spec" title="Spec ready for approval" />}
+                        {needsDeployApproval(w) && <StatusBadge status="Deploy" variant="spec" title="Deploy ready for approval" />}
                         {hasAuditOrSimFailure(w) && <StatusBadge status="Audit/Sim failed" variant="audit-failed" />}
                       </span>
                     </button>
@@ -879,6 +927,14 @@ function ChatPageContent() {
                     error={createError}
                     onRetry={isByokStorageOrMigrationError(createError) ? () => { setCreateError(null); setSettingsOpen(true); } : undefined}
                   />
+                  {isCreditsError(lastCreateErrorRef.current) && (
+                    <Link
+                      href={ROUTES.PAYMENTS}
+                      className="text-xs text-[var(--color-primary-light)] hover:underline"
+                    >
+                      Top up credits in Payments
+                    </Link>
+                  )}
                   {isByokStorageOrMigrationError(createError) && (
                     <p className="text-[11px] text-[var(--color-text-muted)]">
                       {BYOK_SAVE_AGAIN_HINT} Open Settings (header) to save keys.

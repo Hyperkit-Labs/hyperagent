@@ -48,9 +48,10 @@ def _safe_sol_filename(name: str) -> str:
 
 
 class CompileRequest(BaseModel):
-    contractCode: str = Field(..., description="Solidity source code", alias="contractCode")
+    contractCode: str = Field("", description="Solidity source code (optional when files provided)", alias="contractCode")
     framework: str = Field(..., description="hardhat or foundry")
-    files: dict[str, str] | None = Field(None, description="Optional multi-file: filename -> source")
+    files: dict[str, str] | None = Field(None, description="Multi-file: filename -> source for interdependent contracts")
+    entryContract: str | None = Field(None, description="Contract name to return bytecode/abi for when using files")
 
     model_config = {"populate_by_name": True}
 
@@ -110,6 +111,39 @@ def _compile_solcx(contract_name: str, contract_code: str) -> tuple[bool, str | 
     return False, None, None, ["Contract not found in compiled output"]
 
 
+def _compile_foundry_multi(workdir: Path, files: dict[str, str], entry_contract: str) -> tuple[bool, str | None, list | None, list[str]]:
+    """Compile multiple interdependent files with Foundry. Returns artifact for entry_contract."""
+    src = workdir / "src"
+    src.mkdir(parents=True, exist_ok=True)
+    for name, content in files.items():
+        safe = _safe_sol_filename(name)
+        path = src / safe
+        code = _strip_markdown_fences(content)
+        if "pragma solidity" not in code.strip().lower():
+            code = "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n" + code
+        path.write_text(code, encoding="utf-8")
+    (workdir / "foundry.toml").write_text("[profile.default]\nsolc = \"0.8.24\"\n")
+    try:
+        result = subprocess.run(["forge", "build", "--json"], cwd=workdir, capture_output=True, text=True, timeout=90)
+    except FileNotFoundError:
+        return False, None, None, ["Foundry (forge) not installed or not in PATH"]
+    if result.returncode != 0:
+        return False, None, None, [result.stderr or result.stdout or "forge build failed"]
+    for name in files:
+        base = Path(name).stem
+        out_dir = workdir / "out" / f"{base}.sol"
+        if out_dir.exists():
+            artifact = out_dir / f"{base}.json"
+            if artifact.exists() and base == entry_contract:
+                data = json.loads(artifact.read_text())
+                bc = data.get("bytecode", {}) if isinstance(data.get("bytecode"), dict) else data.get("bytecode")
+                bytecode = bc.get("object") if isinstance(bc, dict) else bc
+                if isinstance(bytecode, dict):
+                    bytecode = bytecode.get("object")
+                return True, bytecode, data.get("abi", []), []
+    return False, None, None, [f"Contract {entry_contract} not found in compiled output"]
+
+
 def _compile_foundry_impl(workdir: Path, contract_name: str, contract_code: str) -> tuple[bool, str | None, list | None, list[str]]:
     """Compile using Foundry (forge build)."""
     src = workdir / "src"
@@ -146,6 +180,47 @@ def _compile_foundry_impl(workdir: Path, contract_name: str, contract_code: str)
 
 
 _HARDHAT_TEMPLATE = Path("/opt/hardhat-template")
+
+
+def _compile_hardhat_multi(workdir: Path, files: dict[str, str], entry_contract: str) -> tuple[bool, str | None, list | None, list[str]]:
+    """Compile multiple interdependent files with Hardhat. Returns artifact for entry_contract."""
+    contracts_dir = workdir / "contracts"
+    contracts_dir.mkdir(parents=True, exist_ok=True)
+    for name, content in files.items():
+        safe = _safe_sol_filename(name)
+        code = _strip_markdown_fences(content)
+        if "pragma solidity" not in code.strip().lower():
+            code = "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n" + code
+        (contracts_dir / safe).write_text(code, encoding="utf-8")
+    (workdir / "hardhat.config.js").write_text(
+        """module.exports = { solidity: "0.8.24", paths: { sources: "./contracts" } };\n"""
+    )
+    template_nm = _HARDHAT_TEMPLATE / "node_modules"
+    if template_nm.exists() and not (workdir / "node_modules").exists():
+        os.symlink(str(template_nm), str(workdir / "node_modules"))
+    template_pkg = _HARDHAT_TEMPLATE / "package.json"
+    if template_pkg.exists() and not (workdir / "package.json").exists():
+        shutil.copy2(str(template_pkg), str(workdir / "package.json"))
+    try:
+        result = subprocess.run(
+            ["npx", "hardhat", "compile", "--force"],
+            cwd=workdir,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except FileNotFoundError:
+        return False, None, None, ["Node/npx not installed or not in PATH"]
+    if result.returncode != 0:
+        return False, None, None, [result.stderr or result.stdout or "hardhat compile failed"]
+    artifact_path = workdir / "artifacts" / "contracts" / f"{entry_contract}.sol" / f"{entry_contract}.json"
+    if not artifact_path.exists():
+        return False, None, None, [f"Contract {entry_contract} not found in compiled output"]
+    data = json.loads(artifact_path.read_text())
+    bytecode = data.get("bytecode") or (data.get("deployedBytecode", {}).get("object") if isinstance(data.get("deployedBytecode"), dict) else None)
+    if isinstance(bytecode, dict):
+        bytecode = bytecode.get("object")
+    return True, bytecode, data.get("abi", []), []
 
 
 def _compile_hardhat(workdir: Path, contract_name: str, contract_code: str) -> tuple[bool, str | None, list | None, list[str]]:
@@ -245,15 +320,25 @@ def _compile_via_tools(req: CompileRequest, code: str, contract_name: str) -> Co
 def compile_contract(req: CompileRequest) -> CompileResponse:
     if req.framework not in ("hardhat", "foundry"):
         raise HTTPException(status_code=400, detail="framework must be 'hardhat' or 'foundry'")
-    code = _strip_markdown_fences(req.contractCode)
-    contract_name = _extract_contract_name(code)
+    code = _strip_markdown_fences(req.contractCode or "")
+    files = req.files or {}
+    entry_contract = req.entryContract
 
-    remote = _compile_via_tools(req, code, contract_name)
+    if len(files) > 1:
+        entry_contract = entry_contract or next((Path(n).stem for n in files if n.endswith(".sol")), None)
+        if not entry_contract:
+            raise HTTPException(status_code=400, detail="entryContract required when compiling multiple files")
+        contract_name = entry_contract
+    else:
+        contract_name = entry_contract or _extract_contract_name(code or next(iter(files.values()), ""))
+
+    remote = _compile_via_tools(req, code or next(iter(files.values()), ""), contract_name)
     if remote is not None:
         return remote
 
-    if USE_SOLC_LITE:
-        success, bytecode, abi, errors = _compile_solcx(contract_name, code)
+    if USE_SOLC_LITE and len(files) <= 1:
+        code_for_lite = code or next(iter(files.values()), "")
+        success, bytecode, abi, errors = _compile_solcx(contract_name, code_for_lite)
         return CompileResponse(
             success=success,
             bytecode=bytecode,
@@ -265,17 +350,24 @@ def compile_contract(req: CompileRequest) -> CompileResponse:
 
     workdir = Path(tempfile.mkdtemp(prefix="compile_"))
     try:
-        if req.files:
-            src = workdir / "src" if req.framework == "foundry" else workdir / "contracts"
-            src.mkdir(parents=True, exist_ok=True)
-            for name, content in req.files.items():
-                if isinstance(content, str):
-                    safe_name = _safe_sol_filename(name)
-                    (src / safe_name).write_text(content, encoding="utf-8")
-        if req.framework == "foundry":
-            success, bytecode, abi, errors = _compile_foundry_impl(workdir, contract_name, code)
+        if len(files) > 1:
+            if req.framework == "foundry":
+                success, bytecode, abi, errors = _compile_foundry_multi(workdir, files, entry_contract)
+            else:
+                success, bytecode, abi, errors = _compile_hardhat_multi(workdir, files, entry_contract)
         else:
-            success, bytecode, abi, errors = _compile_hardhat(workdir, contract_name, code)
+            code_single = code or next(iter(files.values()), "")
+            if req.files:
+                src = workdir / "src" if req.framework == "foundry" else workdir / "contracts"
+                src.mkdir(parents=True, exist_ok=True)
+                for name, content in req.files.items():
+                    if isinstance(content, str):
+                        safe_name = _safe_sol_filename(name)
+                        (src / safe_name).write_text(content, encoding="utf-8")
+            if req.framework == "foundry":
+                success, bytecode, abi, errors = _compile_foundry_impl(workdir, contract_name, code_single)
+            else:
+                success, bytecode, abi, errors = _compile_hardhat(workdir, contract_name, code_single)
         return CompileResponse(
             success=success,
             bytecode=bytecode,

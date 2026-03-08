@@ -23,6 +23,7 @@ import { ROUTES } from "@/constants/routes";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { ShimmerGrid } from "@/components/ai-elements";
 import { EmptyState } from "@/components/ui";
+import { PageTitle } from "@/components/layout/PageTitle";
 
 type AgentCategory = "all" | "generators" | "auditors" | "deployers";
 
@@ -96,10 +97,7 @@ export default function AgentsPage() {
         <div className="flex-1 min-w-0 max-w-5xl mx-auto flex flex-col">
         <div className="flex flex-col gap-6 mb-8 animate-enter">
           <div className="flex justify-between items-end">
-            <div>
-              <h1 className="text-xl font-semibold text-[var(--color-text-primary)] tracking-tight mb-1">HyperAgent Workflows</h1>
-              <p className="text-[var(--color-text-tertiary)] text-xs">Manage and monitor your autonomous AI agents.</p>
-            </div>
+            <PageTitle title="HyperAgent Workflows" subtitle="Manage and monitor your autonomous AI agents." />
           </div>
 
           <ApiErrorBanner error={error ?? null} onRetry={refetch} />

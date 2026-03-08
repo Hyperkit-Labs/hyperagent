@@ -9,6 +9,27 @@ from typing import Any
 
 import db as _db
 
+
+def _ensure_contracts_dict(raw: Any) -> dict[str, Any]:
+    """Normalize contracts to dict[str, str]. Handles legacy list format to fix 'list' object has no attribute 'keys'."""
+    if isinstance(raw, dict):
+        return {k: v for k, v in raw.items() if isinstance(v, str)}
+    if isinstance(raw, list):
+        out: dict[str, str] = {}
+        for i, item in enumerate(raw):
+            if not isinstance(item, dict):
+                continue
+            name = item.get("name") or item.get("filename") or item.get("contract_name")
+            code = item.get("source") or item.get("code") or item.get("source_code")
+            if isinstance(name, str) and isinstance(code, str):
+                if not name.endswith(".sol"):
+                    name = f"{name}.sol"
+                out[name] = code
+            elif isinstance(code, str):
+                out[f"Contract_{i}.sol"] = code
+        return out
+    return {}
+
 _workflows: dict[str, dict[str, Any]] = {}
 _lock = threading.Lock()
 
@@ -158,10 +179,16 @@ def get_workflow(workflow_id: str) -> dict[str, Any] | None:
     if _db.is_configured():
         rec = _db.get_workflow_state(workflow_id)
         if rec:
-            return dict(rec)
+            rec = dict(rec)
+            rec["contracts"] = _ensure_contracts_dict(rec.get("contracts"))
+            return rec
     with _lock:
         rec = _workflows.get(workflow_id)
-        return dict(rec) if rec else None
+        if rec:
+            rec = dict(rec)
+            rec["contracts"] = _ensure_contracts_dict(rec.get("contracts"))
+            return rec
+        return None
 
 
 def list_workflows(limit: int = 50, status: str | None = None) -> list[dict[str, Any]]:

@@ -159,13 +159,15 @@ def insert_deployment(
     contract_name: str,
     plan: dict[str, Any],
     network_name: str = "",
+    deployment_order: int = 0,
 ) -> dict[str, Any] | None:
-    """Insert a pending deployment (plan). Returns row with id or None."""
+    """Insert a pending deployment (plan). Returns row with id or None.
+    deployment_order: for multi-contract, lower values deploy first (0, 1, 2...)."""
     client = _client()
     if not client:
         return None
     try:
-        r = client.table("deployments").insert({
+        row = {
             "run_id": run_id,
             "project_id": project_id,
             "chain_id": chain_id,
@@ -173,7 +175,9 @@ def insert_deployment(
             "contract_name": contract_name,
             "plan": plan,
             "status": "pending",
-        }).execute()
+            "deployment_order": deployment_order,
+        }
+        r = client.table("deployments").insert(row).execute()
         return r.data[0] if r.data else None
     except Exception as e:
         logger.warning("[db] insert_deployment failed: %s", e)

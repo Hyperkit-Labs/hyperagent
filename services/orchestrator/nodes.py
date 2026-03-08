@@ -31,6 +31,7 @@ def _step_start(run_id: str, step_type: str) -> None:
     logger.info("[pipeline] run_id=%s step_id=%s step_type=%s status=running", run_id, step_index, step_type)
     if db.is_configured() and run_id:
         db.insert_step(run_id, step_index, step_type, status="running")
+        db.insert_agent_log(run_id, step_type, step_type, "started", log_level="info")
 
 
 def _step_complete(run_id: str, step_type: str, output_summary: str | None = None, error_message: str | None = None) -> None:
@@ -49,6 +50,8 @@ def _step_complete(run_id: str, step_type: str, output_summary: str | None = Non
             output_summary=output_summary, error_message=error_message,
             trace_blob_id=blob_id, trace_da_cert=da_cert, trace_reference_block=ref_block,
         )
+        msg = (error_message or output_summary or status)[:4096]
+        db.insert_agent_log(run_id, step_type, step_type, msg, log_level="error" if error_message else "info")
 from agents.design_agent import generate_design
 from agents.codegen_agent import generate_contracts
 from agents.oz_wizard_client import generate_contracts_oz

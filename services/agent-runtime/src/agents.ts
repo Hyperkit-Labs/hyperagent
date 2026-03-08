@@ -70,7 +70,7 @@ export async function specAgent(prompt: string, context: AgentContext): Promise<
   const result = await generateText({
     model,
     system: `You are a smart contract specification agent. Parse the user's natural language into a structured JSON spec.
-Output only valid JSON with: version, token_type (ERC20|ERC721|ERC1155|custom), template_id (optional; use when request matches: erc20-standard, erc20-upgradeable, erc721-standard, erc721-community, erc4626-vault), chains ([{chain_id, network_name}]), features (array), roles (array), invariants (array), risk_profile (low|medium|high).`,
+Output only valid JSON with: version, token_type (ERC20|ERC721|ERC1155|custom), template_id (optional; use when request matches: erc20-standard, erc20-upgradeable, erc721-standard, erc721-community, erc4626-vault, lending-basic, marketplace-nft, governance-basic, multisig-gnosis, amm-uniswap-style), app_type (token|lending|marketplace|governance|multisig|amm), multi_contract (boolean; true when design requires multiple contracts e.g. lending pool + collateral token, marketplace + NFT, governor + token, multisig, AMM factory + pair), chains ([{chain_id, network_name}]), features (array), roles (array), invariants (array), risk_profile (low|medium|high), oracles (optional; array of price feed or oracle requirements when Chainlink or price feeds mentioned), frontend_actions (optional; array of user actions: deposit, withdraw, borrow, repay, liquidate, list, buy, cancelListing, propose, vote, queue, execute, submitTransaction, confirmTransaction, swap, addLiquidity, removeLiquidity), wizard_options (optional; merge into OZ wizard when using templates: name, symbol, premint/initialSupply as string e.g. "1000000", mintable, burnable, pausable). Extract token name/symbol and initial supply from the prompt when specified.`,
     prompt,
     maxTokens: 4096,
   });
@@ -120,6 +120,22 @@ export async function designAgent(
   }
 }
 
+const FILE_MARKER_RE = /\/\/\s*={0,3}\s*FILE:\s*([A-Za-z0-9_.-]+\.sol)\s*={0,3}\s*\n/g;
+
+function parseMultiFileOutput(text: string): Record<string, string> {
+  const files: Record<string, string> = {};
+  const parts = text.split(FILE_MARKER_RE);
+  for (let i = 1; i < parts.length; i += 2) {
+    const filename = parts[i].trim();
+    const content = (parts[i + 1] || "").trim();
+    if (filename && filename.endsWith(".sol") && content) {
+      files[filename] = content;
+    }
+  }
+  if (Object.keys(files).length > 0) return files;
+  return { "Contract.sol": text.trim() };
+}
+
 export async function codegenAgent(
   spec: Record<string, unknown>,
   design: DesignProposal,
@@ -132,13 +148,21 @@ export async function codegenAgent(
   if (securityContext?.threatsSummary || securityContext?.scvPatterns) {
     system += `\n\nMUST AVOID: ${securityContext.threatsSummary || "N/A"}\n- Reentrancy: use checks-effects-interactions, nonReentrant modifier\n- Unhandled exceptions: check return values of call/transfer/send\n- Known SCV patterns: ${securityContext.scvPatterns || "N/A"}`;
   }
+  const components = design?.components || ["Contract"];
+  const multiContract = components.length > 1;
+  if (multiContract) {
+    system += `\n\nWhen design has multiple components, generate ALL contracts needed. Start each contract with a file marker on its own line: // FILE: ComponentName.sol (e.g. // FILE: Token.sol, // FILE: Vault.sol). Output each contract in full with its marker.`;
+  }
+  const prompt = multiContract
+    ? `Spec: ${JSON.stringify(spec)}\nDesign: ${JSON.stringify(design)}\nGenerate all contracts needed for the design (${components.join(", ")}). Use // FILE: Name.sol before each contract.`
+    : `Spec: ${JSON.stringify(spec)}\nDesign: ${JSON.stringify(design)}\nGenerate one main contract.`;
   const result = await generateText({
     model,
     system,
-    prompt: `Spec: ${JSON.stringify(spec)}\nDesign: ${JSON.stringify(design)}\nGenerate one main contract.`,
+    prompt,
     maxTokens: 8192,
   });
-  return { "Contract.sol": result.text };
+  return parseMultiFileOutput(result.text);
 }
 
 

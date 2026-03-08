@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useConnectModal } from "thirdweb/react";
-import { Code, HardDrive, Package, Activity, Info, List, Rocket, GitBranch, ArrowRight, Loader2, ExternalLink } from "lucide-react";
+import { Code, HardDrive, Package, Activity, Info, List, Rocket, GitBranch, ArrowRight, Loader2, ExternalLink, ChevronDown } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import { createQuickDemo } from "@/lib/api";
 import { getThirdwebClient } from "@/lib/thirdwebClient";
@@ -16,7 +16,65 @@ import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist
 import { Terminal } from "@/components/ai-elements";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { MetricCard, StatusBadge, LiveIndicator } from "@/components/ui";
+import { PageTitle } from "@/components/layout/PageTitle";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
+import type { Workflow } from "@/lib/types";
+
+function DashboardCTAs({
+  workflows,
+  quickDemoLoading,
+  onQuickDemo,
+}: {
+  workflows: Workflow[];
+  quickDemoLoading: boolean;
+  onQuickDemo: () => Promise<void>;
+}) {
+  const [moreOpen, setMoreOpen] = useState(false);
+  return (
+    <div className="flex items-center gap-2">
+      <Link
+        href={ROUTES.HOME}
+        className="px-4 py-2 rounded-lg btn-primary-gradient text-[var(--color-text-primary)] text-xs font-medium transition-all flex items-center gap-2"
+      >
+        <Rocket className="w-3.5 h-3.5" />
+        New workflow
+      </Link>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setMoreOpen(!moreOpen)}
+          className="px-3 py-2 rounded-lg border border-[var(--color-border-subtle)] text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] transition-colors flex items-center gap-1"
+        >
+          More <ChevronDown className={`w-3.5 h-3.5 transition-transform ${moreOpen ? "rotate-180" : ""}`} />
+        </button>
+        {moreOpen && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setMoreOpen(false)} aria-hidden />
+            <div className="absolute right-0 top-full mt-1 z-50 py-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] shadow-xl min-w-[140px]">
+              <button
+                type="button"
+                onClick={() => { onQuickDemo(); setMoreOpen(false); }}
+                disabled={quickDemoLoading || workflows.length === 0}
+                title={workflows.length === 0 ? "Create a workflow first" : undefined}
+                className="w-full px-3 py-2 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)] flex items-center gap-2 disabled:opacity-50"
+              >
+                {quickDemoLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
+                Try demo
+              </button>
+              <Link
+                href={ROUTES.MONITORING}
+                onClick={() => setMoreOpen(false)}
+                className="block px-3 py-2 text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+              >
+                View logs
+              </Link>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -103,68 +161,30 @@ export default function DashboardPage() {
         />
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-2">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[var(--color-text-tertiary)] text-sm">Projects /</span>
-              <span className="text-[var(--color-text-primary)] font-medium text-sm">Overview</span>
-            </div>
-            <h1 className="text-2xl font-semibold text-[var(--color-text-primary)] tracking-tight">Project Overview</h1>
+            <PageTitle breadcrumb="Projects / Overview" title="Project Overview" />
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={async () => {
-                const w = workflows.find((w) => w.contracts && Object.keys(w.contracts).length > 0) ?? workflows[0];
-                if (!w?.workflow_id) {
-                  setQuickDemoError("Create a workflow first to try the demo");
-                  return;
-                }
-                setQuickDemoLoading(true);
-                setQuickDemoError(null);
-                try {
-                  const res = await createQuickDemo(w.workflow_id);
-                  if (res.url) {
-                    window.open(res.url, "_blank", "noopener,noreferrer");
-                  } else {
-                    setQuickDemoError("No sandbox URL returned");
-                  }
-                } catch (e) {
-                  setQuickDemoError(e instanceof Error ? e.message : "Quick demo failed");
-                } finally {
-                  setQuickDemoLoading(false);
-                }
-              }}
-              disabled={quickDemoLoading || workflows.length === 0}
-              title={workflows.length === 0 ? "Create a workflow first" : undefined}
-              className="px-4 py-2 rounded-lg border border-[var(--color-border-default)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] text-xs font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
-            >
-              {quickDemoLoading ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <ExternalLink className="w-3.5 h-3.5" />
-              )}
-              Try it Now
-            </button>
-            <Link
-              href={ROUTES.CHAT}
-              className="px-4 py-2 rounded-lg btn-primary-gradient text-[var(--color-text-primary)] text-xs font-medium transition-all flex items-center gap-2"
-            >
-              <Activity className="w-3.5 h-3.5" />
-              New from idea
-            </Link>
-            <Link
-              href={ROUTES.MONITORING}
-              className="px-4 py-2 rounded-lg border border-[var(--color-border-default)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] text-xs font-medium transition-colors"
-            >
-              View Logs
-            </Link>
-            <Link
-              href={ROUTES.HOME}
-              className="px-4 py-2 rounded-lg border border-[var(--color-border-default)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] text-xs font-medium transition-all flex items-center gap-2"
-            >
-              <Rocket className="w-3.5 h-3.5" />
-              New workflow
-            </Link>
-          </div>
+          <DashboardCTAs
+            workflows={workflows}
+            quickDemoLoading={quickDemoLoading}
+            onQuickDemo={async () => {
+              const w = workflows.find((w) => w.contracts && Object.keys(w.contracts).length > 0) ?? workflows[0];
+              if (!w?.workflow_id) {
+                setQuickDemoError("Create a workflow first to try the demo");
+                return;
+              }
+              setQuickDemoLoading(true);
+              setQuickDemoError(null);
+              try {
+                const res = await createQuickDemo(w.workflow_id);
+                if (res.url) window.open(res.url, "_blank", "noopener,noreferrer");
+                else setQuickDemoError("No sandbox URL returned");
+              } catch (e) {
+                setQuickDemoError(e instanceof Error ? e.message : "Quick demo failed");
+              } finally {
+                setQuickDemoLoading(false);
+              }
+            }}
+          />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

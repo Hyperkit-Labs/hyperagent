@@ -134,7 +134,7 @@ export function isAbortError(error: unknown): error is Error & { name: 'AbortErr
   return error instanceof Error && error.name === 'AbortError';
 }
 
-/** Safe message from catch(err: unknown). Replaces generic SDK errors with a useful fallback. */
+/** Safe message from catch(err: unknown). Replaces generic SDK errors with a useful fallback. Uses status-specific messages when available. */
 export function getErrorMessage(error: unknown, fallback = 'Request failed'): string {
   const GENERIC = [
     'an error occurred.',
@@ -146,6 +146,9 @@ export function getErrorMessage(error: unknown, fallback = 'Request failed'): st
     const lower = s.toLowerCase();
     return GENERIC.some((g) => lower === g || lower.startsWith(g));
   }
+
+  const status = (error as ApiErrorWithStatus)?.status;
+  if (status !== undefined && STATUS_MESSAGES[status]) return STATUS_MESSAGES[status];
 
   if (error instanceof Error) {
     const msg = error.message?.trim() || '';
@@ -173,10 +176,24 @@ export interface NormalizeApiErrorOptions {
   status?: number;
 }
 
+/** Status-to-message map for actionable user-facing errors. See docs/troubleshooting.md for details. */
+const STATUS_MESSAGES: Record<number, string> = {
+  400: 'Invalid request. Check your input and try again.',
+  401: AUTH_ERROR_MESSAGE,
+  402: 'Insufficient credits. Add budget in Payments to continue.',
+  403: 'Access denied. You may not have permission for this action.',
+  404: 'Resource not found. It may have been removed or the link is outdated.',
+  408: 'Request timed out. Try again when the server is less busy.',
+  429: 'Too many requests. Wait a moment and try again.',
+  500: 'Server error. Our team has been notified. Please try again later.',
+  502: 'Backend unavailable. Check status or try again in a few minutes.',
+  503: 'Service temporarily unavailable. Please try again shortly.',
+};
+
 /** Normalize fetch/API errors to a single user-facing message. For 401, returns AUTH_ERROR_MESSAGE so UI can show sign-in. */
 export function normalizeApiError(error: unknown, opts?: NormalizeApiErrorOptions): string {
   const status = opts?.status ?? (error as ApiErrorWithStatus)?.status;
-  if (status === 401) return AUTH_ERROR_MESSAGE;
+  if (status !== undefined && STATUS_MESSAGES[status]) return STATUS_MESSAGES[status];
 
   if (error instanceof Error) {
     if (isAbortError(error)) {

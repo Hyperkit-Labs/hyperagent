@@ -12,6 +12,7 @@ import { useConfig } from "@/components/providers/ConfigProvider";
 import { useNetworks } from "@/hooks/useNetworks";
 import { usePlanData } from "@/hooks/usePlanData";
 import { useSettingsX402Data } from "@/hooks/useSettingsX402Data";
+import { PageTitle } from "@/components/layout/PageTitle";
 
 type SettingsTab = "workspace" | "byok" | "x402" | "integrations" | "plan";
 
@@ -61,8 +62,8 @@ export default function SettingsPage() {
     <div className="p-6 lg:p-8">
       <div className="max-w-[800px] mx-auto space-y-6 animate-enter">
         <div className="flex items-center gap-2 mb-2">
-          <SettingsIcon className="w-5 h-5 text-[var(--color-text-muted)]" />
-          <h1 className="text-xl font-semibold text-[var(--color-text-primary)] tracking-tight">Settings</h1>
+          <SettingsIcon className="w-5 h-5 text-[var(--color-text-muted)] shrink-0" />
+          <PageTitle title="Settings" />
         </div>
         <div className="flex gap-1 border-b border-[var(--color-border-subtle)] overflow-x-auto">
           <button type="button" onClick={() => setTab("workspace")} className={tabClass("workspace")}>

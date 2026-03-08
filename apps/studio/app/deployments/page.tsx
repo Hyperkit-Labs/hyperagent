@@ -7,6 +7,7 @@ import { Rocket } from "lucide-react";
 import { ShimmerTableRows } from "@/components/ai-elements";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { DataTable, EmptyState, MetricCard, StatusBadge } from "@/components/ui";
+import { PageTitle } from "@/components/layout/PageTitle";
 
 export default function DeploymentsPage() {
   const { deployments, stats, loading, error, refetch } = useDeployments();
@@ -16,10 +17,7 @@ export default function DeploymentsPage() {
       <div className="max-w-[1200px] mx-auto space-y-6 animate-enter">
         <ApiErrorBanner error={error} onRetry={refetch} />
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold text-[var(--color-text-primary)] tracking-tight">Deployments</h1>
-            <p className="text-[var(--color-text-tertiary)] text-sm mt-1">Track deployment status and contract addresses.</p>
-          </div>
+          <PageTitle title="Deployments" subtitle="Track deployment status and contract addresses." />
           <Link
             href={ROUTES.HOME}
             className="px-4 py-2 rounded-lg btn-primary-gradient text-[var(--color-text-primary)] text-xs font-medium transition-all flex items-center gap-2 w-fit"

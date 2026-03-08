@@ -54,9 +54,9 @@ async def _agent_runtime_spec(
     agent_session_jwt: str | None,
 ) -> dict[str, Any]:
     """Local fallback: call agent-runtime /agents/spec and normalize to Spec Lock format."""
-    headers: dict[str, str] = {}
-    if agent_session_jwt:
-        headers["X-Agent-Session"] = agent_session_jwt
+    from agents.agent_http import agent_runtime_headers
+
+    headers = agent_runtime_headers(agent_session_jwt)
     payload: dict[str, Any] = {"prompt": prompt}
     if context:
         payload["context"] = context

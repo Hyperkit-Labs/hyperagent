@@ -34,7 +34,7 @@ def _step_start(run_id: str, step_type: str) -> None:
         db.insert_agent_log(run_id, step_type, step_type, "started", log_level="info")
 
 
-def _step_complete(run_id: str, step_type: str, output_summary: str | None = None, error_message: str | None = None) -> None:
+async def _step_complete(run_id: str, step_type: str, output_summary: str | None = None, error_message: str | None = None, extra: dict | None = None) -> None:
     import db
     from trace_writer import write_trace
     status = "failed" if error_message else "completed"
@@ -42,8 +42,8 @@ def _step_complete(run_id: str, step_type: str, output_summary: str | None = Non
     logger.info("[pipeline] run_id=%s step_id=%s step_type=%s status=%s", run_id, step_index, step_type, status)
     blob_id, da_cert, ref_block = None, None, None
     if db.is_configured() and run_id:
-        blob_id, da_cert, ref_block = write_trace(
-            run_id, step_type, step_index, status, output_summary, error_message
+        blob_id, da_cert, ref_block = await write_trace(
+            run_id, step_type, step_index, status, output_summary, error_message, extra
         )
         db.update_step(
             run_id, step_type, status,
@@ -108,7 +108,7 @@ async def spec_agent(state: AgentState) -> AgentState:
                 await rag_client.index_spec(run_id, spec, text=prompt)
                 cid = await ipfs_client.pin_artifact(run_id, "spec", spec)
                 if cid:
-                    await ipfs_client.record_storage(run_id, "spec", cid)
+                    await ipfs_client.record_storage(run_id, "spec", cid, project_id=state.get("project_id"))
             except Exception as pin_err:
                 logger.warning("[pipeline] post-spec pin/index failed: %s", pin_err)
             state["messages"] = list(state.get("messages", [])) + [
@@ -121,10 +121,10 @@ async def spec_agent(state: AgentState) -> AgentState:
                 state["needs_human_approval"] = True
             else:
                 state["needs_human_approval"] = spec.get("risk_profile") == "high"
-            _step_complete(run_id, "spec", output_summary=f"spec {source} token_type={spec.get('token_type', 'contract')}")
+            await _step_complete(run_id, "spec", output_summary=f"spec {source} token_type={spec.get('token_type', 'contract')}")
             return state
         except Exception as e:
-            _step_complete(run_id, "spec", error_message=str(e))
+            await _step_complete(run_id, "spec", error_message=str(e))
             raise
 
 
@@ -167,11 +167,17 @@ async def design_agent(state: AgentState) -> AgentState:
                 {"stage": "spec", "status": "completed"},
                 {"stage": "design", "status": "completed"},
             ])
+            try:
+                cid = await ipfs_client.pin_artifact(run_id, "design", design)
+                if cid:
+                    await ipfs_client.record_storage(run_id, "design", cid, project_id=project_id)
+            except Exception as pin_err:
+                logger.warning("[pipeline] post-design pin failed: %s", pin_err)
             state["messages"] = list(state.get("messages", [])) + [AIMessage(content=f"Design: {len(design.get('components', []))} components")]
-            _step_complete(run_id, "design", output_summary=f"components={len(design.get('components', []))} framework={state['framework']}")
+            await _step_complete(run_id, "design", output_summary=f"components={len(design.get('components', []))} framework={state['framework']}")
             return state
         except Exception as e:
-            _step_complete(run_id, "design", error_message=str(e))
+            await _step_complete(run_id, "design", error_message=str(e))
             raise
 
 
@@ -214,13 +220,13 @@ async def codegen_agent(state: AgentState) -> AgentState:
         try:
             cid = await ipfs_client.pin_artifact(run_id, "contracts", contracts)
             if cid:
-                await ipfs_client.record_storage(run_id, "contracts", cid)
+                await ipfs_client.record_storage(run_id, "contracts", cid, project_id=project_id)
         except Exception as pin_err:
             logger.warning("[pipeline] post-codegen pin failed: %s", pin_err)
-        _step_complete(run_id, "codegen", output_summary=f"files={len(contracts)}")
+        await _step_complete(run_id, "codegen", output_summary=f"files={len(contracts)}")
         return state
     except Exception as e:
-        _step_complete(run_id, "codegen", error_message=str(e))
+        await _step_complete(run_id, "codegen", error_message=str(e))
         raise
 
 
@@ -246,10 +252,10 @@ async def scrubd_validation_agent(state: AgentState) -> AgentState:
         state["messages"] = list(state.get("messages", [])) + [
             AIMessage(content=f"SCRUBD: {'passed' if passed else 'failed'} ({len(findings)} findings)")
         ]
-        _step_complete(run_id, "scrubd", output_summary=f"passed={passed} findings={len(findings)}")
+        await _step_complete(run_id, "scrubd", output_summary=f"passed={passed} findings={len(findings)}")
         return state
     except Exception as e:
-        _step_complete(run_id, "scrubd", error_message=str(e))
+        await _step_complete(run_id, "scrubd", error_message=str(e))
         state["scrubd_validation_passed"] = False
         state["scrubd_findings"] = [{"error": str(e), "type": "scrubd_error"}]
         state["current_stage"] = "scrubd_failed"
@@ -311,13 +317,13 @@ async def audit_agent(state: AgentState) -> AgentState:
         try:
             cid = await ipfs_client.pin_artifact(run_id, "audit", findings)
             if cid:
-                await ipfs_client.record_storage(run_id, "audit", cid)
+                await ipfs_client.record_storage(run_id, "audit", cid, project_id=state.get("project_id"))
         except Exception as pin_err:
             logger.warning("[pipeline] post-audit pin failed: %s", pin_err)
-        _step_complete(run_id, "audit", output_summary=f"findings={len(findings)} passed={state['audit_passed']}")
+        await _step_complete(run_id, "audit", output_summary=f"findings={len(findings)} passed={state['audit_passed']}")
         return state
     except Exception as e:
-        _step_complete(run_id, "audit", error_message=str(e))
+        await _step_complete(run_id, "audit", error_message=str(e))
         raise
 
 
@@ -336,6 +342,12 @@ async def simulation_agent(state: AgentState) -> AgentState:
         state["simulation_results"] = results
         state["simulation_passed"] = results.get("passed", True)
         state["current_stage"] = "simulation" if state["simulation_passed"] else "simulation_failed"
+        try:
+            cid = await ipfs_client.pin_artifact(run_id, "simulation", results)
+            if cid:
+                await ipfs_client.record_storage(run_id, "simulation", cid, project_id=state.get("project_id"))
+        except Exception as pin_err:
+            logger.warning("[pipeline] post-simulation pin failed: %s", pin_err)
         from store import update_workflow
         sim_status = "completed" if state["simulation_passed"] else "failed"
         update_workflow(run_id, status="building", simulation_results=results, simulation_passed=state["simulation_passed"], stages=[
@@ -346,10 +358,10 @@ async def simulation_agent(state: AgentState) -> AgentState:
             {"stage": "simulation", "status": sim_status},
         ])
         state["messages"] = list(state.get("messages", [])) + [AIMessage(content="Simulation complete")]
-        _step_complete(run_id, "simulation", output_summary=f"passed={state['simulation_passed']}")
+        await _step_complete(run_id, "simulation", output_summary=f"passed={state['simulation_passed']}")
         return state
     except Exception as e:
-        _step_complete(run_id, "simulation", error_message=str(e))
+        await _step_complete(run_id, "simulation", error_message=str(e))
         raise
 
 
@@ -380,10 +392,10 @@ async def exploit_simulation_agent(state: AgentState) -> AgentState:
         state["messages"] = list(state.get("messages", [])) + [
             AIMessage(content=f"Exploit sim: {'passed' if passed else 'failed'} ({len(findings)} findings)")
         ]
-        _step_complete(run_id, "exploit_sim", output_summary=f"passed={passed} findings={len(findings)}")
+        await _step_complete(run_id, "exploit_sim", output_summary=f"passed={passed} findings={len(findings)}")
         return state
     except Exception as e:
-        _step_complete(run_id, "exploit_sim", error_message=str(e))
+        await _step_complete(run_id, "exploit_sim", error_message=str(e))
         state["exploit_simulation_passed"] = False
         state["exploit_simulation_findings"] = [{"error": str(e)}]
         raise
@@ -436,10 +448,10 @@ async def deploy_agent(state: AgentState) -> AgentState:
             {"stage": "deploy", "status": "completed"},
         ])
         state["messages"] = list(state.get("messages", [])) + [AIMessage(content=f"Deployed to {len(deployments)} chains")]
-        _step_complete(run_id, "deploy", output_summary=f"chains={len(deployments)}")
+        await _step_complete(run_id, "deploy", output_summary=f"chains={len(deployments)}")
         return state
     except Exception as e:
-        _step_complete(run_id, "deploy", error_message=str(e))
+        await _step_complete(run_id, "deploy", error_message=str(e))
         raise
 
 
@@ -466,10 +478,10 @@ async def ui_scaffold_agent(state: AgentState) -> AgentState:
         ])
         if schema:
             state["messages"] = list(state.get("messages", [])) + [AIMessage(content="UI schema generated")]
-        _step_complete(run_id, "ui_scaffold", output_summary="schema generated" if schema else "no schema")
+        await _step_complete(run_id, "ui_scaffold", output_summary="schema generated" if schema else "no schema")
         return state
     except Exception as e:
-        _step_complete(run_id, "ui_scaffold", error_message=str(e))
+        await _step_complete(run_id, "ui_scaffold", error_message=str(e))
         raise
 
 
@@ -503,7 +515,7 @@ async def autofix_agent(state: AgentState) -> AgentState:
         cycle = state.get("autofix_cycle", 1)
 
         from trace_writer import write_trace
-        blob_id, da_cert, ref_block = write_trace(
+        blob_id, da_cert, ref_block = await write_trace(
             run_id,
             "debate",
             _step_index("debate"),
@@ -537,7 +549,7 @@ async def autofix_agent(state: AgentState) -> AgentState:
         logger.error("[debate] run_id=%s error=%s", run_id, e)
         state["error"] = f"Debate failed: {e}"
         state["current_stage"] = "failed"
-        _step_complete(run_id, "debate", error_message=str(e))
+        await _step_complete(run_id, "debate", error_message=str(e))
         return state
 
 

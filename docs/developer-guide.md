@@ -9,25 +9,27 @@ Setup and workflow for anyone developing or contributing to HyperAgent.
 The repo is a monorepo (pnpm workspaces). Main areas:
 
 | Path | Purpose |
-|------|--------|
+|------|---------|
 | `apps/studio` | Next.js frontend (HyperAgent Studio). Primary app for users. |
-| `apps/api-gateway` | API gateway (auth, routing, x402). Stub. |
-| `apps/docs` | Documentation site. Stub. |
-| `services/*` | Backend services (orchestrator, codegen, audit, simulation, deploy, etc.). Stubs. |
-| `packages/*` | Shared packages (sdk-ts, config, ui, core-types, web3-utils, ai-tools). Some have minimal stubs for Studio. |
-| `contracts/evm`, `contracts/templates` | Smart contracts and blueprints. Stubs. |
-| `infra/docker`, `infra/k8s`, `infra/terraform` | Infrastructure. Stubs. |
-| `platform/supabase`, `platform/redis` | Supabase and Redis config. Stubs. |
-| `docs/` | Documentation (onboarding, user guide, developer guide). |
+| `apps/api-gateway` | API gateway (auth, rate limit, proxy to orchestrator). Runs on port 4000. |
+| `services/orchestrator` | Python/FastAPI backend. Workflows, runs, networks, BYOK, deploy plans. |
+| `services/agent-runtime` | Agent runtime (simulation, deploy, storage). Used by orchestrator. |
+| `services/compile` | Solidity compilation service. |
+| `services/audit` | Security audit service (Slither, Mythril). |
+| `packages/*` | Shared packages (sdk-ts, config, ui, core-types, web3-utils, ai-tools). |
+| `infra/registries` | Chain registry (`network/chains.yaml`), x402 config. |
+| `infra/docker` | Docker Compose for backend stack. |
+| `platform/supabase` | Supabase migrations (runs, run_steps, wallet_users, etc.). |
+| `docs/` | Public documentation (onboarding, user guide, developer guide). |
 
 ---
 
 ## Prerequisites
 
-- **Node.js** 18+  
-- **pnpm** 8+  
-- **Git**  
-- (Optional) **Python** 3.11+, **Docker** for backend and infra  
+- **Node.js** 18+
+- **pnpm** 8+
+- **Git**
+- (Optional) **Python** 3.11+, **Docker** for backend and infra
 
 ---
 
@@ -41,10 +43,17 @@ The repo is a monorepo (pnpm workspaces). Main areas:
    ```
 
 2. **Environment**
-   - Copy `.env.example` to `.env` at repo root if present.
-   - For Studio: set `NEXT_PUBLIC_THIRDWEB_CLIENT_ID`, `NEXT_PUBLIC_API_URL` (e.g. `http://localhost:8000`).
+   - Copy `.env.example` to `.env` at repo root.
+   - For Studio: set `NEXT_PUBLIC_THIRDWEB_CLIENT_ID`, `NEXT_PUBLIC_API_URL` (e.g. `http://localhost:4000` when using gateway).
+   - For backend: set `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `REDIS_URL` for full functionality.
 
-3. **Run Studio**
+3. **Run backend (Docker)**
+   ```bash
+   make up
+   ```
+   Gateway: http://localhost:4000. Orchestrator runs behind the gateway.
+
+4. **Run Studio**
    ```bash
    pnpm --filter hyperagent-studio dev
    ```
@@ -54,9 +63,10 @@ The repo is a monorepo (pnpm workspaces). Main areas:
    ```
    App: [http://localhost:3000](http://localhost:3000).
 
-4. **Backend**
-   - If the project provides a backend (e.g. Python API + Docker), follow its run instructions so the API is available at the URL used by `NEXT_PUBLIC_API_URL`.
-   - Studio calls that API for workflows and data.
+5. **Optional: full stack**
+   - `make up-full` – includes roma-service, codegen (legacy).
+   - `make up-tools` – adds hyperagent-tools on port 9000.
+   - `make up-local` – local postgres, redis, vectordb.
 
 ---
 
@@ -65,11 +75,21 @@ The repo is a monorepo (pnpm workspaces). Main areas:
 From repo root:
 
 ```bash
-pnpm install              # Install all workspace deps
+pnpm install                    # Install all workspace deps
 pnpm --filter hyperagent-studio dev    # Run Studio dev server
 pnpm --filter hyperagent-studio build  # Build Studio
-pnpm turbo lint           # Lint (if turbo.json exists)
-pnpm turbo test           # Test (if turbo.json exists)
+pnpm turbo lint                 # Lint
+pnpm turbo test                 # Test
+```
+
+Backend (Makefile):
+
+```bash
+make up         # Start lite backend (5–6 services)
+make down       # Stop stack
+make restart    # Restart stack
+make logs       # Follow logs
+make run-web    # Start Studio (after make up)
 ```
 
 ---
@@ -88,6 +108,7 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) in the repo root for full guidelines.
 
 ## Where to look
 
-- **Onboarding:** [Getting started](getting-started.md)  
-- **End-user usage:** [User guide](user-guide.md)  
-- **Architecture / internal specs:** See `docs/specs`, `docs/adr`, `docs/runbooks` and repo README when you need deeper context.
+- **Onboarding:** [Getting started](getting-started.md)
+- **End-user usage:** [User guide](user-guide.md)
+- **Architecture:** [Network architecture](architecture-networks.md), [Control plane](control-plane-runs-steps.md), [Deploy ownership](deploy-ownership.md)
+- **Internal specs:** `external/docs/` for plans, runbooks, and detailed specs.

@@ -747,53 +747,116 @@ class DeployCompleteBody(BaseModel):
     chainId: int | None = None
 
 
+def _build_hybrid_deploy_state(workflow_id: str, user_id: str, project_id: str, api_keys: dict) -> dict[str, Any] | None:
+    """Build hybrid/partially synthetic state from workflow store for deploy resume when checkpoint is missing."""
+    from langchain_core.messages import HumanMessage
+    w = get_workflow(workflow_id)
+    if not w or not w.get("contracts"):
+        return None
+    intent = w.get("intent") or ""
+    return {
+        "user_prompt": intent,
+        "user_id": user_id,
+        "project_id": project_id,
+        "run_id": workflow_id,
+        "pipeline_id": DEFAULT_PIPELINE_ID,
+        "api_keys": api_keys or {},
+        "agent_session_jwt": _create_agent_session_jwt_if_configured(user_id, workflow_id, api_keys) or "",
+        "template_id": w.get("template_id") or "",
+        "use_oz_wizard": False,
+        "oz_wizard_options": w.get("oz_wizard_options") or {},
+        "spec": w.get("spec") or {},
+        "spec_approved": True,
+        "design_proposal": {},
+        "design_approved": True,
+        "contracts": w.get("contracts") or {},
+        "framework": "hardhat",
+        "audit_findings": w.get("audit_findings") or [],
+        "audit_passed": w.get("audit_passed", True),
+        "simulation_results": w.get("simulation_results") or {},
+        "simulation_passed": w.get("simulation_passed", True),
+        "deployments": w.get("deployments") or [],
+        "ui_schema": w.get("ui_schema") or {},
+        "messages": [HumanMessage(content=intent)],
+        "current_stage": "deploy",
+        "error": None,
+        "needs_human_approval": False,
+        "autofix_cycle": 0,
+        "deploy_approved": True,
+        "needs_deploy_approval": False,
+        "invariants": [],
+        "invariant_violations": [],
+    }
+
+
 def _resume_deploy_approval_job(workflow_id: str, user_id: str, project_id: str, api_keys: dict) -> None:
-    """Resume pipeline from deploy interrupt with deploy_approved=True."""
+    """Resume pipeline from deploy interrupt with deploy_approved=True. Uses checkpoint when available; falls back to hybrid state from workflow store."""
     set_request_id(None)
+    final = None
     try:
-        final = run_pipeline(
-            "",
-            user_id,
-            project_id,
-            workflow_id,
-            api_keys,
-            checkpoint_id=workflow_id,
-            resume_update={"deploy_approved": True},
-        )
-        current_stage = final.get("current_stage") or "unknown"
-        status = "completed" if current_stage in ("deployed", "deploy", "ui_scaffold") else (
-            "failed" if current_stage in ("audit_failed", "simulation_failed", "failed") else "building"
-        )
-        stages = [
-            {"stage": "spec", "status": "completed"},
-            {"stage": "design", "status": "completed" if final.get("design_proposal") else "pending"},
-            {"stage": "codegen", "status": "completed" if final.get("contracts") else "pending"},
-            {"stage": "audit", "status": "completed" if final.get("audit_passed") else ("failed" if final.get("audit_findings") else "pending")},
-            {"stage": "guardian", "status": "completed" if final.get("invariants") else "pending"},
-            {"stage": "deploy", "status": "completed" if current_stage in ("deployed", "ui_scaffold") else "pending"},
-            {"stage": "simulation", "status": "completed" if final.get("simulation_passed") else ("failed" if final.get("simulation_results") and not final.get("simulation_passed") else "pending")},
-            {"stage": "ui_scaffold", "status": "completed" if final.get("ui_schema") else "pending"},
-        ]
-        update_workflow(
-            workflow_id=workflow_id,
-            status=status,
-            current_stage=current_stage,
-            stages=stages,
-            contracts=final.get("contracts") or {},
-            deployments=final.get("deployments") or [],
-            ui_schema=final.get("ui_schema"),
-            error=final.get("error"),
-            simulation_passed=final.get("simulation_passed"),
-            simulation_results=final.get("simulation_results"),
-        )
-        if db.is_configured():
-            db.update_run(
+        try:
+            final = run_pipeline(
+                "",
+                user_id,
+                project_id,
                 workflow_id,
-                status=_run_status_for_store(status),
-                current_stage=current_stage,
-                error_message=final.get("error"),
-                stages=stages,
+                api_keys,
+                checkpoint_id=workflow_id,
+                resume_update={"deploy_approved": True},
             )
+        except (KeyError, Exception) as e:
+            if "user_prompt" in str(e) or "KeyError" in type(e).__name__:
+                hybrid = _build_hybrid_deploy_state(workflow_id, user_id, project_id, api_keys)
+                if hybrid:
+                    logger.info("[orchestrator] deploy resume: checkpoint failed (%s), using hybrid state from workflow store", e)
+                    final = run_pipeline(
+                        hybrid.get("user_prompt", ""),
+                        user_id,
+                        project_id,
+                        workflow_id,
+                        api_keys,
+                        initial_state=hybrid,
+                    )
+                else:
+                    raise
+            else:
+                raise
+
+        if final:
+            current_stage = final.get("current_stage") or "unknown"
+            status = "completed" if current_stage in ("deployed", "deploy", "ui_scaffold") else (
+                "failed" if current_stage in ("audit_failed", "simulation_failed", "failed") else "building"
+            )
+            stages = [
+                {"stage": "spec", "status": "completed"},
+                {"stage": "design", "status": "completed" if final.get("design_proposal") else "pending"},
+                {"stage": "codegen", "status": "completed" if final.get("contracts") else "pending"},
+                {"stage": "audit", "status": "completed" if final.get("audit_passed") else ("failed" if final.get("audit_findings") else "pending")},
+                {"stage": "guardian", "status": "completed" if final.get("invariants") else "pending"},
+                {"stage": "deploy", "status": "completed" if current_stage in ("deployed", "ui_scaffold") else "pending"},
+                {"stage": "simulation", "status": "completed" if final.get("simulation_passed") else ("failed" if final.get("simulation_results") and not final.get("simulation_passed") else "pending")},
+                {"stage": "ui_scaffold", "status": "completed" if final.get("ui_schema") else "pending"},
+            ]
+            update_workflow(
+                workflow_id=workflow_id,
+                status=status,
+                current_stage=current_stage,
+                stages=stages,
+                contracts=final.get("contracts") or {},
+                deployments=final.get("deployments") or [],
+                ui_schema=final.get("ui_schema"),
+                error=final.get("error"),
+                simulation_passed=final.get("simulation_passed"),
+                simulation_results=final.get("simulation_results"),
+            )
+            if db.is_configured():
+                db.update_run(
+                    workflow_id,
+                    status=_run_status_for_store(status),
+                    current_stage=current_stage,
+                    error_message=final.get("error"),
+                    stages=stages,
+                )
     except Exception as e:
         err_msg = str(e)
         logger.exception("[orchestrator] deploy approval resume failed workflow_id=%s", workflow_id)

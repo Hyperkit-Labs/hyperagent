@@ -492,7 +492,7 @@ def get_workflow_contracts_api(workflow_id: str, request: Request = None) -> lis
 
 
 def _build_workflow_tarball(workflow_id: str) -> bytes:
-    """Build a minimal Hardhat project tarball from workflow contracts. For Vercel Sandbox dynamic source."""
+    """Build a minimal Hardhat project tarball from workflow contracts. For Docker sandbox dynamic source."""
     w = get_workflow(workflow_id)
     if not w:
         return b""
@@ -526,7 +526,7 @@ def _build_workflow_tarball(workflow_id: str) -> bytes:
 
 @app.get("/api/v1/workflows/{workflow_id}/tarball")
 def get_workflow_tarball_api(workflow_id: str, request: Request = None) -> Response:
-    """Return workflow as tarball for Vercel Sandbox dynamic source."""
+    """Return workflow as tarball for Docker sandbox dynamic source."""
     w = get_workflow(workflow_id)
     if not w:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -1849,26 +1849,14 @@ def _check_tools_health() -> dict[str, Any]:
         return {"status": "offline", "url": TOOLS_BASE_URL, "error": str(e)}
 
 
-# Vercel Sandbox: https://vercel.com/docs/vercel-sandbox, https://vercel.com/docs/vercel-sandbox/concepts/authentication
-VERCEL_SANDBOX_API = "https://api.vercel.com/v1/sandboxes"
-VERCEL_SANDBOX_TOKEN = (
-    os.environ.get("VERCEL_SANDBOX_TOKEN", "").strip()
-    or os.environ.get("VERCEL_TOKEN", "").strip()
+# Quick-demo sandbox: Contabo Docker Sandbox API
+SANDBOX_API_URL = (
+    (os.environ.get("SANDBOX_API_URL") or os.environ.get("OPENSANDBOX_API_URL") or "").rstrip("/")
 )
-VERCEL_TEAM_ID = os.environ.get("VERCEL_TEAM_ID", "").strip()
-VERCEL_PROJECT_ID = os.environ.get("VERCEL_PROJECT_ID", "").strip()
-DEMO_SANDBOX_SOURCE_URL = os.environ.get("DEMO_SANDBOX_SOURCE_URL", "https://github.com/NomicFoundation/hardhat-template").strip()
-DEMO_SANDBOX_SOURCE_TYPE = os.environ.get("DEMO_SANDBOX_SOURCE_TYPE", "git").strip().lower()
-
-
-def _ensure_vercel_sandbox_env() -> None:
-    """Ensure Vercel Sandbox SDK reads our env vars. SDK uses VERCEL_TOKEN, VERCEL_TEAM_ID, VERCEL_PROJECT_ID."""
-    if VERCEL_SANDBOX_TOKEN and not os.environ.get("VERCEL_TOKEN"):
-        os.environ["VERCEL_TOKEN"] = VERCEL_SANDBOX_TOKEN
-    if VERCEL_TEAM_ID and not os.environ.get("VERCEL_TEAM_ID"):
-        os.environ["VERCEL_TEAM_ID"] = VERCEL_TEAM_ID
-    if VERCEL_PROJECT_ID and not os.environ.get("VERCEL_PROJECT_ID"):
-        os.environ["VERCEL_PROJECT_ID"] = VERCEL_PROJECT_ID
+SANDBOX_API_KEY = (
+    os.environ.get("SANDBOX_API_KEY", "").strip()
+    or os.environ.get("OPENSANDBOX_API_KEY", "").strip()
+)
 
 
 class QuickDemoBody(BaseModel):
@@ -1877,146 +1865,75 @@ class QuickDemoBody(BaseModel):
     workflow_id: str | None = None
 
 
+async def _quick_demo_via_docker_sandbox(
+    tarball_url: str,
+    timeout_minutes: int = 30,
+) -> dict[str, Any]:
+    """Create sandbox via Contabo Docker Sandbox API (SANDBOX_API_URL)."""
+    if not SANDBOX_API_URL or not SANDBOX_API_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="Docker sandbox not configured: set SANDBOX_API_URL (or OPENSANDBOX_API_URL) and OPENSANDBOX_API_KEY",
+        )
+    create_url = f"{SANDBOX_API_URL}/sandbox/create"
+    payload = {
+        "tarball_url": tarball_url,
+        "timeout_minutes": timeout_minutes,
+        "port": 8545,
+    }
+    async with httpx.AsyncClient(timeout=120) as client:
+        r = await client.post(
+            create_url,
+            json=payload,
+            headers={
+                "Authorization": f"Bearer {SANDBOX_API_KEY}",
+                "Content-Type": "application/json",
+            },
+        )
+        if r.status_code != 200:
+            detail = (r.text[:500] or str(r.status_code)).strip()
+            raise HTTPException(
+                status_code=502,
+                detail=f"sandbox_api_status={r.status_code}, body={detail}",
+            )
+        data = r.json()
+        return {
+            "sandbox_id": data.get("sandbox_id"),
+            "url": data.get("url"),
+            "status": data.get("status", "running"),
+        }
+
+
 @app.post("/api/v1/quick-demo")
 async def quick_demo_api(request: Request, body: QuickDemoBody | None = None) -> dict[str, Any]:
-    """Create a Vercel Sandbox from the demo template or workflow-generated code.
-    When body.workflow_id is provided, uses dynamic source (tarball of generated contracts).
-    Returns sandbox URL for Try it Now. Requires VERCEL_SANDBOX_TOKEN or VERCEL_TOKEN."""
-    if not VERCEL_SANDBOX_TOKEN and not os.environ.get("VERCEL_TOKEN") and not os.environ.get("VERCEL_OIDC_TOKEN"):
-        raise HTTPException(status_code=503, detail="Quick demo not configured: set VERCEL_SANDBOX_TOKEN, VERCEL_TOKEN, or run vercel env pull")
-    _ensure_vercel_sandbox_env()
+    """Create a sandbox from workflow-generated code via Contabo Docker Sandbox API.
+    Requires workflow_id in body. Returns sandbox URL for Try it Now."""
     workflow_id = (body and body.workflow_id) or None
-    if workflow_id:
-        w = get_workflow(workflow_id)
-        if not w:
-            raise HTTPException(status_code=404, detail="Workflow not found")
-        if request:
-            _assert_workflow_owner(w, request)
-        base = (os.environ.get("ORCHESTRATOR_PUBLIC_URL") or str(request.base_url)).rstrip("/")
-        tarball_url = f"{base}/api/v1/workflows/{workflow_id}/tarball"
-        source = {"type": "tarball", "url": tarball_url}
-    else:
-        source_type = "tarball" if DEMO_SANDBOX_SOURCE_TYPE == "tarball" else "git"
-        source = {"type": source_type, "url": DEMO_SANDBOX_SOURCE_URL}
-    create_kwargs: dict[str, Any] = {
-        "source": source,
-        "runtime": "node24",
-        "ports": [3000],
-        "timeout": 300000,
-    }
-    if VERCEL_PROJECT_ID:
-        create_kwargs["project_id"] = VERCEL_PROJECT_ID
-    if VERCEL_TEAM_ID:
-        create_kwargs["team_id"] = VERCEL_TEAM_ID
-    try:
-        from vercel.sandbox import AsyncSandbox
-
-        sandbox = await AsyncSandbox.create(**create_kwargs)
-        sandbox_id = getattr(sandbox, "sandbox_id", None) or getattr(sandbox, "sandboxId", None) or getattr(sandbox, "id", None)
-        status = getattr(sandbox, "status", "running")
-        url: str | None = None
-        try:
-            url = sandbox.domain(3000)
-        except Exception:
-            pass
-        return {
-            "sandbox_id": sandbox_id,
-            "url": url,
-            "status": status,
-        }
-    except (ImportError, AttributeError) as e:
-        logger.info("[quick-demo] SDK unavailable (%s), using REST API fallback", e)
-        return await _quick_demo_via_rest(source=source)
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception("[quick-demo] %s", e)
-        detail = str(e)[:400]
-        if hasattr(e, "response") and getattr(e.response, "status_code", None):
-            detail = f"vercel_status={e.response.status_code}, {detail}"
-        raise HTTPException(status_code=502, detail=detail)
+    if not workflow_id:
+        raise HTTPException(status_code=400, detail="workflow_id required in body")
+    w = get_workflow(workflow_id)
+    if not w:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    if request:
+        _assert_workflow_owner(w, request)
+    base = (os.environ.get("ORCHESTRATOR_PUBLIC_URL") or str(request.base_url)).rstrip("/")
+    tarball_url = f"{base}/api/v1/workflows/{workflow_id}/tarball"
+    return await _quick_demo_via_docker_sandbox(tarball_url=tarball_url)
 
 
 @app.post("/api/v1/workflows/{workflow_id}/debug-sandbox")
 async def debug_sandbox_api(workflow_id: str, request: Request) -> dict[str, Any]:
-    """Create a Vercel Sandbox pre-loaded with the workflow's generated code and failing audit.
-    Use when audit fails so user can fix in a browser-based IDE. Requires VERCEL_SANDBOX_TOKEN."""
+    """Create a sandbox pre-loaded with the workflow's generated code and failing audit.
+    Use when audit fails so user can fix in a browser-based IDE. Uses Contabo Docker Sandbox API."""
     w = get_workflow(workflow_id)
     if not w:
         raise HTTPException(status_code=404, detail="Workflow not found")
     _assert_workflow_owner(w, request)
-    if not VERCEL_SANDBOX_TOKEN and not os.environ.get("VERCEL_TOKEN"):
-        raise HTTPException(status_code=503, detail="Debug sandbox not configured: set VERCEL_SANDBOX_TOKEN")
-    _ensure_vercel_sandbox_env()
     base = (os.environ.get("ORCHESTRATOR_PUBLIC_URL") or str(request.base_url)).rstrip("/")
     tarball_url = f"{base}/api/v1/workflows/{workflow_id}/tarball"
-    source = {"type": "tarball", "url": tarball_url}
-    create_kwargs: dict[str, Any] = {
-        "source": source,
-        "runtime": "node24",
-        "ports": [3000],
-        "timeout": 300000,
-    }
-    if VERCEL_PROJECT_ID:
-        create_kwargs["project_id"] = VERCEL_PROJECT_ID
-    if VERCEL_TEAM_ID:
-        create_kwargs["team_id"] = VERCEL_TEAM_ID
-    try:
-        from vercel.sandbox import AsyncSandbox
-
-        sandbox = await AsyncSandbox.create(**create_kwargs)
-        sandbox_id = getattr(sandbox, "sandbox_id", None) or getattr(sandbox, "sandboxId", None) or getattr(sandbox, "id", None)
-        url: str | None = None
-        try:
-            url = sandbox.domain(3000)
-        except Exception:
-            pass
-        return {"sandbox_id": sandbox_id, "url": url, "status": "running", "workflow_id": workflow_id}
-    except (ImportError, AttributeError):
-        out = await _quick_demo_via_rest_with_source(source)
-        out["workflow_id"] = workflow_id
-        return out
-
-
-async def _quick_demo_via_rest_with_source(source: dict[str, Any]) -> dict[str, Any]:
-    """Create sandbox via REST with given source."""
-    token = VERCEL_SANDBOX_TOKEN or os.environ.get("VERCEL_TOKEN", "").strip()
-    if not token:
-        raise HTTPException(status_code=503, detail="Quick demo not configured")
-    body: dict[str, Any] = {
-        "runtime": "node24",
-        "source": source,
-        "ports": [3000],
-        "timeout": 300000,
-    }
-    if VERCEL_PROJECT_ID:
-        body["projectId"] = VERCEL_PROJECT_ID
-    params = {"teamId": VERCEL_TEAM_ID} if VERCEL_TEAM_ID else None
-    async with httpx.AsyncClient(timeout=30) as client:
-        r = await client.post(
-            VERCEL_SANDBOX_API,
-            json=body,
-            params=params,
-            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-        )
-        if r.status_code != 200:
-            detail = (r.text[:500] or str(r.status_code)).strip()
-            msg = f"vercel_api_status={r.status_code}, body={detail}"
-            status = r.status_code if 400 <= r.status_code < 600 else 502
-            raise HTTPException(status_code=status, detail=msg)
-        data = r.json()
-        routes = data.get("routes") or []
-        sandbox = data.get("sandbox") or {}
-        url = routes[0].get("url") if routes else None
-        return {"sandbox_id": sandbox.get("id"), "url": url, "status": sandbox.get("status", "pending")}
-
-
-async def _quick_demo_via_rest(source: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Fallback: create sandbox via REST API when SDK is unavailable (e.g. Windows)."""
-    if source is None:
-        source_type = "tarball" if DEMO_SANDBOX_SOURCE_TYPE == "tarball" else "git"
-        source = {"type": source_type, "url": DEMO_SANDBOX_SOURCE_URL}
-    return await _quick_demo_via_rest_with_source(source)
+    out = await _quick_demo_via_docker_sandbox(tarball_url=tarball_url)
+    out["workflow_id"] = workflow_id
+    return out
 
 
 @app.get("/health")

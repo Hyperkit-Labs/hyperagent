@@ -8,7 +8,7 @@ export const WIZARD_KINDS = ["erc20", "erc721", "erc1155"] as const;
 export type WizardKind = (typeof WIZARD_KINDS)[number];
 
 const ALLOWED_OPTION_KEYS: Record<string, Set<string>> = {
-  erc20: new Set(["name", "symbol", "burnable", "mintable", "pausable", "permit", "votes", "flashMinting", "upgradeable"]),
+  erc20: new Set(["name", "symbol", "burnable", "mintable", "pausable", "permit", "votes", "flashMinting", "upgradeable", "premint", "initialSupply"]),
   erc721: new Set(["name", "symbol", "baseUri", "uri", "mintable", "burnable", "pausable", "permit", "votes", "upgradeable"]),
   erc1155: new Set(["name", "uri", "baseUri", "burnable", "pausable", "mintable", "supply", "upgradeable"]),
 };
@@ -35,10 +35,16 @@ export interface OzWizardOptions {
   flashMinting?: boolean;
   upgradeable?: boolean | string;
   supply?: boolean;
+  /** Initial supply minted to deployer in constructor (e.g. "1000000"). OZ wizard premint. */
+  premint?: string | number;
+  /** Alias for premint. */
+  initialSupply?: string | number;
   [key: string]: unknown;
 }
 
 function asErc20Opts(opts: OzWizardOptions): Parameters<typeof erc20.print>[0] {
+  const premintRaw = opts.premint ?? opts.initialSupply;
+  const premint = premintRaw != null ? String(premintRaw) : undefined;
   const o: Record<string, unknown> = {
     name: opts.name ?? "MyToken",
     symbol: opts.symbol ?? "MTK",
@@ -49,6 +55,7 @@ function asErc20Opts(opts: OzWizardOptions): Parameters<typeof erc20.print>[0] {
     votes: opts.votes ?? false,
     flashMinting: opts.flashMinting ?? false,
     upgradeable: typeof opts.upgradeable === "string" ? opts.upgradeable : (opts.upgradeable ?? false),
+    ...(premint != null && premint !== "" ? { premint } : {}),
   };
   return o as unknown as Parameters<typeof erc20.print>[0];
 }

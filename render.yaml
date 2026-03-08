@@ -8,17 +8,21 @@
 # Build filters: each service auto-deploys only when its paths change. Changes to docs/, .github/,
 # apps/studio, etc. do not trigger deploys. Add more paths if a service depends on shared packages.
 #
+# Build optimizations: pnpm --frozen-lockfile (deterministic, content-addressable store); pip --cache-dir
+# for Python (reuse cache when Render preserves workspace between builds).
+#
 services:
   - type: web
     name: hyperagent-api
     runtime: python
     plan: free
-    buildCommand: cd services/orchestrator && pip install -r requirements.txt && mkdir -p data && git clone --depth 1 --branch V6.0 https://github.com/sujeetc/SCRUBD data/SCRUBD
+    buildCommand: cd services/orchestrator && pip install --cache-dir .pip-cache -r requirements.txt && mkdir -p data && git clone --depth 1 --branch V6.0 https://github.com/sujeetc/SCRUBD data/SCRUBD
     startCommand: cd services/orchestrator && uvicorn main:app --host 0.0.0.0 --port ${PORT:-9000}
     healthCheckPath: /health
     buildFilter:
       paths:
         - services/orchestrator/**
+        - packages/**
         - infra/registries/**
     envVars:
       - key: DATABASE_URL
@@ -142,12 +146,13 @@ services:
     name: hyperagent-agent-runtime
     runtime: node
     plan: free
-    buildCommand: pnpm install && pnpm --filter hyperagent-agent-runtime... build
+    buildCommand: corepack enable pnpm && pnpm install --frozen-lockfile && pnpm --filter hyperagent-agent-runtime... build
     startCommand: cd services/agent-runtime && node build/index.js
     healthCheckPath: /health
     buildFilter:
       paths:
         - services/agent-runtime/**
+        - packages/**
     envVars:
       - key: NODE_ENV
         value: production
@@ -178,7 +183,7 @@ services:
     name: hyperagent-compile
     runtime: python
     plan: free
-    buildCommand: cd services/compile && pip install -r requirements.txt
+    buildCommand: cd services/compile && pip install --cache-dir .pip-cache -r requirements.txt
     startCommand: cd services/compile && uvicorn main:app --host 0.0.0.0 --port ${PORT:-9000}
     healthCheckPath: /health
     buildFilter:
@@ -196,7 +201,7 @@ services:
     name: hyperagent-audit
     runtime: python
     plan: free
-    buildCommand: cd services/audit && pip install -r requirements.txt
+    buildCommand: cd services/audit && pip install --cache-dir .pip-cache -r requirements.txt
     startCommand: cd services/audit && uvicorn main:app --host 0.0.0.0 --port ${PORT:-9000}
     healthCheckPath: /health
     buildFilter:
@@ -214,7 +219,7 @@ services:
     name: hyperagent-tools
     runtime: python
     plan: free
-    buildCommand: cd services/hyperagent-tools && pip install -r requirements.txt && python -c "import solcx; solcx.install_solc('0.8.24')"
+    buildCommand: cd services/hyperagent-tools && pip install --cache-dir .pip-cache -r requirements.txt && python -c "import solcx; solcx.install_solc('0.8.24')"
     startCommand: sh services/hyperagent-tools/start.sh
     healthCheckPath: /health
     buildFilter:
@@ -228,7 +233,7 @@ services:
     name: hyperagent-roma
     runtime: python
     plan: free
-    buildCommand: cd services/roma-service && pip install -r requirements.txt
+    buildCommand: cd services/roma-service && pip install --cache-dir .pip-cache -r requirements.txt
     startCommand: cd services/roma-service && uvicorn main:app --host 0.0.0.0 --port ${PORT:-9000}
     healthCheckPath: /health
     buildFilter:
@@ -250,7 +255,7 @@ services:
     name: hyperagent-vectordb
     runtime: python
     plan: free
-    buildCommand: cd services/vectordb && pip install -r requirements.txt
+    buildCommand: cd services/vectordb && pip install --cache-dir .pip-cache -r requirements.txt
     startCommand: cd services/vectordb && uvicorn main:app --host 0.0.0.0 --port ${PORT:-9000}
     healthCheckPath: /health
     buildFilter:
@@ -266,7 +271,7 @@ services:
     name: hyperagent-gateway
     runtime: node
     plan: free
-    buildCommand: pnpm install && pnpm --filter hyperagent-api-gateway run build
+    buildCommand: corepack enable pnpm && pnpm install --frozen-lockfile && pnpm --filter hyperagent-api-gateway run build
     startCommand: cd apps/api-gateway && node build/index.js
     healthCheckPath: /health
     buildFilter:

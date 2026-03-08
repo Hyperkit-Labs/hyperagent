@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import Link from "next/link";
 import { useConnectModal } from "thirdweb/react";
 import { Code, HardDrive, Package, Activity, Info, List, Rocket, GitBranch, ArrowRight, Loader2, ExternalLink } from "lucide-react";
@@ -10,9 +11,11 @@ import { createQuickDemo } from "@/lib/api";
 import { getThirdwebClient } from "@/lib/thirdwebClient";
 import { CONNECT_WALLETS } from "@/lib/connectWallets";
 import { useDashboardData } from "@/hooks/useDashboardData";
+import { useLogs } from "@/hooks/useLogs";
 import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist";
+import { Terminal } from "@/components/ai-elements";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
-import { MetricCard } from "@/components/ui";
+import { MetricCard, StatusBadge, LiveIndicator } from "@/components/ui";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
 
 export default function DashboardPage() {
@@ -30,6 +33,7 @@ export default function DashboardPage() {
     error: dashboardError,
     refetch: refetchDashboard,
   } = useDashboardData({ workflowsLimit: 10 });
+  const { logs: liveLogs } = useLogs({ autoRefresh: true, filters: { page_size: 5 } });
   const recentDeployments = deployments.slice(0, 5);
   const apiError = dashboardError;
   const refetchAll = refetchDashboard;
@@ -42,6 +46,32 @@ export default function DashboardPage() {
     metrics?.contracts?.verified ?? 0,
   ];
   const maxBar = Math.max(1, ...barValues);
+  const sparklineWorkflows = [
+    { value: Math.max(0, (metrics?.workflows?.total ?? 0) - 2) },
+    { value: Math.max(0, (metrics?.workflows?.completed ?? 0) - 1) },
+    { value: metrics?.workflows?.total ?? 0 },
+    { value: metrics?.workflows?.completed ?? 0 },
+    { value: workflowsTotal ?? workflows?.length ?? 0 },
+  ];
+  const sparklineDeployments = [
+    { value: Math.max(0, deployments.length - 3) },
+    { value: Math.max(0, deployments.length - 2) },
+    { value: Math.max(0, deployments.length - 1) },
+    { value: deployments.length },
+    { value: deployments.length },
+  ];
+  const hasActiveWorkflows = typeof metrics?.workflows?.active === "number" && metrics.workflows.active > 0;
+  const terminalLines = liveLogs.length > 0
+    ? liveLogs.slice(0, 5).map((entry: { message?: string; level?: string; timestamp?: string }) => ({
+        timestamp: entry.timestamp ?? "",
+        level: entry.level ?? "info",
+        message: entry.message ?? "",
+      }))
+    : recentDeployments.slice(0, 5).map((d) => ({
+        timestamp: "",
+        level: "info",
+        message: `${d.network ?? "?"} | ${d.status} | ${(d.contractAddress ?? "-").slice(0, 10)}...`,
+      }));
 
   return (
     <RequireApiSession title="Sign in to view dashboard" description="Sign in with your wallet to see workflows, deployments, and metrics.">
@@ -53,10 +83,15 @@ export default function DashboardPage() {
           onByokClick={() => router.push(ROUTES.SETTINGS)}
           onPaymentClick={() => router.push(ROUTES.PAYMENTS)}
           onTryItNowClick={async () => {
+            const w = workflows.find((w) => w.contracts && Object.keys(w.contracts).length > 0) ?? workflows[0];
+            if (!w?.workflow_id) {
+              setQuickDemoError("Create a workflow first to try the demo");
+              return;
+            }
             setQuickDemoLoading(true);
             setQuickDemoError(null);
             try {
-              const res = await createQuickDemo();
+              const res = await createQuickDemo(w.workflow_id);
               if (res.url) window.open(res.url, "_blank", "noopener,noreferrer");
               else setQuickDemoError("No sandbox URL returned");
             } catch (e) {
@@ -78,10 +113,15 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={async () => {
+                const w = workflows.find((w) => w.contracts && Object.keys(w.contracts).length > 0) ?? workflows[0];
+                if (!w?.workflow_id) {
+                  setQuickDemoError("Create a workflow first to try the demo");
+                  return;
+                }
                 setQuickDemoLoading(true);
                 setQuickDemoError(null);
                 try {
-                  const res = await createQuickDemo();
+                  const res = await createQuickDemo(w.workflow_id);
                   if (res.url) {
                     window.open(res.url, "_blank", "noopener,noreferrer");
                   } else {
@@ -93,7 +133,8 @@ export default function DashboardPage() {
                   setQuickDemoLoading(false);
                 }
               }}
-              disabled={quickDemoLoading}
+              disabled={quickDemoLoading || workflows.length === 0}
+              title={workflows.length === 0 ? "Create a workflow first" : undefined}
               className="px-4 py-2 rounded-lg border border-[var(--color-border-default)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] text-xs font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
             >
               {quickDemoLoading ? (
@@ -127,34 +168,81 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard
-            label="Workflows"
-            value={dashboardLoading ? "..." : (workflowsTotal ?? workflows?.length ?? 0)}
-            sublabel="Total in list"
-            icon={<div className="w-2 h-2 rounded-full bg-[var(--color-semantic-success)] shadow-[0_0_8px_var(--color-semantic-success)]" />}
-          />
-          <MetricCard
-            label="Deployments"
-            value={deployments.length}
-            sublabel="Active"
-            icon={<Code className="w-4 h-4 text-[var(--color-primary-mid)]" />}
-          />
-          <MetricCard
-            label="Metrics"
-            value={dashboardLoading ? "..." : (typeof metrics?.workflows?.total === "number" ? metrics.workflows.total : "-")}
-            sublabel="From API"
-            icon={<HardDrive className="w-4 h-4 text-[var(--color-semantic-violet)]" />}
-          />
-          <MetricCard
-            label="Status"
-            value={typeof metrics?.workflows?.active === "number" && metrics.workflows.active > 0 ? "Building" : "Idle"}
-            sublabel="Platform"
-            icon={<Package className="w-4 h-4 text-[var(--color-semantic-violet)]" />}
-          />
+          {[
+            {
+              label: "Workflows",
+              value: dashboardLoading ? "..." : (workflowsTotal ?? workflows?.length ?? 0),
+              sublabel: "Total in list",
+              icon: <div className="w-2 h-2 rounded-full bg-[var(--color-semantic-success)] shadow-[0_0_8px_var(--color-semantic-success)]" />,
+              sparkline: sparklineWorkflows,
+            },
+            {
+              label: "Deployments",
+              value: deployments.length,
+              sublabel: "Active",
+              icon: <Code className="w-4 h-4 text-[var(--color-primary-mid)]" />,
+              sparkline: sparklineDeployments,
+            },
+            {
+              label: "Metrics",
+              value: dashboardLoading ? "..." : (typeof metrics?.workflows?.total === "number" ? metrics.workflows.total : "-"),
+              sublabel: "From API",
+              icon: <HardDrive className="w-4 h-4 text-[var(--color-semantic-violet)]" />,
+            },
+            {
+              label: "Status",
+              value: hasActiveWorkflows ? "Building" : "Idle",
+              sublabel: "Platform",
+              icon: <Package className="w-4 h-4 text-[var(--color-semantic-violet)]" />,
+            },
+          ].map((card, i) => (
+            <motion.div
+              key={card.label}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, delay: i * 0.05 }}
+            >
+              <MetricCard label={card.label} value={card.value} sublabel={card.sublabel} icon={card.icon} sparklineData={"sparkline" in card ? card.sparkline : undefined} />
+            </motion.div>
+          ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="glass-panel rounded-xl p-5 lg:col-span-1 animate-enter delay-100 flex flex-col">
+        <motion.div
+          className="glass-panel rounded-xl overflow-hidden relative"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, delay: 0.1 }}
+        >
+          <LiveIndicator live={liveLogs.length > 0} />
+          <div className="p-4 border-b border-[var(--color-border-subtle)] flex items-center justify-between">
+            <div>
+              <h3 className="font-medium text-[var(--color-text-primary)] text-sm">Live Log Stream</h3>
+              <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">Recent activity from backend (5 most recent)</p>
+            </div>
+            <Link
+              href={ROUTES.MONITORING}
+              className="text-xs font-medium text-[var(--color-primary-light)] hover:text-[var(--color-primary)] transition-colors flex items-center gap-1"
+            >
+              See all <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <Terminal lines={terminalLines} noScroll className="rounded-none border-0" />
+        </motion.div>
+
+        <motion.div
+          className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+          initial="hidden"
+          animate="visible"
+          variants={{
+            visible: { transition: { staggerChildren: 0.08 } },
+            hidden: {},
+          }}
+        >
+          <motion.div
+            className="glass-panel rounded-xl p-5 lg:col-span-1 flex flex-col relative"
+            variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
+          >
+            <LiveIndicator live={hasActiveWorkflows} />
             <h3 className="font-medium text-[var(--color-text-primary)] mb-4 flex items-center gap-2 text-sm">
               <Info className="w-4 h-4 text-[var(--color-primary)]" />
               Project Details
@@ -175,9 +263,13 @@ export default function DashboardPage() {
                 <span className="text-[var(--color-text-primary)] text-xs font-medium">Dashboard</span>
               </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="glass-panel rounded-xl p-5 lg:col-span-2 animate-enter delay-100 flex flex-col h-[320px]">
+          <motion.div
+            className="glass-panel rounded-xl p-5 lg:col-span-2 flex flex-col h-[320px] relative"
+            variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
+          >
+            <LiveIndicator live={hasActiveWorkflows} />
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-medium text-[var(--color-text-primary)] flex items-center gap-2 text-sm">
                 <Activity className="w-4 h-4 text-[var(--color-primary)]" />
@@ -199,10 +291,15 @@ export default function DashboardPage() {
                 <span key={label} className="flex-1 min-w-0 text-center truncate" title={label}>{label}</span>
               ))}
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
-        <div className="glass-panel rounded-xl overflow-hidden animate-enter delay-200">
+        <motion.div
+          className="glass-panel rounded-xl overflow-hidden"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, delay: 0.2 }}
+        >
           <div className="p-5 border-b border-[var(--color-border-subtle)] flex items-center justify-between">
             <h3 className="font-medium text-[var(--color-text-primary)] flex items-center gap-2 text-sm">
               <List className="w-4 h-4 text-[var(--color-primary)]" />
@@ -244,9 +341,7 @@ export default function DashboardPage() {
                         <GitBranch className="w-3 h-3 text-[var(--color-text-dim)]" /> {d.network ?? "-"}
                       </td>
                       <td className="px-6 py-4">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-medium">
-                          <div className="w-1 h-1 rounded-full bg-emerald-400" /> {d.status}
-                        </span>
+                        <StatusBadge status={d.status} />
                       </td>
                       <td className="px-6 py-4 text-[var(--color-text-tertiary)] font-mono text-[10px] truncate max-w-[120px]">
                         {d.contractAddress ?? "-"}
@@ -257,7 +352,7 @@ export default function DashboardPage() {
               </tbody>
             </table>
           </div>
-        </div>
+        </motion.div>
       </div>
     </div>
     </RequireApiSession>

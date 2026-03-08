@@ -6,12 +6,11 @@ import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { PaymentHistoryTable } from "@/components/analytics/PaymentHistoryTable";
 import { SpendingTrends } from "@/components/analytics/SpendingTrends";
 import { SpendingControlCard } from "@/components/settings/SpendingControlCard";
-import { CreditsCard } from "@/components/settings/CreditsCard";
 import { PaymentTopUpCard } from "@/components/settings/PaymentTopUpCard";
 import { ROUTES } from "@/constants/routes";
-import { DollarSign, ArrowRight, CreditCard, TrendingUp } from "lucide-react";
+import { ArrowRight, TrendingUp } from "lucide-react";
 import { usePaymentsDashboard } from "@/hooks/usePaymentsDashboard";
-import { useConfig } from "@/components/providers/ConfigProvider";
+import { cn } from "@/lib/utils";
 
 type PaymentItem = {
   id: string;
@@ -55,10 +54,36 @@ function normalizeItem(item: {
   };
 }
 
+function PaymentsHeroMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "primary" | "neutral" | "warning";
+}) {
+  const accent =
+    tone === "primary"
+      ? "from-violet-500/70 to-indigo-400/70"
+      : tone === "warning"
+        ? "from-amber-400/70 to-orange-500/70"
+        : "from-slate-400/70 to-slate-500/70";
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-white/5 bg-slate-900/70 backdrop-blur-md px-4 py-3">
+      <div className={cn("absolute inset-0 opacity-30 bg-gradient-to-br", accent)} />
+      <div className="relative flex flex-col gap-1">
+        <span className="text-xs text-slate-400">{label}</span>
+        <span className="text-xl font-semibold tracking-tight text-slate-100">{value}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function PaymentsPage() {
   const [page, setPage] = useState(1);
   const pageSize = 20;
-  const { config } = useConfig();
 
   const { data, loading, error, refetch } = usePaymentsDashboard({
     page,
@@ -74,6 +99,12 @@ export default function PaymentsPage() {
     ? { balance: data.balance.balance ?? 0, currency: data.balance.currency ?? "USD" }
     : null;
   const stablecoins = data?.stablecoins ?? undefined;
+
+  const balanceValue = balance
+    ? `${balance.balance.toLocaleString()} ${balance.currency}`
+    : loading ? "..." : "0 USD";
+  const spendValue = loading ? "..." : `${summary.total ?? "0"} ${summary.currency ?? "USD"}`;
+  const budgetValue = loading ? "..." : `${control?.budget ?? "0"} ${control?.currency ?? "USD"}`;
 
   return (
     <div className="p-6 lg:p-8">
@@ -98,87 +129,63 @@ export default function PaymentsPage() {
 
         <ApiErrorBanner error={error} onRetry={refetch} />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="glass-panel rounded-xl p-5">
-            <CreditsCard
-              balanceFromParent={balance}
-              onRefetch={refetch}
-              creditsPerRun={config?.credits_per_run}
-            />
+        <div className="grid grid-cols-3 gap-3">
+          <PaymentsHeroMetric label="Balance" value={balanceValue} tone="primary" />
+          <PaymentsHeroMetric label="This period spend" value={spendValue} tone="neutral" />
+          <PaymentsHeroMetric label="Budget" value={budgetValue} tone="warning" />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)] gap-6">
+          <div className="space-y-6">
+            <div className="glass-panel rounded-xl p-5">
+              <h2 className="font-medium text-[var(--color-text-primary)] flex items-center gap-2 text-sm mb-4">
+                <TrendingUp className="w-4 h-4 text-[var(--color-primary)]" />
+                Payment history
+              </h2>
+              <PaymentHistoryTable
+                history={history}
+                page={page}
+                total={total}
+                pageSize={pageSize}
+                onPageChange={setPage}
+              />
+            </div>
+            {history.length > 0 && (
+              <div className="glass-panel rounded-xl p-5">
+                <h2 className="font-medium text-[var(--color-text-primary)] flex items-center gap-2 text-sm mb-4">
+                  Projected burn
+                </h2>
+                <SpendingTrends
+                  history={history.map((h) => ({
+                    timestamp: h.timestamp,
+                    amount: h.amount,
+                    merchant: h.merchant,
+                    network: h.network,
+                    status: h.status,
+                  }))}
+                />
+              </div>
+            )}
           </div>
-          <div className="glass-panel rounded-xl p-5">
-            <PaymentTopUpCard
-              stablecoinsFromParent={stablecoins}
-              onTopUpSuccess={refetch}
-            />
-          </div>
-          <div className="glass-panel rounded-xl p-5">
-            <div className="flex items-center gap-2 text-[var(--color-text-tertiary)] text-xs font-medium">
-              <DollarSign className="w-4 h-4" />
-              Total spent
+          <div className="space-y-6">
+            <div className="glass-panel rounded-xl p-5">
+              <h2 className="font-medium text-[var(--color-text-primary)] text-sm mb-4">Top up</h2>
+              <PaymentTopUpCard
+                stablecoinsFromParent={stablecoins}
+                onTopUpSuccess={refetch}
+              />
             </div>
-            <div className="text-2xl font-semibold text-[var(--color-text-primary)] mt-2">
-              {loading ? "..." : `${summary.total ?? "0"} ${summary.currency ?? "USD"}`}
-            </div>
-            <div className="text-[11px] text-[var(--color-text-dim)] mt-1">
-              {typeof summary.total_count === "number" ? summary.total_count : 0} payments
-            </div>
-          </div>
-          <div className="glass-panel rounded-xl p-5">
-            <div className="flex items-center gap-2 text-[var(--color-text-tertiary)] text-xs font-medium">
-              <CreditCard className="w-4 h-4" />
-              Budget
-            </div>
-            <div className="text-2xl font-semibold text-[var(--color-text-primary)] mt-2">
-              {loading ? "..." : `${control?.budget ?? "0"} ${control?.currency ?? "USD"}`}
-            </div>
-            <div className="text-[11px] text-[var(--color-text-dim)] mt-1">
-              per period
+            <div className="glass-panel rounded-xl p-5">
+              <h2 className="font-medium text-[var(--color-text-primary)] text-sm mb-4">
+                Spending controls
+              </h2>
+              <SpendingControlCard
+                controlFromParent={control}
+                onRefetch={refetch}
+              />
             </div>
           </div>
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 glass-panel rounded-xl p-5">
-            <h2 className="font-medium text-[var(--color-text-primary)] flex items-center gap-2 text-sm mb-4">
-              <TrendingUp className="w-4 h-4 text-[var(--color-primary)]" />
-              Payment history
-            </h2>
-            <PaymentHistoryTable
-              history={history}
-              page={page}
-              total={total}
-              pageSize={pageSize}
-              onPageChange={setPage}
-            />
-          </div>
-          <div className="glass-panel rounded-xl p-5">
-            <h2 className="font-medium text-[var(--color-text-primary)] flex items-center gap-2 text-sm mb-4">
-              Spending controls
-            </h2>
-            <SpendingControlCard
-              controlFromParent={control}
-              onRefetch={refetch}
-            />
-          </div>
-        </div>
-
-        {history.length > 0 && (
-          <div className="glass-panel rounded-xl p-5">
-            <h2 className="font-medium text-[var(--color-text-primary)] flex items-center gap-2 text-sm mb-4">
-              Spending trends
-            </h2>
-            <SpendingTrends
-              history={history.map((h) => ({
-                timestamp: h.timestamp,
-                amount: h.amount,
-                merchant: h.merchant,
-                network: h.network,
-                status: h.status,
-              }))}
-            />
-          </div>
-        )}
       </div>
     </div>
   );

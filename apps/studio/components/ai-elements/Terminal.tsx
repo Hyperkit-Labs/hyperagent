@@ -69,19 +69,19 @@ export function Terminal({ lines, onClear, noScroll = false, className = '' }: T
         {lines.map((entry, i) => (
           <div
             key={i}
-            className="flex items-center px-4 py-2.5 border-b border-[var(--color-border-subtle)] hover:bg-[var(--color-bg-panel)] transition-colors log-row"
+            className="flex items-start gap-3 px-4 py-3 border-b border-[var(--color-border-subtle)] hover:bg-[var(--color-bg-panel)] transition-colors log-row"
           >
             {entry.timestamp && (
-              <span className="text-[10px] text-[var(--color-text-muted)] font-mono w-24 shrink-0">
+              <span className="text-[10px] text-[var(--color-text-muted)] font-mono shrink-0 whitespace-nowrap">
                 {entry.timestamp}
               </span>
             )}
             {entry.level && (
-              <span className="text-[10px] px-2 py-0.5 rounded bg-[var(--color-border-subtle)] text-[var(--color-text-tertiary)] mr-2 shrink-0">
+              <span className="text-[10px] px-2 py-0.5 rounded bg-[var(--color-border-subtle)] text-[var(--color-text-tertiary)] shrink-0">
                 {entry.level}
               </span>
             )}
-            <span className="text-[var(--color-text-secondary)] truncate flex-1 min-w-0">
+            <span className="text-[var(--color-text-secondary)] text-xs font-mono break-words min-w-0 flex-1">
               {entry.message}
             </span>
           </div>

@@ -26,6 +26,7 @@ class AgentState(TypedDict, total=False):
     design_approved: bool
     design_rationale: str
     contracts: dict
+    test_files: dict
     framework: str
     audit_findings: list
     audit_passed: bool

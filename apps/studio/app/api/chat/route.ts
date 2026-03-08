@@ -181,6 +181,12 @@ async function callBackendWorkflow(
       const j = JSON.parse(text) as { detail?: string; error?: string };
       msg = j.detail ?? j.error ?? msg;
     } catch { /* keep */ }
+    if (res.status === 402) {
+      msg = msg.trim();
+      if (!msg.toLowerCase().includes('payments') && !msg.toLowerCase().includes('top up')) {
+        msg += ' Top up in Payments.';
+      }
+    }
     throw new Error(msg);
   }
   return res.json() as Promise<{ workflow_id: string }>;

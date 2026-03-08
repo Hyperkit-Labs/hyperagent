@@ -130,15 +130,40 @@ def _validate_critical_services() -> None:
         )
 
 
+# In-memory latency buffer for p95 measurement (last 1000 requests, excludes /health and streaming)
+_request_latencies: list[float] = []
+_LATENCY_BUFFER_SIZE = 1000
+
+
 @app.middleware("http")
 async def log_request_id(request: Request, call_next):
-    """Set and log x-request-id for trace correlation; downstream services receive it from gateway."""
+    """Set and log x-request-id for trace correlation; downstream services receive it from gateway.
+    Records request latency for p95 SLO measurement (excludes /health and streaming)."""
     rid = (request.headers.get("x-request-id") or request.headers.get("X-Request-Id") or "").strip() or None
     set_request_id(rid)
     if rid:
         logger.info("[orchestrator] request_id=%s path=%s", rid, request.url.path)
+    start = time.perf_counter()
     response = await call_next(request)
+    elapsed = time.perf_counter() - start
+    path = request.url.path or ""
+    if "/health" not in path and "/streaming/" not in path:
+        global _request_latencies
+        _request_latencies.append(elapsed)
+        if len(_request_latencies) > _LATENCY_BUFFER_SIZE:
+            _request_latencies = _request_latencies[-_LATENCY_BUFFER_SIZE:]
+    response.headers["X-Response-Time-Ms"] = f"{elapsed * 1000:.0f}"
     return response
+
+
+def _p95_latency_ms() -> float | None:
+    """Return p95 latency in ms from recent requests, or None if insufficient data."""
+    if len(_request_latencies) < 10:
+        return None
+    sorted_ = sorted(_request_latencies)
+    idx = int(len(sorted_) * 0.95) - 1
+    idx = max(0, idx)
+    return sorted_[idx] * 1000
 
 
 # ---------------------------------------------------------------------------
@@ -1989,9 +2014,14 @@ def _check_service_health(name: str, url: str, timeout: float = 2.0) -> dict[str
 
 @app.get("/api/v1/health/detailed")
 def health_detailed() -> dict[str, Any]:
-    """Detailed health for Studio. Includes Supabase, Redis, compile, simulation, deploy, tools, RAG."""
+    """Detailed health for Studio. Includes Supabase, Redis, compile, simulation, deploy, tools, RAG.
+    Includes p95_latency_ms for SLO monitoring (target: under 2000ms)."""
     versions = get_registry_versions()
     services: dict[str, Any] = {"orchestrator": {"status": "ok"}}
+    p95 = _p95_latency_ms()
+    if p95 is not None:
+        services["orchestrator"]["p95_latency_ms"] = round(p95, 0)
+        services["orchestrator"]["slo_ok"] = p95 < 2000
     services["supabase"] = _check_supabase_health()
     services["redis"] = _check_redis_health()
     services["compile"] = _check_service_health("compile", COMPILE_SERVICE_URL)

@@ -108,6 +108,11 @@ spec:
       allowedInClosedBeta: false
       source: custom
       defaultChains: [1187947933, 324705682]
+      oracle:
+        default: chainlink
+        priceFeeds:
+          ETH_USD: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
+          BTC_USD: "0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c"
     - id: marketplace-nft
       name: NFT Marketplace
       standards: ["ERC721", "custom"]

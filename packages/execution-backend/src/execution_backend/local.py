@@ -5,7 +5,7 @@ from typing import Any
 
 import httpx
 
-from .protocol import AuditResult, CompileResult, ExploitSimResult
+from .protocol import AuditResult, CompileResult, ExploitSimResult, GasBenchmarkResult
 
 COMPILE_SERVICE_URL = os.environ.get("COMPILE_SERVICE_URL", "http://localhost:8004").rstrip("/")
 AUDIT_SERVICE_URL = os.environ.get("AUDIT_SERVICE_URL", "http://localhost:8001").rstrip("/")
@@ -110,3 +110,12 @@ class LocalBackend:
     ) -> ExploitSimResult:
         """Exploit sim: placeholder; returns passed with empty findings."""
         return ExploitSimResult(passed=True, findings=[])
+
+    async def run_gas_benchmark(
+        self,
+        contract_code: str,
+        contract_name: str,
+        configs: list[dict[str, Any]] | None = None,
+    ) -> GasBenchmarkResult:
+        """Gas benchmark: not implemented for LocalBackend; returns default score."""
+        return GasBenchmarkResult(score=0.0, configs=[], bytecode_sizes=[])

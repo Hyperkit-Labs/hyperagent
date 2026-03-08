@@ -233,18 +233,25 @@ export default function DashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25, delay: 0.1 }}
         >
-          <LiveIndicator live={liveLogs.length > 0} />
-          <div className="p-4 border-b border-[var(--color-border-subtle)] flex items-center justify-between">
+          <div className="p-4 border-b border-[var(--color-border-subtle)] flex items-center justify-between gap-4">
             <div>
               <h3 className="font-medium text-[var(--color-text-primary)] text-sm">Live Log Stream</h3>
               <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">Recent activity from backend (5 most recent)</p>
             </div>
-            <Link
-              href={ROUTES.MONITORING}
-              className="text-xs font-medium text-[var(--color-primary-light)] hover:text-[var(--color-primary)] transition-colors flex items-center gap-1"
-            >
-              See all <ArrowRight className="w-3 h-3" />
-            </Link>
+            <div className="flex items-center gap-4 shrink-0">
+              {liveLogs.length > 0 && (
+                <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Live
+                </span>
+              )}
+              <Link
+                href={ROUTES.MONITORING}
+                className="text-xs font-medium text-[var(--color-primary-light)] hover:text-[var(--color-primary)] transition-colors flex items-center gap-1"
+              >
+                See all <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
           </div>
           <Terminal lines={terminalLines} noScroll className="rounded-none border-0" />
         </motion.div>

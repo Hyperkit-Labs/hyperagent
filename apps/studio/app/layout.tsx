@@ -4,6 +4,7 @@ import "./globals.css";
 import { ApiAuthProvider } from "@/components/providers/ApiAuthProvider";
 import { ConfigProvider } from "@/components/providers/ConfigProvider";
 import { LayoutProvider } from "@/components/providers/LayoutProvider";
+import { NetworksProvider } from "@/components/providers/NetworksProvider";
 import { PipelineStateProvider } from "@/components/providers/PipelineStateProvider";
 import { ThirdwebProviderWrapper } from "@/components/providers/ThirdwebProviderWrapper";
 import { Toaster } from "sonner";
@@ -38,11 +39,13 @@ export default function RootLayout({
           <ConfigProvider>
           <ThirdwebProviderWrapper>
             <ApiAuthProvider>
-              <PipelineStateProvider>
-                <LayoutProvider>
-                  <LayoutSwitcher>{children}</LayoutSwitcher>
-                </LayoutProvider>
-              </PipelineStateProvider>
+              <NetworksProvider>
+                <PipelineStateProvider>
+                  <LayoutProvider>
+                    <LayoutSwitcher>{children}</LayoutSwitcher>
+                  </LayoutProvider>
+                </PipelineStateProvider>
+              </NetworksProvider>
               <Toaster position="top-right" richColors />
             </ApiAuthProvider>
           </ThirdwebProviderWrapper>

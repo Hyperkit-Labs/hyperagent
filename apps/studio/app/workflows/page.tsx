@@ -168,6 +168,7 @@ export default function WorkflowsPage() {
             icon={<ArrowRightLeft className="w-8 h-8 text-[var(--color-text-muted)]" />}
             title={search.trim() ? "No matching projects" : "No projects yet"}
             description={search.trim() ? `No projects match "${search.trim()}". Try a different search or clear the filter.` : "Create your first project from the chat. Describe your smart contract and we will generate it."}
+            suggestions={search.trim() ? undefined : ["Deploy an ERC20 token", "Create a simple NFT contract"]}
             action={
               <Link
                 href={ROUTES.CHAT}

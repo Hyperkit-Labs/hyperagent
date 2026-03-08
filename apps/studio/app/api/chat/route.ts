@@ -16,6 +16,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { jwtVerify } from 'jose';
 import { getApiBase } from '@/lib/api';
+import { validateInput as guardrailValidateInput } from '@/lib/input-guardrail';
 import { FALLBACK_DEFAULT_NETWORK_ID } from '@/constants/defaults';
 
 export const maxDuration = 60;
@@ -225,6 +226,14 @@ export async function POST(req: Request) {
   if (content.length > MAX_MESSAGE_LENGTH) {
     return new Response(
       JSON.stringify({ error: `Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters.` }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
+
+  const guardrail = guardrailValidateInput(content);
+  if (!guardrail.passed) {
+    return new Response(
+      JSON.stringify({ error: guardrail.violation ?? 'Security policy violation' }),
       { status: 400, headers: { 'Content-Type': 'application/json' } },
     );
   }

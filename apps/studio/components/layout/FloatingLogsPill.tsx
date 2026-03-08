@@ -23,7 +23,7 @@ export function FloatingLogsPill() {
       <motion.button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--color-bg-panel)] border border-[var(--color-border-subtle)] shadow-lg hover:bg-[var(--color-bg-hover)] transition-colors"
+        className="absolute bottom-6 right-6 z-40 flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--color-bg-panel)] border border-[var(--color-border-subtle)] shadow-lg hover:bg-[var(--color-bg-hover)] transition-colors"
         aria-label={expanded ? "Collapse logs" : "Expand logs"}
         initial={false}
       >
@@ -47,7 +47,7 @@ export function FloatingLogsPill() {
             animate={{ height: 320, opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="fixed bottom-16 right-6 z-40 w-[min(400px,calc(100vw-48px))] overflow-hidden rounded-t-xl border border-b-0 border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] shadow-2xl"
+            className="absolute bottom-16 right-6 z-40 w-[min(400px,calc(100vw-48px))] overflow-hidden rounded-t-xl border border-b-0 border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] shadow-2xl"
           >
             <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)]">
               <div className="flex items-center gap-2">

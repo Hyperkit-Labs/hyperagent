@@ -293,3 +293,5 @@ services:
         sync: false
       - key: RATE_LIMIT_MAX_USER
         sync: false
+      - key: RATE_LIMIT_MULTIPLIER
+        sync: false

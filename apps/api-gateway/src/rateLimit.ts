@@ -14,21 +14,27 @@ const NODE_ENV = process.env.NODE_ENV || "development";
 /** When true, allow requests through when Redis is unreachable (skip rate limit). Use for local/staging when Redis is unavailable. */
 const RATE_LIMIT_BYPASS_ON_FAIL = process.env.RATE_LIMIT_BYPASS_ON_FAIL === "true";
 const RATE_LIMIT_WINDOW_SEC = Number(process.env.RATE_LIMIT_WINDOW_SEC) || 60;
-const RATE_LIMIT_MAX_IP = Number(process.env.RATE_LIMIT_MAX_IP) || 300;
-const RATE_LIMIT_MAX_USER = Number(process.env.RATE_LIMIT_MAX_USER) || 500;
+/** Multiplier applied to all rate limits. Use 2 to double limits, 0.5 to halve. Default 1. */
+const RATE_LIMIT_MULTIPLIER = Math.max(0.1, Number(process.env.RATE_LIMIT_MULTIPLIER) || 1);
+
+const RATE_LIMIT_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_MAX_IP) || 300) * RATE_LIMIT_MULTIPLIER);
+const RATE_LIMIT_MAX_USER = Math.round((Number(process.env.RATE_LIMIT_MAX_USER) || 500) * RATE_LIMIT_MULTIPLIER);
 
 /** Stricter limit for POST llm-keys to prevent key-stuffing attacks. Window 60s. */
 const LLM_KEYS_PATH = "/api/v1/workspaces/current/llm-keys";
-const RATE_LIMIT_LLM_KEYS_MAX_IP = Number(process.env.RATE_LIMIT_LLM_KEYS_MAX_IP) || 10;
-const RATE_LIMIT_LLM_KEYS_MAX_USER = Number(process.env.RATE_LIMIT_LLM_KEYS_MAX_USER) || 5;
+const RATE_LIMIT_LLM_KEYS_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_LLM_KEYS_MAX_IP) || 10) * RATE_LIMIT_MULTIPLIER);
+const RATE_LIMIT_LLM_KEYS_MAX_USER = Math.round((Number(process.env.RATE_LIMIT_LLM_KEYS_MAX_USER) || 5) * RATE_LIMIT_MULTIPLIER);
 
 /** Stricter limit for workflow run start (POST /api/v1/workflows/generate). */
-const RATE_LIMIT_WORKFLOW_GENERATE_MAX_IP = Number(process.env.RATE_LIMIT_WORKFLOW_GENERATE_MAX_IP) || 20;
-const RATE_LIMIT_WORKFLOW_GENERATE_MAX_USER = Number(process.env.RATE_LIMIT_WORKFLOW_GENERATE_MAX_USER) || 30;
+const RATE_LIMIT_WORKFLOW_GENERATE_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_WORKFLOW_GENERATE_MAX_IP) || 20) * RATE_LIMIT_MULTIPLIER);
+const RATE_LIMIT_WORKFLOW_GENERATE_MAX_USER = Math.round((Number(process.env.RATE_LIMIT_WORKFLOW_GENERATE_MAX_USER) || 30) * RATE_LIMIT_MULTIPLIER);
 
 /** Stricter limit for deploy prepare (POST /api/v1/workflows/:id/deploy/prepare). */
-const RATE_LIMIT_DEPLOY_PREPARE_MAX_IP = Number(process.env.RATE_LIMIT_DEPLOY_PREPARE_MAX_IP) || 30;
-const RATE_LIMIT_DEPLOY_PREPARE_MAX_USER = Number(process.env.RATE_LIMIT_DEPLOY_PREPARE_MAX_USER) || 50;
+const RATE_LIMIT_DEPLOY_PREPARE_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_DEPLOY_PREPARE_MAX_IP) || 30) * RATE_LIMIT_MULTIPLIER);
+const RATE_LIMIT_DEPLOY_PREPARE_MAX_USER = Math.round((Number(process.env.RATE_LIMIT_DEPLOY_PREPARE_MAX_USER) || 50) * RATE_LIMIT_MULTIPLIER);
+
+/** Lightweight reads (GET /config, /networks, /tokens/stablecoins). Higher limit; these are read-only and frequently polled. */
+const RATE_LIMIT_LIGHT_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_LIGHT_MAX_IP) || 1000) * RATE_LIMIT_MULTIPLIER);
 
 /** After Redis failure, skip reconnects for this many ms to avoid log spam. */
 const REDIS_BACKOFF_MS = 60_000;
@@ -131,7 +137,7 @@ export async function rateLimitMiddleware(
     (req.path === "/api/v1/config" || req.path === "/api/v1/networks" || req.path === "/api/v1/tokens/stablecoins");
   if (isLightweightRead) {
     const lightKey = `rl:ip:${(req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown"}:light`;
-    const lightOk = await checkLimit(lightKey, 500, RATE_LIMIT_WINDOW_SEC);
+    const lightOk = await checkLimit(lightKey, RATE_LIMIT_LIGHT_MAX_IP, RATE_LIMIT_WINDOW_SEC);
     if (!lightOk) {
       logSecurityEvent("rate_limit_light", 429, req.path, req.requestId, req.userId);
       res.setHeader("Retry-After", String(RATE_LIMIT_WINDOW_SEC));

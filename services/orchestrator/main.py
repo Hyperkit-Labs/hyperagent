@@ -1931,7 +1931,10 @@ async def quick_demo_api(request: Request, body: QuickDemoBody | None = None) ->
         raise
     except Exception as e:
         logger.exception("[quick-demo] %s", e)
-        raise HTTPException(status_code=502, detail=str(e)[:200])
+        detail = str(e)[:400]
+        if hasattr(e, "response") and getattr(e.response, "status_code", None):
+            detail = f"vercel_status={e.response.status_code}, {detail}"
+        raise HTTPException(status_code=502, detail=detail)
 
 
 @app.post("/api/v1/workflows/{workflow_id}/debug-sandbox")
@@ -1997,7 +2000,10 @@ async def _quick_demo_via_rest_with_source(source: dict[str, Any]) -> dict[str, 
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
         )
         if r.status_code != 200:
-            raise HTTPException(status_code=502, detail=r.text[:500] or str(r.status_code))
+            detail = (r.text[:500] or str(r.status_code)).strip()
+            msg = f"vercel_api_status={r.status_code}, body={detail}"
+            status = r.status_code if 400 <= r.status_code < 600 else 502
+            raise HTTPException(status_code=status, detail=msg)
         data = r.json()
         routes = data.get("routes") or []
         sandbox = data.get("sandbox") or {}

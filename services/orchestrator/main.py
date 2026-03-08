@@ -20,6 +20,7 @@ def _log_byok_event(event: str, user_id: str, action: str) -> None:
 import httpx
 import io
 import tarfile
+import zipfile
 
 from fastapi import BackgroundTasks, Body, FastAPI, HTTPException, Header, Request
 from fastapi.responses import Response, StreamingResponse
@@ -693,15 +694,339 @@ async def generate_workflow_ui_schema_api(workflow_id: str, request: Request = N
 
 
 class UiAppExportBody(BaseModel):
-    template: str = "hyperagent-default"
+    template: str = Field(default="viem-wagmi", description="viem-wagmi (default) or hyperagent-default")
+    include_deploy_scripts: bool = Field(default=True, description="Include deployment scripts when contract source available")
+
+
+def _extract_erc20_constructor_args(w: dict[str, Any]) -> list[Any]:
+    """Extract constructor args (name, symbol, initialSupply) from wizard_options or spec for ERC20.
+    Returns list suitable for viem deployContract: [name, symbol] or [name, symbol, initialSupply]."""
+    opts = (w.get("oz_wizard_options") or {}).copy()
+    spec_wo = (w.get("spec") or {}).get("wizard_options")
+    if isinstance(spec_wo, dict):
+        opts.update(spec_wo)
+    name = opts.get("name") or "MyToken"
+    symbol = opts.get("symbol") or "MTK"
+    premint = opts.get("premint") or opts.get("initialSupply")
+    if premint is not None and str(premint).strip() != "":
+        try:
+            supply = int(str(premint).replace(",", ""))
+            if supply > 0:
+                return [str(name), str(symbol), supply]
+        except (ValueError, TypeError):
+            pass
+    return [str(name), str(symbol)]
+
+
+def _build_viem_wagmi_zip(
+    zf: "zipfile.ZipFile",
+    schema: dict[str, Any],
+    app_name: str,
+    chain_id: int,
+    contract_addr: str,
+    abi: list,
+    read_actions: list,
+    write_actions: list,
+    rpc_url: str,
+    explorer_url: str,
+    chain_name: str,
+) -> list[str]:
+    """Add viem + wagmi Next.js scaffold to zip. Returns list of file paths written."""
+    files_written: list[str] = []
+    abi_json = json.dumps(abi)
+
+    deps = {
+        "next": "14.2.0",
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0",
+        "viem": "^2.21.0",
+        "wagmi": "^2.12.0",
+        "@tanstack/react-query": "^5.59.0",
+        "@wagmi/core": "^2.12.0",
+        "tailwindcss": "^3.4.0",
+    }
+    zf.writestr("package.json", json.dumps({
+        "name": app_name,
+        "version": "0.1.0",
+        "private": True,
+        "scripts": {"dev": "next dev", "build": "next build", "start": "next start"},
+        "dependencies": deps,
+        "devDependencies": {"typescript": "^5.0.0", "@types/react": "^18.2.0", "@types/node": "^20.0.0"},
+    }, indent=2))
+    files_written.append("package.json")
+
+    zf.writestr("tsconfig.json", json.dumps({
+        "compilerOptions": {
+            "target": "es2017",
+            "lib": ["dom", "es2017"],
+            "jsx": "preserve",
+            "module": "esnext",
+            "moduleResolution": "bundler",
+            "strict": True,
+            "esModuleInterop": True,
+            "skipLibCheck": True,
+            "forceConsistentCasingInFileNames": True,
+            "resolveJsonModule": True,
+            "isolatedModules": True,
+            "noEmit": True,
+            "incremental": True,
+            "paths": {"@/*": ["./src/*"]},
+        },
+        "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+        "exclude": ["node_modules"],
+    }, indent=2))
+    files_written.append("tsconfig.json")
+
+    zf.writestr("tailwind.config.ts", 'import type { Config } from "tailwindcss";\nconst config: Config = { content: ["./src/**/*.{ts,tsx}"], theme: { extend: {} }, plugins: [] };\nexport default config;\n')
+    zf.writestr("next.config.mjs", '/** @type {import("next").NextConfig} */\nconst nextConfig = {};\nexport default nextConfig;\n')
+    files_written.extend(["tailwind.config.ts", "next.config.mjs"])
+
+    zf.writestr("src/lib/contract.ts", f'''export const CONTRACT_ADDRESS = "{contract_addr}" as const;
+export const CHAIN_ID = {chain_id};
+export const RPC_URL = "{rpc_url.replace('"', '\\"')}";
+export const EXPLORER_URL = "{explorer_url.rstrip("/").replace('"', '\\"')}";
+export const ABI = {abi_json} as const;
+''')
+    files_written.append("src/lib/contract.ts")
+
+    zf.writestr("src/lib/wagmi.ts", f'''import {{ http, createConfig }} from "wagmi";
+import {{ injected }} from "wagmi/connectors";
+import {{ CHAIN_ID, RPC_URL }} from "./contract";
+
+export const config = createConfig({{
+  chains: [{{
+    id: CHAIN_ID,
+    name: "{chain_name.replace('"', '\\"')}",
+    nativeCurrency: {{ decimals: 18, name: "ETH", symbol: "ETH" }},
+    rpcUrls: {{ default: {{ http: [RPC_URL] }} }},
+    blockExplorers: {{ default: {{ url: "{explorer_url.rstrip("/").replace('"', '\\"')}" }} }},
+  }}],
+  connectors: [injected()],
+  transports: {{
+    [CHAIN_ID]: http(RPC_URL),
+  }},
+}});
+''')
+    files_written.append("src/lib/wagmi.ts")
+
+    read_cards = []
+    for a in read_actions[:6]:
+        params = a.get("params") or []
+        if a["fn"] == "balanceOf" and len(params) >= 1:
+            read_cards.append(f'''        <div className="p-4 bg-zinc-800/80 rounded-lg border border-zinc-700">
+          <span className="text-zinc-400 text-sm">{a.get("label", a["fn"])}</span>
+          <div className="text-white font-mono mt-1">
+            {{balanceOfResult?.data !== undefined ? formatUnits(balanceOfResult.data as bigint, decimalsResult?.data ?? 18) : "-"}}
+          </div>
+        </div>''')
+        elif a["fn"] == "totalSupply":
+            read_cards.append(f'''        <div className="p-4 bg-zinc-800/80 rounded-lg border border-zinc-700">
+          <span className="text-zinc-400 text-sm">{a.get("label", a["fn"])}</span>
+          <div className="text-white font-mono mt-1">
+            {{totalSupplyResult?.data !== undefined ? formatUnits(totalSupplyResult.data as bigint, decimalsResult?.data ?? 18) : "-"}}
+          </div>
+        </div>''')
+        elif a["fn"] in ("name", "symbol", "decimals"):
+            v = a["fn"] + "Result"
+            read_cards.append(f'''        <div className="p-4 bg-zinc-800/80 rounded-lg border border-zinc-700">
+          <span className="text-zinc-400 text-sm">{a.get("label", a["fn"])}</span>
+          <div className="text-white font-mono mt-1">{{{v}?.data ?? "-"}}</div>
+        </div>''')
+
+    write_forms = []
+    for a in write_actions[:6]:
+        params = a.get("params") or []
+        if a["fn"] == "mint" and len(params) >= 2:
+            write_forms.append(f'''        <div className="p-4 bg-zinc-800/50 rounded-lg border border-zinc-700 space-y-2">
+          <h3 className="text-sm font-medium text-zinc-300">{a.get("label", a["fn"])}</h3>
+          <input placeholder="Recipient address" value={{mintTo}} onChange={{e => setMintTo(e.target.value)}} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm text-white" />
+          <input placeholder="Amount" value={{mintAmount}} onChange={{e => setMintAmount(e.target.value)}} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm text-white" />
+          <button onClick={{() => writeMint()}} disabled={{isMintPending}} className="px-4 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 text-sm">
+            {{isMintPending ? "Pending..." : "Mint"}}
+          </button>
+          {{mintTxHash && <a href="{{EXPLORER_URL}}/tx/{{mintTxHash}}" target="_blank" rel="noopener noreferrer" className="text-xs text-sky-400 block mt-1">View tx</a>}}
+        </div>''')
+        elif a["fn"] == "burn" and len(params) >= 1:
+            write_forms.append(f'''        <div className="p-4 bg-zinc-800/50 rounded-lg border border-zinc-700 space-y-2">
+          <h3 className="text-sm font-medium text-zinc-300">{a.get("label", a["fn"])}</h3>
+          <input placeholder="Amount" value={{burnAmount}} onChange={{e => setBurnAmount(e.target.value)}} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm text-white" />
+          <button onClick={{() => writeBurn()}} disabled={{isBurnPending}} className="px-4 py-2 rounded bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50 text-sm">
+            {{isBurnPending ? "Pending..." : "Burn"}}
+          </button>
+          {{burnTxHash && <a href="{{EXPLORER_URL}}/tx/{{burnTxHash}}" target="_blank" rel="noopener noreferrer" className="text-xs text-sky-400 block mt-1">View tx</a>}}
+        </div>''')
+        elif a["fn"] == "transfer" and len(params) >= 2:
+            write_forms.append(f'''        <div className="p-4 bg-zinc-800/50 rounded-lg border border-zinc-700 space-y-2">
+          <h3 className="text-sm font-medium text-zinc-300">{a.get("label", a["fn"])}</h3>
+          <input placeholder="To address" value={{transferTo}} onChange={{e => setTransferTo(e.target.value)}} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm text-white" />
+          <input placeholder="Amount" value={{transferAmount}} onChange={{e => setTransferAmount(e.target.value)}} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm text-white" />
+          <button onClick={{() => writeTransfer()}} disabled={{isTransferPending}} className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 text-sm">
+            {{isTransferPending ? "Pending..." : "Transfer"}}
+          </button>
+          {{transferTxHash && <a href="{{EXPLORER_URL}}/tx/{{transferTxHash}}" target="_blank" rel="noopener noreferrer" className="text-xs text-sky-400 block mt-1">View tx</a>}}
+        </div>''')
+
+    page_content = f'''"use client";
+
+import {{ useState }} from "react";
+import {{ WagmiProvider, useAccount, useConnect, useReadContract, useWriteContract }} from "wagmi";
+import {{ QueryClient, QueryClientProvider }} from "@tanstack/react-query";
+import {{ formatUnits }} from "viem";
+import {{ config }} from "@/lib/wagmi";
+import {{ CONTRACT_ADDRESS, ABI, EXPLORER_URL }} from "@/lib/contract";
+
+const queryClient = new QueryClient();
+
+function AppContent() {{
+  const {{ address, isConnected }} = useAccount();
+  const {{ connect, connectors, isPending: isConnectPending }} = useConnect();
+  const [mintTo, setMintTo] = useState("");
+  const [mintAmount, setMintAmount] = useState("");
+  const [burnAmount, setBurnAmount] = useState("");
+  const [transferTo, setTransferTo] = useState("");
+  const [transferAmount, setTransferAmount] = useState("");
+  const [mintTxHash, setMintTxHash] = useState<string | null>(null);
+  const [burnTxHash, setBurnTxHash] = useState<string | null>(null);
+  const [transferTxHash, setTransferTxHash] = useState<string | null>(null);
+
+  const {{ data: balanceOfResult }} = useReadContract({{
+    address: CONTRACT_ADDRESS,
+    abi: ABI,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+  }});
+  const {{ data: totalSupplyResult }} = useReadContract({{
+    address: CONTRACT_ADDRESS,
+    abi: ABI,
+    functionName: "totalSupply",
+  }});
+  const {{ data: decimalsResult }} = useReadContract({{
+    address: CONTRACT_ADDRESS,
+    abi: ABI,
+    functionName: "decimals",
+  }});
+  const {{ data: nameResult }} = useReadContract({{
+    address: CONTRACT_ADDRESS,
+    abi: ABI,
+    functionName: "name",
+  }});
+  const {{ data: symbolResult }} = useReadContract({{
+    address: CONTRACT_ADDRESS,
+    abi: ABI,
+    functionName: "symbol",
+  }});
+
+  const {{ writeContract: writeMintFn, isPending: isMintPending }} = useWriteContract({{
+    mutation: {{ onSuccess: (data) => setMintTxHash(data) }},
+  }});
+  const {{ writeContract: writeBurnFn, isPending: isBurnPending }} = useWriteContract({{
+    mutation: {{ onSuccess: (data) => setBurnTxHash(data) }},
+  }});
+  const {{ writeContract: writeTransferFn, isPending: isTransferPending }} = useWriteContract({{
+    mutation: {{ onSuccess: (data) => setTransferTxHash(data) }},
+  }});
+
+  const writeMint = () => {{
+    if (!mintTo || !mintAmount) return;
+    const decimals = Number(decimalsResult ?? 18);
+    const amount = BigInt(parseFloat(mintAmount) * 10 ** decimals);
+    writeMintFn({{ address: CONTRACT_ADDRESS, abi: ABI, functionName: "mint", args: [mintTo as `0x${{string}}`, amount] }});
+  }};
+  const writeBurn = () => {{
+    if (!burnAmount) return;
+    const decimals = Number(decimalsResult ?? 18);
+    const amount = BigInt(parseFloat(burnAmount) * 10 ** decimals);
+    writeBurnFn({{ address: CONTRACT_ADDRESS, abi: ABI, functionName: "burn", args: [amount] }});
+  }};
+  const writeTransfer = () => {{
+    if (!transferTo || !transferAmount) return;
+    const decimals = Number(decimalsResult ?? 18);
+    const amount = BigInt(parseFloat(transferAmount) * 10 ** decimals);
+    writeTransferFn({{ address: CONTRACT_ADDRESS, abi: ABI, functionName: "transfer", args: [transferTo as `0x${{string}}`, amount] }});
+  }};
+
+  return (
+    <main className="min-h-screen bg-zinc-950 text-white p-8">
+      <div className="max-w-2xl mx-auto space-y-6">
+        <h1 className="text-2xl font-bold">{{nameResult ?? schema.get("name", "dApp")}}</h1>
+        <p className="text-zinc-400 text-sm">
+          Contract: <code className="text-xs">{{CONTRACT_ADDRESS}}</code> on {chain_name}
+        </p>
+        {{!isConnected ? (
+          <button onClick={{() => connect({{ connector: connectors[0] }})}} disabled={{isConnectPending}} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
+            {{isConnectPending ? "Connecting..." : "Connect MetaMask"}}
+          </button>
+        ) : (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+{"\\n".join(read_cards)}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+{"\\n".join(write_forms) if write_forms else "              <p className=\"text-zinc-500 text-sm\">No write actions in ABI.</p>"}
+            </div>
+          </div>
+        )}}
+      </div>
+    </main>
+  );
+}}
+
+export default function Home() {{
+  return (
+    <WagmiProvider config={{config}}>
+      <QueryClientProvider client={{queryClient}}>
+        <AppContent />
+      </QueryClientProvider>
+    </WagmiProvider>
+  );
+}}
+'''
+    page_content = page_content.replace("schema.get(\"name\", \"dApp\")", json.dumps(schema.get("name", "dApp")))
+    zf.writestr("src/app/page.tsx", page_content)
+    files_written.append("src/app/page.tsx")
+
+    zf.writestr("src/app/layout.tsx", f'''import type {{ Metadata }} from "next";
+import "./globals.css";
+
+export const metadata: Metadata = {{ title: "{schema.get("name", "dApp").replace('"', '\\"')}", description: "Generated by HyperAgent" }};
+
+export default function RootLayout({{ children }}: {{ children: React.ReactNode }}) {{
+  return <html lang="en"><body>{{children}}</body></html>;
+}}
+''')
+    zf.writestr("src/app/globals.css", "@tailwind base;\\n@tailwind components;\\n@tailwind utilities;\\n")
+    files_written.extend(["src/app/layout.tsx", "src/app/globals.css"])
+
+    readme = f"""# {schema.get('name', 'dApp')}
+
+Generated by HyperAgent. Full React/Next.js dApp with viem + wagmi.
+
+## Setup
+
+```bash
+npm install
+npm run dev
+```
+
+Open http://localhost:3000
+
+## Contract
+
+- Address: `{contract_addr}`
+- Chain: {chain_name} (ID: {chain_id})
+- Explorer: {explorer_url}
+"""
+    zf.writestr("README.md", readme)
+    files_written.append("README.md")
+
+    return files_written
 
 
 @app.post("/api/v1/workflows/{workflow_id}/ui-apps/export")
 def export_ui_app_api(workflow_id: str, body: UiAppExportBody | None = None, request: Request = None) -> dict[str, Any]:
     """Export dApp as zip: full React/Next.js scaffold with contract integration. Returns zip_base64 and filename."""
     import base64
-    import zipfile
-    import io
+
     w = get_workflow(workflow_id)
     if not w:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -710,7 +1035,8 @@ def export_ui_app_api(workflow_id: str, body: UiAppExportBody | None = None, req
     schema = w.get("ui_schema")
     if not schema:
         raise HTTPException(status_code=400, detail="Generate UI schema first (POST /ui-schema/generate)")
-    template = (body.template if body else "hyperagent-default") or "hyperagent-default"
+    template = (body.template if body else "viem-wagmi") or "viem-wagmi"
+    include_deploy = (body.include_deploy_scripts if body else True)
     app_name = _sanitize_name(schema.get("name") or "dapp").lower().replace(" ", "-")
     chain_id = schema.get("chainId") or get_default_chain_id()
     contract_addr = schema.get("contractAddress", "")
@@ -724,40 +1050,134 @@ def export_ui_app_api(workflow_id: str, body: UiAppExportBody | None = None, req
     actions = raw_actions
     read_actions = [a for a in actions if a.get("kind") == "read"]
     write_actions = [a for a in actions if a.get("kind") == "write"]
+
+    rpc_explorer = get_chain_rpc_explorer(chain_id)
+    if not rpc_explorer and template == "viem-wagmi":
+        raise HTTPException(status_code=400, detail=f"Chain {chain_id} not in registry; add to infra/registries/network/chains.yaml")
+    rpc_url = rpc_explorer[0] if rpc_explorer else ""
+    explorer_url = rpc_explorer[1] if rpc_explorer else ""
+    from registries import get_chain
+    chain_entry = get_chain(chain_id)
+    cl = (chain_entry or {}).get("chainlist") or {}
+    chain_name = cl.get("name", f"Chain {chain_id}") if isinstance(cl, dict) else f"Chain {chain_id}"
+
     buf = io.BytesIO()
+    files_list: list[str] = []
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("ui_schema.json", json.dumps(schema, indent=2))
-        zf.writestr("package.json", json.dumps({
-            "name": app_name,
-            "version": "0.1.0",
-            "private": True,
-            "scripts": {"dev": "next dev", "build": "next build", "start": "next start"},
-            "dependencies": {
-                "next": "14.2.0", "react": "^18.2.0", "react-dom": "^18.2.0",
-                "ethers": "^6.13.0", "tailwindcss": "^3.4.0",
-            },
-            "devDependencies": {"typescript": "^5.0.0", "@types/react": "^18.2.0", "@types/node": "^20.0.0"},
-        }, indent=2))
-        zf.writestr("tsconfig.json", json.dumps({
-            "compilerOptions": {"target": "es2017", "lib": ["dom", "es2017"], "jsx": "preserve",
-                "module": "esnext", "moduleResolution": "bundler", "strict": True,
-                "esModuleInterop": True, "skipLibCheck": True, "forceConsistentCasingInFileNames": True,
-                "resolveJsonModule": True, "isolatedModules": True, "noEmit": True, "incremental": True,
-                "paths": {"@/*": ["./src/*"]}},
-            "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"], "exclude": ["node_modules"],
-        }, indent=2))
-        zf.writestr("tailwind.config.ts", 'import type { Config } from "tailwindcss";\nconst config: Config = { content: ["./src/**/*.{ts,tsx}"], theme: { extend: {} }, plugins: [] };\nexport default config;\n')
-        zf.writestr("next.config.mjs", '/** @type {import("next").NextConfig} */\nconst nextConfig = {};\nexport default nextConfig;\n')
-        zf.writestr("src/lib/contract.ts", f'''import {{ ethers }} from "ethers";\n\nexport const CONTRACT_ADDRESS = "{contract_addr}";\nexport const CHAIN_ID = {chain_id};\nexport const ABI = {json.dumps(abi)} as const;\n\nexport function getContract(signerOrProvider: ethers.Signer | ethers.Provider) {{\n  return new ethers.Contract(CONTRACT_ADDRESS, ABI, signerOrProvider);\n}}\n''')
-        read_imports = "\n".join(f"  async {a['fn']}({', '.join(p['name'] + ': string' for p in a.get('params', []))}): Promise<string> {{\n    const result = await this.contract.{a['fn']}({', '.join(p['name'] for p in a.get('params', []))});\n    return String(result);\n  }}" for a in read_actions)
-        write_imports = "\n".join(f"  async {a['fn']}({', '.join(p['name'] + ': string' for p in a.get('params', []))}): Promise<ethers.TransactionResponse> {{\n    return this.contract.{a['fn']}({', '.join(p['name'] for p in a.get('params', []))});\n  }}" for a in write_actions)
-        zf.writestr("src/lib/actions.ts", f'import {{ ethers }} from "ethers";\nimport {{ getContract }} from "./contract";\n\nexport class ContractActions {{\n  private contract: ethers.Contract;\n  constructor(signerOrProvider: ethers.Signer | ethers.Provider) {{\n    this.contract = getContract(signerOrProvider);\n  }}\n{read_imports}\n{write_imports}\n}}\n')
-        action_buttons = "".join(f'\n          <button onClick={{() => handleAction("{a["fn"]}")}} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm">{a.get("label", a["fn"])}</button>' for a in write_actions[:5])
-        read_displays = "".join(f'\n          <div className="p-3 bg-gray-800 rounded-lg"><span className="text-gray-400 text-xs">{a.get("label", a["fn"])}</span><div id="{a["fn"]}" className="text-white font-mono mt-1">-</div></div>' for a in read_actions[:5])
-        zf.writestr("src/app/page.tsx", f'''"use client";\n\nimport {{ useState }} from "react";\nimport {{ CONTRACT_ADDRESS, CHAIN_ID }} from "@/lib/contract";\n\nexport default function Home() {{\n  const [status, setStatus] = useState("");\n\n  async function handleAction(fn: string) {{\n    setStatus(`Calling ${{fn}}...`);\n    try {{\n      const {{ ethers }} = await import("ethers");\n      if (!window.ethereum) {{ setStatus("Connect MetaMask"); return; }}\n      const provider = new ethers.BrowserProvider(window.ethereum);\n      const signer = await provider.getSigner();\n      const {{ ContractActions }} = await import("@/lib/actions");\n      const actions = new ContractActions(signer);\n      const tx = await (actions as Record<string, (...args: string[]) => Promise<unknown>>)[fn]();\n      setStatus(`TX sent: ${{String(tx)}}`); \n    }} catch (e) {{\n      setStatus(`Error: ${{e instanceof Error ? e.message : String(e)}}`);\n    }}\n  }}\n\n  return (\n    <main className="min-h-screen bg-gray-900 text-white p-8">\n      <div className="max-w-2xl mx-auto space-y-6">\n        <h1 className="text-3xl font-bold">{schema.get("name", "dApp")}</h1>\n        <p className="text-gray-400">Contract: <code className="text-xs">{{CONTRACT_ADDRESS}}</code> on chain {{CHAIN_ID}}</p>\n        <div className="grid grid-cols-2 gap-3">{read_displays}\n        </div>\n        <div className="flex flex-wrap gap-2">{action_buttons}\n        </div>\n        {{status && <p className="text-sm text-yellow-400 mt-4">{{status}}</p>}}\n      </div>\n    </main>\n  );\n}}\n\ndeclare global {{\n  interface Window {{ ethereum?: {{ request: (args: {{ method: string; params?: unknown[] }}) => Promise<unknown> }} }}\n}}\n''')
-        zf.writestr("src/app/layout.tsx", f'import type {{ Metadata }} from "next";\nimport "./globals.css";\n\nexport const metadata: Metadata = {{ title: "{schema.get("name", "dApp")}", description: "Generated by HyperAgent" }};\n\nexport default function RootLayout({{ children }}: {{ children: React.ReactNode }}) {{\n  return <html lang="en"><body>{{children}}</body></html>;\n}}\n')
-        zf.writestr("src/app/globals.css", '@tailwind base;\n@tailwind components;\n@tailwind utilities;\n')
-        zf.writestr("README.md", f"# {schema.get('name', 'dApp')}\n\nGenerated by HyperAgent.\n\n## Setup\n\n```bash\nnpm install\nnpm run dev\n```\n\nOpen http://localhost:3000\n\n## Contract\n\n- Address: `{contract_addr}`\n- Chain ID: {chain_id}\n- Actions: {len(read_actions)} read, {len(write_actions)} write\n")
+        files_list.append("ui_schema.json")
+
+        if template == "viem-wagmi":
+            files_list = _build_viem_wagmi_zip(
+                zf, schema, app_name, chain_id, contract_addr, abi,
+                read_actions, write_actions, rpc_url, explorer_url, chain_name,
+            )
+        else:
+            zf.writestr("package.json", json.dumps({
+                "name": app_name,
+                "version": "0.1.0",
+                "private": True,
+                "scripts": {"dev": "next dev", "build": "next build", "start": "next start"},
+                "dependencies": {
+                    "next": "14.2.0", "react": "^18.2.0", "react-dom": "^18.2.0",
+                    "ethers": "^6.13.0", "tailwindcss": "^3.4.0",
+                },
+                "devDependencies": {"typescript": "^5.0.0", "@types/react": "^18.2.0", "@types/node": "^20.0.0"},
+            }, indent=2))
+            zf.writestr("tsconfig.json", json.dumps({
+                "compilerOptions": {"target": "es2017", "lib": ["dom", "es2017"], "jsx": "preserve",
+                    "module": "esnext", "moduleResolution": "bundler", "strict": True,
+                    "esModuleInterop": True, "skipLibCheck": True, "forceConsistentCasingInFileNames": True,
+                    "resolveJsonModule": True, "isolatedModules": True, "noEmit": True, "incremental": True,
+                    "paths": {"@/*": ["./src/*"]}},
+                "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"], "exclude": ["node_modules"],
+            }, indent=2))
+            zf.writestr("tailwind.config.ts", 'import type { Config } from "tailwindcss";\\nconst config: Config = { content: ["./src/**/*.{ts,tsx}"], theme: { extend: {} }, plugins: [] };\\nexport default config;\\n')
+            zf.writestr("next.config.mjs", '/** @type {import("next").NextConfig} */\\nconst nextConfig = {};\\nexport default nextConfig;\\n')
+            read_imports = "\\n".join(f"  async {a['fn']}({', '.join(p['name'] + ': string' for p in a.get('params', []))}): Promise<string> {{\\n    const result = await this.contract.{a['fn']}({', '.join(p['name'] for p in a.get('params', []))});\\n    return String(result);\\n  }}" for a in read_actions)
+            write_imports = "\\n".join(f"  async {a['fn']}({', '.join(p['name'] + ': string' for p in a.get('params', []))}): Promise<ethers.TransactionResponse> {{\\n    return this.contract.{a['fn']}({', '.join(p['name'] for p in a.get('params', []))});\\n  }}" for a in write_actions)
+            zf.writestr("src/lib/contract.ts", f'''import {{ ethers }} from "ethers";\\n\\nexport const CONTRACT_ADDRESS = "{contract_addr}";\\nexport const CHAIN_ID = {chain_id};\\nexport const ABI = {json.dumps(abi)} as const;\\n\\nexport function getContract(signerOrProvider: ethers.Signer | ethers.Provider) {{\\n  return new ethers.Contract(CONTRACT_ADDRESS, ABI, signerOrProvider);\\n}}\\n''')
+            zf.writestr("src/lib/actions.ts", f'import {{ ethers }} from "ethers";\\nimport {{ getContract }} from "./contract";\\n\\nexport class ContractActions {{\\n  private contract: ethers.Contract;\\n  constructor(signerOrProvider: ethers.Signer | ethers.Provider) {{\\n    this.contract = getContract(signerOrProvider);\\n  }}\\n{read_imports}\\n{write_imports}\\n}}\\n')
+            action_buttons = "".join(f'\\n          <button onClick={{() => handleAction("{a["fn"]}")}} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm">{a.get("label", a["fn"])}</button>' for a in write_actions[:5])
+            read_displays = "".join(f'\\n          <div className="p-3 bg-gray-800 rounded-lg"><span className="text-gray-400 text-xs">{a.get("label", a["fn"])}</span><div id="{a["fn"]}" className="text-white font-mono mt-1">-</div></div>' for a in read_actions[:5])
+            zf.writestr("src/app/page.tsx", f'''"use client";\\n\\nimport {{ useState }} from "react";\\nimport {{ CONTRACT_ADDRESS, CHAIN_ID }} from "@/lib/contract";\\n\\nexport default function Home() {{\\n  const [status, setStatus] = useState("");\\n\\n  async function handleAction(fn: string) {{\\n    setStatus(`Calling ${{fn}}...`);\\n    try {{\\n      const {{ ethers }} = await import("ethers");\\n      if (!window.ethereum) {{ setStatus("Connect MetaMask"); return; }}\\n      const provider = new ethers.BrowserProvider(window.ethereum);\\n      const signer = await provider.getSigner();\\n      const {{ ContractActions }} = await import("@/lib/actions");\\n      const actions = new ContractActions(signer);\\n      const tx = await (actions as Record<string, (...args: string[]) => Promise<unknown>>)[fn]();\\n      setStatus(`TX sent: ${{String(tx)}}`); \\n    }} catch (e) {{\\n      setStatus(`Error: ${{e instanceof Error ? e.message : String(e)}}`);\\n    }}\\n  }}\\n\\n  return (\\n    <main className="min-h-screen bg-gray-900 text-white p-8">\\n      <div className="max-w-2xl mx-auto space-y-6">\\n        <h1 className="text-3xl font-bold">{schema.get("name", "dApp")}</h1>\\n        <p className="text-gray-400">Contract: <code className="text-xs">{{CONTRACT_ADDRESS}}</code> on chain {{CHAIN_ID}}</p>\\n        <div className="grid grid-cols-2 gap-3">{read_displays}\\n        </div>\\n        <div className="flex flex-wrap gap-2">{action_buttons}\\n        </div>\\n        {{status && <p className="text-sm text-yellow-400 mt-4">{{status}}</p>}}\\n      </div>\\n    </main>\\n  );\\n}}\\n\\ndeclare global {{\\n  interface Window {{ ethereum?: {{ request: (args: {{ method: string; params?: unknown[] }}) => Promise<unknown> }} }}\\n}}\\n''')
+            zf.writestr("src/app/layout.tsx", f'import type {{ Metadata }} from "next";\\nimport "./globals.css";\\n\\nexport const metadata: Metadata = {{ title: "{schema.get("name", "dApp")}", description: "Generated by HyperAgent" }};\\n\\nexport default function RootLayout({{ children }}: {{ children: React.ReactNode }}) {{\\n  return <html lang="en"><body>{{children}}</body></html>;\\n}}\\n')
+            zf.writestr("src/app/globals.css", "@tailwind base;\\n@tailwind components;\\n@tailwind utilities;\\n")
+            zf.writestr("README.md", f"# {schema.get('name', 'dApp')}\\n\\nGenerated by HyperAgent.\\n\\n## Setup\\n\\n```bash\\nnpm install\\nnpm run dev\\n```\\n\\nOpen http://localhost:3000\\n\\n## Contract\\n\\n- Address: `{contract_addr}`\\n- Chain ID: {chain_id}\\n- Actions: {len(read_actions)} read, {len(write_actions)} write\\n")
+            files_list = ["package.json", "tsconfig.json", "tailwind.config.ts", "next.config.mjs", "src/lib/contract.ts", "src/lib/actions.ts", "src/app/page.tsx", "src/app/layout.tsx", "src/app/globals.css", "README.md"]
+
+        if include_deploy and w.get("contracts"):
+            first_name = next((n for n in w.get("contracts", {}) if isinstance(w["contracts"].get(n), str)), None)
+            if first_name:
+                try:
+                    headers = get_trace_headers()
+                    with httpx.Client(timeout=get_timeout("main")) as client:
+                        r = client.post(
+                            f"{COMPILE_SERVICE_URL}/compile",
+                            json={"contractCode": w["contracts"][first_name], "framework": "hardhat"},
+                            headers=headers,
+                        )
+                        r.raise_for_status()
+                        data = r.json()
+                    if data.get("success") and data.get("bytecode"):
+                        bytecode = data["bytecode"]
+                        explorer_base = explorer_url.rstrip("/").replace("\\", "\\\\")
+                        constructor_args = _extract_erc20_constructor_args(w)
+                        if len(constructor_args) == 3:
+                            args_ts = f"[{json.dumps(constructor_args[0])}, {json.dumps(constructor_args[1])}, BigInt({json.dumps(str(constructor_args[2]))})]"
+                        elif len(constructor_args) >= 2:
+                            args_ts = f"[{json.dumps(constructor_args[0])}, {json.dumps(constructor_args[1])}]"
+                        else:
+                            args_ts = "[]"
+                        deploy_script = f'''import {{ createWalletClient, http }} from "viem";
+import {{ privateKeyToAccount }} from "viem/accounts";
+import {{ defineChain }} from "viem";
+import {{ CHAIN_ID, RPC_URL }} from "../src/lib/contract";
+
+const chain = defineChain({{
+  id: CHAIN_ID,
+  name: "Custom",
+  nativeCurrency: {{ decimals: 18, name: "ETH", symbol: "ETH" }},
+  rpcUrls: {{ default: {{ http: [RPC_URL] }} }},
+}});
+
+const BYTECODE = "{bytecode}" as `0x${{string}}`;
+const ABI = {json.dumps(abi)};
+const CONSTRUCTOR_ARGS = {args_ts};
+
+async function main() {{
+  const pk = process.env.PRIVATE_KEY;
+  if (!pk) {{ console.error("Set PRIVATE_KEY"); process.exit(1); }}
+  const account = privateKeyToAccount(pk as `0x${{string}}`);
+  const client = createWalletClient({{ account, chain, transport: http(RPC_URL) }});
+  const hash = await client.deployContract({{ abi: ABI, bytecode: BYTECODE, account, args: CONSTRUCTOR_ARGS }});
+  console.log("Deployed tx:", hash);
+  console.log("Explorer:", "{explorer_base}/tx/" + hash);
+}}
+
+main().catch(console.error);
+'''
+                        zf.writestr("scripts/deploy.ts", deploy_script)
+                        zf.writestr("contracts/Contract.sol", w["contracts"][first_name])
+                        zf.writestr("scripts/chain.config.json", json.dumps({"chainId": chain_id, "rpcUrl": rpc_url, "explorerUrl": explorer_url}, indent=2))
+                        files_list.extend(["scripts/deploy.ts", "contracts/Contract.sol", "scripts/chain.config.json"])
+                        if template == "viem-wagmi":
+                            pkg = {
+                                "name": app_name,
+                                "version": "0.1.0",
+                                "private": True,
+                                "scripts": {"dev": "next dev", "build": "next build", "start": "next start", "deploy": "tsx scripts/deploy.ts"},
+                                "dependencies": {
+                                    "next": "14.2.0", "react": "^18.2.0", "react-dom": "^18.2.0",
+                                    "viem": "^2.21.0", "wagmi": "^2.12.0", "@tanstack/react-query": "^5.59.0",
+                                    "@wagmi/core": "^2.12.0", "tailwindcss": "^3.4.0",
+                                },
+                                "devDependencies": {"typescript": "^5.0.0", "@types/react": "^18.2.0", "@types/node": "^20.0.0", "tsx": "^4.0.0"},
+                            }
+                            zf.writestr("package.json", json.dumps(pkg, indent=2))
+                except Exception as e:
+                    logger.warning("[export] deploy script skipped: %s", e)
+
     buf.seek(0)
     zip_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
     filename = f"{app_name}-{workflow_id[:8]}.zip"
@@ -767,9 +1187,7 @@ def export_ui_app_api(workflow_id: str, body: UiAppExportBody | None = None, req
         "template": template,
         "zip_base64": zip_b64,
         "filename": filename,
-        "files": ["package.json", "tsconfig.json", "tailwind.config.ts", "next.config.mjs",
-                  "src/lib/contract.ts", "src/lib/actions.ts", "src/app/page.tsx",
-                  "src/app/layout.tsx", "src/app/globals.css", "ui_schema.json", "README.md"],
+        "files": files_list,
         "message": "React/Next.js scaffold exported; download zip and run npm install && npm run dev",
     }
 
@@ -1119,11 +1537,12 @@ def get_stablecoins_api() -> dict[str, dict[str, str]]:
 
 AGENT_RUNTIME_URL = os.environ.get("AGENT_RUNTIME_URL", "http://localhost:4001").rstrip("/")
 VECTORDB_URL = os.environ.get("VECTORDB_URL", "http://localhost:8010").rstrip("/")
-INTEGRATIONS_TIMEOUT = 2.0
+INTEGRATIONS_TIMEOUT = float(os.environ.get("INTEGRATIONS_TIMEOUT", "15.0"))
 
 
 async def _fetch_integrations() -> dict[str, bool]:
-    """Fetch integration status from agent-runtime and vectordb health endpoints."""
+    """Fetch integration status from agent-runtime and vectordb health endpoints.
+    On Render, agent-runtime and vectordb may cold-start (30-60s); use INTEGRATIONS_TIMEOUT env (default 15s)."""
     tenderly = False
     pinata = False
     qdrant = False
@@ -1134,16 +1553,38 @@ async def _fetch_integrations() -> dict[str, bool]:
                 data = r.json()
                 tenderly = data.get("tenderly_configured", False)
                 pinata = data.get("pinata_configured", False)
-        except Exception:
-            pass
+                logger.debug("[integrations] agent-runtime ok tenderly=%s pinata=%s", tenderly, pinata)
+            else:
+                logger.warning("[integrations] agent-runtime health %s: %s", r.status_code, r.text[:200])
+        except Exception as e:
+            logger.warning("[integrations] agent-runtime unreachable url=%s: %s", AGENT_RUNTIME_URL, e)
         try:
             r = await client.get(f"{VECTORDB_URL}/health")
             if r.status_code == 200:
                 data = r.json()
                 qdrant = data.get("qdrant_configured", False)
-        except Exception:
-            pass
+                logger.debug("[integrations] vectordb ok qdrant=%s", qdrant)
+            else:
+                logger.warning("[integrations] vectordb health %s: %s", r.status_code, r.text[:200])
+        except Exception as e:
+            logger.warning("[integrations] vectordb unreachable url=%s: %s", VECTORDB_URL, e)
     return {"tenderly_configured": tenderly, "pinata_configured": pinata, "qdrant_configured": qdrant}
+
+
+@app.get("/api/v1/config/integrations-debug")
+async def get_integrations_debug_api() -> dict[str, Any]:
+    """Debug endpoint: raw integration health. Use to diagnose Settings > Integrations 'Not configured'.
+    Checks: AGENT_RUNTIME_URL/health (tenderly, pinata), VECTORDB_URL/health (qdrant)."""
+    integrations = await _fetch_integrations()
+    networks = get_networks_for_api()
+    return {
+        "agent_runtime_url": AGENT_RUNTIME_URL,
+        "vectordb_url": VECTORDB_URL,
+        "integrations_timeout": INTEGRATIONS_TIMEOUT,
+        "integrations": integrations,
+        "networks_count": len(networks),
+        "hint": "Tenderly/Pinata need TENDERLY_API_KEY and PINATA_JWT on agent-runtime. Qdrant needs QDRANT_URL on vectordb pointing to a real Qdrant instance.",
+    }
 
 
 @app.get("/api/v1/config")

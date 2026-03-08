@@ -6,6 +6,7 @@ import { useActiveAccount } from "thirdweb/react";
 import { AmbientBackground } from "@/components/layout/AmbientBackground";
 import { AppBar } from "@/components/layout/AppBar";
 import { ContextSidebar } from "@/components/layout/ContextSidebar";
+import { FloatingLogsPill } from "@/components/layout/FloatingLogsPill";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { useLayout } from "@/components/providers/LayoutProvider";
 import { FULL_PAGE_ROUTES, PUBLIC_ROUTE } from "@/constants/routes";
@@ -57,6 +58,7 @@ export function LayoutSwitcher({ children }: { children: React.ReactNode }) {
         </main>
         <ContextSidebarWrapper />
       </div>
+      <FloatingLogsPill />
     </>
   );
 }

@@ -6,8 +6,9 @@ import { ROUTES } from "@/constants/routes";
 import { approveSpec, getWorkflow, getWorkflowContracts } from "@/lib/api";
 import type { Workflow } from "@/lib/types";
 import { hasAuditOrSimFailure } from "@/lib/types";
+import { createDebugSandbox } from "@/lib/api";
 import { WorkflowStages } from "./WorkflowStages";
-import { ArrowLeft, Loader2, CheckCircle, Rocket } from "lucide-react";
+import { ArrowLeft, Loader2, CheckCircle, Rocket, Bug } from "lucide-react";
 
 export interface WorkflowRunState {
   workflow: Workflow | null;
@@ -204,6 +205,8 @@ export function WorkflowRunMeta() {
 
 export function WorkflowRunRiskStrip() {
   const ctx = React.use(WorkflowRunContext);
+  const [debugLoading, setDebugLoading] = React.useState(false);
+  const [debugError, setDebugError] = React.useState<string | null>(null);
   if (!ctx) return null;
   const { workflow } = ctx.state;
   if (!workflow) return null;
@@ -211,6 +214,20 @@ export function WorkflowRunRiskStrip() {
   const highRisk = workflow.risk_profile === "high";
   const auditSimFailed = hasAuditOrSimFailure(workflow);
   if (!roma && !highRisk && !auditSimFailed) return null;
+  const handleDebugSandbox = async () => {
+    if (!workflow.workflow_id) return;
+    setDebugLoading(true);
+    setDebugError(null);
+    try {
+      const res = await createDebugSandbox(workflow.workflow_id);
+      if (res.url) window.open(res.url, "_blank", "noopener,noreferrer");
+      else setDebugError("No sandbox URL returned");
+    } catch (e) {
+      setDebugError(e instanceof Error ? e.message : "Debug sandbox failed");
+    } finally {
+      setDebugLoading(false);
+    }
+  };
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg bg-[var(--color-bg-panel)] border border-[var(--color-border-default)] px-3 py-2 text-[11px]">
       {roma && (
@@ -224,9 +241,22 @@ export function WorkflowRunRiskStrip() {
         </span>
       )}
       {auditSimFailed && (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20" title="Audit or simulation failed">
-          Audit or simulation failed
-        </span>
+        <>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20" title="Audit or simulation failed">
+            Audit or simulation failed
+          </span>
+          <button
+            type="button"
+            onClick={handleDebugSandbox}
+            disabled={debugLoading || !(workflow.contracts && Object.keys(workflow.contracts).length > 0)}
+            title="Open workflow in sandbox to fix"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--color-bg-hover)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] border border-[var(--color-border-subtle)] disabled:opacity-50"
+          >
+            {debugLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Bug className="w-3 h-3" />}
+            Debug in sandbox
+          </button>
+          {debugError && <span className="text-[var(--color-semantic-error)]">{debugError}</span>}
+        </>
       )}
     </div>
   );

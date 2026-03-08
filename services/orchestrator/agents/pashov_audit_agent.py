@@ -11,6 +11,8 @@ from typing import Any
 
 import httpx
 
+from agents.agent_http import agent_runtime_headers
+
 logger = logging.getLogger(__name__)
 
 PASHOV_AUDIT_ENABLED = os.environ.get("PASHOV_AUDIT_ENABLED", "false").strip().lower() in ("1", "true", "yes")
@@ -104,6 +106,7 @@ async def run_pashov_audit(
     user = f"Bundle ({len(bundle)} chars):\n\n{bundle[:120000]}"
 
     try:
+        headers = agent_runtime_headers()
         async with httpx.AsyncClient(timeout=180) as client:
             r = await client.post(
                 f"{AGENT_RUNTIME_URL}/agents/pashov-audit",
@@ -117,6 +120,7 @@ async def run_pashov_audit(
                         "apiKeys": api_keys or {},
                     },
                 },
+                headers=headers,
             )
             if r.status_code != 200:
                 logger.warning("[pashov] agent-runtime returned %s: %s", r.status_code, r.text[:200])

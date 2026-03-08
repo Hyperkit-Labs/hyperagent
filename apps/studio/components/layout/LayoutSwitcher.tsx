@@ -7,7 +7,9 @@ import { AmbientBackground } from "@/components/layout/AmbientBackground";
 import { AppBar } from "@/components/layout/AppBar";
 import { ContextSidebar } from "@/components/layout/ContextSidebar";
 import { FloatingLogsPill } from "@/components/layout/FloatingLogsPill";
-import { Sidebar } from "@/components/layout/Sidebar";
+import { SlimNav } from "@/components/layout/SlimNav";
+import { StatusDock } from "@/components/layout/StatusDock";
+import { OrchestratorRail } from "@/components/layout/OrchestratorRail";
 import { useLayout } from "@/components/providers/LayoutProvider";
 import { FULL_PAGE_ROUTES, PUBLIC_ROUTE } from "@/constants/routes";
 
@@ -50,15 +52,21 @@ export function LayoutSwitcher({ children }: { children: React.ReactNode }) {
   return (
     <>
       <AmbientBackground />
-      <AppBar />
-      <div className="flex flex-1 overflow-hidden z-10 relative min-h-0">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto bg-[var(--color-bg-base)] relative scroll-smooth min-h-0 min-w-0">
-          {children}
-        </main>
-        <ContextSidebarWrapper />
+      <div className="flex flex-col flex-1 min-h-0 z-10 relative">
+        <AppBar />
+        <div className="flex flex-1 overflow-hidden min-h-0">
+          <SlimNav />
+          <div className="flex-1 flex flex-col min-w-0 min-h-0 relative">
+            <main className="flex-1 overflow-y-auto bg-[var(--color-bg-base)] relative scroll-smooth min-h-0 min-w-0">
+              {children}
+            </main>
+            <StatusDock />
+            <FloatingLogsPill />
+          </div>
+          <OrchestratorRail />
+          <ContextSidebarWrapper />
+        </div>
       </div>
-      <FloatingLogsPill />
     </>
   );
 }

@@ -43,6 +43,20 @@ class ExploitSimResult:
         self.findings = findings
 
 
+class GasBenchmarkResult:
+    """Result of gas benchmarking across compiler configs."""
+
+    def __init__(
+        self,
+        score: float,
+        configs: list[dict[str, Any]],
+        bytecode_sizes: list[int],
+    ):
+        self.score = score
+        self.configs = configs
+        self.bytecode_sizes = bytecode_sizes
+
+
 class ExecutionBackend(Protocol):
     """Protocol for execution backends (Local, OpenSandbox)."""
 
@@ -71,4 +85,13 @@ class ExecutionBackend(Protocol):
         design: dict[str, Any],
     ) -> ExploitSimResult:
         """Run exploit PoC tests. Returns passed flag and findings."""
+        ...
+
+    async def run_gas_benchmark(
+        self,
+        contract_code: str,
+        contract_name: str,
+        configs: list[dict[str, Any]] | None = None,
+    ) -> GasBenchmarkResult:
+        """Run gas benchmark across compiler configs. Returns score and bytecode sizes."""
         ...

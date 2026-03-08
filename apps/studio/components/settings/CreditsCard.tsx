@@ -13,9 +13,11 @@ export interface CreditsCardProps {
   balanceFromParent?: { balance: number; currency: string } | null;
   /** Called when parent should refetch (e.g. after top-up). */
   onRefetch?: () => void;
+  /** Credits consumed per workflow run (from config). When set, shown as "Each run costs X credits". */
+  creditsPerRun?: number;
 }
 
-export function CreditsCard({ refetchTrigger = 0, balanceFromParent, onRefetch }: CreditsCardProps) {
+export function CreditsCard({ refetchTrigger = 0, balanceFromParent, onRefetch, creditsPerRun }: CreditsCardProps) {
   const [balance, setBalance] = useState<{ balance: number; currency: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +82,9 @@ export function CreditsCard({ refetchTrigger = 0, balanceFromParent, onRefetch }
         <h3 className="text-sm font-medium text-[var(--color-text-primary)]">Credits</h3>
       </div>
       <p className="text-xs text-[var(--color-text-tertiary)]">
-        Top up with fiat or stablecoins (USDC/USDT). Each workflow run consumes credits. x402 is used for external pay-per-call.
+        Top up with fiat or stablecoins (USDC/USDT).
+        {creditsPerRun != null && creditsPerRun > 0 ? ` Each run costs ${creditsPerRun} credits.` : " Each workflow run consumes credits."}
+        {" "}x402 is used for external pay-per-call.
       </p>
       {error && <ApiErrorBanner error={error} onRetry={handleRefetch} />}
       {loading ? (

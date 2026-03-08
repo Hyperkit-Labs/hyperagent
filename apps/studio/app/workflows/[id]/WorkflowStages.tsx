@@ -107,11 +107,17 @@ export function WorkflowStages({ workflow, contractData }: WorkflowStagesProps) 
       label = `Autofix (${stage.cycles} cycle${stage.cycles > 1 ? 's' : ''})`;
     }
 
+    const baseIcon = STAGE_ICONS[stageDef.name] ?? <Clock className="w-5 h-5" />;
+    const icon =
+      stageDef.name === 'audit' && status === 'processing'
+        ? <span className="inline-flex animate-radar" aria-hidden>{baseIcon}</span>
+        : baseIcon;
+
     return {
       id: stageDef.name,
       label,
       status,
-      icon: STAGE_ICONS[stageDef.name] ?? <Clock className="w-5 h-5" />,
+      icon,
       error: stage?.error,
       required: stageDef.required ?? false,
     };

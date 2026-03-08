@@ -16,7 +16,7 @@ from registries import get_default_pipeline_id, get_audit_max_severity, get_temp
 from registries import get_slither_to_swc, get_high_severity_swc
 from registries import get_roma_complexity_threshold, get_roma_complexity_indicators
 
-STEP_ORDER = ("spec", "design", "codegen", "scrubd", "audit", "debate", "simulation", "exploit_sim", "deploy", "ui_scaffold")
+STEP_ORDER = ("spec", "design", "codegen", "test_generation", "scrubd", "audit", "debate", "simulation", "exploit_sim", "deploy", "ui_scaffold")
 
 
 def _step_index(step_type: str) -> int:
@@ -56,6 +56,7 @@ async def _step_complete(run_id: str, step_type: str, output_summary: str | None
 from agents.design_agent import generate_design
 from agents.codegen_agent import generate_contracts
 from agents.oz_wizard_client import generate_contracts_oz
+from agents.test_generation_agent import generate_tests
 from agents.audit_agent import run_security_audits
 from agents.pashov_audit_agent import run_pashov_audit
 from agents.scrubd_agent import run_scrubd_validation, get_scrubd_fix_hints
@@ -258,6 +259,47 @@ async def codegen_agent(state: AgentState) -> AgentState:
     except Exception as e:
         await _step_complete(run_id, "codegen", error_message=str(e))
         raise
+
+
+async def test_generation_agent(state: AgentState) -> AgentState:
+    """Generate Foundry/Hardhat tests from contracts, spec, and design."""
+    contracts = _ensure_contracts_dict(state.get("contracts"))
+    spec = state.get("spec") or {}
+    design = state.get("design_proposal") or {}
+    run_id = state.get("run_id") or ""
+    user_id = state.get("user_id", "")
+    project_id = state.get("project_id", "")
+    api_keys = state.get("api_keys") or {}
+    agent_session_jwt = state.get("agent_session_jwt")
+    _step_start(run_id, "test_generation")
+    try:
+        test_files = await generate_tests(
+            contracts=contracts,
+            spec=spec,
+            design=design,
+            user_id=user_id,
+            project_id=project_id,
+            run_id=run_id,
+            api_keys=api_keys,
+            agent_session_jwt=agent_session_jwt,
+        )
+        state["test_files"] = test_files
+        from store import update_workflow
+        update_workflow(run_id, status="building", stages=[
+            {"stage": "spec", "status": "completed"},
+            {"stage": "design", "status": "completed"},
+            {"stage": "codegen", "status": "completed"},
+            {"stage": "test_generation", "status": "completed"},
+        ])
+        state["messages"] = list(state.get("messages", [])) + [
+            AIMessage(content=f"Test generation: {len(test_files)} test file(s)")
+        ]
+        await _step_complete(run_id, "test_generation", output_summary=f"files={len(test_files)}")
+        return state
+    except Exception as e:
+        await _step_complete(run_id, "test_generation", error_message=str(e))
+        state["test_files"] = {}
+        return state
 
 
 async def scrubd_validation_agent(state: AgentState) -> AgentState:

@@ -3,6 +3,8 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ApiAuthProvider } from "@/components/providers/ApiAuthProvider";
 import { ConfigProvider } from "@/components/providers/ConfigProvider";
+import { LayoutProvider } from "@/components/providers/LayoutProvider";
+import { PipelineStateProvider } from "@/components/providers/PipelineStateProvider";
 import { ThirdwebProviderWrapper } from "@/components/providers/ThirdwebProviderWrapper";
 import { Toaster } from "sonner";
 import { LayoutSwitcher } from "@/components/layout/LayoutSwitcher";
@@ -36,7 +38,11 @@ export default function RootLayout({
           <ConfigProvider>
           <ThirdwebProviderWrapper>
             <ApiAuthProvider>
-              <LayoutSwitcher>{children}</LayoutSwitcher>
+              <PipelineStateProvider>
+                <LayoutProvider>
+                  <LayoutSwitcher>{children}</LayoutSwitcher>
+                </LayoutProvider>
+              </PipelineStateProvider>
               <Toaster position="top-right" richColors />
             </ApiAuthProvider>
           </ThirdwebProviderWrapper>

@@ -28,6 +28,7 @@ spec:
           permit: false
           votes: false
           flashMinting: false
+          premint: "1000000"
     - id: erc20-upgradeable
       name: Upgradeable ERC20 (UUPS)
       standards: ["ERC20", "UUPS"]
@@ -98,3 +99,48 @@ spec:
       requiresHumanApproval: true
       allowedInClosedBeta: false
       source: custom
+    - id: lending-basic
+      name: Basic Lending Protocol
+      standards: ["ERC20", "custom"]
+      features: ["collateral", "borrow", "repay", "liquidate"]
+      riskProfile: high
+      requiresHumanApproval: true
+      allowedInClosedBeta: false
+      source: custom
+      defaultChains: [1187947933, 324705682]
+    - id: marketplace-nft
+      name: NFT Marketplace
+      standards: ["ERC721", "custom"]
+      features: ["list", "buy", "cancel", "royalties"]
+      riskProfile: high
+      requiresHumanApproval: true
+      allowedInClosedBeta: false
+      source: custom
+      defaultChains: [1187947933, 324705682]
+    - id: governance-basic
+      name: Governor + ERC20Votes
+      standards: ["ERC20", "governance"]
+      features: ["votes", "propose", "vote", "queue", "execute"]
+      riskProfile: high
+      requiresHumanApproval: true
+      allowedInClosedBeta: false
+      source: custom
+      defaultChains: [1187947933, 324705682]
+    - id: multisig-gnosis
+      name: Multi-Sig Wallet
+      standards: ["custom"]
+      features: ["multisig", "confirm", "execute", "revoke"]
+      riskProfile: high
+      requiresHumanApproval: true
+      allowedInClosedBeta: false
+      source: custom
+      defaultChains: [1187947933, 324705682]
+    - id: amm-uniswap-style
+      name: Uniswap-style AMM
+      standards: ["ERC20", "custom"]
+      features: ["factory", "pair", "swap", "addLiquidity", "removeLiquidity"]
+      riskProfile: high
+      requiresHumanApproval: true
+      allowedInClosedBeta: false
+      source: custom
+      defaultChains: [1187947933, 324705682]

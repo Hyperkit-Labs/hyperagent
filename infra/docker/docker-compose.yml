@@ -1,12 +1,14 @@
 # Production stack for Contabo VPS (Coolify or manual deploy).
-# All paths are relative to this compose file's directory (infra/docker/).
+# Paths are relative to project directory (repo root). Coolify uses --project-directory.
 #
 # Run from repo root:
-#   docker compose -f infra/docker/docker-compose.yml up -d
+#   docker compose --project-directory . -f infra/docker/docker-compose.yml up -d
 #
 # Coolify:
 #   - Base Directory: / (repo root)
 #   - Compose path: infra/docker/docker-compose.yml
+#   - Custom Build: docker compose -f infra/docker/docker-compose.yml build
+#   - Custom Start: docker compose -f infra/docker/docker-compose.yml up -d
 #   - Disable Git submodules and LFS in Advanced > Git (Coolify #4746)
 #   - Set env vars in Shared Env
 #
@@ -15,14 +17,14 @@
 services:
   api-gateway:
     build:
-      context: ../..
+      context: .
       dockerfile: infra/docker/Dockerfile.api-gateway
     container_name: hyperagent-gateway
     restart: unless-stopped
     ports:
       - "4000:4000"
     env_file:
-      - ../../.env
+      - .env
     environment:
       - NODE_ENV=production
       - PORT=4000
@@ -43,12 +45,12 @@ services:
 
   orchestrator:
     build:
-      context: ../..
+      context: .
       dockerfile: infra/docker/Dockerfile.orchestrator.monorepo
     container_name: hyperagent-orchestrator
     restart: unless-stopped
     env_file:
-      - ../../.env
+      - .env
     environment:
       - PYTHONUNBUFFERED=1
       - REGISTRIES_PATH=/app/services/orchestrator/registries
@@ -61,7 +63,7 @@ services:
       - VECTORDB_URL=http://vectordb:8080
       - ROMA_URL=http://roma-service:8080
     volumes:
-      - ../../infra/registries:/app/services/orchestrator/registries:ro
+      - ./infra/registries:/app/services/orchestrator/registries:ro
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
@@ -85,12 +87,12 @@ services:
 
   agent-runtime:
     build:
-      context: ../..
+      context: .
       dockerfile: infra/docker/Dockerfile.agent-runtime.monorepo
     container_name: hyperagent-agent-runtime
     restart: unless-stopped
     env_file:
-      - ../../.env
+      - .env
     environment:
       - NODE_ENV=production
       - AUDIT_SERVICE_URL=http://audit:8001
@@ -100,7 +102,7 @@ services:
       - DEPLOY_SERVICE_URL=http://localhost:4001
       - STORAGE_SERVICE_URL=http://localhost:4001
     volumes:
-      - ../../infra/registries:/app/registries:ro
+      - ./infra/registries:/app/registries:ro
     networks:
       - hyperagent
     healthcheck:
@@ -112,48 +114,48 @@ services:
 
   compile:
     build:
-      context: ../../services/compile
+      context: services/compile
       dockerfile: ../../infra/docker/Dockerfile.compile.lite
     container_name: hyperagent-compile
     restart: unless-stopped
     env_file:
-      - ../../.env
+      - .env
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8004"]
     networks:
       - hyperagent
 
   audit:
     build:
-      context: ../../services/audit
+      context: services/audit
       dockerfile: ../../infra/docker/Dockerfile.audit
     container_name: hyperagent-audit
     restart: unless-stopped
     env_file:
-      - ../../.env
+      - .env
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
     networks:
       - hyperagent
 
   hyperagent-tools:
     build:
-      context: ../..
+      context: .
       dockerfile: infra/docker/Dockerfile.hyperagent-tools
     container_name: hyperagent-tools
     restart: unless-stopped
     env_file:
-      - ../../.env
+      - .env
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "9000"]
     networks:
       - hyperagent
 
   roma-service:
     build:
-      context: ../../services/roma-service
+      context: services/roma-service
       dockerfile: ../../infra/docker/Dockerfile.roma
     container_name: hyperagent-roma
     restart: unless-stopped
     env_file:
-      - ../../.env
+      - .env
     environment:
       - AGENT_RUNTIME_URL=http://agent-runtime:4001
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
@@ -174,12 +176,12 @@ services:
 
   vectordb:
     build:
-      context: ../../services/vectordb
+      context: services/vectordb
       dockerfile: ../../infra/docker/Dockerfile.vectordb
     container_name: hyperagent-vectordb
     restart: unless-stopped
     env_file:
-      - ../../.env
+      - .env
     environment:
       - QDRANT_URL=http://qdrant:6333
     depends_on:
@@ -190,7 +192,7 @@ services:
 
   sandbox-api:
     build:
-      context: ../../services/sandbox-docker
+      context: services/sandbox-docker
       dockerfile: Dockerfile
     container_name: hyperagent-sandbox
     restart: unless-stopped
@@ -200,7 +202,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - sandbox-data:/var/lib/sandbox-docker
     env_file:
-      - ../../.env
+      - .env
     environment:
       - SANDBOX_WORK_DIR=/var/lib/sandbox-docker
     networks:

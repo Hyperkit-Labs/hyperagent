@@ -491,7 +491,7 @@ jobs:
           POSTGRES_PASSWORD: test_password_ci_12345
           JWT_SECRET_KEY: test_jwt_secret_key_ci_12345
         run: |
-          docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.ci.yml up -d
+          docker compose --project-directory . -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.ci.yml up -d
           sleep 45
       
       - name: Wait for API gateway
@@ -505,7 +505,7 @@ jobs:
       - name: Stop services
         if: always()
         run: |
-          docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.ci.yml down -v
+          docker compose --project-directory . -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.ci.yml down -v
 
   # ============================================================================
   # STAGE 7: NOTIFICATIONS

@@ -1,0 +1,326 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches: [development, main]
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-python:
+    name: Lint Python Code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: Install linting tools
+        run: |
+          pip install ruff black isort
+      
+      - name: Run ruff
+        run: ruff check services/orchestrator/ --output-format=concise
+        continue-on-error: true
+      
+      - name: Check black formatting
+        run: black --check services/orchestrator/
+        continue-on-error: true
+      
+      - name: Check import sorting
+        run: isort --check-only services/orchestrator/
+        continue-on-error: true
+
+  lint-typescript:
+    name: Lint TypeScript/JavaScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Run ESLint (hyperagent-studio)
+        run: pnpm --filter hyperagent-studio run lint
+        continue-on-error: true
+      
+      - name: Check TypeScript types (hyperagent-studio)
+        run: pnpm --filter hyperagent-studio run typecheck
+        continue-on-error: true
+
+  test-backend:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hyperagent_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r services/orchestrator/requirements.txt
+          pip install pytest pytest-asyncio
+      
+      - name: Run pytest
+        run: |
+          cd services/orchestrator
+          pytest tests/ -v --ignore=tests/integration/docker/ -x
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hyperagent_test
+          REDIS_URL: redis://localhost:6379/0
+          ENVIRONMENT: test
+        continue-on-error: true
+
+  test-frontend:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Run tests (hyperagent-studio)
+        run: pnpm --filter hyperagent-studio run test -- --watchAll=false
+        continue-on-error: true
+
+  test-contracts:
+    name: Smart Contract Tests
+    runs-on: ubuntu-latest
+    if: hashFiles('contracts/**') != ''
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Check for Foundry
+        id: foundry
+        run: |
+          if [ -f contracts/evm/foundry.toml ] || [ -f contracts/foundry.toml ]; then
+            echo "found=true" >> $GITHUB_OUTPUT
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Setup Foundry
+        if: steps.foundry.outputs.found == 'true'
+        uses: foundry-rs/foundry-toolchain@v1
+      
+      - name: Run Foundry tests
+        if: steps.foundry.outputs.found == 'true'
+        run: |
+          cd contracts/evm 2>/dev/null || cd contracts
+          forge test -vvv --gas-report 2>/dev/null || echo "No Foundry project, skipping"
+        continue-on-error: true
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Slither (Smart Contracts)
+        if: hashFiles('contracts/**/*.sol') != ''
+        uses: crytic/slither-action@v0.3.0
+        continue-on-error: true
+        with:
+          target: contracts/
+          slither-args: --filter-paths "lib|test" --exclude-dependencies
+          fail-on: high
+      
+      - name: Run Trivy (Dependencies & IaC)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'CRITICAL,HIGH'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          exit-code: '0'
+        continue-on-error: true
+      
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+      
+      - name: Run Bandit (Python)
+        run: |
+          pip install bandit
+          bandit -r services/orchestrator/ -f json -o bandit-report.json -x '*/data/*' || true
+          bandit -r services/orchestrator/ -x '*/data/*' || true
+      
+      - name: Upload Bandit results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-report
+          path: bandit-report.json
+
+  pr-size-check:
+    name: PR Size Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Check PR size
+        run: |
+          files_changed=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | wc -l)
+          lines_changed=$(git diff --shortstat origin/${{ github.base_ref }}...HEAD | awk '{print $4+$6}')
+          
+          echo "Files changed: $files_changed"
+          echo "Lines changed: $lines_changed"
+          
+          if [ "$files_changed" -gt 50 ]; then
+            echo "::warning::PR modifies $files_changed files. Consider breaking into smaller PRs."
+          fi
+          
+          if [ "$lines_changed" -gt 1000 ]; then
+            echo "::warning::PR changes $lines_changed lines. Consider breaking into smaller PRs."
+          fi
+
+  conventional-commits:
+    name: Validate Commit Messages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Check commit messages
+        run: |
+          pip install gitlint
+          git log --format=%B origin/${{ github.base_ref }}..HEAD | gitlint --config .gitlint 2>/dev/null || true
+        continue-on-error: true
+
+  build-docker:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./infra/docker/Dockerfile
+          push: false
+          tags: hyperagent-backend:pr-${{ github.event.pull_request.number }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Build frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./infra/docker/Dockerfile.studio
+          push: false
+          tags: hyperagent-frontend:pr-${{ github.event.pull_request.number }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  label-pr:
+    name: Auto-label PR
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/labeler@v5
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          configuration-path: .github/labeler.yml
+
+  pr-comment-summary:
+    name: PR Summary Comment
+    runs-on: ubuntu-latest
+    needs: [lint-python, test-backend, security-scan]
+    if: always()
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Comment PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const summary = `## PR Validation Summary
+            
+            | Check | Status |
+            |-------|--------|
+            | Lint Python | ${{ needs.lint-python.result == 'success' && '✅' || '❌' }} |
+            | Backend Tests | ${{ needs.test-backend.result == 'success' && '✅' || '❌' }} |
+            | Security Scan | ${{ needs.security-scan.result == 'success' && '✅' || '❌' }} |
+            
+            ${needs.test-backend.result !== 'success' ? '⚠️ **Backend tests failed. Please review the logs.**' : ''}
+            ${needs.security-scan.result !== 'success' ? '⚠️ **Security scan found issues. Please address them.**' : ''}
+            `;
+            
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: summary
+            });

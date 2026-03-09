@@ -1,132 +1,157 @@
 # Security Policy
 
-## Supported Versions
-
-We actively maintain and provide security updates for the following versions:
-
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.0.x   | :white_check_mark: |
-
-## Security Advisories
-
-### CVE-2025-55182 - React Server Components Remote Code Execution (CRITICAL)
-
-**Date**: December 2025  
-**Severity**: Critical  
-**Status**: ✅ Patched
-
-#### Summary
-
-A critical-severity vulnerability in React Server Components (CVE-2025-55182) affects React 19 and frameworks that use it, including Next.js (CVE-2025-66478). Under certain conditions, specially crafted requests could lead to unintended remote code execution.
-
-**Reference**: [Vercel Security Advisory](https://vercel.com/changelog/cve-2025-55182)
-
-#### Affected Versions
-
-- **React**: 19.0.0, 19.1.0, 19.1.1, 19.2.0
-- **Next.js**: ≥14.3.0-canary.77, ≥15.0.0, ≥16.0.0 (before 16.0.7)
-
-#### Resolution
-
-**Fixed in**:
-- **React**: 19.0.1, 19.1.2, **19.2.1** ✅
-- **Next.js**: 15.0.5, 15.1.9, 15.2.6, 15.3.6, 15.4.8, 15.5.7, 15.6.0-canary.58, **16.0.7** ✅
-
-**Action Taken**:
-- ✅ Updated `frontend/package.json`: React 19.2.0 → 19.2.1
-- ✅ Updated `frontend/package.json`: Next.js 16.0.3 → 16.0.7
-- ✅ Updated `reference/x402-starter-kit/package.json`: React 19.2.0 → 19.2.1, Next.js 16.0.1 → 16.0.7
-- ✅ Updated `eslint-config-next` to match Next.js version
-
-**Immediate Action Required**:
-1. Update dependencies: `npm install` or `npm ci` in the `frontend/` directory
-2. Rebuild Docker images: `make up-build` or `docker-compose build frontend`
-3. Verify versions: `npm list react react-dom next` should show patched versions
-
-#### Impact
-
-Applications using affected versions may process untrusted input in a way that allows an attacker to perform remote code execution. The vulnerability affects React Server Components implementations in:
-- `react-server-dom-parcel`
-- `react-server-dom-webpack`
-- `react-server-dom-turbopack`
-
-#### Additional Recommendations
-
-- Do not rely solely on WAF/CDN protection; upgrade to patched versions
-- Review and audit any custom React Server Components implementations
-- Monitor for additional security advisories from React and Next.js teams
-
-## Reporting a Vulnerability
-
-If you discover a security vulnerability, please **DO NOT** open a public issue. Instead, please report it via one of the following methods:
-
-1. **Email**: Send details to [security@yourdomain.com] (replace with actual security contact)
-2. **GitHub Security Advisory**: Use GitHub's private vulnerability reporting feature
-3. **Direct Contact**: Contact the maintainers directly
-
-### What to Include
-
-- Description of the vulnerability
-- Steps to reproduce
-- Potential impact
-- Suggested fix (if available)
-- Your contact information
-
-### Response Timeline
-
-- **Initial Response**: Within 48 hours
-- **Status Update**: Within 7 days
-- **Resolution**: Depends on severity and complexity
-
-## Security Best Practices
-
-1. **Keep Dependencies Updated**: Regularly update all dependencies to latest patched versions
-2. **Use Dependency Scanning**: Run `npm audit` and `npm audit fix` regularly
-3. **Review Security Advisories**: Monitor security feeds for React, Next.js, and other dependencies
-4. **Follow Principle of Least Privilege**: Limit access and permissions where possible
-5. **Input Validation**: Always validate and sanitize user inputs
-6. **Secure Configuration**: Never commit secrets, API keys, or private keys to version control
-7. **Regular Security Audits**: Conduct periodic security reviews and penetration testing
-
-## Dependency Security
-
-### Automated Scanning
-
-We use automated dependency scanning in CI/CD:
-
-```bash
-# Frontend
-cd frontend && npm audit
-
-# Backend
-pip-audit  # or safety check
-```
-
-### Manual Checks
-
-Regularly check for security updates:
-
-```bash
-# Check for outdated packages
-npm outdated
-
-# Check for known vulnerabilities
-npm audit
-
-# Update dependencies
-npm update
-```
-
-## Additional Resources
-
-- [React Security](https://react.dev/learn/escape-hatches)
-- [Next.js Security](https://nextjs.org/docs/app/building-your-application/configuring/security-headers)
-- [OWASP Top 10](https://owasp.org/www-project-top-ten/)
-- [Node.js Security Best Practices](https://nodejs.org/en/docs/guides/security/)
+Security is mandatory. HyperAgent handles valuable assets, wallet connections, LLM keys, and smart contract deployment. Authentication, rate limiting, access controls, and audit tooling are required, not optional.
 
 ---
 
-**Last Updated**: December 2025  
-**Maintained By**: HyperAgent Security Team
+## System Architecture Overview
 
+HyperAgent is a layered platform. Each layer has distinct security responsibilities and trust boundaries.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  CLIENT LAYER                                                                │
+│  Studio (Next.js) │ Wallet connect (SIWE) │ Thirdweb for deploy signing      │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  GATEWAY LAYER                                                               │
+│  API Gateway │ JWT auth │ Rate limiting (Redis) │ CORS │ Request validation  │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ORCHESTRATOR LAYER                                                          │
+│  LangGraph pipeline │ BYOK decryption │ Agent session JWTs │ Step audit      │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+          ┌───────────────────────────┼───────────────────────────┐
+          ▼                           ▼                           ▼
+┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
+│  BACKEND SERVICES│    │  SECURITY TOOLS   │    │  DATA LAYER      │
+│  Compile, Audit, │    │  Slither, Mythril │    │  Supabase (RLS), │
+│  Simulation,     │    │  Tenderly, SCRUBD │    │  Redis, IPFS     │
+│  Deploy, ROMA,   │    │  Pashov auditor   │    │  (Pinata)        │
+│  Storage, Tools  │    │                   │    │                  │
+└──────────────────┘    └──────────────────┘    └──────────────────┘
+```
+
+---
+
+## Layer 1: Client (Studio)
+
+| Component | Security responsibility |
+|-----------|-------------------------|
+| **Wallet connect** | SIWE (Sign-In with Ethereum) via Thirdweb; no password storage. |
+| **LLM keys (BYOK)** | Keys sent over HTTPS to gateway; never stored in browser after submit. |
+| **Deploy signing** | User signs deploy transaction in browser; private key never leaves wallet. |
+| **API calls** | All backend calls use `Authorization: Bearer <JWT>`; JWT from SIWE. |
+| **CORS** | `CORS_ORIGINS` restricts allowed origins; set for production domains. |
+
+Studio is a thin client. All pipeline logic, BYOK handling, and safety gates live in backend services.
+
+---
+
+## Layer 2: Gateway (API Gateway)
+
+| Component | Security responsibility |
+|-----------|-------------------------|
+| **JWT auth** | `AUTH_JWT_SECRET` required for production. Validates `Authorization: Bearer` on all `/api/v1` routes except public paths. |
+| **Public paths** | `/health`, `/api/v1/auth/siwe`, `/api/v1/config`, `/api/v1/networks`, `/api/v1/tokens/stablecoins` are unauthenticated. |
+| **Rate limiting** | Redis-backed. Per-IP and per-user limits. Stricter limits for LLM keys, workflow start, and deploy prepare. Fail-closed when Redis unavailable in production. |
+| **Request validation** | Request ID for tracing; structured security event logging. |
+
+**Required env:** `AUTH_JWT_SECRET`, `REDIS_URL`, `REQUIRE_AUTH=true` (or unset; default enforced).
+
+---
+
+## Layer 3: Orchestrator
+
+| Component | Security responsibility |
+|-----------|-------------------------|
+| **BYOK decryption** | Decrypts LLM keys only in request scope; never logs or returns plaintext. Uses `LLM_KEY_ENCRYPTION_KEY`. |
+| **Agent session JWTs** | Short-lived JWTs for cross-service calls; scoped to run. |
+| **Internal service token** | `INTERNAL_SERVICE_TOKEN` for service-to-service auth when configured. |
+| **Step audit trail** | `run_steps` table records each pipeline step; trace blob IDs for provenance. |
+| **Workspace isolation** | Runs and keys scoped by `X-User-Id` (wallet user). |
+
+Orchestrator never stores raw LLM keys. Keys are encrypted at rest and decrypted only when building agent context for a run.
+
+---
+
+## Layer 4: Backend Services
+
+| Service | Purpose | Security notes |
+|---------|---------|----------------|
+| **Compile** | Solidity compilation | Receives contract code; no persistent storage of user code. |
+| **Audit** | Slither, Mythril, MythX, Echidna | Runs in isolated context; `TOOLS_API_KEY` when using remote tools. |
+| **Simulation** | Tenderly simulation | Uses `TENDERLY_API_KEY`; simulations before deploy. |
+| **Deploy** | Deploy plan generation | Plans only; actual signing in Studio. |
+| **ROMA** | Spec generation | Optional; agent-runtime fallback when unset. |
+| **Storage** | IPFS/Pinata pinning | `PINATA_JWT` or API keys; artifacts by CID. |
+| **Vectordb** | RAG, embeddings | Qdrant or Pinecone; no user secrets. |
+| **Tools (hyperagent-tools)** | Slither/Mythril remote | `TOOLS_API_KEY` for auth; used by audit service. |
+
+Cross-service URLs (`COMPILE_SERVICE_URL`, `AUDIT_SERVICE_URL`, etc.) are configured per environment. Internal calls use `INTERNAL_SERVICE_TOKEN` when set.
+
+---
+
+## Layer 5: Security Tools
+
+| Tool | Where used | Purpose |
+|------|------------|---------|
+| **Slither** | Audit service, `infra/registries/security.yaml` | Static analysis; reentrancy, access control, gas. |
+| **Mythril** | Audit service | Symbolic execution; SWC mapping. |
+| **MythX** | Audit service (when `AUDIT_MODE=mythx`) | Cloud analysis. |
+| **Echidna** | Audit service | Fuzzing. |
+| **Tenderly** | Simulation service | Pre-deploy simulation; failure blocks deploy. |
+| **SCRUBD** | Orchestrator (mandatory step) | RE/UX validation; reentrancy and unhandled exceptions. |
+| **Pashov solidity-auditor** | Orchestrator (when `PASHOV_AUDIT_ENABLED=true`) | AI-driven security review; merged with Slither/Mythril. |
+
+Policy: `infra/registries/security.yaml` defines `mandatoryTools`, `deployBlockSeverity`, `maxAllowedSeverityForDeploy`, and `requireSimulationSuccess`. High-severity SWC findings block deployment.
+
+---
+
+## Layer 6: Data Layer
+
+| Store | Security responsibility |
+|-------|-------------------------|
+| **Supabase (Postgres)** | RLS on `wallet_users`, `user_profiles`; only owning user can read/update `encrypted_llm_keys`. No LLM keys in logs or responses. |
+| **Redis** | Rate limit state; no persistent user data. Required in production for rate limiting. |
+| **IPFS (Pinata)** | Artifacts by CID; gateway URLs. No secrets in pinned content. |
+
+Storage policy: `docs/storage-policy.md`. Traces (stub IDs), artifacts (IPFS), indexes (Supabase). No large blobs in Postgres.
+
+---
+
+## BYOK (Bring Your Own Keys)
+
+- **Storage:** `wallet_users.encrypted_llm_keys` (Supabase). Encrypted with Fernet using `LLM_KEY_ENCRYPTION_KEY`.
+- **Write path:** `POST /api/v1/workspaces/current/llm-keys`; orchestrator encrypts before write.
+- **Read path:** `GET` returns `configured_providers` only; never plaintext keys.
+- **Use path:** Orchestrator decrypts in request scope when building agent context; keys not exposed to frontend.
+- **Rate limit:** Stricter limits on LLM keys endpoint to prevent key-stuffing.
+
+See `docs/runbooks/BYOK-key-lifecycle.md` for rotation and re-key procedures.
+
+---
+
+## Deployment Checklist
+
+1. Set `AUTH_JWT_SECRET` (`openssl rand -base64 32`).
+2. Set `REDIS_URL` (Redis Cloud or self-hosted).
+3. Set `LLM_KEY_ENCRYPTION_KEY` (strong secret for BYOK).
+4. Set `REQUIRE_AUTH=true` or leave unset (default: enforced).
+5. Set `CORS_ORIGINS` to production domains.
+6. Do not disable rate limiting in production.
+7. Ensure Supabase RLS is enabled on `wallet_users` and `user_profiles`.
+8. Set `TOOLS_API_KEY` if using remote hyperagent-tools for audit.
+9. Set `TENDERLY_API_KEY` for simulation service.
+10. Set `PINATA_JWT` or equivalent for storage service when using IPFS.
+
+---
+
+## Reporting Vulnerabilities
+
+Report security issues privately. Do not open public issues for vulnerabilities.

@@ -2,249 +2,140 @@
   <img src="/public/ascii-art-doh-HyperAgent.png" alt="HyperAgent ASCII Art" width="800">
   
 <!-- Badges: start -->
-![Version](https://img.shields.io/badge/version-1.0.0-brightgreen)
+![Version](https://img.shields.io/badge/version-0.1.0-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
-![Python](https://img.shields.io/badge/python-3.10%2B-blue)
-![Node.js](https://img.shields.io/badge/node.js-18.18%2B-green)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![Node.js](https://img.shields.io/badge/node.js-18%2B-green)
 ![Next.js](https://img.shields.io/badge/next.js-16-black)
 ![Status](https://img.shields.io/badge/status-active-success)
 <!-- Badges: end -->
-  
+
+HyperAgent is an AI-powered smart contract development platform that transforms natural language specifications into production-ready, audited contracts deployed across multiple EVM chains in minutes.
+
 </div>
 
+## Table of Contents
 
-<div align="center">
-  <p><strong>AI-powered smart contract development platform</strong></p>
-  <p>From natural language to production-ready, audited contracts in minutes</p>
-  
-  <!-- Link Buttons -->
-   <p>
-    <a href="https://x.com/HyperionKit">
-      <img src="https://img.shields.io/twitter/follow/HyperionKit.svg?style=social" alt="Follow @HyperionKit" />
-    </a>
-    <a href="https://discord.gg/invite/hyperionkit">
-        <img src="https://img.shields.io/badge/Chat%20on-Discord-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Chat on Discord" />
-    </a>
-    <a href="https://hyperionkit.xyz">
-        <img src="https://img.shields.io/badge/Hyperkit%20Website-FF6B6B?style=flat-square&logo=discourse&logoColor=white" alt="Website" />
-    </a>
-    <a href="https://github.com/HyperionKit/Hyperkit/stargazers">
-      <img src="https://img.shields.io/github/stars/HyperionKit/Hyperkit" alt="stars" />
-    </a>
-    <a href="https://github.com/HyperionKit/Hyperkit/network/members">
-      <img src="https://img.shields.io/github/forks/HyperionKit/Hyperkit" alt="forks" />
-      <a href="https://github.com/HyperionKit/Hyperkit/blob/master/LICENSE.md" target="_blank" rel="noopener noreferrer">
-      <img src="https://img.shields.io/npm/l/hyperionkit?style=flat-square&color=0052FF" alt="MIT License" />
-    </a>
-    </a>
-  </p>
-</div>
+- [Overview](#overview)
+- [Phase 1 (Closed Beta)](#phase-1-closed-beta)
+- [Architecture](#architecture)
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [License](#license)
+- [Support](#support)
+- [Acknowledgments](#acknowledgments)
 
----
+## Overview
 
-## Screenshot
+HyperAgent is an AI-powered multi-agent platform that turns natural-language specifications into production-ready, audited, simulated, and deployed smart contracts across multiple EVM networks. The system uses a microservice and service-oriented architecture (SOA). Agents communicate via the Agent2Agent (A2A) protocol with ERC-8004 on-chain registries for identity, reputation, and validation. LLM access is BYOK: no server-side LLM keys for user workloads; keys are stored in an isolated, encrypted environment and used only for that user's runs.
 
-<div align="center">
-  <img src="/public/screenshot-dashboard.png" alt="HyperAgent Dashboard" width="800">
-  <p><em>HyperAgent Dashboard - Generate, audit, and deploy smart contracts</em></p>
-</div>
+**Goal:** Make end-to-end smart contract development verifiable, repeatable, and safe. Developers go from "idea in English" to deployed and monitored contract with as few manual steps as possible, while preserving auditability and human oversight where needed.
 
----
+## Phase 1 (Closed Beta)
 
-## Getting Started
+**Current phase:** Closed Beta v0.1.0
 
-### Prerequisites
+- Web-based IDE (HyperAgent Studio)
+- Public, user-tested by default
+- SKALE Base networks (SKALE Base Mainnet, SKALE Base Sepolia Testnet). Default network: Sepolia.
 
-#### Required Software
+**User flow:** Connect (wallet) → BYOK (provide LLM keys: Gemini, OpenAI, Claude, OpenRouter) → Approved → Run full pipeline (spec, generate, audit, Tenderly simulation and report, deploy if applicable). Tenderly simulation and report are part of the visible workflow. Users can remove key configuration at any time; keys are wiped with no long-lived exposure.
 
-| Software | Version | Notes |
-|----------|---------|-------|
-| **Python** | 3.10+ | Required for backend |
-| **Node.js** | 18.18+ | Required for frontend (Next.js 16) |
-| **npm** | 9.0+ | Comes with Node.js |
-| **Git** | 2.30+ | Version control |
-| **PostgreSQL** | 15+ | Database (or use [Supabase](https://supabase.com)) |
-| **Redis** | 7.0+ | Caching (optional, can use Redis Cloud) |
-| **Docker** | 24.0+ | Optional, for containerized deployment |
-| **Docker Compose** | 2.20+ | Optional, comes with Docker Desktop |
+## Architecture
 
-#### Required API Keys
+**Three layers:** client shells, orchestration/agents, and core services. Agents are independent services with well-defined input/output schemas; they communicate over A2A with ERC-8004-compatible on-chain registries.
 
-| Service | Purpose | Get Key |
-|---------|---------|---------|
-| **Google Gemini** | AI contract generation | [Get API Key](https://aistudio.google.com/app/apikey) |
-| **Thirdweb** | x402 payments & wallet | [Get Client ID](https://thirdweb.com/dashboard) |
-| **OpenAI** (optional) | Alternative AI provider | [Get API Key](https://platform.openai.com/api-keys) |
+**Core stack:** Python/FastAPI, Next.js/React/TypeScript, Supabase (PostgreSQL), VectorDB (e.g., Pinecone), Redis, Acontext, Docker, Tenderly. Smart contract tooling: Hardhat, Foundry, Thirdweb SDK.
 
-#### Blockchain Requirements (for deployment)
+**Pipeline:** SpecAgent (versioned Spec Lock) → Design and Proposal agents → CodegenAgent (streaming guardrails) → Autofixer and audit agents (Slither, Mythril, MythX, Echidna) → TenderlySimAgent → DeployAgent and VerifyAgent → MonitorAgent. Safety is enforced through Spec Lock, simulation-first validation via Tenderly, and mandatory security tooling.
 
-- **Test AVAX** - For Avalanche Fuji testnet ([Faucet](https://build.avax.network/console/primary-network/faucet))
-- **Test USDC** - For x402 payments on testnets ([Facuet](https://faucet.circle.com/))
-- **Wallet** - MetaMask, Core(Recommended), or any Web3 wallet
+**Deployment:** Vercel (frontend), Contabo/Coolify (backend).
 
-#### Verify Installation
-
-```bash
-# Check versions
-python --version    # Should be 3.10+
-node --version      # Should be 18.18+
-npm --version       # Should be 9.0+
-git --version       # Should be 2.30+
-docker --version    # Should be 24.0+ (optional)
-```
-
-### Hardware Requirements
-
-#### Development Machine
-
-| Resource | Minimum | Recommended | Optimal |
-|----------|---------|-------------|---------|
-| **RAM** | 8 GB | 16 GB | 32 GB |
-| **CPU** | 2 cores | 4 cores | 6+ cores |
-| **Storage** | 30 GB free | 50 GB free | 100 GB free (SSD) |
-
-> 💡 **Tip**: Use cloud services (Supabase, Redis Cloud) to reduce local requirements.
-> See [GUIDE/SIMPLIFIED_SETUP.md](./GUIDE/SIMPLIFIED_SETUP.md) for cloud-based setup.
-
-#### Storage Breakdown
-
-| Component | Size | Notes |
-|-----------|------|-------|
-| Docker Images | ~5-8 GB | Can be cleaned periodically |
-| Docker Volumes | ~5-15 GB | Grows with usage |
-| Python venv | ~1 GB | One-time setup |
-| Frontend node_modules | ~500 MB | One-time setup |
-
-#### Storage Over Time
-
-- **Fresh Install**: ~10-12 GB
-- **After 1 Month**: ~15-18 GB
-- **After 3 Months**: ~22-28 GB
-
-<details>
-<summary>💾 Storage Optimization Tips</summary>
-
-- Use **Supabase** instead of local PostgreSQL (saves ~5-15 GB)
-- Clean Docker regularly: `docker system prune` (saves ~2-5 GB)
-- Limit Prometheus retention (saves ~1-2 GB)
-- Rotate logs (saves ~500 MB - 1 GB)
-- **Total potential savings**: ~8-23 GB
-
-</details>
-
-### Build Performance
-
-| Build Type | Time | Notes |
-|------------|------|-------|
-| **First build** | ~25-45 min | Full setup |
-| **Rebuild (cached)** | ~5-15 min | Layer caching enabled |
-| **Frontend only** | ~3-5 min | `npm run build` |
-| **Backend only** | ~20-35 min | Python deps + Solidity |
-
-> Multi-stage builds and layer caching optimize rebuild times. Most time is spent installing Python dependencies and Solidity compilers.
-
-### Quick Install
-
-```bash
-# Clone repository
-git clone https://github.com/JustineDevs/HyperAgent.git
-cd Hyperkit_agent
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Set up environment
-cp .env.example .env
-# Edit .env with your API keys
-
-# Initialize database
-alembic upgrade head
-
-# or make if you prefer straight forward requires Make installed
-make up
-
-# Run development server | If you prefer not used Docker
-uvicorn hyperagent.api.main:app --reload
-
-```
-
-### Docker
-
-```bash
-# Start all services (frontend, backend, DB, Redis)
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
-```
-
-### Frontend (Optional)
-
-```bash
-cd frontend
-npm install
-npm run dev
-# Open http://localhost:3000
-```
-
----
-
-## Documentation
-
-- **[📖 Full Documentation](https://hyperionkit.xyz/docs)** - Complete guides and API reference
-- **[🚀 Getting Started Guide](./GUIDE/GETTING_STARTED.md)** - Detailed setup and first contract
-- **[🏗️ Architecture Guide](./docs/ARCHITECTURE_GUIDE.md)** - System design and patterns
-- **[💳 x402 Payment Guide](./docs/X402_AVALANCHE_INTEGRATION.md)** - Pay-per-use setup
-- **[⚡ Hyperion PEF Guide](./docs/HYPERION_PEF_GUIDE.md)** - Parallel batch deployment
-- **[🔧 API Reference](./GUIDE/API.md)** - Complete API documentation
-
----
+**Networks:** SKALE Base Roadmap includes Mantle, Avalanche, BNB, Arbitrum, and other EVM-compatible chains via chain registry and SDK capability registry (x402, AA, Thirdweb first-class).
 
 ## Features
 
-- 🤖 **AI-Powered Generation** - Natural language → Solidity contracts
-- 🛡️ **Automated Auditing** - Security analysis with Slither, Mythril, Echidna
-- 🚀 **Multi-Chain Deployment** - Hyperion, Mantle, Avalanche
-- 💳 **x402 Payments** - Pay-per-use on Avalanche networks
-- ⚡ **Parallel Deployment** - 10-50x faster with Hyperion PEF
-- 🎯 **MetisVM Optimized** - Floating-point and AI inference support
+- **Natural language to contracts** – Describe behavior in plain language; get Solidity, tests, and audit-ready artifacts.
+- **BYOK** – Bring your own LLM keys (OpenAI, Anthropic, Google, OpenRouter); no server-side LLM config for user workloads.
+- **Simulation-first** – Tenderly integration for transaction simulation and reports before deployment.
+- **Security tooling** – Slither, Mythril, MythX, Echidna as mandatory pipeline stages.
+- **Multi-chain** – Chain and SDK registries for plug-and-play networks
+- **Account abstraction** – ERC-4337 and EIP-7702 via Thirdweb; x402 metering where configured.
+- **Observability** – OpenTelemetry, MLflow, Tenderly monitoring, Dune dashboards.
+- **RAG and memory** – Curated corpora and Acontext for long-term agent memory; IPFS/Pinata, Arweave, Filecoin for artifacts.
 
-**[View all features →](https://hyperionkit.xyz/features)**
+## Quick Start
 
----
+### Prerequisites
+
+- Node.js 18 or higher
+- pnpm 8 or higher
+- Git
+- (Optional) Python 3.11+, Docker for backend
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/Hyperkit-Labs/hyperagent.git
+   cd hyperagent
+   ```
+
+2. **Install dependencies**
+   ```bash
+   pnpm install
+   ```
+
+3. **Set up environment**
+   - Local dev: copy `.env.development.example` to `.env`. Production: copy `.env.example` to `.env` or `.env.production`.
+   - Set `NEXT_PUBLIC_THIRDWEB_CLIENT_ID` and `NEXT_PUBLIC_API_URL` (e.g. `http://localhost:4000` with Docker backend).
+
+4. **Start the frontend (Studio)**
+   ```bash
+   pnpm --filter hyperagent-studio dev
+   ```
+   Open [http://localhost:3000](http://localhost:3000).
+
+5. **Backend (optional)**  
+   If a backend is provided (e.g. API + Docker), follow its run instructions so the API is available at the URL set in `NEXT_PUBLIC_API_URL`. The web app calls that URL for workflows and data.
+
+For full setup and usage, see [Getting started](docs/getting-started.md) and [Developer guide](docs/developer-guide.md).
+
+## Documentation
+
+- [Docs index](docs/README.md) – Onboarding, users, and developers.
+- [Getting started](docs/getting-started.md) – First-time setup and run locally.
+- [User guide](docs/user-guide.md) – How to use HyperAgent Studio (connect, BYOK, run workflows).
+- [Developer guide](docs/developer-guide.md) – Repo structure, local setup, contributing.
+- [Platform Blueprint](external/docs/detailed/draft.md) – Full specification (SOA, A2A, ERC-8004, pipeline, registries).
+- [Project Details](external/docs/detailed/Project%20Details.md) – Goals, architecture, tech stack, roadmap.
 
 ## Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+We welcome contributions. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-<a href="https://github.com/HyperionKit/HyperAgent/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=HyperionKit/HyperAgent" />
-</a>
-
----
+1. Fork the repository.
+2. Create a feature branch (`git checkout -b feature/your-feature`).
+3. Make your changes; run lint and tests.
+4. Commit with a clear message (`git commit -m 'feat: add X'`).
+5. Push and open a Pull Request.
 
 ## License
 
-MIT License - see [LICENSE](./LICENSE) for details.
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
----
+## Support
 
-## Links
+- [Documentation](docs/README.md) – Getting started, user guide, developer guide.
+- [GitHub Issues](https://github.com/Hyperkit-Labs/hyperagent/issues) – Report bugs or request features.
+- [GitHub Discussions](https://github.com/Hyperkit-Labs/hyperagent/discussions) – Questions and ideas.
 
-- **Website**: [hyperionkit.xyz](https://hyperionkit.xyz/)
-- **GitHub**: [github.com/Hyperionkit/HyperAgent](https://github.com/Hyperionkit/HyperAgent)
-- **Organization**: [github.com/HyperionKit/Hyperkit](https://github.com/HyperionKit/Hyperkit)
-- **Linktree**: [linktr.ee/Hyperionkit](https://linktr.ee/Hyperionkit)
+## Acknowledgments
 
----
+**Core stack:** [FastAPI](https://fastapi.tiangolo.com/), [Next.js](https://nextjs.org/), [Supabase](https://supabase.com/), [pnpm](https://pnpm.io/), [Turbo](https://turbo.build/).
 
-<div align="center">
-  <p>Built with ❤️ by the HyperAgent team</p>
-</div>
+**Web3:** [Thirdweb](https://thirdweb.com/) (x402, account abstraction), [Mantle](https://www.mantle.xyz/), [Pinata](https://www.pinata.cloud/) (IPFS).
+
+**LLM providers (BYOK):** [Anthropic](https://www.anthropic.com/), [OpenAI](https://openai.com/), [Google Gemini](https://deepmind.google/technologies/gemini/), [OpenRouter](https://openrouter.ai/). Keys are user-provided and stored in an isolated, encrypted environment; no server-side LLM keys for user workloads.

@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: hyperagent
+resources:
+  - namespace.yaml
+  - configmap-placeholder.yaml
+  - api-gateway-deployment.yaml
+  - orchestrator-deployment.yaml
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/part-of: hyperagent

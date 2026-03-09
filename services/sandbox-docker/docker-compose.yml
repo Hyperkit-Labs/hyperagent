@@ -1,0 +1,20 @@
+# Docker Compose for Contabo VPS deployment.
+# Run: docker compose up -d
+# Requires: Docker socket mount for spawning sandbox containers.
+version: "3.8"
+services:
+  sandbox-api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - sandbox-data:/var/lib/sandbox-docker
+    environment:
+      - OPENSANDBOX_API_KEY=${OPENSANDBOX_API_KEY}
+      - PREVIEW_BASE_URL=${PREVIEW_BASE_URL:-}
+      - SANDBOX_WORK_DIR=/var/lib/sandbox-docker
+    restart: unless-stopped
+
+volumes:
+  sandbox-data: {}

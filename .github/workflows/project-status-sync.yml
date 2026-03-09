@@ -1,0 +1,132 @@
+name: Project 9 - Status sync (issue close/reopen)
+
+on:
+  issues:
+    types: [closed, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync_status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update Project 9 Status field
+        uses: actions/github-script@v7
+        continue-on-error: true
+        with:
+          # NOTE: If secrets are not configured yet, this step will no-op (fails but workflow continues).
+          github-token: ${{ secrets.PROJECT_TOKEN }}
+          script: |
+            const org = process.env.PROJECT_OWNER || 'Hyperkit-Labs';
+            const projectNumber = Number(process.env.PROJECT_NUMBER || '9');
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issueNumber = context.payload.issue?.number;
+            const action = context.payload.action;
+
+            if (!issueNumber) {
+              core.info('No issue number in event payload; skipping.');
+              return;
+            }
+
+            const desiredStatusName = action === 'closed' ? 'Done' : 'Backlog';
+            core.info(`Syncing issue #${issueNumber} -> Status=${desiredStatusName}`);
+
+            const query = `
+              query($org:String!, $projectNumber:Int!, $owner:String!, $repo:String!, $issueNumber:Int!) {
+                organization(login:$org) {
+                  projectV2(number:$projectNumber) {
+                    id
+                    fields(first: 50) {
+                      nodes {
+                        ... on ProjectV2SingleSelectField {
+                          id
+                          name
+                          options { id name }
+                        }
+                      }
+                    }
+                  }
+                }
+                repository(owner:$owner, name:$repo) {
+                  issue(number:$issueNumber) {
+                    id
+                    projectItems(first: 20) {
+                      nodes { id project { id } }
+                    }
+                  }
+                }
+              }
+            `;
+
+            const data = await github.graphql(query, { org, projectNumber, owner, repo, issueNumber });
+            const project = data.organization?.projectV2;
+            const issue = data.repository?.issue;
+
+            if (!project) {
+              core.setFailed(`ProjectV2 not found: org=${org}, number=${projectNumber}`);
+              return;
+            }
+            if (!issue) {
+              core.setFailed(`Issue not found: ${owner}/${repo}#${issueNumber}`);
+              return;
+            }
+
+            const statusField = (project.fields?.nodes || []).find((f) => f && f.name === 'Status' && f.options);
+            if (!statusField) {
+              core.setFailed('Project field "Status" not found or not a single-select field.');
+              return;
+            }
+
+            const normalize = (s) => String(s || '').trim().toLowerCase();
+            const desired = normalize(desiredStatusName);
+
+            // Be flexible: teams name columns differently. Try a few common variants.
+            const candidates =
+              desired === 'done'
+                ? ['done', 'completed', 'closed']
+                : ['backlog', 'to do', 'todo', 'triage', 'new'];
+
+            const option =
+              statusField.options.find((o) => candidates.includes(normalize(o.name))) ||
+              statusField.options.find((o) => normalize(o.name) === desired);
+
+            if (!option) {
+              core.setFailed(`No matching Status option found for "${desiredStatusName}". Available: ${statusField.options.map((o) => o.name).join(', ')}`);
+              return;
+            }
+
+            const item = (issue.projectItems?.nodes || []).find((n) => n?.project?.id === project.id);
+            if (!item) {
+              core.info('Issue is not in Project 9 yet; nothing to sync.');
+              return;
+            }
+
+            const mutation = `
+              mutation($projectId:ID!, $itemId:ID!, $fieldId:ID!, $optionId:String!) {
+                updateProjectV2ItemFieldValue(input: {
+                  projectId: $projectId,
+                  itemId: $itemId,
+                  fieldId: $fieldId,
+                  value: { singleSelectOptionId: $optionId }
+                }) {
+                  projectV2Item { id }
+                }
+              }
+            `;
+
+            await github.graphql(mutation, {
+              projectId: project.id,
+              itemId: item.id,
+              fieldId: statusField.id,
+              optionId: option.id,
+            });
+
+            core.info(`Updated Project Status to "${option.name}" for issue #${issueNumber}.`);
+
+        env:
+          PROJECT_OWNER: Hyperkit-Labs
+          PROJECT_NUMBER: "9"

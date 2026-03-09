@@ -1,0 +1,84 @@
+name: Docker Image Cleanup
+
+on:
+  schedule:
+    # Run weekly on Sunday at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+
+jobs:
+  cleanup-old-images:
+    name: Cleanup Old Docker Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Log in to Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Install GitHub CLI
+        run: |
+          type -p curl >/dev/null || apt-get update && apt-get install -y curl
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          apt-get update
+          apt-get install -y gh
+      
+      - name: Authenticate GitHub CLI
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+      
+      - name: Clean up old images
+        run: |
+          # Keep last 10 versions per branch/tag
+          # Remove images older than 30 days
+          echo "Cleaning up old Docker images from GitHub Container Registry..."
+          
+          PACKAGE_NAME="${{ github.repository }}"
+          REPO_OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1)
+          REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+          
+          echo "Package: ${PACKAGE_NAME}"
+          echo "Retention policy: Keep last 10 versions, remove images older than 30 days"
+          
+          # Get all package versions
+          VERSIONS=$(gh api repos/${REPO_OWNER}/${REPO_NAME}/packages/container/${REPO_NAME}/versions --jq '.[] | {id: .id, created_at: .created_at, tags: [.metadata.container.tags[]?]}')
+          
+          if [ -z "$VERSIONS" ]; then
+            echo "No package versions found"
+            exit 0
+          fi
+          
+          # Calculate cutoff date (30 days ago)
+          CUTOFF_DATE=$(date -u -d '30 days ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-30d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "")
+          
+          if [ -z "$CUTOFF_DATE" ]; then
+            echo "Warning: Could not calculate cutoff date. Skipping cleanup."
+            exit 0
+          fi
+          
+          echo "Cutoff date: ${CUTOFF_DATE}"
+          
+          # Delete old versions (older than 30 days)
+          echo "$VERSIONS" | jq -r --arg cutoff "$CUTOFF_DATE" '
+            .[] | 
+            select(.created_at < $cutoff) | 
+            .id
+          ' | while read -r version_id; do
+            if [ -n "$version_id" ]; then
+              echo "Deleting version ID: ${version_id}"
+              gh api repos/${REPO_OWNER}/${REPO_NAME}/packages/container/${REPO_NAME}/versions/${version_id} -X DELETE || echo "Failed to delete version ${version_id}"
+            fi
+          done
+          
+          echo "Cleanup completed. Check GitHub Container Registry for details."

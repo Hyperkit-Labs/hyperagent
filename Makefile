@@ -1,131 +1,256 @@
-# Makefile for HyperAgent Docker operations
+# Root Makefile - backend in Docker, frontend (Studio) run locally
+# Run from repository root. Docker = API gateway + orchestrator + services only.
 
-.PHONY: help build up down logs restart clean test format lint type-check quality-check
+# Compose files: local dev vs Contabo production.
+# Run from infra/docker so ../../.env and ../../ paths resolve to repo root.
+COMPOSE_DIR := infra/docker
+COMPOSE_FILE := docker-compose.yml
+COMPOSE_FILE_LOCAL := docker-compose.local.yml
+ENV_FILE := .env
 
-# Default target
+.PHONY: help up down logs restart migrate install-web run-web install-api run-api build rebuild \
+	build-web build-prod check-env validate-prod format-api lint-api type-check-api quality-check-api \
+	dogfood-setup dogfood-help dogfood-daemon
+
+# Dogfood: default scope and date (override: make dogfood-setup SCOPE=settings-byok DOGFOOD_DATE=2025-02-24)
+DOGFOOD_SCOPE ?= full
+DOGFOOD_DATE ?= $(shell date +%Y-%m-%d 2>/dev/null || echo 0000-00-00)
+DOGFOOD_DIR := dogfood-output/$(DOGFOOD_DATE)-$(DOGFOOD_SCOPE)
+DOGFOOD_TEMPLATE := .cursor/skills/dogfood/templates/dogfood-report-template.md
+
 help:
-	@echo "HyperAgent Commands:"
+	@echo "HyperAgent (run from repo root):"
 	@echo ""
-	@echo "Docker Commands:"
-	@echo "  make build          - Build Docker image"
-	@echo "  make up             - Start all services (development)"
-	@echo "  make up-build       - Build and start all services"
-	@echo "  make up-prod        - Start all services (production)"
-	@echo "  make down           - Stop all services"
-	@echo "  make logs           - View logs (all services)"
-	@echo "  make logs-frontend  - View frontend logs"
-	@echo "  make logs-backend   - View backend logs"
-	@echo "  make logs-db        - View database logs"
-	@echo "  make logs-redis     - View Redis logs"
-	@echo "  make restart        - Restart services"
-	@echo "  make clean          - Remove containers and volumes"
-	@echo "  make test           - Run tests in container"
-	@echo "  make shell          - Open shell in container"
-	@echo "  make migrate        - Run database migrations"
-	@echo "  make health         - Check service health"
+	@echo "Development:"
+	@echo "  make up          - Start lite backend (5-6 services, cloud Supabase + Redis)"
+	@echo "  make up-full     - Start with roma-service, codegen (legacy)"
+	@echo "  make up-tools    - Start with hyperagent-tools (port 9000); set TOOLS_BASE_URL=http://hyperagent-tools:9000 in .env"
+	@echo "  make up-local    - Start full stack with local postgres, redis, vectordb"
+	@echo "  make up-contabo  - Start Contabo production stack (for local testing)"
+	@echo "  make build       - Build Docker images for local dev (run when code changes)"
+	@echo "  make rebuild     - Force rebuild Docker images from scratch"
+	@echo "  make down        - Stop stack"
+	@echo "  make restart     - Restart stack"
+	@echo "  make logs        - Follow logs"
+	@echo "  make migrate     - Verify DB (local postgres only; use with make up-local)"
+	@echo "  make install-web - pnpm install (workspaces)"
+	@echo "  make run-web     - Start Next.js Studio locally (make up for backend first)"
+	@echo "  make install-api - Create .venv and install API deps (optional)"
+	@echo "  make run-api     - Run API locally with uvicorn (optional)"
 	@echo ""
-	@echo "Code Quality Commands:"
-	@echo "  make format          - Format code with Black and isort"
-	@echo "  make lint            - Check code formatting and imports"
-	@echo "  make type-check      - Run MyPy type checking"
-	@echo "  make quality-check   - Run all code quality checks"
+	@echo "API code quality (run from root):"
+	@echo "  make format-api       - Format API code (Black, isort)"
+	@echo "  make lint-api        - Check API formatting and imports"
+	@echo "  make type-check-api  - MyPy type check API"
+	@echo "  make quality-check-api - Lint + type-check API"
+	@echo ""
+	@echo "Production:"
+	@echo "  make build-prod   - Build production Docker images and frontend"
+	@echo "  make build-web    - Build production Next.js frontend"
+	@echo "  make validate-prod - Validate production environment variables"
+	@echo "  make check-env   - Check environment configuration"
+	@echo ""
+	@echo "Typical flow:  make up && make migrate && make run-web"
+	@echo "After code changes: make build && make restart"
+	@echo ""
+	@echo "QA / Dogfood:"
+	@echo "  make dogfood-setup [SCOPE=full|settings-byok|...] - Create output dir and report template"
+	@echo "  make dogfood-help  - Show dogfood checklist and doc link"
+	@echo "  make dogfood-daemon - Start agent-browser daemon (Windows fix; run in separate terminal)"
 
-# Build Docker image
+# Build Docker images for local dev (run when code changes, before make up)
 build:
-	@echo "[*] Building HyperAgent Docker image..."
-	docker build -t hyperagent:latest .
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) build
+	@echo "[+] Docker images built. Run 'make up' to start."
 
-# Start development stack
+# Force rebuild from scratch (local dev)
+rebuild:
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) build --no-cache
+	@echo "[+] Docker images rebuilt. Run 'make up' to start."
+
+# Start lite stack (5-6 services). ROMA/codegen in-process. Cloud Supabase + Redis.
 up:
-	@echo "[*] Starting HyperAgent development stack..."
-	docker-compose up -d
-	@echo "[+] Services started. Use 'make logs' to view logs."
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) up -d
+	@echo "[+] Backend up (lite). Gateway: http://localhost:4000  Run Studio: make run-web"
+	@echo "    Requires SUPABASE_URL, REDIS_URL in .env. Stop: make down   Logs: make logs"
 
-# Start development stack with build
-up-build:
-	@echo "[*] Building and starting HyperAgent development stack..."
-	docker-compose up -d --build
-	@echo "[+] Services started. Use 'make logs' to view logs."
+# Start full stack with roma-service, codegen (legacy).
+up-full:
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) --profile full up -d
+	@echo "[+] Backend up (full). Gateway: http://localhost:4000"
 
-# Start production stack
-up-prod:
-	@echo "[*] Starting HyperAgent production stack..."
-	docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-	@echo "[+] Production services started."
+# Start with hyperagent-tools (remote heavy toolchain). Set TOOLS_BASE_URL=http://hyperagent-tools:9000 in .env.
+up-tools:
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) --profile tools up -d
+	@echo "[+] Backend up with hyperagent-tools. Gateway: http://localhost:4000  Tools: http://localhost:9000"
+	@echo "    Ensure TOOLS_BASE_URL=http://hyperagent-tools:9000 in .env for compile/audit to use remote tools"
 
-# Stop all services
+# Start full stack with local postgres, redis, vectordb (heavier).
+up-local:
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) --profile local-db up -d
+	@echo "[+] Backend up (full local). Gateway: http://localhost:4000"
+	@echo "    Local postgres:54322  redis:6379  vectordb:6333"
+
+# Start Contabo production stack (for local testing; Coolify uses docker-compose.yml on server).
+up-contabo:
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE) up -d
+	@echo "[+] Contabo stack up. Gateway: http://localhost:4000  Sandbox: http://localhost:8005"
+
+# Stop local dev stack
 down:
-	@echo "[*] Stopping HyperAgent services..."
-	docker-compose down
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) down
 
-# View logs (all services)
-logs:
-	docker-compose logs -f
+# Stop Contabo stack (use after make up-contabo)
+down-contabo:
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE) down
 
-# View logs for specific service
-logs-frontend:
-	docker-compose logs -f frontend
-
-logs-backend:
-	docker-compose logs -f hyperagent
-
-logs-db:
-	docker-compose logs -f postgres
-
-logs-redis:
-	docker-compose logs -f redis
-
-# Restart services
 restart:
-	@echo "[*] Restarting HyperAgent services..."
-	docker-compose restart
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) restart
+	@echo "[+] Stack restarted"
 
-# Clean up containers and volumes
-clean:
-	@echo "[!] Removing containers and volumes..."
-	docker-compose down -v
-	@echo "[+] Cleanup complete."
+logs:
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) logs -f
 
-# Run tests in container
-test:
-	@echo "[*] Running tests in container..."
-	docker-compose exec hyperagent pytest tests/ -v
-
-# Open shell in container
-shell:
-	docker-compose exec hyperagent /bin/bash
-
-# Run database migrations
+# DB migrations: for local postgres only. Run after make up-local.
+# For cloud Supabase, apply migrations via Dashboard SQL or: supabase db push
 migrate:
-	@echo "[*] Running database migrations..."
-	docker-compose exec hyperagent alembic upgrade head
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) --profile local-db exec supabase pg_isready -U postgres -d hyperagent
+	@echo "[+] DB reachable. Schema from platform/supabase/migrations applied on first start."
 
-# Health check
-health:
-	@echo "[*] Checking service health..."
-	@docker-compose ps
-	@curl -f http://localhost:8000/api/v1/health/basic || echo "[-] API not responding"
+# Frontend
+install-web:
+	pnpm install
+	@echo "[+] Run frontend: make run-web"
 
-# Code Quality Commands
-format:
-	@echo "[*] Formatting code with Black and isort..."
-	black hyperagent/
-	isort hyperagent/
-	@echo "[+] Code formatting complete"
+run-web:
+	pnpm --filter hyperagent-studio dev
 
-lint:
-	@echo "[*] Checking code formatting and imports..."
-	black --check hyperagent/
-	isort --check-only hyperagent/
-	@echo "[+] Linting checks passed"
+# Optional: run API locally without Docker (venv + uvicorn). Use "make up" for standard backend.
+install-api:
+	@cd apps/hyperagent-api && \
+	if [ ! -d .venv ]; then python -m venv .venv; fi && \
+	(. .venv/Scripts/activate 2>/dev/null || . .venv/bin/activate) && \
+	pip install -q -r requirements.txt && \
+	echo "[+] Optional: make run-api to run API without Docker"
 
-type-check:
-	@echo "[*] Running MyPy type checking..."
-	mypy hyperagent/
-	@echo "[+] Type checking passed"
+run-api:
+	@cd apps/hyperagent-api && \
+	(. .venv/Scripts/activate 2>/dev/null || . .venv/bin/activate) && \
+	uvicorn hyperagent.api.main:app --reload --host 0.0.0.0 --port 8000
 
-quality-check: lint type-check
-	@echo "[*] Running all code quality checks..."
-	@bash scripts/check_code_quality.sh || echo "[-] Some checks failed. See output above."
-	@echo "[+] All code quality checks complete"
+# API code quality (run from repo root)
+format-api:
+	@echo "[*] Formatting API code with Black and isort..."
+	@cd apps/hyperagent-api && black hyperagent/ && isort hyperagent/
+	@echo "[+] API formatting complete"
 
+lint-api:
+	@echo "[*] Checking API formatting and imports..."
+	@cd apps/hyperagent-api && black --check hyperagent/ && isort --check-only hyperagent/
+	@echo "[+] API lint passed"
+
+type-check-api:
+	@echo "[*] Running MyPy on API..."
+	@cd apps/hyperagent-api && mypy hyperagent/
+	@echo "[+] API type check passed"
+
+quality-check-api: lint-api type-check-api
+	@echo "[+] API quality checks complete"
+
+# Production builds
+build-web:
+	@echo "[*] Building production Next.js frontend..."
+	@cd apps/studio && pnpm run build
+	@echo "[+] Frontend build complete"
+
+build-prod: build build-web
+	@echo "[+] Production build complete"
+	@echo "    Backend images: built"
+	@echo "    Frontend: built"
+	@echo "    Next steps:"
+	@echo "      1. Set production environment variables"
+	@echo "      2. Run: make validate-prod"
+	@echo "      3. Deploy using your deployment method"
+
+# Environment validation
+check-env:
+	@echo "[*] Checking environment configuration..."
+	@if [ -f .env ]; then \
+		echo "[+] .env file found"; \
+		if grep -q "NEXT_PUBLIC_API_URL" .env && ! grep -q "NEXT_PUBLIC_API_URL=http://localhost" .env; then \
+			echo "[+] NEXT_PUBLIC_API_URL is configured"; \
+		else \
+			echo "[!] Warning: NEXT_PUBLIC_API_URL not set or using localhost"; \
+		fi; \
+		if grep -q "CORS_ORIGINS" .env && ! grep -q "CORS_ORIGINS=\*" .env; then \
+			echo "[+] CORS_ORIGINS is configured"; \
+		else \
+			echo "[!] Warning: CORS_ORIGINS not set or using wildcard"; \
+		fi; \
+		if grep -q "JWT_SECRET_KEY" .env && ! grep -q "JWT_SECRET_KEY=change-me" .env; then \
+			echo "[+] JWT_SECRET_KEY is configured"; \
+		else \
+			echo "[!] Warning: JWT_SECRET_KEY not set or using default"; \
+		fi; \
+		if grep -q "POSTGRES_PASSWORD" .env; then \
+			echo "[+] POSTGRES_PASSWORD is configured"; \
+		else \
+			echo "[!] Warning: POSTGRES_PASSWORD not set"; \
+		fi; \
+	else \
+		echo "[!] Warning: .env file not found"; \
+	fi
+
+validate-prod:
+	@echo "[*] Validating production environment..."
+	@if [ -z "$$NEXT_PUBLIC_API_URL" ]; then \
+		echo "[!] Error: NEXT_PUBLIC_API_URL not set"; \
+		exit 1; \
+	fi
+	@if [ -z "$$CORS_ORIGINS" ] || [ "$$CORS_ORIGINS" = "*" ]; then \
+		echo "[!] Error: CORS_ORIGINS must be set to explicit origins in production"; \
+		exit 1; \
+	fi
+	@if [ -z "$$JWT_SECRET_KEY" ] || [ "$$JWT_SECRET_KEY" = "change-me-in-production" ]; then \
+		echo "[!] Error: JWT_SECRET_KEY must be set to a secure value in production"; \
+		exit 1; \
+	fi
+	@if [ -z "$$POSTGRES_PASSWORD" ]; then \
+		echo "[!] Error: POSTGRES_PASSWORD must be set"; \
+		exit 1; \
+	fi
+	@echo "[+] Production environment validation passed"
+
+# Dogfood QA: create output dir, screenshots/videos subdirs, and copy report template.
+# Usage: make dogfood-setup [SCOPE=full] [DOGFOOD_DATE=YYYY-MM-DD]
+dogfood-setup:
+	@mkdir -p $(DOGFOOD_DIR)/screenshots $(DOGFOOD_DIR)/videos
+	@if [ -f $(DOGFOOD_TEMPLATE) ]; then \
+		cp $(DOGFOOD_TEMPLATE) $(DOGFOOD_DIR)/report.md; \
+		echo "[+] Dogfood output: $(DOGFOOD_DIR)/"; \
+		echo "    Edit report: $(DOGFOOD_DIR)/report.md (set App name, URL, Session, Scope)"; \
+		echo "    Then: agent-browser --session hyperkit-local open http://localhost:3000"; \
+	else \
+		echo "[!] Template not found: $(DOGFOOD_TEMPLATE)"; exit 1; \
+	fi
+
+# Print dogfood checklist and link to full plan.
+dogfood-help:
+	@echo "Dogfood (exploratory QA) checklist:"
+	@echo "  1. Backend and Studio running (make up, make run-web) or staging/prod URL known"
+	@echo "  2. make dogfood-setup SCOPE=full  (or SCOPE=settings-byok, etc.)"
+	@echo "  3. Edit dogfood-output/.../report.md: App name, URL, Session, Scope"
+	@echo "  4. agent-browser --session <name> open <STUDIO_URL> && agent-browser --session <name> wait --load networkidle"
+	@echo "  5. If auth required: login, then save state if supported"
+	@echo "  6. Orient: screenshot + snapshot; then explore pages, document issues in report.md"
+	@echo "  7. Close: agent-browser --session <name> close"
+	@echo ""
+	@echo "Full plan: docs/qa/dogfood.md"
+	@echo "Skill: .cursor/skills/dogfood/SKILL.md (use agent-browser directly, not npx)"
+	@echo ""
+	@echo "Windows 'Daemon failed to start': run 'make dogfood-daemon' in one terminal; in another, run agent-browser WITHOUT --session (e.g. agent-browser open http://localhost:3000)."
+
+# Start agent-browser daemon manually (Windows workaround when CLI fails to start daemon).
+# Run in one terminal and leave it open; run agent-browser open/wait/... in another terminal.
+dogfood-daemon:
+	@bash scripts/dogfood-daemon.sh

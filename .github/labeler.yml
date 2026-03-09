@@ -1,0 +1,109 @@
+# Auto-label PRs based on changed files
+# See: https://github.com/actions/labeler
+
+# Areas
+'area:frontend':
+  - changed-files:
+    - any-glob-to-any-file: 'apps/studio/**/*'
+    - any-glob-to-any-file: '**/*.tsx'
+    - any-glob-to-any-file: '**/*.jsx'
+    - any-glob-to-any-file: '**/*.css'
+
+'area:backend':
+  - changed-files:
+    - any-glob-to-any-file: 'services/orchestrator/**/*'
+    - any-glob-to-any-file: '**/*.py'
+
+'area:contracts':
+  - changed-files:
+    - any-glob-to-any-file: 'contracts/**/*'
+    - any-glob-to-any-file: '**/*.sol'
+
+'area:infra':
+  - changed-files:
+    - any-glob-to-any-file: 'infra/**/*'
+    - any-glob-to-any-file: 'k8s/**/*'
+    - any-glob-to-any-file: 'docker/**/*'
+    - any-glob-to-any-file: 'Dockerfile*'
+    - any-glob-to-any-file: 'docker-compose*.yml'
+    - any-glob-to-any-file: '.github/workflows/**/*'
+
+'area:database':
+  - changed-files:
+    - any-glob-to-any-file: 'services/orchestrator/**/*'
+    - any-glob-to-any-file: '**/migrations/**/*'
+    - any-glob-to-any-file: '**/alembic/**/*'
+
+'area:docs':
+  - changed-files:
+    - any-glob-to-any-file: 'docs/**/*'
+    - any-glob-to-any-file: '**/*.md'
+
+# Types
+'type:feature':
+  - changed-files:
+    - any-glob-to-any-file: 'services/orchestrator/**/*.py'
+    - any-glob-to-any-file: 'apps/studio/**/*'
+  - head-branch: ['^feature/', '^feat/']
+
+'type:bugfix':
+  - head-branch: ['^bugfix/', '^fix/']
+
+'type:hotfix':
+  - head-branch: ['^hotfix/']
+
+'type:chore':
+  - head-branch: ['^chore/']
+  - changed-files:
+    - any-glob-to-any-file: 'package*.json'
+    - any-glob-to-any-file: 'requirements*.txt'
+    - any-glob-to-any-file: 'pyproject.toml'
+
+'type:docs':
+  - changed-files:
+    - all-globs-to-all-files: '**/*.md'
+
+# Dependencies
+'dependencies':
+  - changed-files:
+    - any-glob-to-any-file: 'package*.json'
+    - any-glob-to-any-file: 'requirements*.txt'
+    - any-glob-to-any-file: 'pyproject.toml'
+    - any-glob-to-any-file: 'Cargo.toml'
+
+# Size labels
+'size:small':
+  - changed-files:
+    - 1-10
+
+'size:medium':
+  - changed-files:
+    - 11-50
+
+'size:large':
+  - changed-files:
+    - 51-100
+
+'size:xl':
+  - changed-files:
+    - 101+
+
+# Priority (based on file patterns)
+'priority:critical':
+  - changed-files:
+    - any-glob-to-any-file: 'services/orchestrator/**/*'
+    - any-glob-to-any-file: 'contracts/security/**/*'
+
+# Testing
+'needs-tests':
+  - changed-files:
+    - any-glob-to-any-file: 'services/orchestrator/**/*.py'
+    - any-glob-to-any-file: 'apps/studio/**/*.{ts,tsx}'
+    - all-globs-to-all-files: '!**/*.test.{py,ts,tsx}'
+    - all-globs-to-all-files: '!**/tests/**'
+
+# Security
+'security':
+  - changed-files:
+    - any-glob-to-any-file: 'services/orchestrator/**/*'
+    - any-glob-to-any-file: 'contracts/security/**/*'

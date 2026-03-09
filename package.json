@@ -1,37 +1,61 @@
 {
   "name": "hyperagent",
-  "version": "1.0.0",
-  "description": "AI Agent Platform for On-Chain Smart Contract Generation",
+  "version": "0.1.0",
+  "description": "AI-powered smart contract development platform",
   "private": true,
   "scripts": {
-    "commit": "node scripts/version/parallel-commit.js",
-    "commit:dry": "node scripts/version/parallel-commit.js --dry-run",
-    "commit:sh": "bash scripts/version/parallel-commit.sh",
-    "commit:sh:dry": "bash scripts/version/parallel-commit.sh --dry-run",
+    "dev": "pnpm turbo dev",
+    "build": "pnpm turbo build",
+    "lint": "pnpm turbo lint",
+    "typecheck": "pnpm turbo typecheck",
+    "test": "pnpm turbo test",
+    "format": "pnpm turbo format",
+    "commit": "node .github/version/scripts/commit/cli/index.js commit",
+    "commit:dry": "node .github/version/scripts/commit/cli/index.js commit --dry-run",
+    "commit:sh": "bash .github/version/scripts/commit/parallel-commit.sh",
+    "commit:sh:dry": "bash .github/version/scripts/commit/parallel-commit.sh --dry-run",
     "commit:all": "git add -A && git commit -m 'chore: update all changes'",
-    "commit:auto": "bash scripts/version/parallel-commit.sh --max 3",
+    "commit:auto": "node .github/version/scripts/commit/cli/index.js commit --max 3",
+    "commit:cli": "node .github/version/scripts/commit/cli/index.js",
+    "security:check": "node .github/version/scripts/commit/cli/index.js security",
     "status": "git status",
     "changes": "git status --porcelain",
     "staged": "git diff --cached --name-only"
   },
   "keywords": [
     "smart-contracts",
-    "blockchain",
     "ai",
-    "llm",
-    "solidity",
-    "hyperion",
-    "mantle",
-    "web3"
+    "web3",
+    "blockchain",
+    "hyperagent"
   ],
-  "author": "HyperAgent Team",
+  "author": "HyperKit Labs",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/JustineDevs/HyperAgent.git"
+    "url": "https://github.com/Hyperkit-Labs/hyperagent.git"
   },
+  "packageManager": "pnpm@10.20.0",
   "engines": {
     "node": ">=18.0.0"
+  },
+  "resolutions": {
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "@emotion/use-insertion-effect-with-fallbacks": "^1.1.0"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@emotion/use-insertion-effect-with-fallbacks": "^1.2.0"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "react": "19.2.3",
+      "react-dom": "19.2.3"
+    }
   }
 }
-

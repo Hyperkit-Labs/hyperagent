@@ -1,0 +1,477 @@
+# HyperKit Agent - Technology Stack & Integration Guide
+
+## Mandatory Pre-Action (Global)
+Before any implementation, code change, or planning, the agent MUST (in order): check `.cursor/rules/`, `.cursor/wiki/`, `.cursor/skills/`, `.cursor/llm/`. Do not run other tools or write code before completing this check. See `.cursor/rules/MANDATORY_PRE_ACTION.mdc`, `AGENTS.mdc`, and `CLAUDE.md` (AI Agent Guidelines).
+
+## Core Technology Stack
+
+### Smart Contract Development
+- **OpenZeppelin**: Security-focused smart contract libraries and standards
+- **Foundry**: Fast, portable toolkit for Ethereum application development
+  - Used for: Solidity compilation, testing, deployment
+- **Hardhat**: Ethereum development environment
+  - Used for: Development workflow, testing, deployment scripts
+
+### Blockchain Infrastructure
+- **EigenDA**: Data availability layer for Mantle mainnet
+  - Used for: Batch transaction data availability on Mantle
+- **IPFS/Pinata**: Decentralized storage and content addressing
+  - Gateway: `https://gateway.pinata.cloud`
+  - Used for: Contract metadata, artifact storage, decentralized file hosting
+- **libp2p**: Modular networking stack for peer-to-peer applications
+  - Used for: P2P networking, content routing
+
+### Payment & Wallet Infrastructure
+- **Thirdweb x402 SDK**: Open-source protocol for HTTP 402 Payment Required
+  - Client SDK: `thirdweb/x402` for React/TypeScript
+  - Server SDK: `thirdweb/x402` facilitator for payment settlement
+  - Payment tokens: ERC-2612 permit or ERC-3009 sign with authorization (USDC)
+  - Supported chains: 170+ EVM chains
+  - References:
+    - https://portal.thirdweb.com/x402
+    - Client: `useFetchWithPayment` hook for automatic 402 handling
+    - Server: `settlePayment` function with facilitator
+- **Thirdweb Wallets SDK**: User wallet creation and management
+  - Authentication methods: Email, SMS, OAuth, Passkeys, SIWE
+  - Server wallets: For backend operations
+  - References:
+    - https://portal.thirdweb.com/wallets
+    - API: `/v1/auth/initiate`, `/v1/auth/complete`
+    - Social auth: `/v1/auth/social`
+- **Thirdweb Gas Sponsorship**: Sponsor gas fees for transactions
+  - Supports both EIP-7702 (recommended) and ERC-4337
+  - EIP-7702: Default execution mode for user and server wallets
+  - ERC-4337: Account abstraction standard for gasless transactions
+  - References:
+    - https://portal.thirdweb.com/wallets/sponsor-gas
+    - API: `/v1/contracts/write` with automatic gas sponsorship
+    - Sponsorship policies: Configure rules for gas sponsorship
+
+### Database & Backend
+- **Supabase**: PostgreSQL database with pgbouncer connection pooling
+  - Connection format: `postgresql://postgres:PASSWORD@db.PROJECT_REF.supabase.co:5432/postgres`
+  - Pooling: Uses pgbouncer (transaction mode)
+  - Python: Uses `psycopg` (async) for pgbouncer compatibility
+  - TypeScript: Uses `pg` Pool with reduced max connections (5) for Supabase
+  - Schema: `hyperagent` namespace for all tables
+
+### Frontend Stack
+- **Next.js**: React framework with App Router
+- **Tailwind CSS**: Utility-first CSS framework
+- **TypeScript**: Type-safe JavaScript
+
+### Network SDKs
+- **Mantle SDK**: Bridge and cross-chain operations
+  - Deposit: `depositETH`, `depositMNT`, `depositERC20`, `depositERC721`
+  - Withdrawal: `withdrawMNT`, `withdrawERC20`, `withdrawERC721`
+  - Cross-chain messaging: L1 ↔ L2 contract communication
+  - References:
+    - https://docs.mantle.xyz/network/for-developers/how-to-guides/how-to-use-mantle-sdk
+    - Contract verification: https://docs.mantle.xyz/network/for-developers/how-to-guides/how-to-verify-smart-contracts/use-explorer-to-verify-smart-contracts
+- **SKALE SDK**: SKALE chain operations and x402 facilitator
+  - References:
+    - https://docs.skale.space/get-started/agentic-builders/facilitators
+    - https://docs.skale.space/developers/run-a-skale-chain/intro-to-schains
+    - https://docs.skale.space/cookbook/agents/build-an-agent#security-considerations
+    - https://docs.skale.space/cookbook/x402/become-an-x402-seller
+
+## Supported Networks
+
+### Mantle
+- **Testnet**: Chain ID 5003, RPC: `https://rpc.sepolia.mantle.xyz`
+  - Explorer: https://sepolia.mantlescan.xyz
+  - Currency: MNT
+  - Features: Batch deployment enabled, EigenDA disabled
+- **Mainnet**: Chain ID 5000, RPC: `https://rpc.mantle.xyz`
+  - Explorer: https://mantlescan.xyz
+  - Currency: MNT
+  - Features: Batch deployment enabled, EigenDA enabled
+
+### Avalanche
+- **Fuji Testnet**: Chain ID 43113, RPC: `https://api.avax-test.network/ext/bc/C/rpc`
+  - Explorer: https://testnet.snowtrace.io
+  - Currency: AVAX
+  - Features: Batch deployment enabled, EigenDA disabled
+  - x402 enabled: Yes
+- **Mainnet**: Chain ID 43114, RPC: `https://api.avax.network/ext/bc/C/rpc`
+  - Explorer: https://snowtrace.io
+  - Currency: AVAX
+  - Features: Batch deployment enabled, EigenDA disabled
+  - x402 enabled: Yes
+
+### Arbitrum
+- **Sepolia Testnet**: Chain ID 421614, RPC: `https://sepolia-rollup.arbitrum.io/rpc`
+  - Explorer: https://sepolia.arbiscan.io
+  - Currency: ETH
+  - Features: Batch deployment enabled
+  - References:
+    - https://docs.arbitrum.io/get-started/overview
+    - https://docs.arbitrum.io/for-devs/oracles/chainlink
+    - https://docs.arbitrum.io/stylus/gentle-introduction
+    - https://docs.arbitrum.io/how-arbitrum-works/inside-arbitrum-nitro
+- **One Mainnet**: Chain ID 42161, RPC: `https://arb1.arbitrum.io/rpc`
+  - Explorer: https://arbiscan.io
+  - Currency: ETH
+  - Features: Batch deployment enabled
+
+### Base
+- **Sepolia Testnet**: Chain ID 84532, RPC: `https://sepolia.base.org`
+  - Explorer: https://sepolia.basescan.org
+  - Currency: ETH
+  - Features: Batch deployment enabled
+- **Mainnet**: Chain ID 8453, RPC: `https://mainnet.base.org`
+  - Explorer: https://basescan.org
+  - Currency: ETH
+  - Features: Batch deployment enabled
+
+### BNB Chain
+- **Testnet**: Chain ID 97, RPC: Various
+  - Explorer: https://testnet.bscscan.com
+  - Currency: BNB
+- **Mainnet**: Chain ID 56, RPC: Various
+  - Explorer: https://bscscan.com
+  - Currency: BNB
+  - References:
+    - https://docs.bnbchain.org/bnb-opbnb/advanced/full-stack-dapp/#learning-takeaways
+
+### SKALE
+- **Chaos Testnet**: Chain ID 1444673419
+  - Explorer: https://testnet-chaos.explorer.skale.network
+  - Features: x402 facilitator support
+
+### Protocol Labs / Filecoin
+- **Calibration Testnet**: Chain ID 314159
+  - Explorer: https://calibration.filfox.info/en
+- **Mainnet**: Chain ID 314
+  - Explorer: https://filfox.info/en
+
+## Integration Patterns
+
+### Thirdweb x402 Payment Flow
+
+#### Client Side (React/Next.js)
+```typescript
+import { useFetchWithPayment } from "thirdweb/react";
+import { createThirdwebClient } from "thirdweb";
+
+const client = createThirdwebClient({ clientId: "your-client-id" });
+
+// Automatic 402 handling with wallet popup
+const { fetchWithPayment, isPending } = useFetchWithPayment(client);
+
+const response = await fetchWithPayment("https://api.example.com/paid-endpoint");
+```
+
+#### Server Side (TypeScript API)
+```typescript
+import { settlePayment } from "thirdweb/x402";
+import { facilitator } from "thirdweb/x402";
+
+const thirdwebX402Facilitator = facilitator({
+  client,
+  serverWalletAddress: "0xYourWalletAddress",
+});
+
+const result = await settlePayment({
+  resourceUrl: "https://api.example.com/premium-content",
+  method: "GET",
+  paymentData: request.headers.get("PAYMENT-SIGNATURE"),
+  payTo: "0xYourWalletAddress",
+  network: "avalanche_fuji",
+  price: "$0.01",
+  facilitator: thirdwebX402Facilitator,
+});
+```
+
+#### Payment Headers
+- **v1**: `X-PAYMENT` header
+- **v2**: `PAYMENT-SIGNATURE` header (preferred)
+
+### Supabase Database Configuration
+
+#### Python (FastAPI)
+```python
+# Uses psycopg for pgbouncer compatibility
+database_url = "postgresql+psycopg://postgres:PASSWORD@db.PROJECT.supabase.co:5432/postgres"
+engine = create_async_engine(
+    database_url,
+    poolclass=NullPool,  # pgbouncer handles pooling
+)
+```
+
+#### TypeScript (Fastify)
+```typescript
+// Detects Supabase automatically
+const isSupabase = databaseUrl.includes("supabase.com");
+const poolConfig = {
+  connectionString: databaseUrl,
+  max: isSupabase ? 5 : 20,  // Lower for pgbouncer
+};
+```
+
+#### Environment Variables
+```bash
+# Option 1: Direct connection string
+DATABASE_URL=postgresql://postgres:PASSWORD@db.PROJECT.supabase.co:5432/postgres
+
+# Option 2: Supabase credentials (auto-constructed)
+SUPABASE_URL=https://PROJECT.supabase.co
+SUPABASE_PASSWORD=your_password
+```
+
+### Mantle SDK Integration
+
+#### Deposit Operations
+```typescript
+// Deposit MNT to Mantle L2
+await depositMNT({
+  amount: "1.0",
+  l1Signer: l1Wallet,
+  l2Provider: mantleL2Provider,
+});
+
+// Deposit ERC20 tokens
+await depositERC20({
+  l1TokenAddress: "0x...",
+  l2TokenAddress: "0x...",
+  amount: "100",
+  l1Signer: l1Wallet,
+  l2Provider: mantleL2Provider,
+});
+```
+
+#### Withdrawal Operations
+```typescript
+// Withdraw MNT from Mantle L2
+await withdrawMNT({
+  amount: "1.0",
+  l2Signer: l2Wallet,
+  l1Provider: ethereumProvider,
+});
+```
+
+#### Cross-Chain Messaging
+- Contracts on Mantle can invoke functions on Ethereum
+- Contracts on Ethereum can invoke functions on Mantle
+- Uses L1StandardBridge and L2StandardBridge contracts
+
+### Network Configuration
+
+#### Network Registry (YAML)
+```yaml
+# config/networks.yaml
+networks:
+  mantle_testnet:
+    chain_id: 5003
+    rpc_urls:
+      - https://rpc.sepolia.mantle.xyz
+    explorer: https://sepolia.mantlescan.xyz
+    currency: MNT
+    features:
+      batch_deployment: true
+      eigenda: false
+```
+
+#### TypeScript Network Config
+```typescript
+// ts/api/src/evm/networkConfig.ts
+export function getNetworkConfig(env: Env, network: string): NetworkConfig {
+  const normalized = normalizeNetworkId(network);
+  // Supports: network keys, chain IDs, CAIP-2 format
+  // Falls back to Thirdweb RPC if not configured
+}
+```
+
+### IPFS/Pinata Integration
+
+#### Configuration
+```python
+# Python backend
+PINATA_JWT=your_jwt_token
+PINATA_GATEWAY=https://gateway.pinata.cloud
+ENABLE_IPFS_UPLOAD=true
+IPFS_VERIFY_INTEGRITY=true
+```
+
+#### Usage
+- Upload contract metadata to IPFS
+- Store compilation artifacts
+- Decentralized content addressing
+- Gateway access via Pinata
+
+### Account Abstraction (ERC-4337)
+
+#### EntryPoint Configuration
+- Standard EntryPoint: `0x5FF137D4b0FDCD49DcA30c7B5Fb0e97ee356842`
+- Used for: Gasless transactions, session keys, sponsored transactions
+- Paymaster: Thirdweb paymaster (configured per network)
+
+## API Endpoints
+
+### Workflow Management
+- `POST /api/v1/workflows/generate` - Generate contract from NLP
+- `POST /api/v2/workflows` - Create workflow (v2 API)
+- `GET /api/v1/workflows/:id` - Get workflow status
+- `GET /api/v1/workflows` - List workflows
+
+### x402 Payment Endpoints
+- `POST /api/v1/x402/contracts/generate` - Generate contract with payment
+- `POST /api/v1/x402/workflows/create-from-contract` - Create workflow with payment
+- `POST /api/v1/x402/deployments/deploy` - Deploy contract with payment
+
+### Spending Controls
+- `GET /api/v1/x402/analytics/history` - Payment history
+- `GET /api/v1/x402/analytics/summary` - Payment summary
+- `GET /api/v1/x402/spending-controls/:wallet` - Get spending controls
+- `PUT /api/v1/x402/spending-controls/:wallet` - Update spending controls
+
+### Network Endpoints
+- `GET /api/v1/networks` - List supported networks
+- `GET /api/v1/networks/:network` - Get network details
+
+## Environment Variables
+
+### Required
+```bash
+# Database (Supabase)
+DATABASE_URL=postgresql://postgres:PASSWORD@db.PROJECT.supabase.co:5432/postgres
+# OR
+SUPABASE_URL=https://PROJECT.supabase.co
+SUPABASE_PASSWORD=your_password
+
+# Thirdweb
+THIRDWEB_CLIENT_ID=your_client_id
+THIRDWEB_SECRET_KEY=your_secret_key  # Backend only
+MERCHANT_WALLET_ADDRESS=0x...  # x402 payment recipient
+```
+
+### Optional
+```bash
+# x402 Configuration
+X402_ENABLED=true
+X402_ENABLED_NETWORKS=avalanche_fuji,avalanche_mainnet
+X402_CONTRACT_PRICE_USDC=0.01
+X402_WORKFLOW_PRICE_USDC=0.02
+X402_DEPLOY_PRICE_USDC=0.1
+
+# Network RPC URLs (override defaults)
+RPC_URL_MANTLE_TESTNET=https://rpc.sepolia.mantle.xyz
+RPC_URL_AVALANCHE_FUJI=https://api.avax-test.network/ext/bc/C/rpc
+
+# IPFS/Pinata
+PINATA_API_KEY=
+PINATA_API_SECRET=
+PINATA_JWT=
+PINATA_GATEWAY=https://gateway.pinata.cloud
+
+# Deployment: from user connected account (EOA, ERC-4337, or EIP-7702). No server-side deployer key.
+```
+
+## Security Considerations
+
+### x402 Payments
+- Always verify payment signatures server-side
+- Use facilitator for payment settlement
+- Implement spending controls (daily/monthly limits)
+- Validate network support before processing payments
+
+### Database (Supabase)
+- Use connection pooling (pgbouncer) for production
+- Never expose database credentials in frontend code
+- Use environment variables for all secrets
+- Enable SSL/TLS for database connections
+
+### Smart Contracts
+- Use OpenZeppelin libraries for security
+- Audit contracts before mainnet deployment
+- Verify contracts on block explorers
+- Use Foundry/Hardhat for testing
+
+### Network Security
+- Validate chain IDs before processing transactions
+- Use official RPC endpoints
+- Implement rate limiting for API endpoints
+- Monitor for suspicious activity
+
+## Development Workflow
+
+### Local Development
+1. Start Supabase (or use cloud instance)
+2. Configure `.env` with Supabase credentials
+3. Run migrations: `alembic upgrade head`
+4. Start Python backend: `uvicorn hyperagent.api.main:app --reload`
+5. Start TypeScript API: `cd ts/api && npm run dev`
+6. Start Next.js frontend: `cd frontend && npm run dev`
+
+### Testing
+- Foundry: `forge test`
+- Hardhat: `npx hardhat test`
+- Python: `pytest tests/`
+- TypeScript: `npm test`
+
+### Deployment
+- Contracts: Deploy via Foundry/Hardhat scripts
+- Backend: Deploy to cloud (Render, Railway, etc.)
+- Frontend: Deploy to Vercel
+- Database: Use Supabase cloud instance
+
+## References
+
+### Thirdweb
+- Wallets: https://portal.thirdweb.com/wallets
+- x402 Payments: https://portal.thirdweb.com/x402
+
+### Mantle
+- SDK Guide: https://docs.mantle.xyz/network/for-developers/how-to-guides/how-to-use-mantle-sdk
+- Contract Verification: https://docs.mantle.xyz/network/for-developers/how-to-guides/how-to-verify-smart-contracts/use-explorer-to-verify-smart-contracts
+
+### SKALE
+- Facilitators: https://docs.skale.space/get-started/agentic-builders/facilitators
+- SKALE Chains: https://docs.skale.space/developers/run-a-skale-chain/intro-to-schains
+- Agent Security: https://docs.skale.space/cookbook/agents/build-an-agent#security-considerations
+- x402 Seller: https://docs.skale.space/cookbook/x402/become-an-x402-seller
+
+### Arbitrum
+- Overview: https://docs.arbitrum.io/get-started/overview
+- Chainlink Oracles: https://docs.arbitrum.io/for-devs/oracles/chainlink
+- Stylus: https://docs.arbitrum.io/stylus/gentle-introduction
+- Nitro: https://docs.arbitrum.io/how-arbitrum-works/inside-arbitrum-nitro
+
+### Avalanche
+- AI/LLM Tools: https://build.avax.network/docs/tooling/ai-llm
+- Tenderly Integration: https://build.avax.network/integrations/tenderly
+- Integrations: https://build.avax.network/integrations
+
+### BNB Chain
+- Full-Stack DApp: https://docs.bnbchain.org/bnb-opbnb/advanced/full-stack-dapp/#learning-takeaways
+
+### IPFS
+- IPFS: https://ipfs.tech/
+- libp2p: https://libp2p.io/
+
+## Code Structure
+
+### Python Backend (`hyperagent/`)
+- `api/` - FastAPI routes and middleware
+- `core/` - Core services (generation, audit, deployment)
+- `blockchain/` - Network configuration and blockchain operations
+- `db/` - Database session management (Supabase)
+- `api/middleware/x402.py` - x402 payment middleware
+
+### TypeScript API (`ts/api/`)
+- `src/routes/` - Fastify route handlers
+- `src/x402/` - x402 payment verification client
+- `src/storage/postgres.ts` - Supabase database store
+- `src/evm/networkConfig.ts` - Network configuration
+- `src/config/env.ts` - Environment configuration
+
+### Frontend (`frontend/`)
+- `app/` - Next.js App Router pages
+- `components/` - React components
+- `components/x402/` - x402 payment UI components
+
+### Smart Contracts
+- `contracts/` - Solidity contracts
+- Uses OpenZeppelin libraries
+- Compiled with Foundry/Hardhat
+

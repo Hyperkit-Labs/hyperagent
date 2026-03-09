@@ -1,5 +1,6 @@
 """IPFS/Pinata artifact pinning. Pins specs, audit reports, code, and ABIs after pipeline stages.
 Set STORAGE_SERVICE_URL (default http://localhost:4005) to enable. No-op when unconfigured."""
+
 from __future__ import annotations
 
 import json
@@ -11,15 +12,21 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-STORAGE_SERVICE_URL = os.environ.get("STORAGE_SERVICE_URL", "http://localhost:4005").rstrip("/")
+STORAGE_SERVICE_URL = os.environ.get(
+    "STORAGE_SERVICE_URL", "http://localhost:4005"
+).rstrip("/")
 IPFS_TIMEOUT = float(os.environ.get("IPFS_TIMEOUT_SEC", "15"))
 
 
 def is_configured() -> bool:
-    return bool(STORAGE_SERVICE_URL and STORAGE_SERVICE_URL != "http://localhost:4005") or bool(os.environ.get("IPFS_ENABLED"))
+    return bool(
+        STORAGE_SERVICE_URL and STORAGE_SERVICE_URL != "http://localhost:4005"
+    ) or bool(os.environ.get("IPFS_ENABLED"))
 
 
-async def pin_json(data: dict | list | str, name: str, metadata: dict[str, str] | None = None) -> str | None:
+async def pin_json(
+    data: dict | list | str, name: str, metadata: dict[str, str] | None = None
+) -> str | None:
     """Pin JSON data to IPFS via the storage service. Returns CID or None on failure."""
     if not is_configured():
         return None
@@ -71,6 +78,7 @@ async def record_storage(
 ) -> None:
     """Record IPFS CID in Supabase. Creates project_artifact when project_id given, then storage_record with artifact_id."""
     import db
+
     if not db.is_configured() or not cid:
         return
     try:

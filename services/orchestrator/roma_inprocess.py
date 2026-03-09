@@ -9,7 +9,6 @@ import os
 from typing import Any
 
 import httpx
-
 from registries import get_timeout
 
 logger = logging.getLogger(__name__)
@@ -23,7 +22,9 @@ ROMA_URL = (
 ROMA_PROFILE = (os.environ.get("ROMA_PROFILE") or "general").strip() or "general"
 ROMA_SPEC_TIMEOUT = int(os.environ.get("ROMA_SPEC_TIMEOUT", "120"))
 ROMA_MAX_DEPTH = int(os.environ.get("ROMA_MAX_DEPTH", "1"))
-AGENT_RUNTIME_URL = (os.environ.get("AGENT_RUNTIME_URL") or "http://localhost:4001").rstrip("/")
+AGENT_RUNTIME_URL = (
+    os.environ.get("AGENT_RUNTIME_URL") or "http://localhost:4001"
+).rstrip("/")
 
 
 def _build_roma_goal(prompt: str) -> str:
@@ -72,7 +73,9 @@ async def _agent_runtime_spec(
         return {}
     chains = data.get("chains") or []
     if chains and isinstance(chains[0], dict):
-        chains = [c.get("network_name") or str(c.get("chain_id", "")) for c in chains if c]
+        chains = [
+            c.get("network_name") or str(c.get("chain_id", "")) for c in chains if c
+        ]
     out: dict[str, Any] = {
         "version": str(data.get("version", "1.0")),
         "chains": chains,

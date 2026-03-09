@@ -4,6 +4,7 @@ Single source of truth; load at startup and cache. Set REGISTRIES_PATH to overri
 Paths: pipelines.yaml, network/chains.yaml, security.yaml, tokens.yaml, x402/settings.yaml,
 roma.yaml, orchestrator.yaml, erc8004/erc8004.yaml.
 """
+
 from __future__ import annotations
 
 import os
@@ -142,6 +143,7 @@ def get_da_backend() -> str:
     """DA backend for traces. Returns ipfs when IPFS/storage configured; else none (stub)."""
     try:
         from ipfs_client import is_configured
+
         if is_configured():
             return "ipfs"
     except Exception:
@@ -323,17 +325,19 @@ def get_templates_for_api() -> list[dict[str, Any]]:
         source = t.get("source") or "custom"
         wizard = t.get("wizard") or {}
         codegen_mode = "oz_wizard" if source == "openzeppelin-wizard" else "custom"
-        out.append({
-            "id": t.get("id"),
-            "name": t.get("name"),
-            "description": _template_description(t),
-            "source": source,
-            "codegen_mode": codegen_mode,
-            "risk_profile": t.get("riskProfile", "medium"),
-            "requires_human_approval": t.get("requiresHumanApproval", False),
-            "wizard_kind": wizard.get("kind"),
-            "wizard_options": wizard.get("options"),
-        })
+        out.append(
+            {
+                "id": t.get("id"),
+                "name": t.get("name"),
+                "description": _template_description(t),
+                "source": source,
+                "codegen_mode": codegen_mode,
+                "risk_profile": t.get("riskProfile", "medium"),
+                "requires_human_approval": t.get("requiresHumanApproval", False),
+                "wizard_kind": wizard.get("kind"),
+                "wizard_options": wizard.get("options"),
+            }
+        )
     return out
 
 
@@ -511,23 +515,28 @@ def get_networks_for_api(skale: bool = False) -> list[dict[str, Any]]:
         cl = c.get("chainlist") or {}
         ha = c.get("hyperagent") or {}
         name = cl.get("name") or ha.get("slug") or str(chain_id)
-        slug = ha.get("slug") or (name.lower().replace(" ", "-") if name else str(chain_id))
+        slug = ha.get("slug") or (
+            name.lower().replace(" ", "-") if name else str(chain_id)
+        )
         if skale and not (slug and slug.startswith("skalebase-")):
             continue
         currency = (cl.get("nativeCurrency") or {}).get("symbol") or "ETH"
         tier = ha.get("tier") or "supported"
         category = ha.get("category") or "mainnet"
         is_mainnet = category != "testnet"
-        out.append({
-            "network": slug,
-            "network_id": slug,
-            "name": name,
-            "chain_id": chain_id,
-            "currency": currency,
-            "tier": tier,
-            "category": category,
-            "is_mainnet": is_mainnet,
-        })
+        out.append(
+            {
+                "network": slug,
+                "network_id": slug,
+                "name": name,
+                "chain_id": chain_id,
+                "currency": currency,
+                "tier": tier,
+                "category": category,
+                "is_mainnet": is_mainnet,
+            }
+        )
+
     def order_key(item: dict[str, Any]) -> tuple[int, str]:
         slug = (item.get("network_id") or "").strip()
         is_mainnet = item.get("is_mainnet", True)
@@ -536,5 +545,6 @@ def get_networks_for_api(skale: bool = False) -> list[dict[str, Any]]:
         if not is_mainnet:
             return (1, slug)
         return (2, slug)
+
     out.sort(key=order_key)
     return out

@@ -1,12 +1,12 @@
 """Audit agent: call audit service (Slither + Mythril); persist to security_findings.
 Includes weighted-evidence consensus resolution for conflicting tool results.
 When OPENSANDBOX_ENABLED, routes through ExecutionBackend for gVisor/Firecracker isolation."""
+
 import logging
 import os
 from collections import defaultdict
 
 import httpx
-
 from db import insert_security_finding, is_configured
 from registries import get_timeout
 from trace_context import get_trace_headers
@@ -14,7 +14,9 @@ from trace_context import get_trace_headers
 logger = logging.getLogger(__name__)
 AUDIT_SERVICE_URL = os.environ.get("AUDIT_SERVICE_URL", "http://localhost:8001")
 AUDIT_TOOLS = ["slither", "mythril"]
-OPENSANDBOX_ENABLED = os.environ.get("OPENSANDBOX_ENABLED", "false").strip().lower() in ("1", "true", "yes")
+OPENSANDBOX_ENABLED = os.environ.get(
+    "OPENSANDBOX_ENABLED", "false"
+).strip().lower() in ("1", "true", "yes")
 
 TOOL_WEIGHTS: dict[str, float] = {
     "slither": 0.6,
@@ -82,7 +84,9 @@ async def _run_audit_via_execution_backend(
         if OPENSANDBOX_ENABLED and hasattr(backend, "run_multi_engine_audit"):
             result = await backend.run_multi_engine_audit(code, contract_name)
         else:
-            result = await backend.run_audit(code, contract_name, tools=list(AUDIT_TOOLS))
+            result = await backend.run_audit(
+                code, contract_name, tools=list(AUDIT_TOOLS)
+            )
         tool_label = ",".join(result.tools_run) or "audit"
         findings = []
         for f in result.findings:
@@ -105,7 +109,11 @@ async def _run_audit_via_execution_backend(
                     location=finding.get("location"),
                     category=finding.get("category"),
                 )
-        return findings, len(result.tools_failed) < len(result.tools_run) or len(result.findings) > 0
+        return (
+            findings,
+            len(result.tools_failed) < len(result.tools_run)
+            or len(result.findings) > 0,
+        )
     except ImportError:
         logger.warning("[audit] execution_backend not installed, falling back to HTTP")
         return [], False
@@ -131,7 +139,9 @@ async def run_security_audits(
     audit_succeeded_count = 0
     for contract_name, code in contracts_to_audit:
         if OPENSANDBOX_ENABLED:
-            exec_findings, exec_ok = await _run_audit_via_execution_backend(contract_name, code, run_id)
+            exec_findings, exec_ok = await _run_audit_via_execution_backend(
+                contract_name, code, run_id
+            )
             if exec_ok or exec_findings:
                 findings.extend(exec_findings)
                 audit_succeeded_count += 1
@@ -146,12 +156,25 @@ async def run_security_audits(
                     headers=headers,
                 )
                 if r.status_code != 200:
-                    logger.warning("[audit] %s returned %s: %s", contract_name, r.status_code, r.text[:200])
+                    logger.warning(
+                        "[audit] %s returned %s: %s",
+                        contract_name,
+                        r.status_code,
+                        r.text[:200],
+                    )
                     continue
                 audit_succeeded_count += 1
                 data = r.json()
-                raw_findings = data.get("findings", []) if isinstance(data, dict) else data if isinstance(data, list) else []
-                tool_label = ",".join(data.get("tools_run", AUDIT_TOOLS)) if isinstance(data, dict) else "audit"
+                raw_findings = (
+                    data.get("findings", [])
+                    if isinstance(data, dict)
+                    else data if isinstance(data, list) else []
+                )
+                tool_label = (
+                    ",".join(data.get("tools_run", AUDIT_TOOLS))
+                    if isinstance(data, dict)
+                    else "audit"
+                )
                 for f in raw_findings:
                     finding = {
                         "tool": tool_label,
@@ -177,15 +200,20 @@ async def run_security_audits(
             continue
 
     if audit_succeeded_count == 0 and contracts_to_audit:
-        logger.error("[audit] All %d contract(s) failed to audit (service unreachable or error)", len(contracts_to_audit))
-        findings.append({
-            "tool": "audit",
-            "severity": "high",
-            "title": "Audit service unavailable",
-            "description": "All contracts failed to reach the audit service. Check AUDIT_SERVICE_URL and that Slither/Mythril are installed.",
-            "location": None,
-            "category": "service",
-        })
+        logger.error(
+            "[audit] All %d contract(s) failed to audit (service unreachable or error)",
+            len(contracts_to_audit),
+        )
+        findings.append(
+            {
+                "tool": "audit",
+                "severity": "high",
+                "title": "Audit service unavailable",
+                "description": "All contracts failed to reach the audit service. Check AUDIT_SERVICE_URL and that Slither/Mythril are installed.",
+                "location": None,
+                "category": "service",
+            }
+        )
 
     if len(findings) > 1:
         findings = _resolve_consensus(findings)

@@ -2,7 +2,7 @@
   <img src="/public/ascii-art-doh-HyperAgent.png" alt="HyperAgent ASCII Art" width="800">
   
 <!-- Badges: start -->
-![Version](https://img.shields.io/badge/version-1.0.0-brightgreen)
+![Version](https://img.shields.io/badge/version-0.1.0-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![Node.js](https://img.shields.io/badge/node.js-18%2B-green)
@@ -17,109 +17,63 @@ HyperAgent is an AI-powered smart contract development platform that transforms 
 ## Table of Contents
 
 - [Overview](#overview)
-- [Project Status](#project-status)
-- [Monorepo Structure](#monorepo-structure)
-- [Quick Start](#quick-start)
+- [Phase 1 (Closed Beta)](#phase-1-closed-beta)
+- [Architecture](#architecture)
 - [Features](#features)
+- [Quick Start](#quick-start)
 - [Documentation](#documentation)
 - [Contributing](#contributing)
 - [License](#license)
+- [Support](#support)
+- [Acknowledgments](#acknowledgments)
 
 ## Overview
 
-HyperAgent enables developers to build production-grade smart contracts in under 2 minutes by leveraging AI-powered code generation, automated security auditing, and multi-chain deployment capabilities.
+HyperAgent is an AI-powered multi-agent platform that turns natural-language specifications into production-ready, audited, simulated, and deployed smart contracts across multiple EVM networks. The system uses a microservice and service-oriented architecture (SOA). Agents communicate via the Agent2Agent (A2A) protocol with ERC-8004 on-chain registries for identity, reputation, and validation. LLM access is BYOK: no server-side LLM keys for user workloads; keys are stored in an isolated, encrypted environment and used only for that user's runs.
 
-**Key Capabilities:**
-- Natural language to Solidity contract generation
-- Automated security auditing with static analysis
-- Multi-chain deployment across 100+ EVM networks
-- Native x402 payment protocol integration
-- Account abstraction with EIP-7702 and ERC-4337
-- Real-time monitoring and analytics
+**Goal:** Make end-to-end smart contract development verifiable, repeatable, and safe. Developers go from "idea in English" to deployed and monitored contract with as few manual steps as possible, while preserving auditability and human oversight where needed.
 
-## Project Status
+## Phase 1 (Closed Beta)
 
-**Current Phase:** Phase 1 - Foundation (In Progress)
+**Current phase:** Closed Beta v0.1.0
 
-**Monorepo Migration:** ✅ Complete
-- All code migrated to monorepo structure
-- pnpm workspace configured
-- Turbo build system integrated
-- Services organized and operational
+- Web-based IDE (HyperAgent Studio)
+- Public, user-tested by default
+- SKALE Base networks (SKALE Base Mainnet, SKALE Base Sepolia Testnet). Default network: Sepolia.
 
-**Active Development:**
-- Core orchestration and data model
-- Agent implementations
-- Frontend shell and run view
-- Multi-tenant workspaces
-- CI/CD and quality gates
+**User flow:** Connect (wallet) → BYOK (provide LLM keys: Gemini, OpenAI, Claude, OpenRouter) → Approved → Run full pipeline (spec, generate, audit, Tenderly simulation and report, deploy if applicable). Tenderly simulation and report are part of the visible workflow. Users can remove key configuration at any time; keys are wiped with no long-lived exposure.
 
-**Production Ready:**
-- Mantle SDK integration
-- Thirdweb x402 payments
-- Supabase database
-- IPFS/Pinata storage
-- Multi-LLM routing
+## Architecture
 
-## Monorepo Structure
+**Three layers:** client shells, orchestration/agents, and core services. Agents are independent services with well-defined input/output schemas; they communicate over A2A with ERC-8004-compatible on-chain registries.
 
-HyperAgent uses a monorepo architecture managed with pnpm workspaces and Turbo:
+**Core stack:** Python/FastAPI, Next.js/React/TypeScript, Supabase (PostgreSQL), VectorDB (e.g., Pinecone), Redis, Acontext, Docker, Tenderly. Smart contract tooling: Hardhat, Foundry, Thirdweb SDK.
 
-```
-hyperagent/
-├── apps/                          # Applications
-│   ├── hyperagent-api/           # Python/FastAPI backend
-│   ├── hyperagent-web/           # Next.js frontend
-│   ├── issue-automation/         # GitHub Projects automation
-│   └── worker/                   # Background jobs
-│
-├── services/                      # Microservices
-│   ├── orchestrator/             # LangGraph orchestration
-│   ├── api-gateway/              # HTTP API gateway
-│   ├── mantle-bridge/            # Mantle SDK bridge
-│   ├── x402-verifier/           # x402 payment verifier
-│   └── agents/                   # Agent implementations
-│       ├── codegen/              # Code generation agent
-│       ├── audit/                # Security audit agent
-│       ├── deploy/               # Deployment agent
-│       └── monitor/              # Monitoring agent
-│
-├── packages/                      # Shared packages
-│   ├── sdk-ts/                   # TypeScript SDK
-│   ├── shared-ui/                # Shared React components
-│   ├── config/                   # Configuration utilities
-│   ├── core-lib/                 # Core domain logic
-│   ├── cli/                      # CLI tool
-│   └── env/                      # Environment loader
-│
-├── contracts/                    # Smart contracts
-│   ├── evm/                      # EVM contract projects
-│   └── templates/                # Contract templates
-│
-├── infra/                        # Infrastructure
-│   ├── k8s/                      # Kubernetes manifests
-│   ├── docker/                   # Docker configurations
-│   └── terraform/                # Infrastructure as Code
-│
-├── docs/                         # Documentation
-│   ├── specs/                    # Architecture specs
-│   ├── implementation/           # Implementation tracking
-│   └── runbooks/                # Operational guides
-│
-└── tools/                        # Development tools
-    └── scripts/                  # Automation scripts
-```
+**Pipeline:** SpecAgent (versioned Spec Lock) → Design and Proposal agents → CodegenAgent (streaming guardrails) → Autofixer and audit agents (Slither, Mythril, MythX, Echidna) → TenderlySimAgent → DeployAgent and VerifyAgent → MonitorAgent. Safety is enforced through Spec Lock, simulation-first validation via Tenderly, and mandatory security tooling.
+
+**Deployment:** Vercel (frontend), Render (backend).
+
+**Networks:** SKALE Base Roadmap includes Mantle, Avalanche, BNB, Arbitrum, and other EVM-compatible chains via chain registry and SDK capability registry (x402, AA, Thirdweb first-class).
+
+## Features
+
+- **Natural language to contracts** – Describe behavior in plain language; get Solidity, tests, and audit-ready artifacts.
+- **BYOK** – Bring your own LLM keys (OpenAI, Anthropic, Google, OpenRouter); no server-side LLM config for user workloads.
+- **Simulation-first** – Tenderly integration for transaction simulation and reports before deployment.
+- **Security tooling** – Slither, Mythril, MythX, Echidna as mandatory pipeline stages.
+- **Multi-chain** – Chain and SDK registries for plug-and-play networks
+- **Account abstraction** – ERC-4337 and EIP-7702 via Thirdweb; x402 metering where configured.
+- **Observability** – OpenTelemetry, MLflow, Tenderly monitoring, Dune dashboards.
+- **RAG and memory** – Curated corpora and Acontext for long-term agent memory; IPFS/Pinata, Arweave, Filecoin for artifacts.
 
 ## Quick Start
 
 ### Prerequisites
 
-- **Node.js** 18.0 or higher
-- **pnpm** 8.0 or higher (package manager)
-- **Python** 3.11 or higher
-- **PostgreSQL** 15+ (or Supabase)
-- **Redis** 7.0+ (optional)
-- **Git** 2.30+
+- Node.js 18 or higher
+- pnpm 8 or higher
+- Git
+- (Optional) Python 3.11+, Docker for backend
 
 ### Installation
 
@@ -134,107 +88,54 @@ hyperagent/
    pnpm install
    ```
 
-3. **Set up environment variables**
+3. **Set up environment**
+   - Local dev: copy `.env.development.example` to `.env`. Production: copy `.env.example` to `.env` or `.env.production`.
+   - Set `NEXT_PUBLIC_THIRDWEB_CLIENT_ID` and `NEXT_PUBLIC_API_URL` (e.g. `http://localhost:4000` with Docker backend).
+
+4. **Start the frontend (Studio)**
    ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
+   pnpm --filter hyperagent-studio dev
    ```
+   Open [http://localhost:3000](http://localhost:3000).
 
-4. **Start development servers**
-   ```bash
-   # Start all apps and services
-   pnpm turbo dev
+5. **Backend (optional)**  
+   If a backend is provided (e.g. API + Docker), follow its run instructions so the API is available at the URL set in `NEXT_PUBLIC_API_URL`. The web app calls that URL for workflows and data.
 
-   # Or start specific services
-   pnpm turbo dev --filter hyperagent-api
-   pnpm turbo dev --filter hyperagent-web
-   ```
-
-5. **Verify installation**
-   - API: http://localhost:8000/api/v1/health
-   - Web: http://localhost:3000
-
-### Using Turbo Commands
-
-```bash
-# Run lint across all packages
-pnpm turbo lint
-
-# Run tests
-pnpm turbo test
-
-# Build all packages
-pnpm turbo build
-
-# Run for specific package
-pnpm turbo lint --filter hyperagent-web
-pnpm turbo build --filter @hyperagent/sdk-ts
-```
-
-## Features
-
-- **AI-Powered Generation** - Multi-LLM routing with Claude 4.5, GPT-4, Gemini, Llama 3.1
-- **Security Auditing** - Automated static analysis with Slither and dynamic testing
-- **Multi-Chain Deployment** - Deploy to 100+ EVM networks from a single workflow
-- **x402 Payments** - Native USDC-based micro-payments via Thirdweb
-- **Account Abstraction** - EIP-7702 and ERC-4337 support for gasless transactions
-- **Real-Time Monitoring** - WebSocket updates and comprehensive analytics
-- **Developer Experience** - TypeScript SDK, CLI tools, and comprehensive documentation
+For full setup and usage, see [Getting started](docs/getting-started.md) and [Developer guide](docs/developer-guide.md).
 
 ## Documentation
 
-- **[Architecture Guide](./docs/ARCHITECTURE_SIMPLIFIED.md)** - System design and patterns
-- **[API Reference](./GUIDE/API.md)** - Complete API documentation
-- **[Environment Configuration](./ENV_CONFIGURATION_GUIDE.md)** - Environment variables guide
-- **[Getting Started](./GUIDE/GETTING_STARTED.md)** - Detailed setup instructions
-- **[x402 Integration](./docs/billing/x402_integration.md)** - Payment protocol guide
-- **[Implementation Tracking](./docs/implementation/)** - Issue tracking and progress
+- [Docs index](docs/README.md) – Onboarding, users, and developers.
+- [Getting started](docs/getting-started.md) – First-time setup and run locally.
+- [User guide](docs/user-guide.md) – How to use HyperAgent Studio (connect, BYOK, run workflows).
+- [Developer guide](docs/developer-guide.md) – Repo structure, local setup, contributing.
+- [Platform Blueprint](external/docs/detailed/draft.md) – Full specification (SOA, A2A, ERC-8004, pipeline, registries).
+- [Project Details](external/docs/detailed/Project%20Details.md) – Goals, architecture, tech stack, roadmap.
 
 ## Contributing
 
-We welcome contributions. Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+We welcome contributions. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-**Quick Start for Contributors:**
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Run tests (`pnpm turbo test`)
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to your branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
+1. Fork the repository.
+2. Create a feature branch (`git checkout -b feature/your-feature`).
+3. Make your changes; run lint and tests.
+4. Commit with a clear message (`git commit -m 'feat: add X'`).
+5. Push and open a Pull Request.
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 ## Support
 
-- **Documentation**: [docs/](./docs/) - Complete architecture and API documentation
-- **Issues**: [GitHub Issues](https://github.com/Hyperkit-Labs/hyperagent/issues) - Report bugs or request features
-- **Discussions**: [GitHub Discussions](https://github.com/Hyperkit-Labs/hyperagent/discussions) - Ask questions and share ideas
+- [Documentation](docs/README.md) – Getting started, user guide, developer guide.
+- [GitHub Issues](https://github.com/Hyperkit-Labs/hyperagent/issues) – Report bugs or request features.
+- [GitHub Discussions](https://github.com/Hyperkit-Labs/hyperagent/discussions) – Questions and ideas.
 
 ## Acknowledgments
 
-### Core Technologies
-- [FastAPI](https://fastapi.tiangolo.com/) - Python backend framework
-- [Next.js](https://nextjs.org/) - React frontend framework
-- [Supabase](https://supabase.com/) - PostgreSQL database
-- [Turbo](https://turbo.build/) - Monorepo build system
-- [pnpm](https://pnpm.io/) - Fast, disk space efficient package manager
+**Core stack:** [FastAPI](https://fastapi.tiangolo.com/), [Next.js](https://nextjs.org/), [Supabase](https://supabase.com/), [pnpm](https://pnpm.io/), [Turbo](https://turbo.build/).
 
-### Web3 Infrastructure
-- [Thirdweb](https://thirdweb.com/) - x402 payments and wallet SDK
-- [Mantle Network](https://www.mantle.xyz/) - L2 scaling and cross-chain messaging
-- [EigenDA](https://www.eigenlayer.xyz/) - Data availability layer
-- [Pinata](https://www.pinata.cloud/) - IPFS gateway
+**Web3:** [Thirdweb](https://thirdweb.com/) (x402, account abstraction), [Mantle](https://www.mantle.xyz/), [Pinata](https://www.pinata.cloud/) (IPFS).
 
-### AI & LLM Providers
-- [Anthropic Claude](https://www.anthropic.com/) - Primary AI generation
-- [OpenAI](https://openai.com/) - GPT-4 Turbo integration
-- [Google Gemini](https://deepmind.google/technologies/gemini/) - Gemini 1.5 Pro
-- [Meta Llama](https://ai.meta.com/llama/) - Llama 3.1 open-source option
-
----
-
-Built with ❤️ by the HyperAgent team
+**LLM providers (BYOK):** [Anthropic](https://www.anthropic.com/), [OpenAI](https://openai.com/), [Google Gemini](https://deepmind.google/technologies/gemini/), [OpenRouter](https://openrouter.ai/). Keys are user-provided and stored in an isolated, encrypted environment; no server-side LLM keys for user workloads.

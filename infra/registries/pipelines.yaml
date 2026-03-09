@@ -1,0 +1,62 @@
+# Pipeline & agent registry (GitOps). Named pipelines with stage list, default models per
+# stage, and gating rules. Change via PR; no code change required.
+apiVersion: hyperagent.io/v1
+kind: PipelineRegistry
+metadata:
+  name: evm-default-pipelines
+  version: "1"
+  defaultPipelineId: evm-default
+spec:
+  pipelines:
+    - id: evm-default
+      name: EVM Default
+      stages:
+        - spec
+        - design
+        - codegen
+        - audit
+        - simulation
+        - deploy
+      defaultModels:
+        spec: openai/gpt-4o
+        design: anthropic/claude-3-7-sonnet
+        codegen: anthropic/claude-3-7-sonnet
+        audit: anthropic/claude-3-7-sonnet
+      gates:
+        - type: audit
+          maxSeverity: high
+        - type: simulation
+          requireSuccess: true
+    - id: evm-fast-iter
+      name: EVM Fast Iteration
+      stages:
+        - spec
+        - codegen
+        - simulation
+      defaultModels:
+        spec: google/gemini-2.0-flash
+        codegen: google/gemini-2.0-flash
+      gates:
+        - type: simulation
+          requireSuccess: true
+    - id: evm-governance
+      name: EVM Governance
+      stages:
+        - spec
+        - design
+        - codegen
+        - audit
+        - simulation
+        - deploy
+      defaultModels:
+        spec: anthropic/claude-3-7-sonnet
+        design: anthropic/claude-3-7-sonnet
+        codegen: anthropic/claude-3-7-sonnet
+        audit: anthropic/claude-3-7-sonnet
+      gates:
+        - type: audit
+          maxSeverity: medium
+        - type: simulation
+          requireSuccess: true
+        - type: human-approval
+          required: true

@@ -1,0 +1,62 @@
+# x402 product/plan registry (GitOps). Resource IDs for metered APIs, unit pricing,
+# per-plan limits, and mapping from SKU to enabled pipelines/features.
+apiVersion: hyperagent.io/v1
+kind: X402ProductRegistry
+metadata:
+  name: x402-products
+  version: "1"
+spec:
+  resources:
+    - id: pipeline.run
+      name: Pipeline run
+      unit: run
+      description: Full pipeline execution (spec → deploy)
+    - id: tenderly.sim
+      name: Tenderly simulation
+      unit: simulation
+      description: Single Tenderly simulation and report
+    - id: audit.full
+      name: Full audit
+      unit: audit
+      description: Slither + Mythril + MythX + Echidna
+    - id: codegen.quick
+      name: Quick codegen
+      unit: request
+      description: Single codegen request (e.g. quick-edit model)
+  plans:
+    - id: free
+      name: Free
+      limits:
+        pipeline.run: 10
+        tenderly.sim: 20
+        audit.full: 2
+        codegen.quick: 50
+      enabledPipelines:
+        - evm-fast-iter
+      features: []
+    - id: pro
+      name: Pro
+      limits:
+        pipeline.run: 1000
+        tenderly.sim: 5000
+        audit.full: 100
+        codegen.quick: 10000
+      enabledPipelines:
+        - evm-default
+        - evm-fast-iter
+        - evm-governance
+      features:
+        - x402-metering
+        - account-abstraction
+    - id: enterprise
+      name: Enterprise
+      limits: {}
+      enabledPipelines:
+        - evm-default
+        - evm-fast-iter
+        - evm-governance
+      features:
+        - x402-metering
+        - account-abstraction
+        - human-approval-gates
+        - custom-templates

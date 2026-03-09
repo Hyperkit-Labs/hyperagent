@@ -1,0 +1,19 @@
+# Placeholder ConfigMaps. Override in overlays or replace with real config.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-config
+  namespace: hyperagent
+data:
+  ORCHESTRATOR_URL: "http://orchestrator:8000"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orchestrator-config
+  namespace: hyperagent
+data: {}
+---
+# Secrets are not committed. Create api-gateway-secrets and orchestrator-secrets
+# in the namespace (e.g. from external secrets or CI) with keys such as
+# SUPABASE_URL, SUPABASE_ANON_KEY, REDIS_URL, JWT_SECRET_KEY, etc.

@@ -10,12 +10,12 @@ HyperAgent is an AI-powered smart contract development platform that transforms 
 - All development follows agent-oriented design patterns
 - Services communicate via A2A (Agent-to-Agent) protocol
 - ERC-8004 for agent identity and reputation
-- Verifiable by design with EigenDA provenance
+- Verifiable by design with trace provenance (stub blob IDs in run_steps)
 
-### 2. Multi-Chain from Day One
-- Support for Mantle, Avalanche, BNB, SKALE, Protocol Labs, and more
-- Chain adapters are modular and independently deployable
-- Same agentic pipeline works across all chains
+### 2. MVP Scope and Multi-Chain Roadmap
+- **Phase 1 (MVP)**: single primary chain and one fully supported, end-to-end pipeline (spec → design/codegen → audit → simulation → deploy) as described in `docs/control-plane-runs-steps.md`.
+- Multi-chain support (Mantle, Avalanche, BNB, SKALE, Protocol Labs, and others) is a roadmap goal that is enabled by modular chain adapters, but **must not** expand beyond the MVP chain until the single-chain path is stable and meeting SLOs.
+- Chain adapters remain modular and independently deployable, but new chains are added only after the MVP path has clear success metrics and reliable observability.
 
 ### 3. Security & Observability First
 - Automated security audits (Slither, Mythril, MythX, Echidna)
@@ -30,6 +30,17 @@ HyperAgent is an AI-powered smart contract development platform that transforms 
 - CLI for terminal-based workflows
 - Comprehensive documentation and examples
 
+### 5. BYOK (Bring Your Own Keys)
+- No LLM keys in `.env` for any environment; `.env` is for other necessary config only
+- Users connect (wallet), provide LLM keys via the app (stored in TEE), get approved, then run workflows end-to-end (including Tenderly simulation and report)
+- Backend only provides functions; frontend is the web IDE surface
+- User-provided keys are stored in an isolated, encrypted TEE; remove config in-app and keys are wiped
+- **Phase 1 BYOK surface** is intentionally minimal, as described in `docs/byok-and-run-flow.md`: per-user, per-workspace encrypted keys with a single write path and a single read-for-run path, and short-lived agent-session JWTs where configured. Richer rotation and recovery tooling is a later-phase concern.
+
+### 6. Data Ownership and Storage Policy
+- Follow the storage and data-availability policy in `docs/storage-policy.md`: traces (stub blob IDs), artifacts in IPFS/Pinata (or equivalent), indices and metadata in Supabase, and minimal large blobs in Postgres.
+- Every stored artifact or trace must have an explicit hash/version and clear source-of-truth.
+
 ## Technology Stack
 
 ### Backend
@@ -40,6 +51,7 @@ HyperAgent is an AI-powered smart contract development platform that transforms 
 - **Database**: Supabase (PostgreSQL) with RLS
 - **Vector DB**: Pinecone for RAG
 - **Memory**: Acontext for long-term agent memory
+- **Key service (TEE)** for BYOK: user-provided LLM keys stored and used per user; no server-side LLM keys for user workloads
 
 ### Frontend
 - **Framework**: Next.js 14 (App Router)
@@ -101,24 +113,16 @@ HyperAgent is an AI-powered smart contract development platform that transforms 
 
 ## AI Agent Guidelines
 
-### Resource Compliance (AGENT.mdc)
-Before taking any action, you MUST:
+### Mandatory Pre-Action (Global)
+**This applies to all agents and all tasks. No exceptions.** Before any implementation, code change, or planning output, the agent MUST perform this check first (see `.cursor/rules/MANDATORY_PRE_ACTION.mdc` and `AGENTS.mdc`):
 
-1. **Check `.cursor/skills/` directory first**
-   - Review available skills and documentation
-   - Read relevant `SKILL.md` files
-   - Check `references/` folders for templates
-   - Follow patterns and best practices
+1. **`.cursor/rules/`** — Review rule files relevant to the task (AGENT.mdc, production.mdc, rules.mdc, etc.).
+2. **`.cursor/wiki/`** — Read wiki docs (e.g. robots.txt, scope boundaries).
+3. **`.cursor/skills/`** — Identify and read relevant SKILL.md and references.
+4. **`.cursor/llm/`** — Review LLM resources (llm.txt, usage constraints).
+5. **Then** proceed with the reply or implementation using those resources.
 
-2. **Check `.cursor/llm/` directory second**
-   - Review LLM-related resources
-   - Understand usage patterns and constraints
-   - Apply LLM-specific rules
-
-3. **Apply Resources Before Action**
-   - Do not proceed without reviewing relevant resources
-   - Incorporate patterns and guidelines
-   - Ensure alignment with established practices
+Do not run other tools or write code before completing steps 1–4 for any coding, planning, or project task.
 
 ### AI Interaction Structure
 - **robots.txt** (`.cursor/wiki/robots.txt`): Defines AI crawler boundaries
@@ -158,18 +162,27 @@ Before taking any action, you MUST:
 
 ```
 apps/
-  api/          # Python/FastAPI backend
-  web/          # Next.js frontend
-  worker/       # Background jobs
-agents/
-  codegen/      # CodeGenAgent
-  audit/        # AuditAgent
-  deploy/       # DeployAgent
-  monitor/      # MonitorAgent
+  hyperagent-api/    # Python/FastAPI backend
+  hyperagent-web/    # Next.js frontend
+services/
+  orchestrator/      # LangGraph orchestration
+  api-gateway/       # HTTP API gateway
+  blockchain-gateway/ # Blockchain RPC abstraction
+  agent-spec/        # Specification agent
+  agent-codegen/     # CodeGenAgent
+  agent-audit/       # AuditAgent
+  agent-tenderly-sim/ # TenderlySimAgent
+  agent-deploy/      # DeployAgent
+  agent-verify/      # VerifyAgent
+  agent-monitor/     # MonitorAgent
 packages/
-  sdk-ts/       # TypeScript SDK
-  ui/           # Shared UI components
-  core-lib/     # Shared core libraries
+  sdk-ts/            # TypeScript SDK
+  spec-dictionary/   # Spec Lock schemas
+  rag-kb/            # RAG knowledge base
+  chain-registry/    # Chain registry
+  sdk-registry/      # SDK capability registry
+  shared-ui/         # Shared UI components
+  core-lib/          # Shared core libraries
 infra/
   terraform/    # Infrastructure as Code
   github/       # GitHub Actions, workflows
@@ -187,8 +200,8 @@ configs/
 ## Environment Configuration
 
 ### Development
-- Use `.env.development` for local development
-- Docker Compose for local services
+- Use `.env` for environment-specific config; production uses cloud DB (Supabase) and Redis (Redis Cloud or container)
+- Docker Compose for backend stack (cloud config via DATABASE_URL, REDIS_URL)
 - K8s overlays for development environment
 
 ### Staging

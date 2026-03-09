@@ -1,0 +1,20 @@
+# HyperAgent Tools - remote compile/audit. Compile via py-solc-x; audit via Slither.
+# Build from repo root: docker build -f infra/docker/Dockerfile.hyperagent-tools .
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY services/hyperagent-tools/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt && \
+    python -c "import solcx; solcx.install_solc('0.8.24')" && \
+    solc-select install 0.8.24 && solc-select use 0.8.24
+
+COPY services/hyperagent-tools/main.py .
+
+EXPOSE 9000
+
+# Use PORT from env (Render sets this); fallback to 9000 for local/docker-compose
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-9000}"]

@@ -1,9 +1,0 @@
-{
-  "name": "Simple Storage Contract",
-  "description": "Basic storage contract for storing and retrieving a single value",
-  "contract_type": "Storage",
-  "template_code": "pragma solidity ^0.8.30;\n\ncontract SimpleStorage {\n    uint256 private storedValue;\n    \n    event ValueChanged(uint256 newValue);\n    \n    function set(uint256 value) public {\n        storedValue = value;\n        emit ValueChanged(value);\n    }\n    \n    function get() public view returns (uint256) {\n        return storedValue;\n    }\n}",
-  "version": "1.0.0",
-  "tags": ["storage", "simple", "basic"]
-}
-

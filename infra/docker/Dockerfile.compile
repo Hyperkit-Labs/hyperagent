@@ -1,0 +1,32 @@
+FROM python:3.11-slim
+
+# Install system deps: curl, git (Foundry needs git), ca-certificates
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl ca-certificates git && \
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install Foundry (forge + cast)
+RUN curl -L https://foundry.paradigm.xyz | bash && \
+    /root/.foundry/bin/foundryup
+ENV PATH="/root/.foundry/bin:${PATH}"
+
+# Pre-build a Hardhat 2 template with node_modules + OpenZeppelin for fast compilation
+RUN mkdir -p /opt/hardhat-template && \
+    cd /opt/hardhat-template && \
+    echo '{"private":true}' > package.json && \
+    npm install --save-dev hardhat@^2.22.0 @nomicfoundation/hardhat-toolbox@^5.0.0 && \
+    npm install @openzeppelin/contracts@4.9.6 && \
+    mkdir -p contracts
+
+# Pre-install OpenZeppelin for Foundry too
+RUN cd /opt && \
+    forge install --no-git OpenZeppelin/openzeppelin-contracts@v4.9.6 2>/dev/null || true
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+EXPOSE 8004
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8004"]

@@ -1,0 +1,429 @@
+# infra/registries/network/chains.yaml
+# HyperAgent Chain Registry (GitOps-managed)
+# Fields under `chainlist:` are synced from Chainlist / ethereum-lists.
+# Fields under `hyperagent:` are local extensions and MUST NOT be overwritten by sync.
+
+apiVersion: hyperagent.io/v1
+kind: ChainRegistry
+metadata:
+  name: hyperagent-chains
+  version: 1.0.0
+spec:
+  chains:
+    # -------------------------------------------------------------------------
+    # Ethereum Mainnet (reference / baseline)
+    # -------------------------------------------------------------------------
+    - id: 1
+      enabled: true
+
+      chainlist:
+        name: Ethereum Mainnet
+        chainId: 1
+        rpcUrls:
+          - https://ethereum.publicnode.com
+        blockExplorerUrls:
+          - https://etherscan.io
+        nativeCurrency:
+          name: Ether
+          symbol: ETH
+          decimals: 18
+        faucets: []
+
+      hyperagent:
+        slug: ethereum-mainnet
+        category: L1
+        tier: canonical
+        capabilities:
+          tenderly: true
+          accountAbstraction:
+            erc4337: true
+            eip7702: true
+          x402: true
+          verification: true
+        defaults:
+          framework: hardhat
+          gasStrategy: standard
+          securityProfile: strict
+        notes:
+          - "Use as reference chain for gas estimates and attack surface."
+
+    # -------------------------------------------------------------------------
+    # Base Mainnet
+    # -------------------------------------------------------------------------
+    - id: 8453
+      enabled: true
+
+      chainlist:
+        name: Base
+        chainId: 8453
+        rpcUrls:
+          - https://mainnet.base.org
+        blockExplorerUrls:
+          - https://basescan.org
+        nativeCurrency:
+          name: Ether
+          symbol: ETH
+          decimals: 18
+        faucets: []
+
+      hyperagent:
+        slug: base-mainnet
+        category: L2
+        tier: primary
+        capabilities:
+          tenderly: true
+          accountAbstraction:
+            erc4337: true
+            eip7702: true
+          x402: true
+          verification: true
+        defaults:
+          framework: hardhat
+          gasStrategy: standard
+          securityProfile: strict
+        notes:
+          - "Preferred L2 target for production deployments."
+          - "High priority for x402 + AA templates."
+
+    # -------------------------------------------------------------------------
+    # SKALE Base Mainnet
+    # -------------------------------------------------------------------------
+    - id: 1187947933
+      enabled: true
+
+      chainlist:
+        name: SKALE Base
+        chainId: 1187947933
+        rpcUrls:
+          - https://skale-base.skalenodes.com/v1/base
+        blockExplorerUrls:
+          - https://skale-base-explorer.skalenodes.com/
+        nativeCurrency:
+          name: CREDIT
+          symbol: CREDIT
+          decimals: 18
+        faucets: []  # SKALE uses portals / allocations, not public gas token faucets
+
+      hyperagent:
+        slug: skalebase-mainnet
+        category: L2
+        tier: preferred
+        capabilities:
+          tenderly: false
+          accountAbstraction:
+            erc4337: true
+            eip7702: false
+          x402: true
+          erc8004: true
+          verification: true
+        defaults:
+          framework: foundry
+          gasStrategy: low
+          securityProfile: strict
+        notes:
+          - "Gas abstraction via CREDIT; user gas is effectively free."
+          - "Integrate SKALE Base docs for deployment helpers."
+
+    # -------------------------------------------------------------------------
+    # SKALE Base Sepolia Testnet
+    # -------------------------------------------------------------------------
+    - id: 324705682
+      enabled: true
+
+      chainlist:
+        name: SKALE Base Sepolia
+        chainId: 324705682
+        rpcUrls:
+          - https://base-sepolia-testnet.skalenodes.com/v1/jubilant-horrible-ancha
+        blockExplorerUrls:
+          - https://base-sepolia-testnet-explorer.skalenodes.com/
+        nativeCurrency:
+          name: CREDIT
+          symbol: CREDIT
+          decimals: 18
+        faucets:
+          - https://base-sepolia-faucet.skale.space/
+
+      hyperagent:
+        slug: skalebase-sepolia
+        category: testnet
+        tier: primary
+        capabilities:
+          tenderly: false
+          accountAbstraction:
+            erc4337: true
+            eip7702: false
+          x402: true
+          erc8004: true
+          verification: true
+        defaults:
+          framework: foundry
+          gasStrategy: cheap
+          securityProfile: relaxed
+        notes:
+          - "Default testnet for SKALE Base pipelines."
+          - "Use for closed beta deployments."
+
+    # -------------------------------------------------------------------------
+    # Mantle Mainnet
+    # -------------------------------------------------------------------------
+    - id: 5000
+      enabled: true
+
+      chainlist:
+        name: Mantle
+        chainId: 5000
+        rpcUrls:
+          - https://rpc.mantle.xyz
+        blockExplorerUrls:
+          - https://explorer.mantle.xyz
+        nativeCurrency:
+          name: Mantle
+          symbol: MNT
+          decimals: 18
+        faucets: []
+
+      hyperagent:
+        slug: mantle-mainnet
+        category: L2
+        tier: preferred
+        capabilities:
+          tenderly: true
+          accountAbstraction:
+            erc4337: true
+            eip7702: false
+          x402: true
+          verification: true
+        defaults:
+          framework: hardhat
+          gasStrategy: low
+          securityProfile: strict
+        notes:
+          - "Integrate Mantle-specific bridges and DA settings."
+
+    # -------------------------------------------------------------------------
+    # Avalanche C-Chain Mainnet
+    # -------------------------------------------------------------------------
+    - id: 43114
+      enabled: true
+
+      chainlist:
+        name: Avalanche C-Chain
+        chainId: 43114
+        rpcUrls:
+          - https://api.avax.network/ext/bc/C/rpc
+        blockExplorerUrls:
+          - https://snowtrace.io
+        nativeCurrency:
+          name: Avalanche
+          symbol: AVAX
+          decimals: 18
+        faucets: []
+
+      hyperagent:
+        slug: avalanche-c
+        category: L1
+        tier: supported
+        capabilities:
+          tenderly: true
+          accountAbstraction:
+            erc4337: true
+            eip7702: false
+          x402: true
+          erc8004: true
+          verification: true
+        defaults:
+          framework: hardhat
+          gasStrategy: standard
+          securityProfile: strict
+        notes:
+          - "Preferred for EVM L1 multi-chain deployments."
+
+    # -------------------------------------------------------------------------
+    # Avalanche Fuji Testnet
+    # -------------------------------------------------------------------------
+    - id: 43113
+      enabled: true
+
+      chainlist:
+        name: Avalanche Fuji
+        chainId: 43113
+        rpcUrls:
+          - https://api.avax-test.network/ext/bc/C/rpc
+        blockExplorerUrls:
+          - https://testnet.snowtrace.io
+        nativeCurrency:
+          name: Avalanche
+          symbol: AVAX
+          decimals: 18
+        faucets:
+          - https://faucet.avax.network/
+
+      hyperagent:
+        slug: avalanche-fuji
+        category: testnet
+        tier: primary
+        capabilities:
+          tenderly: true
+          accountAbstraction:
+            erc4337: true
+            eip7702: false
+          x402: true
+          erc8004: true
+          verification: true
+        defaults:
+          framework: hardhat
+          gasStrategy: cheap
+          securityProfile: relaxed
+        notes:
+          - "Avalanche testnet for closed beta."
+          - "Use with Skale Base Sepolia as alternate testnet options."
+
+    # -------------------------------------------------------------------------
+    # Arbitrum One
+    # -------------------------------------------------------------------------
+    - id: 42161
+      enabled: true
+
+      chainlist:
+        name: Arbitrum One
+        chainId: 42161
+        rpcUrls:
+          - https://arb1.arbitrum.io/rpc
+        blockExplorerUrls:
+          - https://arbiscan.io
+        nativeCurrency:
+          name: Ether
+          symbol: ETH
+          decimals: 18
+        faucets: []
+
+      hyperagent:
+        slug: arbitrum-one
+        category: L2
+        tier: supported
+        capabilities:
+          tenderly: true
+          accountAbstraction:
+            erc4337: true
+            eip7702: false
+          x402: true
+          verification: true
+        defaults:
+          framework: foundry
+          gasStrategy: low
+          securityProfile: strict
+        notes:
+          - "High-throughput L2 with cheap gas; good for DeFi templates."
+
+    # -------------------------------------------------------------------------
+    # BNB Smart Chain Mainnet
+    # -------------------------------------------------------------------------
+    - id: 56
+      enabled: true
+
+      chainlist:
+        name: BNB Smart Chain
+        chainId: 56
+        rpcUrls:
+          - https://bsc-dataseed.bnbchain.org
+        blockExplorerUrls:
+          - https://bscscan.com
+        nativeCurrency:
+          name: BNB
+          symbol: BNB
+          decimals: 18
+        faucets: []
+
+      hyperagent:
+        slug: bsc-mainnet
+        category: L1
+        tier: supported
+        capabilities:
+          tenderly: true
+          accountAbstraction:
+            erc4337: true
+            eip7702: false
+          x402: true
+          verification: true
+        defaults:
+          framework: hardhat
+          gasStrategy: standard
+          securityProfile: medium
+        notes:
+          - "Heavily used retail chain; higher rug risk; adjust templates."
+
+    # -------------------------------------------------------------------------
+    # opBNB Mainnet
+    # -------------------------------------------------------------------------
+    - id: 204
+      enabled: true
+
+      chainlist:
+        name: opBNB
+        chainId: 204
+        rpcUrls:
+          - https://opbnb-mainnet-rpc.bnbchain.org
+        blockExplorerUrls:
+          - https://opbnbscan.com
+        nativeCurrency:
+          name: BNB
+          symbol: BNB
+          decimals: 18
+        faucets: []
+
+      hyperagent:
+        slug: opbnb-mainnet
+        category: L2
+        tier: experimental
+        capabilities:
+          tenderly: false
+          accountAbstraction:
+            erc4337: true
+            eip7702: false
+          x402: true
+          verification: true
+        defaults:
+          framework: hardhat
+          gasStrategy: low
+          securityProfile: medium
+        notes:
+          - "High throughput, very low fees; good for high-frequency flows."
+
+    # -------------------------------------------------------------------------
+    # Filecoin Mainnet (FEVM)
+    # -------------------------------------------------------------------------
+    - id: 314
+      enabled: true
+
+      chainlist:
+        name: Filecoin
+        chainId: 314
+        rpcUrls:
+          - https://api.node.glif.io/rpc/v1
+        blockExplorerUrls:
+          - https://filfox.info
+        nativeCurrency:
+          name: Filecoin
+          symbol: FIL
+          decimals: 18
+        faucets: []
+
+      hyperagent:
+        slug: filecoin-mainnet
+        category: L1-storage
+        tier: specialized
+        capabilities:
+          tenderly: false
+          accountAbstraction:
+            erc4337: false
+            eip7702: false
+          x402: true
+          verification: limited
+        defaults:
+          framework: hardhat
+          gasStrategy: standard
+          securityProfile: strict
+        notes:
+          - "Use FEVM for storage-related contracts; integrate with IPFS/Filecoin DA."
+

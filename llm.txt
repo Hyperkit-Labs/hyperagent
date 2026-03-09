@@ -1,5 +1,8 @@
 # HyperKit Agent - Technology Stack & Integration Guide
 
+## Mandatory Pre-Action (Global)
+Before any implementation, code change, or planning, the agent MUST (in order): check `.cursor/rules/`, `.cursor/wiki/`, `.cursor/skills/`, `.cursor/llm/`. Do not run other tools or write code before completing this check. See `.cursor/rules/MANDATORY_PRE_ACTION.mdc`, `AGENTS.mdc`, and `CLAUDE.md` (AI Agent Guidelines).
+
 ## Core Technology Stack
 
 ### Smart Contract Development
@@ -356,11 +359,12 @@ RPC_URL_MANTLE_TESTNET=https://rpc.sepolia.mantle.xyz
 RPC_URL_AVALANCHE_FUJI=https://api.avax-test.network/ext/bc/C/rpc
 
 # IPFS/Pinata
-PINATA_JWT=your_jwt_token
+PINATA_API_KEY=
+PINATA_API_SECRET=
+PINATA_JWT=
 PINATA_GATEWAY=https://gateway.pinata.cloud
 
-# Deployment
-DEPLOYER_PRIVATE_KEY=0x...  # 64 hex chars with 0x prefix
+# Deployment: from user connected account (EOA, ERC-4337, or EIP-7702). No server-side deployer key.
 ```
 
 ## Security Considerations

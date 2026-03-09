@@ -40,7 +40,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./docker/Dockerfile.backend
+          file: ./infra/docker/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -50,8 +50,8 @@ jobs:
       - name: Build and push frontend image
         uses: docker/build-push-action@v5
         with:
-          context: ./apps/web
-          file: ./apps/web/Dockerfile
+          context: .
+          file: ./apps/hyperagent-web/Dockerfile
           push: true
           tags: ghcr.io/${{ github.repository }}/frontend:develop-${{ github.sha }}
           cache-from: type=gha

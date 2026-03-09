@@ -1,0 +1,80 @@
+# Security & policy registry (GitOps). Mandatory tools per network/risk level, severity
+# thresholds that block deploy, allowed upgrade patterns, time-lock defaults.
+# slitherToSwc: Slither detector category -> SWC ID mapping for known exploit patterns.
+# highSeveritySwc: SWC IDs that block deploy when matched.
+apiVersion: hyperagent.io/v1
+kind: SecurityPolicyRegistry
+metadata:
+  name: evm-security-policies
+  version: "1"
+spec:
+  slitherToSwc:
+    reentrancy-eth: SWC-107
+    reentrancy-no-eth: SWC-107
+    reentrancy-benign: SWC-107
+    unchecked-transfer: SWC-104
+    unchecked-send: SWC-104
+    unchecked-lowlevel: SWC-104
+    unprotected-upgrade: SWC-101
+    arbitrary-send-eth: SWC-132
+    controlled-delegatecall: SWC-112
+    uninitialized-storage: SWC-109
+    uninitialized-local: SWC-109
+    unprotected-initializer: SWC-101
+    timestamp: SWC-116
+    block-timestamp: SWC-116
+    weak-randomness: SWC-120
+    tx-origin: SWC-115
+    delegatecall-loop: SWC-112
+    suicidal: SWC-106
+    locked-ether: SWC-132
+  highSeveritySwc:
+    - SWC-107
+    - SWC-104
+    - SWC-100
+    - SWC-101
+    - SWC-112
+    - SWC-109
+    - SWC-132
+    - SWC-106
+  policies:
+    - id: default
+      name: Default EVM
+      mandatoryTools:
+        - slither
+        - mythril
+        - mythx
+        - echidna
+        - tenderly
+      deployBlockSeverity: critical
+      maxAllowedSeverityForDeploy: high
+      requireSimulationSuccess: true
+      allowedUpgradePatterns:
+        - timelock
+        - multisig
+      timeLockDefaultHours: 48
+    - id: testnet
+      name: Testnet
+      mandatoryTools:
+        - slither
+        - tenderly
+      deployBlockSeverity: critical
+      maxAllowedSeverityForDeploy: high
+      requireSimulationSuccess: true
+      timeLockDefaultHours: 0
+    - id: high-value
+      name: High-value / mainnet
+      mandatoryTools:
+        - slither
+        - mythril
+        - mythx
+        - echidna
+        - tenderly
+      deployBlockSeverity: high
+      maxAllowedSeverityForDeploy: medium
+      requireSimulationSuccess: true
+      requireHumanApproval: true
+      allowedUpgradePatterns:
+        - timelock
+        - multisig
+      timeLockDefaultHours: 168

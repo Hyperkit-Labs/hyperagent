@@ -1,0 +1,24 @@
+# Orchestrator timeouts and backends (GitOps). Single source for which DA/memory backend to use.
+apiVersion: hyperagent.io/v1
+kind: OrchestratorRegistry
+metadata:
+  name: orchestrator-settings
+  version: "1"
+spec:
+  # Backends: one code path picks SDK from this. No hardcoded backend list in business logic.
+  backends:
+    da_backend: none          # stub mode; trace_blob_id stored in run_steps.
+    memory_backend: supabase  # acontext | supabase | memory. For acontext set ACONTEXT_API_URL and ACONTEXT_API_KEY.
+  timeouts:
+    default: 60
+    spec: 120
+    design: 60
+    codegen: 180
+    audit: 180
+    simulation: 60
+    deploy: 120
+    deploy_client: 30
+    roma: 60
+    oz_wizard: 60
+    ui_scaffold: 60
+    main: 60

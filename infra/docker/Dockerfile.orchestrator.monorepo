@@ -1,0 +1,20 @@
+# Orchestrator with execution-backend. Build from repo root (context: ../..).
+FROM python:3.11-slim
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy execution-backend and orchestrator for pip install
+COPY packages/execution-backend ./packages/execution-backend
+COPY services/orchestrator/requirements.txt ./services/orchestrator/
+WORKDIR /app/services/orchestrator
+RUN pip install --no-cache-dir -e ../../packages/execution-backend -r requirements.txt
+
+# Clone SCRUBD (RE/UX validation)
+RUN mkdir -p /app/services/orchestrator/data \
+    && git clone --depth 1 --branch V6.0 https://github.com/sujeetc/SCRUBD /app/services/orchestrator/data/SCRUBD
+
+COPY services/orchestrator .
+WORKDIR /app/services/orchestrator
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

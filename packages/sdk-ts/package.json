@@ -1,19 +1,7 @@
 {
   "name": "@hyperagent/sdk-ts",
   "version": "0.1.0",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "scripts": {
-    "build": "tsup src/index.ts --dts --format esm,cjs --out-dir dist",
-    "lint": "eslint src --ext .ts",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
-  },
-  "devDependencies": {
-    "@types/node": "^20",
-    "tsup": "^8.0.0",
-    "typescript": "^5",
-    "vitest": "^1.0.0"
-  }
+  "private": true,
+  "main": "index.js",
+  "types": "index.d.ts"
 }
-

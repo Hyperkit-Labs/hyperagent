@@ -1,0 +1,121 @@
+/**
+ * Theme CSS Variables
+ * 
+ * CSS custom properties for design tokens.
+ * Used by Tailwind CSS v4 and components.
+ */
+
+:root {
+  /* Colors - Background (aligned with external Dashboard HTML) */
+  --color-bg-base: #020617;
+  --color-bg-elevated: #050814;
+  --color-bg-overlay: #030205;
+  --color-bg-surface: #0B1020;
+  --color-bg-panel: #101322;
+  --color-bg-hover: #18181B;
+  
+  /* Borders (from HTML) */
+  --color-border-subtle: #1F1F22;
+  --color-border-default: #27272A;
+  --color-border-strong: #3F3F46;
+  --color-border-accent: rgba(148, 163, 255, 0.08);
+  
+  /* Text hierarchy */
+  --color-text-primary: #F9FAFB;
+  --color-text-secondary: #E5E7EB;
+  --color-text-tertiary: #9CA3AF;
+  --color-text-muted: #6B7280;
+  --color-text-dim: #52525B;
+  
+  /* Primary / Accent (from HTML) */
+  --color-primary: #7C3AED;
+  --color-primary-mid: #6366F1;
+  --color-primary-light: #A78BFA;
+  --color-primary-alpha-05: rgba(124, 58, 237, 0.05);
+  --color-primary-alpha-10: rgba(124, 58, 237, 0.1);
+  --color-primary-alpha-20: rgba(124, 58, 237, 0.2);
+  --color-primary-alpha-30: rgba(124, 58, 237, 0.3);
+  --color-primary-alpha-40: rgba(124, 58, 237, 0.4);
+  --color-primary-alpha-50: rgba(124, 58, 237, 0.5);
+  
+  /* Semantic */
+  --color-semantic-success: #10B981;
+  --color-semantic-warning: #F59E0B;
+  --color-semantic-error: #EF4444;
+  --color-semantic-info: #3B82F6;
+  --color-semantic-violet: #8B5CF6;
+  
+  /* Spacing (4px base grid system) */
+  --spacing-xs: 0.25rem;   /* 4px */
+  --spacing-sm: 0.5rem;    /* 8px */
+  --spacing-md: 1rem;      /* 16px */
+  --spacing-lg: 1.5rem;    /* 24px */
+  --spacing-xl: 2rem;      /* 32px */
+  --spacing-2xl: 2.5rem;   /* 40px */
+  --spacing-3xl: 3rem;     /* 48px */
+  --spacing-4xl: 4rem;     /* 64px */
+  
+  /* Border Radius */
+  --radius-sm: 0.375rem;   /* 6px */
+  --radius-md: 0.5rem;     /* 8px */
+  --radius-lg: 0.75rem;    /* 12px */
+  --radius-xl: 1rem;       /* 16px */
+  --radius-2xl: 1.5rem;    /* 24px */
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15);
+  
+  /* Grid System */
+  --grid-columns: 12;
+  --grid-gap-sm: 1rem;     /* 16px */
+  --grid-gap-md: 1.5rem;   /* 24px */
+  --grid-gap-lg: 2rem;     /* 32px */
+  --grid-cell-size: 40px;
+  
+  /* Typography */
+  --font-size-xs: 0.75rem;    /* 12px */
+  --font-size-sm: 0.875rem;   /* 14px */
+  --font-size-base: 1rem;     /* 16px */
+  --font-size-lg: 1.125rem;    /* 18px */
+  --font-size-xl: 1.25rem;     /* 20px */
+  --font-size-2xl: 1.5rem;     /* 24px */
+  --font-size-3xl: 1.875rem;   /* 30px */
+  --font-size-4xl: 2.25rem;    /* 36px */
+  
+  --line-height-tight: 1.25;
+  --line-height-snug: 1.375;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.625;
+  --line-height-loose: 2;
+  
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  
+  /* Animation */
+  --animation-duration-fast: 150ms;
+  --animation-duration-normal: 200ms;
+  --animation-duration-slow: 300ms;
+  
+  --animation-easing-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --animation-easing-in: cubic-bezier(0.4, 0, 1, 1);
+  --animation-easing-out: cubic-bezier(0, 0, 0.2, 1);
+  --animation-easing-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Component-specific */
+  --card-padding-sm: 1rem;     /* 16px */
+  --card-padding-md: 1.5rem;   /* 24px */
+  --card-padding-lg: 2rem;     /* 32px */
+  
+  --button-height-sm: 2rem;    /* 32px */
+  --button-height-md: 2.5rem;  /* 40px */
+  --button-height-lg: 3rem;    /* 48px */
+  
+  --input-height-sm: 2.5rem;   /* 40px */
+  --input-height-md: 3rem;     /* 48px */
+  --input-height-lg: 3.5rem;   /* 56px */
+}

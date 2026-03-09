@@ -1,0 +1,151 @@
+# Token / template registry (GitOps). Canonical templates: ERC20/721 variants, governance
+# modules; source (openzeppelin-wizard | custom); wizard options for OZ-backed templates.
+# Community-contracts templates: riskProfile high, requiresHumanApproval true.
+apiVersion: hyperagent.io/v1
+kind: TokenTemplateRegistry
+metadata:
+  name: evm-token-templates
+  version: "1"
+spec:
+  templates:
+    - id: erc20-standard
+      name: Standard ERC20
+      standards: ["ERC20"]
+      features: ["mintable", "burnable"]
+      riskProfile: low
+      defaultChains: [1187947933, 324705682]
+      auditRequired: true
+      allowedInClosedBeta: true
+      source: openzeppelin-wizard
+      wizard:
+        kind: erc20
+        options:
+          name: "MyToken"
+          symbol: "MTK"
+          mintable: true
+          burnable: true
+          pausable: false
+          permit: false
+          votes: false
+          flashMinting: false
+          premint: "1000000"
+    - id: erc20-upgradeable
+      name: Upgradeable ERC20 (UUPS)
+      standards: ["ERC20", "UUPS"]
+      features: ["mintable", "pausable", "upgradeable"]
+      riskProfile: high
+      requiresHumanApproval: true
+      allowedInClosedBeta: false
+      source: openzeppelin-wizard
+      wizard:
+        kind: erc20
+        options:
+          name: "MyTokenUpgradeable"
+          symbol: "MTK"
+          mintable: true
+          burnable: false
+          pausable: true
+          permit: false
+          votes: false
+          flashMinting: false
+          upgradeable: true
+    - id: erc721-standard
+      name: Standard ERC721
+      standards: ["ERC721"]
+      features: ["mintable"]
+      riskProfile: low
+      defaultChains: [1187947933, 324705682]
+      auditRequired: true
+      allowedInClosedBeta: true
+      source: openzeppelin-wizard
+      wizard:
+        kind: erc721
+        options:
+          name: "MyToken"
+          symbol: "MTK"
+          baseUri: ""
+          mintable: true
+          burnable: true
+          pausable: false
+          permit: false
+          votes: false
+          upgradeable: false
+    - id: erc721-community
+      name: ERC721 with Community extensions
+      standards: ["ERC721"]
+      features: ["mintable", "enumerable", "community"]
+      riskProfile: high
+      requiresHumanApproval: true
+      allowedInClosedBeta: false
+      source: openzeppelin-wizard
+      usesCommunityContracts: true
+      wizard:
+        kind: erc721
+        options:
+          name: "MyNFT"
+          symbol: "MNFT"
+          baseUri: ""
+          mintable: true
+          burnable: true
+          pausable: false
+          permit: false
+          votes: false
+          upgradeable: false
+    - id: erc4626-vault
+      name: ERC4626 Vault
+      standards: ["ERC4626"]
+      features: ["vault", "shares"]
+      riskProfile: high
+      requiresHumanApproval: true
+      allowedInClosedBeta: false
+      source: custom
+    - id: lending-basic
+      name: Basic Lending Protocol
+      standards: ["ERC20", "custom"]
+      features: ["collateral", "borrow", "repay", "liquidate"]
+      riskProfile: high
+      requiresHumanApproval: true
+      allowedInClosedBeta: false
+      source: custom
+      defaultChains: [1187947933, 324705682]
+      oracle:
+        default: chainlink
+        priceFeeds:
+          ETH_USD: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
+          BTC_USD: "0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c"
+    - id: marketplace-nft
+      name: NFT Marketplace
+      standards: ["ERC721", "custom"]
+      features: ["list", "buy", "cancel", "royalties"]
+      riskProfile: high
+      requiresHumanApproval: true
+      allowedInClosedBeta: false
+      source: custom
+      defaultChains: [1187947933, 324705682]
+    - id: governance-basic
+      name: Governor + ERC20Votes
+      standards: ["ERC20", "governance"]
+      features: ["votes", "propose", "vote", "queue", "execute"]
+      riskProfile: high
+      requiresHumanApproval: true
+      allowedInClosedBeta: false
+      source: custom
+      defaultChains: [1187947933, 324705682]
+    - id: multisig-gnosis
+      name: Multi-Sig Wallet
+      standards: ["custom"]
+      features: ["multisig", "confirm", "execute", "revoke"]
+      riskProfile: high
+      requiresHumanApproval: true
+      allowedInClosedBeta: false
+      source: custom
+      defaultChains: [1187947933, 324705682]
+    - id: amm-uniswap-style
+      name: Uniswap-style AMM
+      standards: ["ERC20", "custom"]
+      features: ["factory", "pair", "swap", "addLiquidity", "removeLiquidity"]
+      riskProfile: high
+      requiresHumanApproval: true
+      allowedInClosedBeta: false
+      source: custom
+      defaultChains: [1187947933, 324705682]

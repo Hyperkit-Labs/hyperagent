@@ -1,0 +1,3 @@
+[submodule "packages/pashov-skills"]
+	path = packages/pashov-skills
+	url = https://github.com/pashov/skills.git

@@ -1,0 +1,41 @@
+name: Project 9 - Auto add issues/PRs
+
+on:
+  issues:
+    types: [opened, labeled, reopened]
+  pull_request:
+    types: [opened, labeled, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  add_issue:
+    name: Add issue to Project 9
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add issue to project (label-gated)
+        uses: actions/add-to-project@v1.0.2
+        continue-on-error: true
+        with:
+          # NOTE: If secrets are not configured yet, this step will no-op (fails but workflow continues).
+          project-url: ${{ secrets.PROJECT_URL }}
+          github-token: ${{ secrets.PROJECT_TOKEN }}
+          # Add only when issue has at least one of these labels.
+          labeled: phase:foundation,phase:1,phase:2,phase:3
+          label-operator: OR
+
+  add_pr:
+    name: Add PR to Project 9
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add PR to project (label-gated)
+        uses: actions/add-to-project@v1.0.2
+        continue-on-error: true
+        with:
+          # NOTE: If secrets are not configured yet, this step will no-op (fails but workflow continues).
+          project-url: ${{ secrets.PROJECT_URL }}
+          github-token: ${{ secrets.PROJECT_TOKEN }}
+          labeled: phase:foundation,phase:1,phase:2,phase:3
+          label-operator: OR

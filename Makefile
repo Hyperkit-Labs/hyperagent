@@ -1,9 +1,11 @@
 # Root Makefile - backend in Docker, frontend (Studio) run locally
 # Run from repository root. Docker = API gateway + orchestrator + services only.
 
-# Compose file and env: run from infra/docker so ../../.env and ../../ paths in compose resolve to repo root.
+# Compose files: local dev vs Contabo production.
+# Run from infra/docker so ../../.env and ../../ paths resolve to repo root.
 COMPOSE_DIR := infra/docker
 COMPOSE_FILE := docker-compose.yml
+COMPOSE_FILE_LOCAL := docker-compose.local.yml
 ENV_FILE := .env
 
 .PHONY: help up down logs restart migrate install-web run-web install-api run-api build rebuild \
@@ -24,7 +26,8 @@ help:
 	@echo "  make up-full     - Start with roma-service, codegen (legacy)"
 	@echo "  make up-tools    - Start with hyperagent-tools (port 9000); set TOOLS_BASE_URL=http://hyperagent-tools:9000 in .env"
 	@echo "  make up-local    - Start full stack with local postgres, redis, vectordb"
-	@echo "  make build       - Build Docker images (run when code changes)"
+	@echo "  make up-contabo  - Start Contabo production stack (for local testing)"
+	@echo "  make build       - Build Docker images for local dev (run when code changes)"
 	@echo "  make rebuild     - Force rebuild Docker images from scratch"
 	@echo "  make down        - Stop stack"
 	@echo "  make restart     - Restart stack"
@@ -55,53 +58,63 @@ help:
 	@echo "  make dogfood-help  - Show dogfood checklist and doc link"
 	@echo "  make dogfood-daemon - Start agent-browser daemon (Windows fix; run in separate terminal)"
 
-# Build Docker images (run when code changes, before make up)
+# Build Docker images for local dev (run when code changes, before make up)
 build:
-	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE) build
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) build
 	@echo "[+] Docker images built. Run 'make up' to start."
 
-# Force rebuild from scratch
+# Force rebuild from scratch (local dev)
 rebuild:
-	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE) build --no-cache
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) build --no-cache
 	@echo "[+] Docker images rebuilt. Run 'make up' to start."
 
 # Start lite stack (5-6 services). ROMA/codegen in-process. Cloud Supabase + Redis.
 up:
-	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE) up -d
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) up -d
 	@echo "[+] Backend up (lite). Gateway: http://localhost:4000  Run Studio: make run-web"
 	@echo "    Requires SUPABASE_URL, REDIS_URL in .env. Stop: make down   Logs: make logs"
 
 # Start full stack with roma-service, codegen (legacy).
 up-full:
-	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE) --profile full up -d
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) --profile full up -d
 	@echo "[+] Backend up (full). Gateway: http://localhost:4000"
 
 # Start with hyperagent-tools (remote heavy toolchain). Set TOOLS_BASE_URL=http://hyperagent-tools:9000 in .env.
 up-tools:
-	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE) --profile tools up -d
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) --profile tools up -d
 	@echo "[+] Backend up with hyperagent-tools. Gateway: http://localhost:4000  Tools: http://localhost:9000"
 	@echo "    Ensure TOOLS_BASE_URL=http://hyperagent-tools:9000 in .env for compile/audit to use remote tools"
 
 # Start full stack with local postgres, redis, vectordb (heavier).
 up-local:
-	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE) --profile local-db up -d
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) --profile local-db up -d
 	@echo "[+] Backend up (full local). Gateway: http://localhost:4000"
 	@echo "    Local postgres:54322  redis:6379  vectordb:6333"
 
+# Start Contabo production stack (for local testing; Coolify uses docker-compose.yml on server).
+up-contabo:
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE) up -d
+	@echo "[+] Contabo stack up. Gateway: http://localhost:4000  Sandbox: http://localhost:8005"
+
+# Stop local dev stack
 down:
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) down
+
+# Stop Contabo stack (use after make up-contabo)
+down-contabo:
 	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE) down
 
 restart:
-	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE) restart
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) restart
 	@echo "[+] Stack restarted"
 
 logs:
-	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE) logs -f
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) logs -f
 
 # DB migrations: for local postgres only. Run after make up-local.
 # For cloud Supabase, apply migrations via Dashboard SQL or: supabase db push
 migrate:
-	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE) --profile local-db exec supabase pg_isready -U postgres -d hyperagent
+	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) --profile local-db exec supabase pg_isready -U postgres -d hyperagent
 	@echo "[+] DB reachable. Schema from platform/supabase/migrations applied on first start."
 
 # Frontend

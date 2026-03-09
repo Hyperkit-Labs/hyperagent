@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState } from "react";
+import { createContext, Suspense, useCallback, useContext, useState } from "react";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 import { MobileNavDrawer } from "@/components/layout/MobileNavDrawer";
 
@@ -57,7 +57,9 @@ export function LayoutProvider({ children }: { children: React.ReactNode }) {
     <LayoutContext.Provider value={value}>
       {children}
       <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
-      <MobileNavDrawer open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+      <Suspense fallback={null}>
+        <MobileNavDrawer open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+      </Suspense>
     </LayoutContext.Provider>
   );
 }

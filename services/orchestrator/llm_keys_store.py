@@ -1,10 +1,10 @@
 """
 In-memory LLM API keys per workspace (BYOK). Keyed by workspace_id; no key values returned on GET.
 """
+
 from __future__ import annotations
 
 import threading
-from typing import Any
 
 _store: dict[str, dict[str, str]] = {}
 _lock = threading.Lock()

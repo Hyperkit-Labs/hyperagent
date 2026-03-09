@@ -28,13 +28,13 @@
 | `CREDITS_ENABLED` | Set `true` to enable credit system |
 | `CREDITS_PER_USD` | Credits granted per 1 USD (default 10) |
 | `CREDITS_PER_RUN` | Credits consumed per workflow run (default 7) |
-| `REGISTRIES_PATH` | Chain registry for orchestrator (Render/Docker) |
+| `REGISTRIES_PATH` | Chain registry for orchestrator (Contabo/Docker) |
 
 ---
 
 ## Network Registry
 
-Orchestrator loads networks from `infra/registries/network/chains.yaml`. On Render, set `REGISTRIES_PATH` to repo-relative path so the registry is found.
+Orchestrator loads networks from `infra/registries/network/chains.yaml`. In production (Contabo/Coolify), set `REGISTRIES_PATH` to repo-relative path so the registry is found.
 
 ---
 

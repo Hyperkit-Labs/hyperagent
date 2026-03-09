@@ -2,13 +2,13 @@
 Short-lived agent session JWT (Option B): api_keys encrypted inside token with shared secret.
 Orchestrator creates; agent-runtime verifies and decrypts. Keys never in body or logs.
 """
+
 from __future__ import annotations
 
 import base64
 import json
 import os
 import time
-from typing import Any
 
 import jwt
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -21,7 +21,9 @@ AGENT_SESSION_EXP_MINUTES = 15
 def _get_payload_key() -> bytes:
     raw = os.environ.get("AGENT_SESSION_PAYLOAD_KEY")
     if not raw or len(raw) < 32:
-        raise ValueError("AGENT_SESSION_PAYLOAD_KEY must be set and at least 32 bytes (e.g. base64)")
+        raise ValueError(
+            "AGENT_SESSION_PAYLOAD_KEY must be set and at least 32 bytes (e.g. base64)"
+        )
     if len(raw) == 32 and raw.isascii():
         return raw.encode("utf-8")
     try:

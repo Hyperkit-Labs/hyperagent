@@ -4,14 +4,14 @@
 # Areas
 'area:frontend':
   - changed-files:
-    - any-glob-to-any-file: 'apps/hyperagent-web/**/*'
+    - any-glob-to-any-file: 'apps/studio/**/*'
     - any-glob-to-any-file: '**/*.tsx'
     - any-glob-to-any-file: '**/*.jsx'
     - any-glob-to-any-file: '**/*.css'
 
 'area:backend':
   - changed-files:
-    - any-glob-to-any-file: 'apps/hyperagent-api/hyperagent/**/*'
+    - any-glob-to-any-file: 'services/orchestrator/**/*'
     - any-glob-to-any-file: '**/*.py'
 
 'area:contracts':
@@ -30,7 +30,7 @@
 
 'area:database':
   - changed-files:
-    - any-glob-to-any-file: 'apps/hyperagent-api/hyperagent/**/*'
+    - any-glob-to-any-file: 'services/orchestrator/**/*'
     - any-glob-to-any-file: '**/migrations/**/*'
     - any-glob-to-any-file: '**/alembic/**/*'
 
@@ -42,8 +42,8 @@
 # Types
 'type:feature':
   - changed-files:
-    - any-glob-to-any-file: 'apps/hyperagent-api/hyperagent/**/*.py'
-    - any-glob-to-any-file: 'apps/hyperagent-web/src/**/*'
+    - any-glob-to-any-file: 'services/orchestrator/**/*.py'
+    - any-glob-to-any-file: 'apps/studio/**/*'
   - head-branch: ['^feature/', '^feat/']
 
 'type:bugfix':
@@ -91,19 +91,19 @@
 # Priority (based on file patterns)
 'priority:critical':
   - changed-files:
-    - any-glob-to-any-file: 'apps/hyperagent-api/hyperagent/**/*'
+    - any-glob-to-any-file: 'services/orchestrator/**/*'
     - any-glob-to-any-file: 'contracts/security/**/*'
 
 # Testing
 'needs-tests':
   - changed-files:
-    - any-glob-to-any-file: 'apps/hyperagent-api/hyperagent/**/*.py'
-    - any-glob-to-any-file: 'apps/hyperagent-web/src/**/*.{ts,tsx}'
+    - any-glob-to-any-file: 'services/orchestrator/**/*.py'
+    - any-glob-to-any-file: 'apps/studio/**/*.{ts,tsx}'
     - all-globs-to-all-files: '!**/*.test.{py,ts,tsx}'
     - all-globs-to-all-files: '!**/tests/**'
 
 # Security
 'security':
   - changed-files:
-    - any-glob-to-any-file: 'apps/hyperagent-api/hyperagent/**/*'
+    - any-glob-to-any-file: 'services/orchestrator/**/*'
     - any-glob-to-any-file: 'contracts/security/**/*'

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Settings as SettingsIcon, Folder, Key, Plug, ExternalLink, DollarSign, CreditCard, Zap } from "lucide-react";
+import { Settings as SettingsIcon, Folder, Key, Plug, ExternalLink, DollarSign, CreditCard } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import { LLMKeysCard } from "@/components/settings/LLMKeysCard";
 import { WorkspaceTab } from "@/components/settings/WorkspaceTab";
@@ -41,11 +41,11 @@ export default function SettingsPage() {
   } = useSettingsX402Data({ enabled: tab === "x402" });
 
   const configError = networksError ?? null;
-  const workspaceLoading = configLoading || networksLoading;
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setDefaultNetwork(localStorage.getItem("hyperagent_default_network") || "");
+      const stored = localStorage.getItem("hyperagent_default_network") || "";
+      queueMicrotask(() => setDefaultNetwork(stored));
     }
   }, []);
 

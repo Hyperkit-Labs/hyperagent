@@ -453,9 +453,9 @@ _site/
 *.bz2
 *.xz
 
-# Lock files (keep package-lock.json but ignore others)
+# Lock files (pnpm-lock.yaml at root for monorepo; package-lock.json in subdirs for npm-based services)
+/package-lock.json
 yarn.lock
-pnpm-lock.yaml
 poetry.lock
 Pipfile.lock
 Gemfile.lock

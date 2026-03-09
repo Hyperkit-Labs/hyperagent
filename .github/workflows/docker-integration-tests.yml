@@ -49,6 +49,8 @@ jobs:
           pip install -e packages/execution-backend
           pip install -r services/orchestrator/requirements.txt
           pip install httpx pytest pytest-asyncio
+        env:
+          ENVIRONMENT: test
 
       - name: Run orchestrator integration tests
         run: |

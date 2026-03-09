@@ -1,7 +1,7 @@
 """
 Docker Sandbox API for Contabo VPS.
 
-Accepts tarball URLs from the Render orchestrator, spawns ephemeral Docker
+Accepts tarball URLs from the orchestrator, spawns ephemeral Docker
 containers with the extracted project, and returns preview URLs. Validates
 requests via Bearer token (OPENSANDBOX_API_KEY).
 """

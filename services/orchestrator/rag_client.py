@@ -1,6 +1,7 @@
 """RAG client: query vectordb service for spec/template context. Used by spec and codegen nodes.
 Set VECTORDB_URL (default http://localhost:8010) to enable RAG. No-op when unconfigured.
 Supports versioned metadata fields (library_version, status, timestamp) for filtered retrieval."""
+
 from __future__ import annotations
 
 import logging
@@ -17,7 +18,9 @@ RAG_TIMEOUT = float(os.environ.get("RAG_TIMEOUT_SEC", "5"))
 
 
 def is_configured() -> bool:
-    return bool(VECTORDB_URL and VECTORDB_URL != "http://localhost:8010") or bool(os.environ.get("VECTORDB_ENABLED"))
+    return bool(VECTORDB_URL and VECTORDB_URL != "http://localhost:8010") or bool(
+        os.environ.get("VECTORDB_ENABLED")
+    )
 
 
 async def query_specs(
@@ -52,7 +55,11 @@ async def query_specs(
                     if sid and sid not in seen:
                         seen.add(sid)
                         results.append(item)
-        payload_global: dict[str, Any] = {"query": prompt, "collection": "specs", "limit": limit}
+        payload_global: dict[str, Any] = {
+            "query": prompt,
+            "collection": "specs",
+            "limit": limit,
+        }
         metadata_filter: dict[str, str] = {}
         if library_version:
             metadata_filter["library_version"] = library_version
@@ -130,7 +137,11 @@ async def query_templates(
     if not is_configured():
         return []
     try:
-        payload: dict[str, Any] = {"query": prompt, "collection": "templates", "limit": limit}
+        payload: dict[str, Any] = {
+            "query": prompt,
+            "collection": "templates",
+            "limit": limit,
+        }
         if library_version:
             payload["metadata_filter"] = {"library_version": library_version}
         async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:

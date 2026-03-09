@@ -1,6 +1,7 @@
 """Simulation agent: call simulation provider per deployment, persist results, set passed."""
-from providers import get_simulation_provider
+
 from db import insert_simulation, is_configured
+from providers import get_simulation_provider
 
 SIM_FROM_ADDRESS = "0x0000000000000000000000000000000000000001"
 
@@ -43,7 +44,10 @@ async def run_tenderly_simulations(
             result = {"success": False, "error": str(e), "gasUsed": 0}
 
         error_message = str(result.get("error") or "")
-        tenderly_disabled = "Tenderly not configured" in error_message or "TENDERLY_API_KEY not configured" in error_message
+        tenderly_disabled = (
+            "Tenderly not configured" in error_message
+            or "TENDERLY_API_KEY not configured" in error_message
+        )
 
         sim_record = {
             "success": result.get("success", False),

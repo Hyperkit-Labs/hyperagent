@@ -8,31 +8,29 @@ Flow:
     or [autofix (up to MAX_AUTOFIX_CYCLES) -> audit -> ...]
     or [END (failed)]
 """
-from typing import Annotated, Sequence
 
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
-from langgraph.graph import END, StateGraph
+
+from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
-import operator
-
-from registries import get_default_pipeline_id
-from workflow_state import AgentState, MAX_AUTOFIX_CYCLES
+from langgraph.graph import END, StateGraph
 from nodes import (
-    spec_agent,
-    design_agent,
-    codegen_agent,
-    test_generation_agent,
-    scrubd_validation_agent,
     audit_agent,
-    simulation_agent,
-    exploit_simulation_agent,
-    deploy_gate_agent,
-    deploy_agent,
-    ui_scaffold_agent,
     autofix_agent,
-    guardian_agent,
+    codegen_agent,
+    deploy_agent,
+    deploy_gate_agent,
+    design_agent,
     estimate_agent,
+    exploit_simulation_agent,
+    guardian_agent,
+    scrubd_validation_agent,
+    simulation_agent,
+    spec_agent,
+    test_generation_agent,
+    ui_scaffold_agent,
 )
+from registries import get_default_pipeline_id
+from workflow_state import MAX_AUTOFIX_CYCLES, AgentState
 
 
 def _start_router(state: AgentState) -> str:
@@ -123,47 +121,75 @@ def create_workflow():
     workflow.add_node("ui_scaffold", ui_scaffold_agent)
 
     workflow.set_entry_point("start")
-    workflow.add_conditional_edges("start", _start_router, {
-        "estimate": "estimate",
-        "design": "design",
-        "deploy": "deploy",
-    })
+    workflow.add_conditional_edges(
+        "start",
+        _start_router,
+        {
+            "estimate": "estimate",
+            "design": "design",
+            "deploy": "deploy",
+        },
+    )
     workflow.add_edge("estimate", "spec")
-    workflow.add_conditional_edges("spec", _should_approve_spec, {
-        "human_review": END,
-        "design": "design",
-    })
+    workflow.add_conditional_edges(
+        "spec",
+        _should_approve_spec,
+        {
+            "human_review": END,
+            "design": "design",
+        },
+    )
     workflow.add_edge("design", "codegen")
     workflow.add_edge("codegen", "test_generation")
     workflow.add_edge("test_generation", "scrubd_validation")
-    workflow.add_conditional_edges("scrubd_validation", _after_scrubd, {
-        "audit": "audit",
-        "autofix": "autofix",
-        "failed": END,
-    })
-    workflow.add_conditional_edges("audit", _after_audit, {
-        "guardian": "guardian",
-        "autofix": "autofix",
-        "failed": END,
-    })
+    workflow.add_conditional_edges(
+        "scrubd_validation",
+        _after_scrubd,
+        {
+            "audit": "audit",
+            "autofix": "autofix",
+            "failed": END,
+        },
+    )
+    workflow.add_conditional_edges(
+        "audit",
+        _after_audit,
+        {
+            "guardian": "guardian",
+            "autofix": "autofix",
+            "failed": END,
+        },
+    )
     workflow.add_edge("autofix", "scrubd_validation")
-    workflow.add_conditional_edges("guardian", _after_guardian, {
-        "deploy": "deploy_gate",
-        "autofix": "autofix",
-        "failed": END,
-    })
+    workflow.add_conditional_edges(
+        "guardian",
+        _after_guardian,
+        {
+            "deploy": "deploy_gate",
+            "autofix": "autofix",
+            "failed": END,
+        },
+    )
     workflow.add_edge("deploy_gate", "deploy")
     workflow.add_edge("deploy", "simulation")
-    workflow.add_conditional_edges("simulation", _after_simulation, {
-        "exploit_simulation": "exploit_simulation",
-        "autofix": "autofix",
-        "failed": END,
-    })
-    workflow.add_conditional_edges("exploit_simulation", _after_exploit_simulation, {
-        "ui_scaffold": "ui_scaffold",
-        "autofix": "autofix",
-        "failed": END,
-    })
+    workflow.add_conditional_edges(
+        "simulation",
+        _after_simulation,
+        {
+            "exploit_simulation": "exploit_simulation",
+            "autofix": "autofix",
+            "failed": END,
+        },
+    )
+    workflow.add_conditional_edges(
+        "exploit_simulation",
+        _after_exploit_simulation,
+        {
+            "ui_scaffold": "ui_scaffold",
+            "autofix": "autofix",
+            "failed": END,
+        },
+    )
     workflow.add_edge("ui_scaffold", END)
 
     return workflow
@@ -172,14 +198,19 @@ def create_workflow():
 def _get_checkpointer():
     """Return Redis-backed checkpointer if REDIS_URL is set, else MemorySaver."""
     import os
+
     redis_url = (os.environ.get("REDIS_URL") or "").strip()
     if redis_url:
         try:
             from langgraph.checkpoint.redis import RedisSaver
+
             return RedisSaver(redis_url)
         except (ImportError, Exception) as e:
             import logging
-            logging.getLogger(__name__).warning("Redis checkpointer unavailable, falling back to MemorySaver: %s", e)
+
+            logging.getLogger(__name__).warning(
+                "Redis checkpointer unavailable, falling back to MemorySaver: %s", e
+            )
     return MemorySaver()
 
 
@@ -199,6 +230,7 @@ def run_pipeline(
     resume_update: dict | None = None,
 ) -> dict:
     import asyncio
+
     pipeline_id = pipeline_id or get_default_pipeline_id()
     memory = _get_checkpointer()
     graph = create_workflow().compile(checkpointer=memory, interrupt_before=["deploy"])
@@ -252,7 +284,13 @@ def run_pipeline(
     if initial_state_override:
         initial.update(initial_state_override)
     import logging
-    logging.getLogger(__name__).info("[pipeline] run_pipeline start run_id=%s api_keys_providers=%s agent_session_jwt=%s", run_id, list(initial.get("api_keys") or {}).keys(), "yes" if initial.get("agent_session_jwt") else "no")
+
+    logging.getLogger(__name__).info(
+        "[pipeline] run_pipeline start run_id=%s api_keys_providers=%s agent_session_jwt=%s",
+        run_id,
+        list(initial.get("api_keys") or {}).keys(),
+        "yes" if initial.get("agent_session_jwt") else "no",
+    )
     config = {"configurable": {"thread_id": run_id}}
     try:
         if checkpoint_id and resume_update:

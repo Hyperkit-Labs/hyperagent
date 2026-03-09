@@ -19,7 +19,7 @@
     "@hyperagent/core-types": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/node": "^25.3.5",
     "typescript": "^5.0.0"
   }
 }

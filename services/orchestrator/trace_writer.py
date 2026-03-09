@@ -2,6 +2,7 @@
 Trace writer: build AgentTraceBlob-shaped payload, pin to IPFS when configured.
 Returns real CID as blob_id when IPFS configured; otherwise stub for run_steps.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -33,6 +34,7 @@ def build_trace_payload(
     }
     try:
         from registries import get_erc8004_agent_identity
+
         identity = get_erc8004_agent_identity()
         if identity:
             payload["agent"] = identity
@@ -57,12 +59,17 @@ async def write_trace(
     blob_id: IPFS CID when pinned, else stub. Caller stores in run_steps via update_step.
     extra: optional dict merged into payload (e.g. discussion_trace for debate steps).
     """
-    payload = build_trace_payload(run_id, step_type, step_index, status, output_summary, error_message, extra)
+    payload = build_trace_payload(
+        run_id, step_type, step_index, status, output_summary, error_message, extra
+    )
     try:
-        from ipfs_client import pin_json, is_configured
+        from ipfs_client import is_configured, pin_json
+
         if is_configured():
             name = f"trace/{run_id}/{step_type}/{step_index}.json"
-            cid = await pin_json(payload, name, {"run_id": run_id, "step_type": step_type})
+            cid = await pin_json(
+                payload, name, {"run_id": run_id, "step_type": step_type}
+            )
             if cid:
                 return cid, None, None
     except Exception as e:
@@ -84,15 +91,32 @@ def write_trace_sync(
         loop = asyncio.get_event_loop()
         if loop.is_running():
             import concurrent.futures
+
             with concurrent.futures.ThreadPoolExecutor() as pool:
                 fut = pool.submit(
                     asyncio.run,
-                    write_trace(run_id, step_type, step_index, status, output_summary, error_message, extra),
+                    write_trace(
+                        run_id,
+                        step_type,
+                        step_index,
+                        status,
+                        output_summary,
+                        error_message,
+                        extra,
+                    ),
                 )
                 return fut.result(timeout=15)
         else:
             return loop.run_until_complete(
-                write_trace(run_id, step_type, step_index, status, output_summary, error_message, extra)
+                write_trace(
+                    run_id,
+                    step_type,
+                    step_index,
+                    status,
+                    output_summary,
+                    error_message,
+                    extra,
+                )
             )
     except Exception as e:
         logger.warning("[trace_writer] write_trace_sync failed: %s", e)

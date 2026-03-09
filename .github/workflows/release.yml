@@ -80,7 +80,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./apps/hyperagent-web/Dockerfile
+          file: ./infra/docker/Dockerfile.studio
           push: true
           tags: ${{ steps.frontend-meta.outputs.tags }}
           labels: ${{ steps.frontend-meta.outputs.labels }}

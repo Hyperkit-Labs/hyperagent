@@ -1,5 +1,6 @@
 """Proposer + Auditor debate subgraph. Replaces autofix with iterative refinement.
 Proposer suggests fixes; Auditor (pashov-audit) verifies. Converges when Auditor finds no state-breaking path."""
+
 from __future__ import annotations
 
 import logging
@@ -14,7 +15,9 @@ from agents.scrubd_agent import get_scrubd_fix_hints
 
 logger = logging.getLogger(__name__)
 
-AGENT_RUNTIME_URL = os.environ.get("AGENT_RUNTIME_URL", "http://localhost:4001").rstrip("/")
+AGENT_RUNTIME_URL = os.environ.get("AGENT_RUNTIME_URL", "http://localhost:4001").rstrip(
+    "/"
+)
 MAX_DEBATE_ROUNDS = int(os.environ.get("MAX_DEBATE_ROUNDS", "3"))
 
 
@@ -30,6 +33,7 @@ def _build_audit_bundle(contracts: dict) -> str:
 def _parse_audit_findings(text: str) -> list[dict[str, Any]]:
     """Parse pashov report into findings. Returns empty if no findings."""
     import re
+
     findings = []
     if not text or "No findings." in text.lower():
         return findings
@@ -38,11 +42,13 @@ def _parse_audit_findings(text: str) -> list[dict[str, Any]]:
         confidence = int(m.group(1))
         title = m.group(3).strip()
         if confidence >= 75:
-            findings.append({
-                "severity": "high" if confidence >= 90 else "medium",
-                "title": title,
-                "confidence": confidence,
-            })
+            findings.append(
+                {
+                    "severity": "high" if confidence >= 90 else "medium",
+                    "title": title,
+                    "confidence": confidence,
+                }
+            )
     return findings
 
 
@@ -87,7 +93,9 @@ async def _run_auditor(
                 headers=headers,
             )
             if r.status_code != 200:
-                logger.warning("[debate] auditor returned %s: %s", r.status_code, r.text[:200])
+                logger.warning(
+                    "[debate] auditor returned %s: %s", r.status_code, r.text[:200]
+                )
                 return r.text[:2000], []
             data = r.json()
             text = data.get("text", "")
@@ -126,7 +134,9 @@ async def run_debate(
             desc = f.get("description", f.get("error", str(f)))
             error_context_parts.append(f"[exploit] {desc}")
     if state.get("simulation_results", {}).get("error"):
-        error_context_parts.append(f"Simulation error: {state['simulation_results']['error']}")
+        error_context_parts.append(
+            f"Simulation error: {state['simulation_results']['error']}"
+        )
     if state.get("invariant_violations"):
         for v in state["invariant_violations"][:5]:
             inv = v.get("invariant", str(v))
@@ -139,7 +149,9 @@ async def run_debate(
     converged = False
 
     for round_num in range(1, MAX_DEBATE_ROUNDS + 1):
-        logger.info("[debate] run_id=%s round=%d/%d", run_id, round_num, MAX_DEBATE_ROUNDS)
+        logger.info(
+            "[debate] run_id=%s round=%d/%d", run_id, round_num, MAX_DEBATE_ROUNDS
+        )
 
         correction_prompt = (
             f"The following Solidity contracts failed security audit or simulation.\n\n"
@@ -170,31 +182,39 @@ async def run_debate(
             )
         except Exception as e:
             logger.error("[debate] proposer failed round %d: %s", round_num, e)
-            discussion_trace.append({
-                "round": round_num,
-                "role": "proposer",
-                "status": "error",
-                "content": str(e),
-            })
+            discussion_trace.append(
+                {
+                    "round": round_num,
+                    "role": "proposer",
+                    "status": "error",
+                    "content": str(e),
+                }
+            )
             state["error"] = f"Debate proposer failed: {e}"
             state["discussion_trace"] = discussion_trace
             state["debate_converged"] = False
             return state
 
-        discussion_trace.append({
-            "round": round_num,
-            "role": "proposer",
-            "status": "ok",
-            "files_count": len(new_contracts),
-        })
+        discussion_trace.append(
+            {
+                "round": round_num,
+                "role": "proposer",
+                "status": "ok",
+                "files_count": len(new_contracts),
+            }
+        )
 
-        auditor_text, auditor_findings = await _run_auditor(new_contracts, api_keys, run_id)
-        discussion_trace.append({
-            "round": round_num,
-            "role": "auditor",
-            "findings_count": len(auditor_findings),
-            "summary": auditor_text[:500] if auditor_text else "",
-        })
+        auditor_text, auditor_findings = await _run_auditor(
+            new_contracts, api_keys, run_id
+        )
+        discussion_trace.append(
+            {
+                "round": round_num,
+                "role": "auditor",
+                "findings_count": len(auditor_findings),
+                "summary": auditor_text[:500] if auditor_text else "",
+            }
+        )
 
         if not _has_state_breaking_findings(auditor_findings):
             converged = True

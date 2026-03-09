@@ -1,6 +1,6 @@
 # Primary backend image for CI/CD. Builds orchestrator (main API).
 # For full stack, use docker-compose.yml which builds all services.
-FROM python:3.11-slim
+FROM python:3.14-slim
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends git \
     && rm -rf /var/lib/apt/lists/*

@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 # Install system deps: curl, git (Foundry needs git), ca-certificates
 RUN apt-get update && \

@@ -1,6 +1,6 @@
 # HyperAgent Tools - remote compile/audit. Compile via py-solc-x; audit via Slither.
 # Build from repo root: docker build -f infra/docker/Dockerfile.hyperagent-tools .
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 WORKDIR /app
 

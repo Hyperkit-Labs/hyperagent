@@ -23,7 +23,7 @@ import {
   BookOpen,
   X,
 } from "lucide-react";
-import { ROUTES } from "@/constants/routes";
+import { ROUTES, CLI_VERSION } from "@/constants/routes";
 
 const coreNavItems = [
   { href: ROUTES.DASHBOARD, label: "Overview", icon: LayoutDashboard },
@@ -177,7 +177,7 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
               </div>
             </nav>
             <div className="shrink-0 px-4 py-3 border-t border-[var(--color-border-subtle)] text-[11px] text-[var(--color-text-dim)]">
-              Hyperkit CLI v2.4.0
+              {`Hyperkit CLI v${CLI_VERSION}`}
             </div>
           </motion.aside>
         </>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useActiveAccount } from "thirdweb/react";
 import { AmbientBackground } from "@/components/layout/AmbientBackground";
@@ -64,7 +64,9 @@ export function LayoutSwitcher({ children }: { children: React.ReactNode }) {
             <FloatingLogsPill />
           </div>
           <OrchestratorRail />
-          <ContextSidebarWrapper />
+          <Suspense fallback={null}>
+            <ContextSidebarWrapper />
+          </Suspense>
         </div>
       </div>
     </>

@@ -1,6 +1,7 @@
 """
 Workflow store: Supabase (runs.workflow_state) as source of truth when configured; in-memory fallback for dev.
 """
+
 from __future__ import annotations
 
 import threading
@@ -29,6 +30,7 @@ def _ensure_contracts_dict(raw: Any) -> dict[str, Any]:
                 out[f"Contract_{i}.sol"] = code
         return out
     return {}
+
 
 _workflows: dict[str, dict[str, Any]] = {}
 _lock = threading.Lock()
@@ -173,7 +175,15 @@ def _normalize_status(stage: str) -> str:
         return "cancelled"
     if stage in ("running", "pending"):
         return stage
-    if stage in ("spec_review", "design_review", "audit", "simulation", "codegen", "design", "spec"):
+    if stage in (
+        "spec_review",
+        "design_review",
+        "audit",
+        "simulation",
+        "codegen",
+        "design",
+        "spec",
+    ):
         return "building"
     return "building" if stage else "unknown"
 
@@ -215,7 +225,9 @@ def count_workflows() -> int:
         return len(_workflows)
 
 
-def append_deployment(workflow_id: str, deployment: dict[str, Any]) -> dict[str, Any] | None:
+def append_deployment(
+    workflow_id: str, deployment: dict[str, Any]
+) -> dict[str, Any] | None:
     """Append one deployment record to workflow; persist to Supabase when configured."""
     now = datetime.now(UTC).isoformat()
     rec = get_workflow(workflow_id)

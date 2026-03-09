@@ -16,7 +16,7 @@
     "cors": "^2.8.5",
     "ai": "^3.0.0",
     "@ai-sdk/openai": "^0.0.50",
-    "@ai-sdk/anthropic": "^0.0.50",
+    "@ai-sdk/anthropic": "^3.0.58",
     "@ai-sdk/google": "^0.0.50",
     "zod": "^3.22.0",
     "jsonwebtoken": "^9.0.2",

@@ -1,19 +1,21 @@
 """Deploy agent: compile contracts, get deploy plan per chain, persist to Supabase."""
-from store import _ensure_contracts_dict
+
 import logging
 import os
 import re
 
 import httpx
-
-from providers import get_deploy_provider
 from db import insert_deployment, is_configured
-from registries import get_timeout, get_default_chain_id
+from providers import get_deploy_provider
+from registries import get_default_chain_id, get_timeout
+from store import _ensure_contracts_dict
 from trace_context import get_trace_headers
 
 logger = logging.getLogger(__name__)
 
-COMPILE_SERVICE_URL = os.environ.get("COMPILE_SERVICE_URL", "http://localhost:8004").rstrip("/")
+COMPILE_SERVICE_URL = os.environ.get(
+    "COMPILE_SERVICE_URL", "http://localhost:8004"
+).rstrip("/")
 
 _MD_FENCE_RE = re.compile(r"^```(?:solidity|sol)?\s*\n?", re.MULTILINE)
 _MD_FENCE_END_RE = re.compile(r"\n?```\s*$", re.MULTILINE)
@@ -37,20 +39,33 @@ async def _compile_contract(
     headers = get_trace_headers()
     payload: dict = {"framework": framework}
     if all_files and len(all_files) > 1:
-        payload["files"] = {n: _strip_markdown_fences(s) for n, s in all_files.items() if isinstance(s, str)}
+        payload["files"] = {
+            n: _strip_markdown_fences(s)
+            for n, s in all_files.items()
+            if isinstance(s, str)
+        }
         payload["entryContract"] = contract_name
     else:
         payload["contractCode"] = clean_source
     async with httpx.AsyncClient(timeout=get_timeout("deploy")) as client:
-        r = await client.post(f"{COMPILE_SERVICE_URL}/compile", json=payload, headers=headers)
+        r = await client.post(
+            f"{COMPILE_SERVICE_URL}/compile", json=payload, headers=headers
+        )
         if r.status_code != 200:
-            logger.warning("[deploy] compile HTTP %s for %s", r.status_code, contract_name)
+            logger.warning(
+                "[deploy] compile HTTP %s for %s", r.status_code, contract_name
+            )
             return None
         data = r.json()
         if not data.get("success") or not data.get("bytecode"):
             errors = data.get("errors") or []
-            msgs = [e.get("message", "")[:200] if isinstance(e, dict) else str(e)[:200] for e in errors[:3]]
-            logger.warning("[deploy] compile failed for %s: %s", contract_name, "; ".join(msgs))
+            msgs = [
+                e.get("message", "")[:200] if isinstance(e, dict) else str(e)[:200]
+                for e in errors[:3]
+            ]
+            logger.warning(
+                "[deploy] compile failed for %s: %s", contract_name, "; ".join(msgs)
+            )
             return None
         return {"bytecode": data["bytecode"], "abi": data.get("abi") or []}
 
@@ -68,7 +83,9 @@ def _chain_ids_from_spec(chains: list) -> list[int]:
     return out if out else [get_default_chain_id()]
 
 
-def _extract_erc20_constructor_args(spec: dict, oz_wizard_options: dict | None = None) -> list:
+def _extract_erc20_constructor_args(
+    spec: dict, oz_wizard_options: dict | None = None
+) -> list:
     """Extract constructor args (name, symbol, initialSupply) for ERC20 from wizard_options."""
     opts = dict(oz_wizard_options or {})
     if isinstance(spec.get("wizard_options"), dict):
@@ -104,18 +121,31 @@ async def deploy_contracts(
     framework = spec.get("framework") or "hardhat"
 
     contracts = _ensure_contracts_dict(contracts)
-    contract_items = [(n, s) for n, s in contracts.items() if n.endswith(".sol") and isinstance(s, str)]
+    contract_items = [
+        (n, s)
+        for n, s in contracts.items()
+        if n.endswith(".sol") and isinstance(s, str)
+    ]
     all_files = dict(contract_items) if len(contract_items) > 1 else None
-    logger.info("[deploy] chain_ids=%s contracts=%s", chain_ids, [n for n, _ in contract_items])
+    logger.info(
+        "[deploy] chain_ids=%s contracts=%s", chain_ids, [n for n, _ in contract_items]
+    )
     for order, (name, source) in enumerate(contract_items):
         contract_name = name.replace(".sol", "")
-        compiled = await _compile_contract(source, contract_name, framework, all_files=all_files)
+        compiled = await _compile_contract(
+            source, contract_name, framework, all_files=all_files
+        )
         if not compiled:
             logger.warning("[deploy] skipping %s: compile returned None", contract_name)
             continue
         bytecode = compiled["bytecode"]
         abi = compiled["abi"]
-        logger.info("[deploy] compiled %s bytecode=%d bytes abi=%d entries", contract_name, len(bytecode), len(abi))
+        logger.info(
+            "[deploy] compiled %s bytecode=%d bytes abi=%d entries",
+            contract_name,
+            len(bytecode),
+            len(abi),
+        )
 
         constructor_args: list = []
         if order == 0 and str(spec.get("token_type", "")).upper() == "ERC20":
@@ -123,9 +153,16 @@ async def deploy_contracts(
 
         for chain_id in chain_ids:
             try:
-                plan = await get_deploy_provider().get_deploy_plan(chain_id, bytecode, abi, constructor_args)
+                plan = await get_deploy_provider().get_deploy_plan(
+                    chain_id, bytecode, abi, constructor_args
+                )
             except Exception as exc:
-                logger.warning("[deploy] deploy plan failed chain=%s contract=%s: %s", chain_id, contract_name, exc)
+                logger.warning(
+                    "[deploy] deploy plan failed chain=%s contract=%s: %s",
+                    chain_id,
+                    contract_name,
+                    exc,
+                )
                 continue
             if order > 0 and spec.get("multi_contract"):
                 plan["priorAddressParams"] = [{"paramIndex": 0, "deploymentIndex": 0}]
@@ -146,9 +183,17 @@ async def deploy_contracts(
                 if row:
                     deployments.append({**row, "plan": plan})
                 else:
-                    deployments.append({"chain_id": chain_id, "contract_name": contract_name, "plan": plan})
+                    deployments.append(
+                        {
+                            "chain_id": chain_id,
+                            "contract_name": contract_name,
+                            "plan": plan,
+                        }
+                    )
             else:
-                deployments.append({"chain_id": chain_id, "contract_name": contract_name, "plan": plan})
+                deployments.append(
+                    {"chain_id": chain_id, "contract_name": contract_name, "plan": plan}
+                )
 
     logger.info("[deploy] finished: %d deployment(s)", len(deployments))
     return deployments

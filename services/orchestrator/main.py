@@ -2,12 +2,14 @@
 HyperAgent Orchestrator
 FastAPI app: workflows CRUD, runs, networks, metrics, BYOK, deploy, UI schema. Studio contract for E2E.
 """
+
 from pathlib import Path
 
 # Load .env from repo root so X402_ENABLED, CREDITS_ENABLED, etc. are available when running locally.
 # Docker passes env via env_file; dotenv is a no-op when vars are already set.
 try:
     from dotenv import load_dotenv
+
     _repo_root = Path(__file__).resolve().parent.parent.parent
     _env_path = _repo_root / ".env"
     if _env_path.exists():
@@ -15,7 +17,6 @@ try:
 except ImportError:
     pass
 
-import asyncio
 import json
 import logging
 import os
@@ -28,44 +29,72 @@ logger = logging.getLogger(__name__)
 
 def _log_byok_event(event: str, user_id: str, action: str) -> None:
     """Structured security log for BYOK access (no key values)."""
-    logger.warning("[security] %s", json.dumps({"event": event, "byok_action": action, "user_id": user_id}))
+    logger.warning(
+        "[security] %s",
+        json.dumps({"event": event, "byok_action": action, "user_id": user_id}),
+    )
 
-import httpx
+
 import io
 import tarfile
 import zipfile
 
-from fastapi import BackgroundTasks, Body, FastAPI, HTTPException, Header, Request
+import credits_supabase
+import db
+import httpx
+import llm_keys_supabase
+import payments_supabase
+from fastapi import BackgroundTasks, Body, FastAPI, Header, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
-from pydantic import BaseModel, Field
-
+from input_guardrail import validate_input as guardrail_validate_input
 from llm_keys_store import (
+    DEFAULT_WORKSPACE,
+    delete_keys,
     get_configured_providers,
     get_keys_for_pipeline,
     set_keys,
-    delete_keys,
-    DEFAULT_WORKSPACE,
 )
-import llm_keys_supabase
-import payments_supabase
-import credits_supabase
-from registries import DEFAULT_PIPELINE_ID, ANCHOR_NETWORK_SLUG, get_registry_versions, get_networks_for_api, get_templates_for_api, get_template, get_x402_enabled, get_timeout, get_monitoring_enabled, get_chain_rpc_explorer, get_chain_id_by_network_slug, get_default_chain_id, get_x402_plans, get_x402_plan, get_x402_resources, get_resource_price, get_stablecoins_by_chain, check_plan_limit, get_a2a_agent_id, get_a2a_default_chain_id, get_erc8004_agent_identity
+from pydantic import BaseModel, Field
+from registries import (
+    ANCHOR_NETWORK_SLUG,
+    DEFAULT_PIPELINE_ID,
+    get_a2a_agent_id,
+    get_a2a_default_chain_id,
+    get_chain_id_by_network_slug,
+    get_chain_rpc_explorer,
+    get_default_chain_id,
+    get_erc8004_agent_identity,
+    get_monitoring_enabled,
+    get_networks_for_api,
+    get_registry_versions,
+    get_resource_price,
+    get_stablecoins_by_chain,
+    get_templates_for_api,
+    get_timeout,
+    get_x402_enabled,
+    get_x402_plan,
+    get_x402_plans,
+    get_x402_resources,
+)
 from store import (
+    MAX_INTENT_LENGTH,
+    append_deployment,
+    count_workflows,
     create_workflow,
-    update_workflow,
     get_workflow,
     list_workflows,
-    count_workflows,
-    append_deployment,
-    MAX_INTENT_LENGTH,
+    update_workflow,
 )
-from input_guardrail import validate_input as guardrail_validate_input
+from trace_context import get_trace_headers, set_request_id
 from workflow import run_pipeline
-from trace_context import set_request_id, get_trace_headers
-import db
 
-COMPILE_SERVICE_URL = os.environ.get("COMPILE_SERVICE_URL", "http://localhost:8004").rstrip("/")
-AUDIT_SERVICE_URL = os.environ.get("AUDIT_SERVICE_URL", "http://localhost:8001").rstrip("/")
+COMPILE_SERVICE_URL = os.environ.get(
+    "COMPILE_SERVICE_URL", "http://localhost:8004"
+).rstrip("/")
+AUDIT_SERVICE_URL = os.environ.get("AUDIT_SERVICE_URL", "http://localhost:8001").rstrip(
+    "/"
+)
+
 
 # Map store status to runs.status (pending|running|success|failed|cancelled)
 def _run_status_for_store(status: str) -> str:
@@ -85,18 +114,30 @@ def _get_keys_for_run(user_id: str, workspace_id: str) -> dict[str, str]:
     return get_keys_for_pipeline(workspace_id or DEFAULT_WORKSPACE)
 
 
-def _create_agent_session_jwt_if_configured(user_id: str, run_id: str, api_keys: dict) -> str | None:
+def _create_agent_session_jwt_if_configured(
+    user_id: str, run_id: str, api_keys: dict
+) -> str | None:
     """When JWT_SECRET_KEY and AGENT_SESSION_PAYLOAD_KEY are set, return short-lived JWT with encrypted api_keys."""
     if not api_keys:
         return None
-    if not os.environ.get("JWT_SECRET_KEY") or not os.environ.get("AGENT_SESSION_PAYLOAD_KEY"):
+    if not os.environ.get("JWT_SECRET_KEY") or not os.environ.get(
+        "AGENT_SESSION_PAYLOAD_KEY"
+    ):
         return None
     try:
         from agent_session_jwt import create_agent_session_jwt
+
         return create_agent_session_jwt(sub=user_id, run_id=run_id, api_keys=api_keys)
     except Exception as e:
-        logger.error("[agent-session] JWT creation failed user_id=%s run_id=%s: %s", user_id, run_id, e, exc_info=True)
+        logger.error(
+            "[agent-session] JWT creation failed user_id=%s run_id=%s: %s",
+            user_id,
+            run_id,
+            e,
+            exc_info=True,
+        )
         return None
+
 
 app = FastAPI(title="HyperAgent Orchestrator", version="0.1.0")
 
@@ -130,10 +171,11 @@ def _validate_critical_services() -> None:
     if missing:
         logger.warning(
             "[orchestrator] Critical services not configured: %s. "
-            "Workflow pipeline will fail. Set env vars or use Render Blueprint fromService.",
+            "Workflow pipeline will fail. Set env vars in Contabo/Coolify.",
             ", ".join(missing),
         )
     from pathlib import Path
+
     scrubd_path = os.environ.get("SCRUBD_PATH", "./data/SCRUBD").strip()
     labels = Path(scrubd_path).resolve() / "SCRUBD-CD" / "data" / "labels.csv"
     if not labels.exists():
@@ -153,7 +195,9 @@ _LATENCY_BUFFER_SIZE = 1000
 async def log_request_id(request: Request, call_next):
     """Set and log x-request-id for trace correlation; downstream services receive it from gateway.
     Records request latency for p95 SLO measurement (excludes /health and streaming)."""
-    rid = (request.headers.get("x-request-id") or request.headers.get("X-Request-Id") or "").strip() or None
+    rid = (
+        request.headers.get("x-request-id") or request.headers.get("X-Request-Id") or ""
+    ).strip() or None
     set_request_id(rid)
     if rid:
         logger.info("[orchestrator] request_id=%s path=%s", rid, request.url.path)
@@ -184,9 +228,12 @@ def _p95_latency_ms() -> float | None:
 # Auth helpers
 # ---------------------------------------------------------------------------
 
+
 def _get_caller_id(request: Request) -> str | None:
     """Extract authenticated user id from gateway-injected header."""
-    return (request.headers.get("X-User-Id") or request.headers.get("x-user-id") or "").strip() or None
+    return (
+        request.headers.get("X-User-Id") or request.headers.get("x-user-id") or ""
+    ).strip() or None
 
 
 def _assert_workflow_owner(w: dict[str, Any], request: Request) -> None:
@@ -217,7 +264,13 @@ def _sanitize_ident(value: str, fallback: str = "fn") -> str:
 
 def _sanitize_label(value: str, fallback: str = "Action") -> str:
     """Escape HTML entities in labels to prevent XSS in generated code."""
-    safe = (value or fallback).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+    safe = (
+        (value or fallback)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
     return safe[:128]
 
 
@@ -233,6 +286,7 @@ def _sanitize_name(value: str, fallback: str = "dapp") -> str:
 # Request/response models
 # ---------------------------------------------------------------------------
 
+
 class RunRequest(BaseModel):
     user_prompt: str = Field(..., min_length=1, max_length=MAX_INTENT_LENGTH)
     user_id: str = ""
@@ -242,7 +296,9 @@ class RunRequest(BaseModel):
 
 
 class CreateWorkflowBody(BaseModel):
-    nlp_input: str = Field(..., alias="nlp_input", min_length=1, max_length=MAX_INTENT_LENGTH)
+    nlp_input: str = Field(
+        ..., alias="nlp_input", min_length=1, max_length=MAX_INTENT_LENGTH
+    )
     network: str | None = None
     user_id: str = ""
     project_id: str = ""
@@ -256,6 +312,7 @@ class CreateWorkflowBody(BaseModel):
 # ---------------------------------------------------------------------------
 # Workflow lifecycle
 # ---------------------------------------------------------------------------
+
 
 def _run_workflow_pipeline_job(
     workflow_id: str,
@@ -272,9 +329,18 @@ def _run_workflow_pipeline_job(
 ) -> None:
     """Background job: run LangGraph pipeline and persist workflow + run status."""
     set_request_id(request_id)
-    logger.info("[pipeline] job start workflow_id=%s api_keys_providers=%s agent_session_jwt=%s", workflow_id, list(api_keys.keys()) if api_keys else [], "yes" if agent_session_jwt else "no")
+    logger.info(
+        "[pipeline] job start workflow_id=%s api_keys_providers=%s agent_session_jwt=%s",
+        workflow_id,
+        list(api_keys.keys()) if api_keys else [],
+        "yes" if agent_session_jwt else "no",
+    )
     if request_id:
-        logger.info("[orchestrator] pipeline start workflow_id=%s request_id=%s", workflow_id, request_id)
+        logger.info(
+            "[orchestrator] pipeline start workflow_id=%s request_id=%s",
+            workflow_id,
+            request_id,
+        )
     if api_keys and user_id:
         _log_byok_event("byok_keys_used", user_id, "run_pipeline")
     try:
@@ -297,7 +363,10 @@ def _run_workflow_pipeline_job(
         )
         current_stage = final.get("current_stage") or "unknown"
         if auto_approve and current_stage == "awaiting_deploy_approval":
-            logger.info("[orchestrator] auto_approve: resuming deploy for workflow_id=%s", workflow_id)
+            logger.info(
+                "[orchestrator] auto_approve: resuming deploy for workflow_id=%s",
+                workflow_id,
+            )
             final = run_pipeline(
                 nlp_input,
                 user_id,
@@ -309,26 +378,77 @@ def _run_workflow_pipeline_job(
                 resume_update={"deploy_approved": True, "user_prompt": nlp_input},
             )
             current_stage = final.get("current_stage") or "unknown"
-        status = "completed" if current_stage in ("deployed", "deploy", "ui_scaffold") else (
-            "failed" if current_stage in ("audit_failed", "simulation_failed", "failed") else "building"
+        status = (
+            "completed"
+            if current_stage in ("deployed", "deploy", "ui_scaffold")
+            else (
+                "failed"
+                if current_stage in ("audit_failed", "simulation_failed", "failed")
+                else "building"
+            )
         )
         autofix_cycle = final.get("autofix_cycle", 0)
         guardian_violations = final.get("invariant_violations") or []
         stages = [
             {"stage": "spec", "status": "completed"},
-            {"stage": "design", "status": "completed" if final.get("design_proposal") else "pending"},
-            {"stage": "codegen", "status": "completed" if final.get("contracts") else "pending"},
-            {"stage": "test_generation", "status": "completed" if final.get("test_files") else "pending"},
-            {"stage": "audit", "status": "completed" if final.get("audit_passed") else ("failed" if final.get("audit_findings") else "pending")},
+            {
+                "stage": "design",
+                "status": "completed" if final.get("design_proposal") else "pending",
+            },
+            {
+                "stage": "codegen",
+                "status": "completed" if final.get("contracts") else "pending",
+            },
+            {
+                "stage": "test_generation",
+                "status": "completed" if final.get("test_files") else "pending",
+            },
+            {
+                "stage": "audit",
+                "status": (
+                    "completed"
+                    if final.get("audit_passed")
+                    else ("failed" if final.get("audit_findings") else "pending")
+                ),
+            },
         ]
         if autofix_cycle > 0:
-            stages.append({"stage": "autofix", "status": "completed", "cycles": autofix_cycle})
+            stages.append(
+                {"stage": "autofix", "status": "completed", "cycles": autofix_cycle}
+            )
         if final.get("invariants"):
-            stages.append({"stage": "guardian", "status": "failed" if guardian_violations else "completed"})
+            stages.append(
+                {
+                    "stage": "guardian",
+                    "status": "failed" if guardian_violations else "completed",
+                }
+            )
         stages += [
-            {"stage": "simulation", "status": "completed" if final.get("simulation_passed") else ("failed" if final.get("simulation_results") and not final.get("simulation_passed") else "pending")},
-            {"stage": "deploy", "status": "completed" if current_stage in ("deployed", "ui_scaffold") else "pending"},
-            {"stage": "ui_scaffold", "status": "completed" if final.get("ui_schema") else "pending"},
+            {
+                "stage": "simulation",
+                "status": (
+                    "completed"
+                    if final.get("simulation_passed")
+                    else (
+                        "failed"
+                        if final.get("simulation_results")
+                        and not final.get("simulation_passed")
+                        else "pending"
+                    )
+                ),
+            },
+            {
+                "stage": "deploy",
+                "status": (
+                    "completed"
+                    if current_stage in ("deployed", "ui_scaffold")
+                    else "pending"
+                ),
+            },
+            {
+                "stage": "ui_scaffold",
+                "status": "completed" if final.get("ui_schema") else "pending",
+            },
         ]
         codegen_mode = "oz_wizard" if final.get("use_oz_wizard") else "custom"
         oz_opts = final.get("oz_wizard_options") or None
@@ -371,10 +491,17 @@ def _run_workflow_pipeline_job(
                     resource_id="pipeline.run",
                     endpoint="/api/v1/workflows/generate",
                     status="completed",
-                    metadata={"workflow_id": workflow_id, "current_stage": current_stage},
+                    metadata={
+                        "workflow_id": workflow_id,
+                        "current_stage": current_stage,
+                    },
                 )
             except Exception as pay_err:
-                logger.warning("[x402] insert_payment failed workflow_id=%s err=%s", workflow_id, pay_err)
+                logger.warning(
+                    "[x402] insert_payment failed workflow_id=%s err=%s",
+                    workflow_id,
+                    pay_err,
+                )
     except Exception as e:
         err_msg = str(e)
         update_workflow(workflow_id=workflow_id, status="failed", error=err_msg)
@@ -403,7 +530,9 @@ def workflows_generate(
     Studio polls /api/v1/workflows/{id} and /api/v1/runs/{id}/steps for progress.
     Credit-based: when credits_supabase is configured, deducts credits per run (CREDITS_PER_RUN); insufficient balance returns 402.
     """
-    x_user_id = (request.headers.get("X-User-Id") or request.headers.get("x-user-id") or "").strip() or None
+    x_user_id = (
+        request.headers.get("X-User-Id") or request.headers.get("x-user-id") or ""
+    ).strip() or None
     workflow_id = str(uuid.uuid4())
     user_id = body.user_id or x_user_id or "anonymous"
     project_id = body.project_id or workflow_id
@@ -422,7 +551,10 @@ def workflows_generate(
             metadata={"pipeline_id": body.pipeline_id or DEFAULT_PIPELINE_ID},
         )
         if not ok:
-            raise HTTPException(status_code=402, detail="Failed to deduct credits. Top up and try again.")
+            raise HTTPException(
+                status_code=402,
+                detail="Failed to deduct credits. Top up and try again.",
+            )
     api_keys = body.api_keys or _get_keys_for_run(user_id, DEFAULT_WORKSPACE)
     logger.info(
         "[generate] user_id=%s body_keys=%s supabase_keys=%s resolved=%s",
@@ -438,12 +570,22 @@ def workflows_generate(
         )
     passed, violation = guardrail_validate_input(body.nlp_input)
     if not passed:
-        raise HTTPException(status_code=400, detail=violation or "Security policy violation")
-    agent_session_jwt = _create_agent_session_jwt_if_configured(user_id, workflow_id, api_keys)
+        raise HTTPException(
+            status_code=400, detail=violation or "Security policy violation"
+        )
+    agent_session_jwt = _create_agent_session_jwt_if_configured(
+        user_id, workflow_id, api_keys
+    )
     if db.is_configured():
-        effective_user = user_id if db._is_uuid(user_id) else os.environ.get("SUPABASE_SYSTEM_USER_ID")
+        effective_user = (
+            user_id
+            if db._is_uuid(user_id)
+            else os.environ.get("SUPABASE_SYSTEM_USER_ID")
+        )
         if effective_user and db.ensure_project(project_id, effective_user):
-            db.insert_run(workflow_id, project_id, status="running", workflow_version="0.1.0")
+            db.insert_run(
+                workflow_id, project_id, status="running", workflow_version="0.1.0"
+            )
         if user_id and db._is_uuid(user_id):
             db.ensure_user_profile(user_id)
     create_workflow(
@@ -454,8 +596,15 @@ def workflows_generate(
         project_id=project_id,
         template_id=body.template_id,
     )
-    request_id = (request.headers.get("x-request-id") or request.headers.get("X-Request-Id") or "").strip() or None
-    logger.info("[generate] pipeline job queued workflow_id=%s api_keys_providers=%s agent_session_jwt=%s", workflow_id, list(api_keys.keys()) if api_keys else [], "yes" if agent_session_jwt else "no")
+    request_id = (
+        request.headers.get("x-request-id") or request.headers.get("X-Request-Id") or ""
+    ).strip() or None
+    logger.info(
+        "[generate] pipeline job queued workflow_id=%s api_keys_providers=%s agent_session_jwt=%s",
+        workflow_id,
+        list(api_keys.keys()) if api_keys else [],
+        "yes" if agent_session_jwt else "no",
+    )
     background_tasks.add_task(
         _run_workflow_pipeline_job,
         workflow_id,
@@ -479,12 +628,18 @@ def _workflow_list_item(w: dict[str, Any]) -> dict[str, Any]:
 
 
 @app.get("/api/v1/workflows")
-def list_workflows_api(limit: int = 50, status: str | None = None, request: Request = None) -> dict[str, Any]:
+def list_workflows_api(
+    limit: int = 50, status: str | None = None, request: Request = None
+) -> dict[str, Any]:
     """List workflows for Studio. Newest first. Scoped to authenticated user."""
     items = list_workflows(limit=min(limit, 100), status=status)
     caller = _get_caller_id(request) if request else None
     if caller:
-        items = [i for i in items if (i.get("user_id") or "anonymous") in (caller, "anonymous")]
+        items = [
+            i
+            for i in items
+            if (i.get("user_id") or "anonymous") in (caller, "anonymous")
+        ]
     return {"workflows": [_workflow_list_item(i) for i in items]}
 
 
@@ -506,7 +661,9 @@ def get_workflow_api(workflow_id: str, request: Request = None) -> dict[str, Any
 
 
 @app.get("/api/v1/workflows/{workflow_id}/status")
-def get_workflow_status_api(workflow_id: str, request: Request = None) -> dict[str, str]:
+def get_workflow_status_api(
+    workflow_id: str, request: Request = None
+) -> dict[str, str]:
     """Return workflow status only."""
     w = get_workflow(workflow_id)
     if not w:
@@ -517,7 +674,9 @@ def get_workflow_status_api(workflow_id: str, request: Request = None) -> dict[s
 
 
 @app.get("/api/v1/workflows/{workflow_id}/contracts")
-def get_workflow_contracts_api(workflow_id: str, request: Request = None) -> list[dict[str, Any]]:
+def get_workflow_contracts_api(
+    workflow_id: str, request: Request = None
+) -> list[dict[str, Any]]:
     """Return generated contracts for a workflow."""
     w = get_workflow(workflow_id)
     if not w:
@@ -526,7 +685,11 @@ def get_workflow_contracts_api(workflow_id: str, request: Request = None) -> lis
         _assert_workflow_owner(w, request)
     contracts = w.get("contracts") or {}
     return [
-        {"contract_name": name.replace(".sol", ""), "source_code": code, "contract_type": "solidity"}
+        {
+            "contract_name": name.replace(".sol", ""),
+            "source_code": code,
+            "contract_type": "solidity",
+        }
         for name, code in contracts.items()
         if isinstance(code, str)
     ]
@@ -551,17 +714,25 @@ def _build_workflow_tarball(workflow_id: str) -> bytes:
                 ti.size = len(data)
                 tf.addfile(ti, io.BytesIO(data))
         for name, code in test_files.items():
-            if isinstance(code, str) and (name.endswith(".sol") or name.endswith(".t.sol")):
+            if isinstance(code, str) and (
+                name.endswith(".sol") or name.endswith(".t.sol")
+            ):
                 test_path = name if "/" in name else f"test/{name}"
                 data = code.encode("utf-8")
                 ti = tarfile.TarInfo(name=test_path)
                 ti.size = len(data)
                 tf.addfile(ti, io.BytesIO(data))
-        pkg = json.dumps({
-            "name": "hyperagent-demo",
-            "scripts": {"compile": "npx hardhat compile", "start": "npx hardhat node"},
-            "devDependencies": {"hardhat": "^2.19.0"},
-        }, indent=2).encode("utf-8")
+        pkg = json.dumps(
+            {
+                "name": "hyperagent-demo",
+                "scripts": {
+                    "compile": "npx hardhat compile",
+                    "start": "npx hardhat node",
+                },
+                "devDependencies": {"hardhat": "^2.19.0"},
+            },
+            indent=2,
+        ).encode("utf-8")
         ti = tarfile.TarInfo(name="package.json")
         ti.size = len(pkg)
         tf.addfile(ti, io.BytesIO(pkg))
@@ -608,7 +779,9 @@ def _stream_workflow_code_sse(workflow_id: str):
 
 
 @app.get("/api/v1/streaming/workflows/{workflow_id}/code")
-def stream_workflow_code_api(workflow_id: str, request: Request = None) -> StreamingResponse:
+def stream_workflow_code_api(
+    workflow_id: str, request: Request = None
+) -> StreamingResponse:
     """SSE stream of workflow contract source for Studio code viewer. Yields data: {text} then data: {done}."""
     w = get_workflow(workflow_id)
     if not w:
@@ -657,7 +830,9 @@ def _stream_agent_discussion_sse(workflow_id: str):
 
 
 @app.get("/api/v1/streaming/workflows/{workflow_id}/discussion")
-def stream_agent_discussion_api(workflow_id: str, request: Request = None) -> StreamingResponse:
+def stream_agent_discussion_api(
+    workflow_id: str, request: Request = None
+) -> StreamingResponse:
     """SSE stream of agent discussion events (autofix cycles, guardian checks) for real-time visibility."""
     w = get_workflow(workflow_id)
     if not w:
@@ -672,7 +847,9 @@ def stream_agent_discussion_api(workflow_id: str, request: Request = None) -> St
 
 
 @app.get("/api/v1/workflows/{workflow_id}/deployments")
-def get_workflow_deployments_api(workflow_id: str, request: Request = None) -> dict[str, Any]:
+def get_workflow_deployments_api(
+    workflow_id: str, request: Request = None
+) -> dict[str, Any]:
     """Return deployments for a workflow."""
     w = get_workflow(workflow_id)
     if not w:
@@ -683,7 +860,9 @@ def get_workflow_deployments_api(workflow_id: str, request: Request = None) -> d
 
 
 @app.get("/api/v1/workflows/{workflow_id}/ui-schema")
-def get_workflow_ui_schema_api(workflow_id: str, request: Request = None) -> dict[str, Any]:
+def get_workflow_ui_schema_api(
+    workflow_id: str, request: Request = None
+) -> dict[str, Any]:
     """Return UI schema for contract interaction if generated."""
     w = get_workflow(workflow_id)
     if not w:
@@ -697,7 +876,9 @@ def get_workflow_ui_schema_api(workflow_id: str, request: Request = None) -> dic
 
 
 @app.post("/api/v1/workflows/{workflow_id}/ui-schema/generate")
-async def generate_workflow_ui_schema_api(workflow_id: str, request: Request = None) -> dict[str, Any]:
+async def generate_workflow_ui_schema_api(
+    workflow_id: str, request: Request = None
+) -> dict[str, Any]:
     """Generate UI schema from first deployment and contract; store and return."""
     w = get_workflow(workflow_id)
     if not w:
@@ -706,24 +887,36 @@ async def generate_workflow_ui_schema_api(workflow_id: str, request: Request = N
         _assert_workflow_owner(w, request)
     deployments = w.get("deployments") or []
     if not deployments:
-        raise HTTPException(status_code=400, detail="No deployments; deploy a contract first")
+        raise HTTPException(
+            status_code=400, detail="No deployments; deploy a contract first"
+        )
     contracts = w.get("contracts") or {}
     from agents.ui_scaffold_agent import generate_ui_schema
+
     schema = await generate_ui_schema(deployments, contracts, w.get("network") or "")
     if not schema:
-        raise HTTPException(status_code=400, detail="Could not build schema (missing ABI or compile failed)")
+        raise HTTPException(
+            status_code=400,
+            detail="Could not build schema (missing ABI or compile failed)",
+        )
     update_workflow(workflow_id, ui_schema=schema)
     return {"workflow_id": workflow_id, "ui_schema": schema}
 
 
 class UiAppExportBody(BaseModel):
-    template: str = Field(default="viem-wagmi", description="viem-wagmi (default) or hyperagent-default")
-    include_deploy_scripts: bool = Field(default=True, description="Include deployment scripts when contract source available")
+    template: str = Field(
+        default="viem-wagmi", description="viem-wagmi (default) or hyperagent-default"
+    )
+    include_deploy_scripts: bool = Field(
+        default=True,
+        description="Include deployment scripts when contract source available",
+    )
 
 
 def _extract_erc20_constructor_args(w: dict[str, Any]) -> list[Any]:
     """Extract constructor args (name, symbol, initialSupply) from wizard_options or spec for ERC20.
-    Returns list suitable for viem deployContract: [name, symbol] or [name, symbol, initialSupply]."""
+    Returns list suitable for viem deployContract: [name, symbol] or [name, symbol, initialSupply].
+    """
     opts = (w.get("oz_wizard_options") or {}).copy()
     spec_wo = (w.get("spec") or {}).get("wizard_options")
     if isinstance(spec_wo, dict):
@@ -768,56 +961,92 @@ def _build_viem_wagmi_zip(
         "@wagmi/core": "^2.12.0",
         "tailwindcss": "^3.4.0",
     }
-    zf.writestr("package.json", json.dumps({
-        "name": app_name,
-        "version": "0.1.0",
-        "private": True,
-        "scripts": {"dev": "next dev", "build": "next build", "start": "next start"},
-        "dependencies": deps,
-        "devDependencies": {"typescript": "^5.0.0", "@types/react": "^18.2.0", "@types/node": "^20.0.0"},
-    }, indent=2))
+    zf.writestr(
+        "package.json",
+        json.dumps(
+            {
+                "name": app_name,
+                "version": "0.1.0",
+                "private": True,
+                "scripts": {
+                    "dev": "next dev",
+                    "build": "next build",
+                    "start": "next start",
+                },
+                "dependencies": deps,
+                "devDependencies": {
+                    "typescript": "^5.0.0",
+                    "@types/react": "^18.2.0",
+                    "@types/node": "^20.0.0",
+                },
+            },
+            indent=2,
+        ),
+    )
     files_written.append("package.json")
 
-    zf.writestr("tsconfig.json", json.dumps({
-        "compilerOptions": {
-            "target": "es2017",
-            "lib": ["dom", "es2017"],
-            "jsx": "preserve",
-            "module": "esnext",
-            "moduleResolution": "bundler",
-            "strict": True,
-            "esModuleInterop": True,
-            "skipLibCheck": True,
-            "forceConsistentCasingInFileNames": True,
-            "resolveJsonModule": True,
-            "isolatedModules": True,
-            "noEmit": True,
-            "incremental": True,
-            "paths": {"@/*": ["./src/*"]},
-        },
-        "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
-        "exclude": ["node_modules"],
-    }, indent=2))
+    zf.writestr(
+        "tsconfig.json",
+        json.dumps(
+            {
+                "compilerOptions": {
+                    "target": "es2017",
+                    "lib": ["dom", "es2017"],
+                    "jsx": "preserve",
+                    "module": "esnext",
+                    "moduleResolution": "bundler",
+                    "strict": True,
+                    "esModuleInterop": True,
+                    "skipLibCheck": True,
+                    "forceConsistentCasingInFileNames": True,
+                    "resolveJsonModule": True,
+                    "isolatedModules": True,
+                    "noEmit": True,
+                    "incremental": True,
+                    "paths": {"@/*": ["./src/*"]},
+                },
+                "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+                "exclude": ["node_modules"],
+            },
+            indent=2,
+        ),
+    )
     files_written.append("tsconfig.json")
 
-    zf.writestr("tailwind.config.ts", 'import type { Config } from "tailwindcss";\nconst config: Config = { content: ["./src/**/*.{ts,tsx}"], theme: { extend: {} }, plugins: [] };\nexport default config;\n')
-    zf.writestr("next.config.mjs", '/** @type {import("next").NextConfig} */\nconst nextConfig = {};\nexport default nextConfig;\n')
+    zf.writestr(
+        "tailwind.config.ts",
+        'import type { Config } from "tailwindcss";\nconst config: Config = { content: ["./src/**/*.{ts,tsx}"], theme: { extend: {} }, plugins: [] };\nexport default config;\n',
+    )
+    zf.writestr(
+        "next.config.mjs",
+        '/** @type {import("next").NextConfig} */\nconst nextConfig = {};\nexport default nextConfig;\n',
+    )
     files_written.extend(["tailwind.config.ts", "next.config.mjs"])
 
     contracts_list = schema.get("contracts") or []
     if not contracts_list:
         contracts_list = [{"address": contract_addr, "name": "Contract"}]
-    contracts_json = json.dumps([{"address": c.get("address", ""), "name": c.get("name", "Contract")} for c in contracts_list])
-    zf.writestr("src/lib/contract.ts", f'''export const CONTRACTS = {contracts_json} as const;
+    contracts_json = json.dumps(
+        [
+            {"address": c.get("address", ""), "name": c.get("name", "Contract")}
+            for c in contracts_list
+        ]
+    )
+    zf.writestr(
+        "src/lib/contract.ts",
+        f'''export const CONTRACTS = {contracts_json} as const;
 export const CONTRACT_ADDRESS = "{contract_addr}" as const;
 export const CHAIN_ID = {chain_id};
 export const RPC_URL = "{rpc_url.replace('"', '\\"')}";
 export const EXPLORER_URL = "{explorer_url.rstrip("/").replace('"', '\\"')}";
 export const ABI = {abi_json} as const;
-''')
+''',
+    )
     files_written.append("src/lib/contract.ts")
 
-    zf.writestr("src/lib/wagmi.ts", f'''import {{ http, createConfig }} from "wagmi";
+    zf.writestr(
+        "src/lib/wagmi.ts",
+        f'''import {{ http, createConfig }} from "wagmi";
 import {{ injected }} from "wagmi/connectors";
 import {{ CHAIN_ID, RPC_URL }} from "./contract";
 
@@ -834,38 +1063,46 @@ export const config = createConfig({{
     [CHAIN_ID]: http(RPC_URL),
   }},
 }});
-''')
+''',
+    )
     files_written.append("src/lib/wagmi.ts")
 
     read_cards = []
     for a in read_actions[:6]:
         params = a.get("params") or []
         if a["fn"] == "balanceOf" and len(params) >= 1:
-            read_cards.append(f'''        <div className="p-4 bg-zinc-800/80 rounded-lg border border-zinc-700">
+            read_cards.append(
+                f"""        <div className="p-4 bg-zinc-800/80 rounded-lg border border-zinc-700">
           <span className="text-zinc-400 text-sm">{a.get("label", a["fn"])}</span>
           <div className="text-white font-mono mt-1">
             {{balanceOfResult?.data !== undefined ? formatUnits(balanceOfResult.data as bigint, decimalsResult?.data ?? 18) : "-"}}
           </div>
-        </div>''')
+        </div>"""
+            )
         elif a["fn"] == "totalSupply":
-            read_cards.append(f'''        <div className="p-4 bg-zinc-800/80 rounded-lg border border-zinc-700">
+            read_cards.append(
+                f"""        <div className="p-4 bg-zinc-800/80 rounded-lg border border-zinc-700">
           <span className="text-zinc-400 text-sm">{a.get("label", a["fn"])}</span>
           <div className="text-white font-mono mt-1">
             {{totalSupplyResult?.data !== undefined ? formatUnits(totalSupplyResult.data as bigint, decimalsResult?.data ?? 18) : "-"}}
           </div>
-        </div>''')
+        </div>"""
+            )
         elif a["fn"] in ("name", "symbol", "decimals"):
             v = a["fn"] + "Result"
-            read_cards.append(f'''        <div className="p-4 bg-zinc-800/80 rounded-lg border border-zinc-700">
+            read_cards.append(
+                f"""        <div className="p-4 bg-zinc-800/80 rounded-lg border border-zinc-700">
           <span className="text-zinc-400 text-sm">{a.get("label", a["fn"])}</span>
           <div className="text-white font-mono mt-1">{{{v}?.data ?? "-"}}</div>
-        </div>''')
+        </div>"""
+            )
 
     write_forms = []
     for a in write_actions[:6]:
         params = a.get("params") or []
         if a["fn"] == "mint" and len(params) >= 2:
-            write_forms.append(f'''        <div className="p-4 bg-zinc-800/50 rounded-lg border border-zinc-700 space-y-2">
+            write_forms.append(
+                f"""        <div className="p-4 bg-zinc-800/50 rounded-lg border border-zinc-700 space-y-2">
           <h3 className="text-sm font-medium text-zinc-300">{a.get("label", a["fn"])}</h3>
           <input placeholder="Recipient address" value={{mintTo}} onChange={{e => setMintTo(e.target.value)}} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm text-white" />
           <input placeholder="Amount" value={{mintAmount}} onChange={{e => setMintAmount(e.target.value)}} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm text-white" />
@@ -873,18 +1110,22 @@ export const config = createConfig({{
             {{isMintPending ? "Pending..." : "Mint"}}
           </button>
           {{mintTxHash && <a href="{{EXPLORER_URL}}/tx/{{mintTxHash}}" target="_blank" rel="noopener noreferrer" className="text-xs text-sky-400 block mt-1">View tx</a>}}
-        </div>''')
+        </div>"""
+            )
         elif a["fn"] == "burn" and len(params) >= 1:
-            write_forms.append(f'''        <div className="p-4 bg-zinc-800/50 rounded-lg border border-zinc-700 space-y-2">
+            write_forms.append(
+                f"""        <div className="p-4 bg-zinc-800/50 rounded-lg border border-zinc-700 space-y-2">
           <h3 className="text-sm font-medium text-zinc-300">{a.get("label", a["fn"])}</h3>
           <input placeholder="Amount" value={{burnAmount}} onChange={{e => setBurnAmount(e.target.value)}} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm text-white" />
           <button onClick={{() => writeBurn()}} disabled={{isBurnPending}} className="px-4 py-2 rounded bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50 text-sm">
             {{isBurnPending ? "Pending..." : "Burn"}}
           </button>
           {{burnTxHash && <a href="{{EXPLORER_URL}}/tx/{{burnTxHash}}" target="_blank" rel="noopener noreferrer" className="text-xs text-sky-400 block mt-1">View tx</a>}}
-        </div>''')
+        </div>"""
+            )
         elif a["fn"] == "transfer" and len(params) >= 2:
-            write_forms.append(f'''        <div className="p-4 bg-zinc-800/50 rounded-lg border border-zinc-700 space-y-2">
+            write_forms.append(
+                f"""        <div className="p-4 bg-zinc-800/50 rounded-lg border border-zinc-700 space-y-2">
           <h3 className="text-sm font-medium text-zinc-300">{a.get("label", a["fn"])}</h3>
           <input placeholder="To address" value={{transferTo}} onChange={{e => setTransferTo(e.target.value)}} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm text-white" />
           <input placeholder="Amount" value={{transferAmount}} onChange={{e => setTransferAmount(e.target.value)}} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm text-white" />
@@ -892,7 +1133,8 @@ export const config = createConfig({{
             {{isTransferPending ? "Pending..." : "Transfer"}}
           </button>
           {{transferTxHash && <a href="{{EXPLORER_URL}}/tx/{{transferTxHash}}" target="_blank" rel="noopener noreferrer" className="text-xs text-sky-400 block mt-1">View tx</a>}}
-        </div>''')
+        </div>"""
+            )
 
     page_content = f'''"use client";
 
@@ -1020,21 +1262,32 @@ export default function Home() {{
   );
 }}
 '''
-    page_content = page_content.replace("schema.get(\"name\", \"dApp\")", json.dumps(schema.get("name", "dApp")))
-    page_content = page_content.replace("__HREF_EXPLORER_ADDRESS__", "EXPLORER_URL + \"/address/\" + c.address")
+    page_content = page_content.replace(
+        'schema.get("name", "dApp")', json.dumps(schema.get("name", "dApp"))
+    )
+    page_content = page_content.replace(
+        "__HREF_EXPLORER_ADDRESS__", 'EXPLORER_URL + "/address/" + c.address'
+    )
     zf.writestr("src/app/page.tsx", page_content)
     files_written.append("src/app/page.tsx")
 
-    zf.writestr("src/app/layout.tsx", f'''import type {{ Metadata }} from "next";
+    layout_title = schema.get("name", "dApp").replace('"', '\\"')
+    zf.writestr(
+        "src/app/layout.tsx",
+        f'''import type {{ Metadata }} from "next";
 import "./globals.css";
 
-export const metadata: Metadata = {{ title: "{schema.get("name", "dApp").replace('"', '\\"')}", description: "Generated by HyperAgent" }};
+export const metadata: Metadata = {{ title: "{layout_title}", description: "Generated by HyperAgent" }};
 
 export default function RootLayout({{ children }}: {{ children: React.ReactNode }}) {{
   return <html lang="en"><body>{{children}}</body></html>;
 }}
-''')
-    zf.writestr("src/app/globals.css", "@tailwind base;\\n@tailwind components;\\n@tailwind utilities;\\n")
+''',
+    )
+    zf.writestr(
+        "src/app/globals.css",
+        "@tailwind base;\\n@tailwind components;\\n@tailwind utilities;\\n",
+    )
     files_written.extend(["src/app/layout.tsx", "src/app/globals.css"])
 
     readme = f"""# {schema.get('name', 'dApp')}
@@ -1063,7 +1316,9 @@ Open http://localhost:3000
 
 
 @app.post("/api/v1/workflows/{workflow_id}/ui-apps/export")
-def export_ui_app_api(workflow_id: str, body: UiAppExportBody | None = None, request: Request = None) -> dict[str, Any]:
+def export_ui_app_api(
+    workflow_id: str, body: UiAppExportBody | None = None, request: Request = None
+) -> dict[str, Any]:
     """Export dApp as zip: full React/Next.js scaffold with contract integration. Returns zip_base64 and filename."""
     import base64
 
@@ -1074,9 +1329,12 @@ def export_ui_app_api(workflow_id: str, body: UiAppExportBody | None = None, req
         _assert_workflow_owner(w, request)
     schema = w.get("ui_schema")
     if not schema:
-        raise HTTPException(status_code=400, detail="Generate UI schema first (POST /ui-schema/generate)")
+        raise HTTPException(
+            status_code=400,
+            detail="Generate UI schema first (POST /ui-schema/generate)",
+        )
     template = (body.template if body else "viem-wagmi") or "viem-wagmi"
-    include_deploy = (body.include_deploy_scripts if body else True)
+    include_deploy = body.include_deploy_scripts if body else True
     app_name = _sanitize_name(schema.get("name") or "dapp").lower().replace(" ", "-")
     chain_id = schema.get("chainId") or get_default_chain_id()
     contract_addr = schema.get("contractAddress", "")
@@ -1093,13 +1351,21 @@ def export_ui_app_api(workflow_id: str, body: UiAppExportBody | None = None, req
 
     rpc_explorer = get_chain_rpc_explorer(chain_id)
     if not rpc_explorer and template == "viem-wagmi":
-        raise HTTPException(status_code=400, detail=f"Chain {chain_id} not in registry; add to infra/registries/network/chains.yaml")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Chain {chain_id} not in registry; add to infra/registries/network/chains.yaml",
+        )
     rpc_url = rpc_explorer[0] if rpc_explorer else ""
     explorer_url = rpc_explorer[1] if rpc_explorer else ""
     from registries import get_chain
+
     chain_entry = get_chain(chain_id)
     cl = (chain_entry or {}).get("chainlist") or {}
-    chain_name = cl.get("name", f"Chain {chain_id}") if isinstance(cl, dict) else f"Chain {chain_id}"
+    chain_name = (
+        cl.get("name", f"Chain {chain_id}")
+        if isinstance(cl, dict)
+        else f"Chain {chain_id}"
+    )
 
     buf = io.BytesIO()
     files_list: list[str] = []
@@ -1109,59 +1375,162 @@ def export_ui_app_api(workflow_id: str, body: UiAppExportBody | None = None, req
 
         if template == "viem-wagmi":
             files_list = _build_viem_wagmi_zip(
-                zf, schema, app_name, chain_id, contract_addr, abi,
-                read_actions, write_actions, rpc_url, explorer_url, chain_name,
+                zf,
+                schema,
+                app_name,
+                chain_id,
+                contract_addr,
+                abi,
+                read_actions,
+                write_actions,
+                rpc_url,
+                explorer_url,
+                chain_name,
             )
         test_files = w.get("test_files") or {}
         for name, code in test_files.items():
-            if isinstance(code, str) and (name.endswith(".sol") or name.endswith(".t.sol")):
+            if isinstance(code, str) and (
+                name.endswith(".sol") or name.endswith(".t.sol")
+            ):
                 path = name if "/" in name else f"test/{name}"
                 zf.writestr(path, code)
                 files_list.append(path)
 
         if template != "viem-wagmi":
-            zf.writestr("package.json", json.dumps({
-                "name": app_name,
-                "version": "0.1.0",
-                "private": True,
-                "scripts": {"dev": "next dev", "build": "next build", "start": "next start"},
-                "dependencies": {
-                    "next": "14.2.0", "react": "^18.2.0", "react-dom": "^18.2.0",
-                    "ethers": "^6.13.0", "tailwindcss": "^3.4.0",
-                },
-                "devDependencies": {"typescript": "^5.0.0", "@types/react": "^18.2.0", "@types/node": "^20.0.0"},
-            }, indent=2))
-            zf.writestr("tsconfig.json", json.dumps({
-                "compilerOptions": {"target": "es2017", "lib": ["dom", "es2017"], "jsx": "preserve",
-                    "module": "esnext", "moduleResolution": "bundler", "strict": True,
-                    "esModuleInterop": True, "skipLibCheck": True, "forceConsistentCasingInFileNames": True,
-                    "resolveJsonModule": True, "isolatedModules": True, "noEmit": True, "incremental": True,
-                    "paths": {"@/*": ["./src/*"]}},
-                "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"], "exclude": ["node_modules"],
-            }, indent=2))
-            zf.writestr("tailwind.config.ts", 'import type { Config } from "tailwindcss";\\nconst config: Config = { content: ["./src/**/*.{ts,tsx}"], theme: { extend: {} }, plugins: [] };\\nexport default config;\\n')
-            zf.writestr("next.config.mjs", '/** @type {import("next").NextConfig} */\\nconst nextConfig = {};\\nexport default nextConfig;\\n')
-            read_imports = "\\n".join(f"  async {a['fn']}({', '.join(p['name'] + ': string' for p in a.get('params', []))}): Promise<string> {{\\n    const result = await this.contract.{a['fn']}({', '.join(p['name'] for p in a.get('params', []))});\\n    return String(result);\\n  }}" for a in read_actions)
-            write_imports = "\\n".join(f"  async {a['fn']}({', '.join(p['name'] + ': string' for p in a.get('params', []))}): Promise<ethers.TransactionResponse> {{\\n    return this.contract.{a['fn']}({', '.join(p['name'] for p in a.get('params', []))});\\n  }}" for a in write_actions)
-            zf.writestr("src/lib/contract.ts", f'''import {{ ethers }} from "ethers";\\n\\nexport const CONTRACT_ADDRESS = "{contract_addr}";\\nexport const CHAIN_ID = {chain_id};\\nexport const ABI = {json.dumps(abi)} as const;\\n\\nexport function getContract(signerOrProvider: ethers.Signer | ethers.Provider) {{\\n  return new ethers.Contract(CONTRACT_ADDRESS, ABI, signerOrProvider);\\n}}\\n''')
-            zf.writestr("src/lib/actions.ts", f'import {{ ethers }} from "ethers";\\nimport {{ getContract }} from "./contract";\\n\\nexport class ContractActions {{\\n  private contract: ethers.Contract;\\n  constructor(signerOrProvider: ethers.Signer | ethers.Provider) {{\\n    this.contract = getContract(signerOrProvider);\\n  }}\\n{read_imports}\\n{write_imports}\\n}}\\n')
-            action_buttons = "".join(f'\\n          <button onClick={{() => handleAction("{a["fn"]}")}} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm">{a.get("label", a["fn"])}</button>' for a in write_actions[:5])
-            read_displays = "".join(f'\\n          <div className="p-3 bg-gray-800 rounded-lg"><span className="text-gray-400 text-xs">{a.get("label", a["fn"])}</span><div id="{a["fn"]}" className="text-white font-mono mt-1">-</div></div>' for a in read_actions[:5])
-            zf.writestr("src/app/page.tsx", f'''"use client";\\n\\nimport {{ useState }} from "react";\\nimport {{ CONTRACT_ADDRESS, CHAIN_ID }} from "@/lib/contract";\\n\\nexport default function Home() {{\\n  const [status, setStatus] = useState("");\\n\\n  async function handleAction(fn: string) {{\\n    setStatus(`Calling ${{fn}}...`);\\n    try {{\\n      const {{ ethers }} = await import("ethers");\\n      if (!window.ethereum) {{ setStatus("Connect MetaMask"); return; }}\\n      const provider = new ethers.BrowserProvider(window.ethereum);\\n      const signer = await provider.getSigner();\\n      const {{ ContractActions }} = await import("@/lib/actions");\\n      const actions = new ContractActions(signer);\\n      const tx = await (actions as Record<string, (...args: string[]) => Promise<unknown>>)[fn]();\\n      setStatus(`TX sent: ${{String(tx)}}`); \\n    }} catch (e) {{\\n      setStatus(`Error: ${{e instanceof Error ? e.message : String(e)}}`);\\n    }}\\n  }}\\n\\n  return (\\n    <main className="min-h-screen bg-gray-900 text-white p-8">\\n      <div className="max-w-2xl mx-auto space-y-6">\\n        <h1 className="text-3xl font-bold">{schema.get("name", "dApp")}</h1>\\n        <p className="text-gray-400">Contract: <code className="text-xs">{{CONTRACT_ADDRESS}}</code> on chain {{CHAIN_ID}}</p>\\n        <div className="grid grid-cols-2 gap-3">{read_displays}\\n        </div>\\n        <div className="flex flex-wrap gap-2">{action_buttons}\\n        </div>\\n        {{status && <p className="text-sm text-yellow-400 mt-4">{{status}}</p>}}\\n      </div>\\n    </main>\\n  );\\n}}\\n\\ndeclare global {{\\n  interface Window {{ ethereum?: {{ request: (args: {{ method: string; params?: unknown[] }}) => Promise<unknown> }} }}\\n}}\\n''')
-            zf.writestr("src/app/layout.tsx", f'import type {{ Metadata }} from "next";\\nimport "./globals.css";\\n\\nexport const metadata: Metadata = {{ title: "{schema.get("name", "dApp")}", description: "Generated by HyperAgent" }};\\n\\nexport default function RootLayout({{ children }}: {{ children: React.ReactNode }}) {{\\n  return <html lang="en"><body>{{children}}</body></html>;\\n}}\\n')
-            zf.writestr("src/app/globals.css", "@tailwind base;\\n@tailwind components;\\n@tailwind utilities;\\n")
-            zf.writestr("README.md", f"# {schema.get('name', 'dApp')}\\n\\nGenerated by HyperAgent.\\n\\n## Setup\\n\\n```bash\\nnpm install\\nnpm run dev\\n```\\n\\nOpen http://localhost:3000\\n\\n## Contract\\n\\n- Address: `{contract_addr}`\\n- Chain ID: {chain_id}\\n- Actions: {len(read_actions)} read, {len(write_actions)} write\\n")
-            files_list = ["package.json", "tsconfig.json", "tailwind.config.ts", "next.config.mjs", "src/lib/contract.ts", "src/lib/actions.ts", "src/app/page.tsx", "src/app/layout.tsx", "src/app/globals.css", "README.md"]
+            zf.writestr(
+                "package.json",
+                json.dumps(
+                    {
+                        "name": app_name,
+                        "version": "0.1.0",
+                        "private": True,
+                        "scripts": {
+                            "dev": "next dev",
+                            "build": "next build",
+                            "start": "next start",
+                        },
+                        "dependencies": {
+                            "next": "14.2.0",
+                            "react": "^18.2.0",
+                            "react-dom": "^18.2.0",
+                            "ethers": "^6.13.0",
+                            "tailwindcss": "^3.4.0",
+                        },
+                        "devDependencies": {
+                            "typescript": "^5.0.0",
+                            "@types/react": "^18.2.0",
+                            "@types/node": "^20.0.0",
+                        },
+                    },
+                    indent=2,
+                ),
+            )
+            zf.writestr(
+                "tsconfig.json",
+                json.dumps(
+                    {
+                        "compilerOptions": {
+                            "target": "es2017",
+                            "lib": ["dom", "es2017"],
+                            "jsx": "preserve",
+                            "module": "esnext",
+                            "moduleResolution": "bundler",
+                            "strict": True,
+                            "esModuleInterop": True,
+                            "skipLibCheck": True,
+                            "forceConsistentCasingInFileNames": True,
+                            "resolveJsonModule": True,
+                            "isolatedModules": True,
+                            "noEmit": True,
+                            "incremental": True,
+                            "paths": {"@/*": ["./src/*"]},
+                        },
+                        "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+                        "exclude": ["node_modules"],
+                    },
+                    indent=2,
+                ),
+            )
+            zf.writestr(
+                "tailwind.config.ts",
+                'import type { Config } from "tailwindcss";\\nconst config: Config = { content: ["./src/**/*.{ts,tsx}"], theme: { extend: {} }, plugins: [] };\\nexport default config;\\n',
+            )
+            zf.writestr(
+                "next.config.mjs",
+                '/** @type {import("next").NextConfig} */\\nconst nextConfig = {};\\nexport default nextConfig;\\n',
+            )
+            read_imports = "\\n".join(
+                f"  async {a['fn']}({', '.join(p['name'] + ': string' for p in a.get('params', []))}): Promise<string> {{\\n    const result = await this.contract.{a['fn']}({', '.join(p['name'] for p in a.get('params', []))});\\n    return String(result);\\n  }}"
+                for a in read_actions
+            )
+            write_imports = "\\n".join(
+                f"  async {a['fn']}({', '.join(p['name'] + ': string' for p in a.get('params', []))}): Promise<ethers.TransactionResponse> {{\\n    return this.contract.{a['fn']}({', '.join(p['name'] for p in a.get('params', []))});\\n  }}"
+                for a in write_actions
+            )
+            zf.writestr(
+                "src/lib/contract.ts",
+                f"""import {{ ethers }} from "ethers";\\n\\nexport const CONTRACT_ADDRESS = "{contract_addr}";\\nexport const CHAIN_ID = {chain_id};\\nexport const ABI = {json.dumps(abi)} as const;\\n\\nexport function getContract(signerOrProvider: ethers.Signer | ethers.Provider) {{\\n  return new ethers.Contract(CONTRACT_ADDRESS, ABI, signerOrProvider);\\n}}\\n""",
+            )
+            zf.writestr(
+                "src/lib/actions.ts",
+                f'import {{ ethers }} from "ethers";\\nimport {{ getContract }} from "./contract";\\n\\nexport class ContractActions {{\\n  private contract: ethers.Contract;\\n  constructor(signerOrProvider: ethers.Signer | ethers.Provider) {{\\n    this.contract = getContract(signerOrProvider);\\n  }}\\n{read_imports}\\n{write_imports}\\n}}\\n',
+            )
+            action_buttons = "".join(
+                f'\\n          <button onClick={{() => handleAction("{a["fn"]}")}} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm">{a.get("label", a["fn"])}</button>'
+                for a in write_actions[:5]
+            )
+            read_displays = "".join(
+                f'\\n          <div className="p-3 bg-gray-800 rounded-lg"><span className="text-gray-400 text-xs">{a.get("label", a["fn"])}</span><div id="{a["fn"]}" className="text-white font-mono mt-1">-</div></div>'
+                for a in read_actions[:5]
+            )
+            zf.writestr(
+                "src/app/page.tsx",
+                f""""use client";\\n\\nimport {{ useState }} from "react";\\nimport {{ CONTRACT_ADDRESS, CHAIN_ID }} from "@/lib/contract";\\n\\nexport default function Home() {{\\n  const [status, setStatus] = useState("");\\n\\n  async function handleAction(fn: string) {{\\n    setStatus(`Calling ${{fn}}...`);\\n    try {{\\n      const {{ ethers }} = await import("ethers");\\n      if (!window.ethereum) {{ setStatus("Connect MetaMask"); return; }}\\n      const provider = new ethers.BrowserProvider(window.ethereum);\\n      const signer = await provider.getSigner();\\n      const {{ ContractActions }} = await import("@/lib/actions");\\n      const actions = new ContractActions(signer);\\n      const tx = await (actions as Record<string, (...args: string[]) => Promise<unknown>>)[fn]();\\n      setStatus(`TX sent: ${{String(tx)}}`); \\n    }} catch (e) {{\\n      setStatus(`Error: ${{e instanceof Error ? e.message : String(e)}}`);\\n    }}\\n  }}\\n\\n  return (\\n    <main className="min-h-screen bg-gray-900 text-white p-8">\\n      <div className="max-w-2xl mx-auto space-y-6">\\n        <h1 className="text-3xl font-bold">{schema.get("name", "dApp")}</h1>\\n        <p className="text-gray-400">Contract: <code className="text-xs">{{CONTRACT_ADDRESS}}</code> on chain {{CHAIN_ID}}</p>\\n        <div className="grid grid-cols-2 gap-3">{read_displays}\\n        </div>\\n        <div className="flex flex-wrap gap-2">{action_buttons}\\n        </div>\\n        {{status && <p className="text-sm text-yellow-400 mt-4">{{status}}</p>}}\\n      </div>\\n    </main>\\n  );\\n}}\\n\\ndeclare global {{\\n  interface Window {{ ethereum?: {{ request: (args: {{ method: string; params?: unknown[] }}) => Promise<unknown> }} }}\\n}}\\n""",
+            )
+            zf.writestr(
+                "src/app/layout.tsx",
+                f'import type {{ Metadata }} from "next";\\nimport "./globals.css";\\n\\nexport const metadata: Metadata = {{ title: "{schema.get("name", "dApp")}", description: "Generated by HyperAgent" }};\\n\\nexport default function RootLayout({{ children }}: {{ children: React.ReactNode }}) {{\\n  return <html lang="en"><body>{{children}}</body></html>;\\n}}\\n',
+            )
+            zf.writestr(
+                "src/app/globals.css",
+                "@tailwind base;\\n@tailwind components;\\n@tailwind utilities;\\n",
+            )
+            zf.writestr(
+                "README.md",
+                f"# {schema.get('name', 'dApp')}\\n\\nGenerated by HyperAgent.\\n\\n## Setup\\n\\n```bash\\nnpm install\\nnpm run dev\\n```\\n\\nOpen http://localhost:3000\\n\\n## Contract\\n\\n- Address: `{contract_addr}`\\n- Chain ID: {chain_id}\\n- Actions: {len(read_actions)} read, {len(write_actions)} write\\n",
+            )
+            files_list = [
+                "package.json",
+                "tsconfig.json",
+                "tailwind.config.ts",
+                "next.config.mjs",
+                "src/lib/contract.ts",
+                "src/lib/actions.ts",
+                "src/app/page.tsx",
+                "src/app/layout.tsx",
+                "src/app/globals.css",
+                "README.md",
+            ]
 
         if include_deploy and w.get("contracts"):
-            first_name = next((n for n in w.get("contracts", {}) if isinstance(w["contracts"].get(n), str)), None)
+            first_name = next(
+                (
+                    n
+                    for n in w.get("contracts", {})
+                    if isinstance(w["contracts"].get(n), str)
+                ),
+                None,
+            )
             if first_name:
                 try:
                     headers = get_trace_headers()
                     with httpx.Client(timeout=get_timeout("main")) as client:
                         r = client.post(
                             f"{COMPILE_SERVICE_URL}/compile",
-                            json={"contractCode": w["contracts"][first_name], "framework": "hardhat"},
+                            json={
+                                "contractCode": w["contracts"][first_name],
+                                "framework": "hardhat",
+                            },
                             headers=headers,
                         )
                         r.raise_for_status()
@@ -1176,7 +1545,7 @@ def export_ui_app_api(workflow_id: str, body: UiAppExportBody | None = None, req
                             args_ts = f"[{json.dumps(constructor_args[0])}, {json.dumps(constructor_args[1])}]"
                         else:
                             args_ts = "[]"
-                        deploy_script = f'''import {{ createWalletClient, http }} from "viem";
+                        deploy_script = f"""import {{ createWalletClient, http }} from "viem";
 import {{ privateKeyToAccount }} from "viem/accounts";
 import {{ defineChain }} from "viem";
 import {{ CHAIN_ID, RPC_URL }} from "../src/lib/contract";
@@ -1203,23 +1572,56 @@ async function main() {{
 }}
 
 main().catch(console.error);
-'''
+"""
                         zf.writestr("scripts/deploy.ts", deploy_script)
-                        zf.writestr("contracts/Contract.sol", w["contracts"][first_name])
-                        zf.writestr("scripts/chain.config.json", json.dumps({"chainId": chain_id, "rpcUrl": rpc_url, "explorerUrl": explorer_url}, indent=2))
-                        files_list.extend(["scripts/deploy.ts", "contracts/Contract.sol", "scripts/chain.config.json"])
+                        zf.writestr(
+                            "contracts/Contract.sol", w["contracts"][first_name]
+                        )
+                        zf.writestr(
+                            "scripts/chain.config.json",
+                            json.dumps(
+                                {
+                                    "chainId": chain_id,
+                                    "rpcUrl": rpc_url,
+                                    "explorerUrl": explorer_url,
+                                },
+                                indent=2,
+                            ),
+                        )
+                        files_list.extend(
+                            [
+                                "scripts/deploy.ts",
+                                "contracts/Contract.sol",
+                                "scripts/chain.config.json",
+                            ]
+                        )
                         if template == "viem-wagmi":
                             pkg = {
                                 "name": app_name,
                                 "version": "0.1.0",
                                 "private": True,
-                                "scripts": {"dev": "next dev", "build": "next build", "start": "next start", "deploy": "tsx scripts/deploy.ts"},
-                                "dependencies": {
-                                    "next": "14.2.0", "react": "^18.2.0", "react-dom": "^18.2.0",
-                                    "viem": "^2.21.0", "wagmi": "^2.12.0", "@tanstack/react-query": "^5.59.0",
-                                    "@wagmi/core": "^2.12.0", "tailwindcss": "^3.4.0",
+                                "scripts": {
+                                    "dev": "next dev",
+                                    "build": "next build",
+                                    "start": "next start",
+                                    "deploy": "tsx scripts/deploy.ts",
                                 },
-                                "devDependencies": {"typescript": "^5.0.0", "@types/react": "^18.2.0", "@types/node": "^20.0.0", "tsx": "^4.0.0"},
+                                "dependencies": {
+                                    "next": "14.2.0",
+                                    "react": "^18.2.0",
+                                    "react-dom": "^18.2.0",
+                                    "viem": "^2.21.0",
+                                    "wagmi": "^2.12.0",
+                                    "@tanstack/react-query": "^5.59.0",
+                                    "@wagmi/core": "^2.12.0",
+                                    "tailwindcss": "^3.4.0",
+                                },
+                                "devDependencies": {
+                                    "typescript": "^5.0.0",
+                                    "@types/react": "^18.2.0",
+                                    "@types/node": "^20.0.0",
+                                    "tsx": "^4.0.0",
+                                },
                             }
                             zf.writestr("package.json", json.dumps(pkg, indent=2))
                 except Exception as e:
@@ -1240,7 +1642,10 @@ main().catch(console.error);
 
 
 class PrepareDeployBody(BaseModel):
-    mainnet_confirm: bool = Field(False, description="Set true to confirm mainnet deploy; required for mainnet chain_id.")
+    mainnet_confirm: bool = Field(
+        False,
+        description="Set true to confirm mainnet deploy; required for mainnet chain_id.",
+    )
 
 
 @app.post("/api/v1/workflows/{workflow_id}/deploy/prepare")
@@ -1257,6 +1662,7 @@ def prepare_deploy_api(
         raise HTTPException(status_code=404, detail="Workflow not found")
     _assert_workflow_owner(w, request)
     from mainnet_guard import check_mainnet_guard, is_mainnet
+
     allowed, reason = check_mainnet_guard(w, chain_id)
     if not allowed:
         raise HTTPException(status_code=403, detail=reason)
@@ -1267,10 +1673,18 @@ def prepare_deploy_api(
         )
     contracts = w.get("contracts") or {}
     if not contracts:
-        return {"workflow_id": workflow_id, "error": "No contracts to deploy", "chainId": chain_id}
+        return {
+            "workflow_id": workflow_id,
+            "error": "No contracts to deploy",
+            "chainId": chain_id,
+        }
     first_name = next((n for n in contracts if isinstance(contracts.get(n), str)), None)
     if not first_name:
-        return {"workflow_id": workflow_id, "error": "No contract source", "chainId": chain_id}
+        return {
+            "workflow_id": workflow_id,
+            "error": "No contract source",
+            "chainId": chain_id,
+        }
     source = contracts[first_name]
     contract_name = first_name.replace(".sol", "")
     try:
@@ -1286,10 +1700,21 @@ def prepare_deploy_api(
     except Exception as e:
         return {"workflow_id": workflow_id, "error": str(e), "chainId": chain_id}
     if not data.get("success") or not data.get("bytecode"):
-        return {"workflow_id": workflow_id, "error": data.get("errors", ["Compilation failed"])[0] if data.get("errors") else "Compilation failed", "chainId": chain_id}
+        return {
+            "workflow_id": workflow_id,
+            "error": (
+                data.get("errors", ["Compilation failed"])[0]
+                if data.get("errors")
+                else "Compilation failed"
+            ),
+            "chainId": chain_id,
+        }
     rpc_explorer = get_chain_rpc_explorer(chain_id)
     if not rpc_explorer:
-        raise HTTPException(status_code=400, detail=f"Chain {chain_id} not in registry; add to infra/registries/network/chains.yaml")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Chain {chain_id} not in registry; add to infra/registries/network/chains.yaml",
+        )
     rpc_url, explorer = rpc_explorer
     return {
         "workflow_id": workflow_id,
@@ -1312,9 +1737,12 @@ class DeployCompleteBody(BaseModel):
     chainId: int | None = None
 
 
-def _build_hybrid_deploy_state(workflow_id: str, user_id: str, project_id: str, api_keys: dict) -> dict[str, Any] | None:
+def _build_hybrid_deploy_state(
+    workflow_id: str, user_id: str, project_id: str, api_keys: dict
+) -> dict[str, Any] | None:
     """Build hybrid/partially synthetic state from workflow store for deploy resume when checkpoint is missing."""
     from langchain_core.messages import HumanMessage
+
     w = get_workflow(workflow_id)
     if not w or not w.get("contracts"):
         return None
@@ -1326,7 +1754,10 @@ def _build_hybrid_deploy_state(workflow_id: str, user_id: str, project_id: str, 
         "run_id": workflow_id,
         "pipeline_id": DEFAULT_PIPELINE_ID,
         "api_keys": api_keys or {},
-        "agent_session_jwt": _create_agent_session_jwt_if_configured(user_id, workflow_id, api_keys) or "",
+        "agent_session_jwt": _create_agent_session_jwt_if_configured(
+            user_id, workflow_id, api_keys
+        )
+        or "",
         "template_id": w.get("template_id") or "",
         "use_oz_wizard": False,
         "oz_wizard_options": w.get("oz_wizard_options") or {},
@@ -1355,12 +1786,15 @@ def _build_hybrid_deploy_state(workflow_id: str, user_id: str, project_id: str, 
     }
 
 
-def _resume_deploy_approval_job(workflow_id: str, user_id: str, project_id: str, api_keys: dict) -> None:
+def _resume_deploy_approval_job(
+    workflow_id: str, user_id: str, project_id: str, api_keys: dict
+) -> None:
     """Resume pipeline from deploy interrupt with deploy_approved=True. Uses checkpoint when available; falls back to hybrid state from workflow store."""
     set_request_id(None)
     final = None
     try:
         from store import get_workflow
+
         w = get_workflow(workflow_id)
         user_prompt = (w or {}).get("intent", "") if w else ""
         try:
@@ -1375,9 +1809,14 @@ def _resume_deploy_approval_job(workflow_id: str, user_id: str, project_id: str,
             )
         except (KeyError, Exception) as e:
             if "user_prompt" in str(e) or "KeyError" in type(e).__name__:
-                hybrid = _build_hybrid_deploy_state(workflow_id, user_id, project_id, api_keys)
+                hybrid = _build_hybrid_deploy_state(
+                    workflow_id, user_id, project_id, api_keys
+                )
                 if hybrid:
-                    logger.info("[orchestrator] deploy resume: checkpoint failed (%s), using hybrid state from workflow store", e)
+                    logger.info(
+                        "[orchestrator] deploy resume: checkpoint failed (%s), using hybrid state from workflow store",
+                        e,
+                    )
                     final = run_pipeline(
                         hybrid.get("user_prompt", ""),
                         user_id,
@@ -1393,19 +1832,68 @@ def _resume_deploy_approval_job(workflow_id: str, user_id: str, project_id: str,
 
         if final:
             current_stage = final.get("current_stage") or "unknown"
-            status = "completed" if current_stage in ("deployed", "deploy", "ui_scaffold") else (
-                "failed" if current_stage in ("audit_failed", "simulation_failed", "failed") else "building"
+            status = (
+                "completed"
+                if current_stage in ("deployed", "deploy", "ui_scaffold")
+                else (
+                    "failed"
+                    if current_stage in ("audit_failed", "simulation_failed", "failed")
+                    else "building"
+                )
             )
             stages = [
                 {"stage": "spec", "status": "completed"},
-                {"stage": "design", "status": "completed" if final.get("design_proposal") else "pending"},
-                {"stage": "codegen", "status": "completed" if final.get("contracts") else "pending"},
-                {"stage": "test_generation", "status": "completed" if final.get("test_files") else "pending"},
-                {"stage": "audit", "status": "completed" if final.get("audit_passed") else ("failed" if final.get("audit_findings") else "pending")},
-                {"stage": "guardian", "status": "completed" if final.get("invariants") else "pending"},
-                {"stage": "deploy", "status": "completed" if current_stage in ("deployed", "ui_scaffold") else "pending"},
-                {"stage": "simulation", "status": "completed" if final.get("simulation_passed") else ("failed" if final.get("simulation_results") and not final.get("simulation_passed") else "pending")},
-                {"stage": "ui_scaffold", "status": "completed" if final.get("ui_schema") else "pending"},
+                {
+                    "stage": "design",
+                    "status": (
+                        "completed" if final.get("design_proposal") else "pending"
+                    ),
+                },
+                {
+                    "stage": "codegen",
+                    "status": "completed" if final.get("contracts") else "pending",
+                },
+                {
+                    "stage": "test_generation",
+                    "status": "completed" if final.get("test_files") else "pending",
+                },
+                {
+                    "stage": "audit",
+                    "status": (
+                        "completed"
+                        if final.get("audit_passed")
+                        else ("failed" if final.get("audit_findings") else "pending")
+                    ),
+                },
+                {
+                    "stage": "guardian",
+                    "status": "completed" if final.get("invariants") else "pending",
+                },
+                {
+                    "stage": "deploy",
+                    "status": (
+                        "completed"
+                        if current_stage in ("deployed", "ui_scaffold")
+                        else "pending"
+                    ),
+                },
+                {
+                    "stage": "simulation",
+                    "status": (
+                        "completed"
+                        if final.get("simulation_passed")
+                        else (
+                            "failed"
+                            if final.get("simulation_results")
+                            and not final.get("simulation_passed")
+                            else "pending"
+                        )
+                    ),
+                },
+                {
+                    "stage": "ui_scaffold",
+                    "status": "completed" if final.get("ui_schema") else "pending",
+                },
             ]
             update_workflow(
                 workflow_id=workflow_id,
@@ -1430,7 +1918,9 @@ def _resume_deploy_approval_job(workflow_id: str, user_id: str, project_id: str,
                 )
     except Exception as e:
         err_msg = str(e)
-        logger.exception("[orchestrator] deploy approval resume failed workflow_id=%s", workflow_id)
+        logger.exception(
+            "[orchestrator] deploy approval resume failed workflow_id=%s", workflow_id
+        )
         update_workflow(workflow_id=workflow_id, status="failed", error=err_msg)
         if db.is_configured():
             db.update_run(workflow_id, status="failed", error_message=err_msg)
@@ -1442,7 +1932,10 @@ def _resume_deploy_approval_job(workflow_id: str, user_id: str, project_id: str,
 
 
 class DeployApproveBody(BaseModel):
-    api_keys: dict[str, str] | None = Field(None, description="Optional LLM keys for resume; when omitted, uses workspace keys.")
+    api_keys: dict[str, str] | None = Field(
+        None,
+        description="Optional LLM keys for resume; when omitted, uses workspace keys.",
+    )
 
 
 @app.post("/api/v1/workflows/{workflow_id}/deploy/approve")
@@ -1466,18 +1959,28 @@ def deploy_approve_api(
         )
     user_id = w.get("user_id") or "anonymous"
     project_id = w.get("project_id") or workflow_id
-    api_keys = (body.api_keys if body.api_keys else None) or _get_keys_for_run(user_id, DEFAULT_WORKSPACE)
+    api_keys = (body.api_keys if body.api_keys else None) or _get_keys_for_run(
+        user_id, DEFAULT_WORKSPACE
+    )
     if not api_keys:
         raise HTTPException(
             status_code=422,
             detail="LLM API keys required to resume. Add keys in Settings or pass api_keys in request body.",
         )
-    background_tasks.add_task(_resume_deploy_approval_job, workflow_id, user_id, project_id, dict(api_keys))
-    return {"workflow_id": workflow_id, "status": "resuming", "message": "Deploy approved; pipeline resuming."}
+    background_tasks.add_task(
+        _resume_deploy_approval_job, workflow_id, user_id, project_id, dict(api_keys)
+    )
+    return {
+        "workflow_id": workflow_id,
+        "status": "resuming",
+        "message": "Deploy approved; pipeline resuming.",
+    }
 
 
 @app.post("/api/v1/workflows/{workflow_id}/deploy/complete")
-def complete_deploy_api(workflow_id: str, body: DeployCompleteBody, request: Request = None) -> dict[str, Any]:
+def complete_deploy_api(
+    workflow_id: str, body: DeployCompleteBody, request: Request = None
+) -> dict[str, Any]:
     """Record deployment from client and persist to workflow."""
     w = get_workflow(workflow_id)
     if not w:
@@ -1503,7 +2006,9 @@ class ClarifyBody(BaseModel):
 
 
 @app.post("/api/v1/workflows/{workflow_id}/clarify")
-def clarify_workflow_api(workflow_id: str, body: ClarifyBody, request: Request = None) -> dict[str, Any]:
+def clarify_workflow_api(
+    workflow_id: str, body: ClarifyBody, request: Request = None
+) -> dict[str, Any]:
     """Persist user clarification message on workflow and return updated clarification list."""
     w = get_workflow(workflow_id)
     if not w:
@@ -1511,9 +2016,13 @@ def clarify_workflow_api(workflow_id: str, body: ClarifyBody, request: Request =
     if request:
         _assert_workflow_owner(w, request)
     from datetime import UTC, datetime
+
     meta = w.get("metadata") or {}
     clarifications = list(meta.get("clarifications") or [])
-    entry = {"message": (body.message or "").strip() or "(empty)", "at": datetime.now(UTC).isoformat()}
+    entry = {
+        "message": (body.message or "").strip() or "(empty)",
+        "at": datetime.now(UTC).isoformat(),
+    }
     clarifications.append(entry)
     update_workflow(workflow_id, metadata_merge={"clarifications": clarifications})
     return {
@@ -1539,6 +2048,7 @@ def cancel_workflow_api(workflow_id: str, request: Request = None) -> dict[str, 
 # ---------------------------------------------------------------------------
 # Runs (alias for Studio)
 # ---------------------------------------------------------------------------
+
 
 @app.get("/api/v1/runs/{run_id}")
 def get_run_api(run_id: str, request: Request = None) -> dict[str, Any]:
@@ -1573,6 +2083,7 @@ def get_run_steps_api(run_id: str, request: Request = None) -> dict[str, Any]:
 # Networks, metrics, presets
 # ---------------------------------------------------------------------------
 
+
 @app.get("/api/v1/networks")
 def get_networks_api(skale: bool = False) -> list[dict[str, Any]]:
     """Return networks from chain registry. When skale=true, return SKALE Base networks."""
@@ -1585,14 +2096,17 @@ def get_stablecoins_api() -> dict[str, dict[str, str]]:
     return get_stablecoins_by_chain()
 
 
-AGENT_RUNTIME_URL = os.environ.get("AGENT_RUNTIME_URL", "http://localhost:4001").rstrip("/")
+AGENT_RUNTIME_URL = os.environ.get("AGENT_RUNTIME_URL", "http://localhost:4001").rstrip(
+    "/"
+)
 VECTORDB_URL = os.environ.get("VECTORDB_URL", "http://localhost:8010").rstrip("/")
 INTEGRATIONS_TIMEOUT = float(os.environ.get("INTEGRATIONS_TIMEOUT", "15.0"))
 
 
 async def _fetch_integrations() -> dict[str, bool]:
     """Fetch integration status from agent-runtime and vectordb health endpoints.
-    On Render, agent-runtime and vectordb may cold-start (30-60s); use INTEGRATIONS_TIMEOUT env (default 15s)."""
+    In production (Contabo/Coolify), agent-runtime and vectordb may cold-start (30-60s); use INTEGRATIONS_TIMEOUT env (default 15s).
+    """
     tenderly = False
     pinata = False
     qdrant = False
@@ -1603,11 +2117,23 @@ async def _fetch_integrations() -> dict[str, bool]:
                 data = r.json()
                 tenderly = data.get("tenderly_configured", False)
                 pinata = data.get("pinata_configured", False)
-                logger.debug("[integrations] agent-runtime ok tenderly=%s pinata=%s", tenderly, pinata)
+                logger.debug(
+                    "[integrations] agent-runtime ok tenderly=%s pinata=%s",
+                    tenderly,
+                    pinata,
+                )
             else:
-                logger.warning("[integrations] agent-runtime health %s: %s", r.status_code, r.text[:200])
+                logger.warning(
+                    "[integrations] agent-runtime health %s: %s",
+                    r.status_code,
+                    r.text[:200],
+                )
         except Exception as e:
-            logger.warning("[integrations] agent-runtime unreachable url=%s: %s", AGENT_RUNTIME_URL, e)
+            logger.warning(
+                "[integrations] agent-runtime unreachable url=%s: %s",
+                AGENT_RUNTIME_URL,
+                e,
+            )
         try:
             r = await client.get(f"{VECTORDB_URL}/health")
             if r.status_code == 200:
@@ -1615,16 +2141,25 @@ async def _fetch_integrations() -> dict[str, bool]:
                 qdrant = data.get("qdrant_configured", False)
                 logger.debug("[integrations] vectordb ok qdrant=%s", qdrant)
             else:
-                logger.warning("[integrations] vectordb health %s: %s", r.status_code, r.text[:200])
+                logger.warning(
+                    "[integrations] vectordb health %s: %s", r.status_code, r.text[:200]
+                )
         except Exception as e:
-            logger.warning("[integrations] vectordb unreachable url=%s: %s", VECTORDB_URL, e)
-    return {"tenderly_configured": tenderly, "pinata_configured": pinata, "qdrant_configured": qdrant}
+            logger.warning(
+                "[integrations] vectordb unreachable url=%s: %s", VECTORDB_URL, e
+            )
+    return {
+        "tenderly_configured": tenderly,
+        "pinata_configured": pinata,
+        "qdrant_configured": qdrant,
+    }
 
 
 @app.get("/api/v1/config/integrations-debug")
 async def get_integrations_debug_api() -> dict[str, Any]:
     """Debug endpoint: raw integration health. Use to diagnose Settings > Integrations 'Not configured'.
-    Checks: AGENT_RUNTIME_URL/health (tenderly, pinata), VECTORDB_URL/health (qdrant)."""
+    Checks: AGENT_RUNTIME_URL/health (tenderly, pinata), VECTORDB_URL/health (qdrant).
+    """
     integrations = await _fetch_integrations()
     networks = get_networks_for_api()
     return {
@@ -1696,7 +2231,13 @@ def pricing_usage_api(
         try:
             client = db._client()
             if client:
-                r = client.table("wallet_users").select("plan_id").eq("id", x_user_id).maybe_single().execute()
+                r = (
+                    client.table("wallet_users")
+                    .select("plan_id")
+                    .eq("id", x_user_id)
+                    .maybe_single()
+                    .execute()
+                )
                 if r and r.data:
                     plan_id = r.data.get("plan_id") or "free"
         except Exception:
@@ -1726,8 +2267,17 @@ def get_metrics_api() -> dict[str, Any]:
         try:
             client = db._client()
             if client:
-                for status_val, counter_name in [("running", "active"), ("success", "completed"), ("failed", "failed")]:
-                    r = client.table("runs").select("id", count="exact").eq("status", status_val).execute()
+                for status_val, counter_name in [
+                    ("running", "active"),
+                    ("success", "completed"),
+                    ("failed", "failed"),
+                ]:
+                    r = (
+                        client.table("runs")
+                        .select("id", count="exact")
+                        .eq("status", status_val)
+                        .execute()
+                    )
                     cnt = int(getattr(r, "count", 0) or 0)
                     if counter_name == "active":
                         active = cnt
@@ -1741,7 +2291,12 @@ def get_metrics_api() -> dict[str, Any]:
     else:
         completed = total
     return {
-        "workflows": {"total": total, "active": active, "completed": completed, "failed": failed},
+        "workflows": {
+            "total": total,
+            "active": active,
+            "completed": completed,
+            "failed": failed,
+        },
         "total_workflows": total,
     }
 
@@ -1750,7 +2305,11 @@ def get_metrics_api() -> dict[str, Any]:
 def get_presets_api() -> list[dict[str, Any]]:
     """Return presets from token template registry."""
     return [
-        {"id": t["id"], "name": t.get("name", t["id"]), "description": t.get("description", "")}
+        {
+            "id": t["id"],
+            "name": t.get("name", t["id"]),
+            "description": t.get("description", ""),
+        }
         for t in get_templates_for_api()
     ]
 
@@ -1759,7 +2318,11 @@ def get_presets_api() -> list[dict[str, Any]]:
 def get_blueprints_api() -> list[dict[str, Any]]:
     """Return blueprints from token template registry; same source as presets."""
     return [
-        {"id": t["id"], "name": t.get("name", t["id"]), "description": t.get("description", "")}
+        {
+            "id": t["id"],
+            "name": t.get("name", t["id"]),
+            "description": t.get("description", ""),
+        }
         for t in get_templates_for_api()
     ]
 
@@ -1768,6 +2331,7 @@ def get_blueprints_api() -> list[dict[str, Any]]:
 # BYOK workspace LLM keys
 # ---------------------------------------------------------------------------
 
+
 class LLMKeysBody(BaseModel):
     keys: dict[str, str] = Field(default_factory=dict)
 
@@ -1775,7 +2339,10 @@ class LLMKeysBody(BaseModel):
 def _require_user_id_for_byok(x_user_id: str | None) -> None:
     """Raise 401 when Supabase BYOK is configured but X-User-Id is missing."""
     if llm_keys_supabase._is_configured() and not (x_user_id and x_user_id.strip()):
-        raise HTTPException(status_code=401, detail="X-User-Id required when BYOK persistence is configured")
+        raise HTTPException(
+            status_code=401,
+            detail="X-User-Id required when BYOK persistence is configured",
+        )
 
 
 def _trace_llm_keys(
@@ -1787,7 +2354,9 @@ def _trace_llm_keys(
     provider_count: int | None = None,
 ) -> None:
     """Structured trace for llm-keys requests; correlate with gateway auth logs via x-request-id."""
-    request_id = request.headers.get("x-request-id") or request.headers.get("X-Request-Id") or ""
+    request_id = (
+        request.headers.get("x-request-id") or request.headers.get("X-Request-Id") or ""
+    )
     payload = {
         "trace": "llm_keys",
         "method": method,
@@ -1814,18 +2383,34 @@ def get_llm_keys(
     try:
         _require_user_id_for_byok(x_user_id)
     except HTTPException:
-        _trace_llm_keys(request, "GET", x_user_id, x_workspace_id, "401_missing_x_user_id")
+        _trace_llm_keys(
+            request, "GET", x_user_id, x_workspace_id, "401_missing_x_user_id"
+        )
         raise
     wid = x_workspace_id or DEFAULT_WORKSPACE
     if x_user_id and llm_keys_supabase._is_configured():
         _log_byok_event("byok_access", x_user_id, "get_configured_providers")
         providers = llm_keys_supabase.get_configured_providers(x_user_id)
-        _trace_llm_keys(request, "GET", x_user_id, x_workspace_id, "success", provider_count=len(providers))
+        _trace_llm_keys(
+            request,
+            "GET",
+            x_user_id,
+            x_workspace_id,
+            "success",
+            provider_count=len(providers),
+        )
         return {"configured_providers": providers}
     if llm_keys_supabase._is_configured():
         return {"configured_providers": []}
     providers = get_configured_providers(wid)
-    _trace_llm_keys(request, "GET", x_user_id, x_workspace_id, "success", provider_count=len(providers))
+    _trace_llm_keys(
+        request,
+        "GET",
+        x_user_id,
+        x_workspace_id,
+        "success",
+        provider_count=len(providers),
+    )
     return {"configured_providers": providers}
 
 
@@ -1841,12 +2426,19 @@ def post_llm_keys(
     try:
         _require_user_id_for_byok(x_user_id)
     except HTTPException:
-        _trace_llm_keys(request, "POST", x_user_id, x_workspace_id, "401_missing_x_user_id")
+        _trace_llm_keys(
+            request, "POST", x_user_id, x_workspace_id, "401_missing_x_user_id"
+        )
         raise
     # Production: require encryption (Fernet or KMS) for BYOK persistence.
-    if os.environ.get("ENV") == "production" and not (os.environ.get("LLM_KEY_ENCRYPTION_KEY") or os.environ.get("LLM_KEY_KMS_KEY_ARN")):
+    if os.environ.get("ENV") == "production" and not (
+        os.environ.get("LLM_KEY_ENCRYPTION_KEY")
+        or os.environ.get("LLM_KEY_KMS_KEY_ARN")
+    ):
         if x_user_id and (body.keys or {}):
-            _trace_llm_keys(request, "POST", x_user_id, x_workspace_id, "503_missing_encryption_key")
+            _trace_llm_keys(
+                request, "POST", x_user_id, x_workspace_id, "503_missing_encryption_key"
+            )
             raise HTTPException(
                 status_code=503,
                 detail="BYOK requires LLM_KEY_ENCRYPTION_KEY or LLM_KEY_KMS_KEY_ARN in production",
@@ -1856,12 +2448,26 @@ def post_llm_keys(
         _log_byok_event("byok_access", x_user_id, "set_keys")
         providers = llm_keys_supabase.set_keys_for_user(x_user_id, body.keys or {})
         if body.keys and not providers:
-            _trace_llm_keys(request, "POST", x_user_id, x_workspace_id, "error_storage", provider_count=0)
+            _trace_llm_keys(
+                request,
+                "POST",
+                x_user_id,
+                x_workspace_id,
+                "error_storage",
+                provider_count=0,
+            )
             raise HTTPException(
                 status_code=503,
                 detail="BYOK storage failed. Check LLM_KEY_ENCRYPTION_KEY, SUPABASE_URL, and SUPABASE_SERVICE_KEY.",
             )
-        _trace_llm_keys(request, "POST", x_user_id, x_workspace_id, "success", provider_count=len(providers))
+        _trace_llm_keys(
+            request,
+            "POST",
+            x_user_id,
+            x_workspace_id,
+            "success",
+            provider_count=len(providers),
+        )
         return {"configured_providers": providers}
     if llm_keys_supabase._is_configured():
         raise HTTPException(
@@ -1869,7 +2475,14 @@ def post_llm_keys(
             detail="BYOK persistence is configured; sign in and use the gateway so X-User-Id is set.",
         )
     providers = set_keys(wid, body.keys or {})
-    _trace_llm_keys(request, "POST", x_user_id, x_workspace_id, "success", provider_count=len(providers))
+    _trace_llm_keys(
+        request,
+        "POST",
+        x_user_id,
+        x_workspace_id,
+        "success",
+        provider_count=len(providers),
+    )
     return {"configured_providers": providers}
 
 
@@ -1884,14 +2497,18 @@ def delete_llm_keys(
     try:
         _require_user_id_for_byok(x_user_id)
     except HTTPException:
-        _trace_llm_keys(request, "DELETE", x_user_id, x_workspace_id, "401_missing_x_user_id")
+        _trace_llm_keys(
+            request, "DELETE", x_user_id, x_workspace_id, "401_missing_x_user_id"
+        )
         raise
     wid = x_workspace_id or DEFAULT_WORKSPACE
     if x_user_id and llm_keys_supabase._is_configured():
         _log_byok_event("byok_access", x_user_id, "delete_keys")
         ok = llm_keys_supabase.delete_keys_for_user(x_user_id)
         if not ok:
-            _trace_llm_keys(request, "DELETE", x_user_id, x_workspace_id, "error_no_row_updated")
+            _trace_llm_keys(
+                request, "DELETE", x_user_id, x_workspace_id, "error_no_row_updated"
+            )
             raise HTTPException(
                 status_code=500,
                 detail="Failed to clear LLM keys. No matching user found. Sign out and sign in again, then try Remove all keys.",
@@ -1899,7 +2516,9 @@ def delete_llm_keys(
         _trace_llm_keys(request, "DELETE", x_user_id, x_workspace_id, "success")
         return {"success": True}
     if llm_keys_supabase._is_configured():
-        _trace_llm_keys(request, "DELETE", x_user_id, x_workspace_id, "skipped_no_user_id")
+        _trace_llm_keys(
+            request, "DELETE", x_user_id, x_workspace_id, "skipped_no_user_id"
+        )
         return {"success": True}
     delete_keys(wid)
     _trace_llm_keys(request, "DELETE", x_user_id, x_workspace_id, "success")
@@ -1909,6 +2528,7 @@ def delete_llm_keys(
 # ---------------------------------------------------------------------------
 # Templates (Studio)
 # ---------------------------------------------------------------------------
+
 
 @app.get("/api/v1/templates")
 def get_templates_api() -> list[dict[str, Any]]:
@@ -1923,12 +2543,17 @@ def search_templates_api(q: str = "") -> list[dict[str, Any]]:
     if not q or not q.strip():
         return all_t
     ql = q.lower()
-    return [t for t in all_t if ql in (t.get("name") or "").lower() or ql in (t.get("id") or "").lower()]
+    return [
+        t
+        for t in all_t
+        if ql in (t.get("name") or "").lower() or ql in (t.get("id") or "").lower()
+    ]
 
 
 # ---------------------------------------------------------------------------
 # x402 Payments and spending controls (Supabase-backed)
 # ---------------------------------------------------------------------------
+
 
 @app.get("/api/v1/payments/history")
 def payments_history_api(
@@ -1942,7 +2567,9 @@ def payments_history_api(
         return {"items": [], "total": 0, "message": "X-User-Id required"}
     if not payments_supabase.is_configured():
         return {"items": [], "total": 0}
-    items, total = payments_supabase.get_payment_history(x_user_id, limit=min(100, max(1, limit)), offset=max(0, offset))
+    items, total = payments_supabase.get_payment_history(
+        x_user_id, limit=min(100, max(1, limit)), offset=max(0, offset)
+    )
     return {"items": items, "total": total}
 
 
@@ -1959,7 +2586,13 @@ def payments_summary_api(
 
 
 def _spending_control_default() -> dict[str, Any]:
-    return {"budget": "0", "currency": "USD", "period": "monthly", "alert_threshold_percent": 80, "spent": "0"}
+    return {
+        "budget": "0",
+        "currency": "USD",
+        "period": "monthly",
+        "alert_threshold_percent": 80,
+        "spent": "0",
+    }
 
 
 @app.get("/api/v1/payments/spending-control")
@@ -1985,7 +2618,9 @@ def payments_spending_control_get_api(
             "budget": str(row.get("budget_amount", 0) or 0),
             "currency": row.get("budget_currency") or "USD",
             "period": row.get("period") or "monthly",
-            "alert_threshold_percent": int(row.get("alert_threshold_percent", 80) or 80),
+            "alert_threshold_percent": int(
+                row.get("alert_threshold_percent", 80) or 80
+            ),
             "spent": spent,
         }
     except Exception as e:
@@ -2037,6 +2672,7 @@ def payments_spending_control_patch_api(
 # Credits (top-up off-chain; consume per workflow run; x402 for external pay-per-call)
 # ---------------------------------------------------------------------------
 
+
 @app.get("/api/v1/credits/balance")
 def credits_balance_api(
     x_user_id: str | None = Header(None, alias="X-User-Id"),
@@ -2048,7 +2684,9 @@ def credits_balance_api(
 
 
 class CreditsTopUpBody(BaseModel):
-    amount: float = Field(gt=0, description="Credit amount to add (e.g. fiat/USDC/USDT conversion)")
+    amount: float = Field(
+        gt=0, description="Credit amount to add (e.g. fiat/USDC/USDT conversion)"
+    )
     currency: str = "USD"
     reference_id: str | None = None
     reference_type: str | None = "manual"
@@ -2060,12 +2698,17 @@ def credits_top_up_api(
     x_user_id: str | None = Header(None, alias="X-User-Id"),
 ) -> dict[str, Any]:
     """Record a credit top-up (e.g. after Stripe/fiat or USDC/USDT). Idempotency via reference_id recommended.
-    When amount is in USD (usdc_transfer, fiat), it is multiplied by CREDITS_PER_USD to get credits."""
+    When amount is in USD (usdc_transfer, fiat), it is multiplied by CREDITS_PER_USD to get credits.
+    """
     if not x_user_id:
         raise HTTPException(status_code=401, detail="X-User-Id required")
     if not credits_supabase.is_configured():
         raise HTTPException(status_code=503, detail="Credits not configured")
-    is_usd_input = (body.reference_type or "").lower() in ("usdc_transfer", "usdt_transfer", "fiat") or (body.currency or "").upper() == "USD"
+    is_usd_input = (body.reference_type or "").lower() in (
+        "usdc_transfer",
+        "usdt_transfer",
+        "fiat",
+    ) or (body.currency or "").upper() == "USD"
     credits_to_add = body.amount * CREDITS_PER_USD if is_usd_input else body.amount
     result = credits_supabase.top_up(
         x_user_id,
@@ -2073,11 +2716,19 @@ def credits_top_up_api(
         currency=body.currency or "USD",
         reference_id=body.reference_id,
         reference_type=body.reference_type or "manual",
-        metadata={"usd_amount": body.amount, "credits_per_usd": CREDITS_PER_USD} if is_usd_input else None,
+        metadata=(
+            {"usd_amount": body.amount, "credits_per_usd": CREDITS_PER_USD}
+            if is_usd_input
+            else None
+        ),
     )
     if not result:
         raise HTTPException(status_code=500, detail="Top-up failed")
-    return {"balance": result["balance"], "currency": result["currency"], "user_id": result["user_id"]}
+    return {
+        "balance": result["balance"],
+        "currency": result["currency"],
+        "user_id": result["user_id"],
+    }
 
 
 @app.get("/api/v1/logs")
@@ -2099,7 +2750,9 @@ def logs_services_api() -> list[str]:
     """Return distinct service names from recent activity; empty when not configured."""
     try:
         logs = db.get_recent_activity_logs(limit=100)
-        services = sorted({str(e.get("service", "orchestrator")) for e in logs if e.get("service")})
+        services = sorted(
+            {str(e.get("service", "orchestrator")) for e in logs if e.get("service")}
+        )
         return services if services else ["orchestrator"]
     except Exception:
         return ["orchestrator"]
@@ -2117,13 +2770,18 @@ def logs_hosts_api() -> list[str]:
             out.insert(0, env_host)
         return out
     except Exception:
-        return ["orchestrator"] if (os.environ.get("ORCHESTRATOR_HOST") or "").strip() else []
+        return (
+            ["orchestrator"]
+            if (os.environ.get("ORCHESTRATOR_HOST") or "").strip()
+            else []
+        )
 
 
 @app.get("/api/v1/agents")
 def agents_api() -> dict[str, Any]:
     """Return pipeline agents from workflow (spec, design, codegen, audit, simulation, deploy, ui_scaffold)."""
     from nodes import STEP_ORDER
+
     return {
         "agents": [
             {"name": name, "status": "ok", "step_index": i}
@@ -2135,6 +2793,7 @@ def agents_api() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Contract read/call
 # ---------------------------------------------------------------------------
+
 
 class ContractReadBody(BaseModel):
     contract_address: str = ""
@@ -2161,7 +2820,10 @@ class ContractCallBody(BaseModel):
 def contract_read_api(body: ContractReadBody) -> dict[str, Any]:
     """Contract read (view/pure) via chain RPC. Requires chain_id or network and abi."""
     if not body.contract_address or not body.function_name:
-        return {"success": False, "error": "contract_address and function_name required"}
+        return {
+            "success": False,
+            "error": "contract_address and function_name required",
+        }
     if not body.abi:
         return {"success": False, "error": "abi required for contract read"}
     chain_id = body.chain_id
@@ -2174,8 +2836,13 @@ def contract_read_api(body: ContractReadBody) -> dict[str, Any]:
         return {"success": False, "error": f"RPC not found for chain_id={chain_id}"}
     rpc_url, _ = rpc_explorer
     from contract_rpc import contract_read
+
     ok, result, err = contract_read(
-        rpc_url, body.contract_address, body.abi, body.function_name, body.function_args or []
+        rpc_url,
+        body.contract_address,
+        body.abi,
+        body.function_name,
+        body.function_args or [],
     )
     if not ok:
         return {"success": False, "error": err or "RPC call failed"}
@@ -2186,7 +2853,10 @@ def contract_read_api(body: ContractReadBody) -> dict[str, Any]:
 def contract_call_api(body: ContractCallBody) -> dict[str, Any]:
     """Build unsigned transaction for contract write; client signs and submits."""
     if not body.contract_address or not body.function_name:
-        return {"success": False, "error": "contract_address and function_name required"}
+        return {
+            "success": False,
+            "error": "contract_address and function_name required",
+        }
     abi = body.abi or []
     if not abi:
         return {"success": False, "error": "abi required for contract call"}
@@ -2200,6 +2870,7 @@ def contract_call_api(body: ContractCallBody) -> dict[str, Any]:
         return {"success": False, "error": f"RPC not found for chain_id={chain_id}"}
     rpc_url, _ = rpc_explorer
     from contract_rpc import contract_call_build_tx
+
     ok, tx, err = contract_call_build_tx(
         rpc_url,
         body.contract_address,
@@ -2213,12 +2884,17 @@ def contract_call_api(body: ContractCallBody) -> dict[str, Any]:
     )
     if not ok:
         return {"success": False, "error": err or "Build tx failed"}
-    return {"success": True, "transaction": tx, "message": "Sign and send with your wallet"}
+    return {
+        "success": True,
+        "transaction": tx,
+        "message": "Sign and send with your wallet",
+    }
 
 
 # ---------------------------------------------------------------------------
 # Legacy /run and health
 # ---------------------------------------------------------------------------
+
 
 @app.post("/run")
 def create_run_legacy(req: RunRequest) -> dict[str, Any]:
@@ -2227,19 +2903,34 @@ def create_run_legacy(req: RunRequest) -> dict[str, Any]:
     project_id = req.project_id or workflow_id
     passed, violation = guardrail_validate_input(req.user_prompt)
     if not passed:
-        raise HTTPException(status_code=400, detail=violation or "Security policy violation")
+        raise HTTPException(
+            status_code=400, detail=violation or "Security policy violation"
+        )
     api_keys = req.api_keys or _get_keys_for_run(req.user_id or "", DEFAULT_WORKSPACE)
     if not api_keys:
         raise HTTPException(
             status_code=422,
             detail="LLM API keys are required to run the pipeline. Add keys in Settings (workspace LLM keys).",
         )
-    agent_session_jwt = _create_agent_session_jwt_if_configured(req.user_id, workflow_id, api_keys)
-    create_workflow(workflow_id=workflow_id, intent=req.user_prompt, user_id=req.user_id, project_id=project_id)
+    agent_session_jwt = _create_agent_session_jwt_if_configured(
+        req.user_id, workflow_id, api_keys
+    )
+    create_workflow(
+        workflow_id=workflow_id,
+        intent=req.user_prompt,
+        user_id=req.user_id,
+        project_id=project_id,
+    )
     if db.is_configured():
-        effective_user = req.user_id if db._is_uuid(req.user_id) else os.environ.get("SUPABASE_SYSTEM_USER_ID")
+        effective_user = (
+            req.user_id
+            if db._is_uuid(req.user_id)
+            else os.environ.get("SUPABASE_SYSTEM_USER_ID")
+        )
         if effective_user and db.ensure_project(project_id, effective_user):
-            db.insert_run(workflow_id, project_id, status="running", workflow_version="0.1.0")
+            db.insert_run(
+                workflow_id, project_id, status="running", workflow_version="0.1.0"
+            )
     try:
         final = run_pipeline(
             req.user_prompt,
@@ -2251,14 +2942,25 @@ def create_run_legacy(req: RunRequest) -> dict[str, Any]:
             agent_session_jwt=agent_session_jwt,
         )
         stage = final.get("current_stage", "unknown")
-        status = "success" if stage in ("deployed", "design_review", "audit", "simulation", "deploy") else (
-            "running" if stage == "spec_review" else "failed"
+        status = (
+            "success"
+            if stage in ("deployed", "design_review", "audit", "simulation", "deploy")
+            else ("running" if stage == "spec_review" else "failed")
         )
         store_status = "completed" if status == "success" else "failed"
         update_workflow(workflow_id, status=store_status)
         if db.is_configured():
-            db.update_run(workflow_id, status="success" if status == "success" else "failed", current_stage=stage)
-        return {"run_id": workflow_id, "status": status, "current_stage": stage, "message": "Pipeline completed"}
+            db.update_run(
+                workflow_id,
+                status="success" if status == "success" else "failed",
+                current_stage=stage,
+            )
+        return {
+            "run_id": workflow_id,
+            "status": status,
+            "current_stage": stage,
+            "message": "Pipeline completed",
+        }
     except Exception as e:
         update_workflow(workflow_id, status="failed", error=str(e))
         if db.is_configured():
@@ -2274,12 +2976,16 @@ def _approve_spec_impl(run_id: str, request: Request | None = None) -> dict[str,
     if request:
         _assert_workflow_owner(w, request)
     if not w.get("spec"):
-        raise HTTPException(status_code=400, detail="No spec to approve; run must be at spec_review")
+        raise HTTPException(
+            status_code=400, detail="No spec to approve; run must be at spec_review"
+        )
     update_workflow(run_id, spec_approved=True)
     user_id = w.get("user_id") or "anonymous"
     project_id = w.get("project_id") or run_id
     api_keys = _get_keys_for_run(user_id, DEFAULT_WORKSPACE)
-    agent_session_jwt = _create_agent_session_jwt_if_configured(user_id, run_id, api_keys)
+    agent_session_jwt = _create_agent_session_jwt_if_configured(
+        user_id, run_id, api_keys
+    )
     initial_state = {
         "user_prompt": w.get("intent", ""),
         "user_id": user_id,
@@ -2327,8 +3033,15 @@ def _approve_spec_impl(run_id: str, request: Request | None = None) -> dict[str,
             audit_findings=final.get("audit_findings"),
         )
         if db.is_configured():
-            db.update_run(run_id, status=_run_status_for_store(status), current_stage=stage)
-        return {"run_id": run_id, "status": status, "current_stage": stage, "message": "Resumed from design"}
+            db.update_run(
+                run_id, status=_run_status_for_store(status), current_stage=stage
+            )
+        return {
+            "run_id": run_id,
+            "status": status,
+            "current_stage": stage,
+            "message": "Resumed from design",
+        }
     except Exception as e:
         update_workflow(run_id, status="failed", error=str(e))
         if db.is_configured():
@@ -2367,8 +3080,8 @@ def _check_tools_health() -> dict[str, Any]:
 
 # Quick-demo sandbox: Contabo Docker Sandbox API
 SANDBOX_API_URL = (
-    (os.environ.get("SANDBOX_API_URL") or os.environ.get("OPENSANDBOX_API_URL") or "").rstrip("/")
-)
+    os.environ.get("SANDBOX_API_URL") or os.environ.get("OPENSANDBOX_API_URL") or ""
+).rstrip("/")
 SANDBOX_API_KEY = (
     os.environ.get("SANDBOX_API_KEY", "").strip()
     or os.environ.get("OPENSANDBOX_API_KEY", "").strip()
@@ -2421,7 +3134,9 @@ async def _quick_demo_via_docker_sandbox(
 
 
 @app.post("/api/v1/quick-demo")
-async def quick_demo_api(request: Request, body: QuickDemoBody | None = None) -> dict[str, Any]:
+async def quick_demo_api(
+    request: Request, body: QuickDemoBody | None = None
+) -> dict[str, Any]:
     """Create a sandbox from workflow-generated code via Contabo Docker Sandbox API.
     Requires workflow_id in body. Returns sandbox URL for Try it Now."""
     workflow_id = (body and body.workflow_id) or None
@@ -2432,7 +3147,9 @@ async def quick_demo_api(request: Request, body: QuickDemoBody | None = None) ->
         raise HTTPException(status_code=404, detail="Workflow not found")
     if request:
         _assert_workflow_owner(w, request)
-    base = (os.environ.get("ORCHESTRATOR_PUBLIC_URL") or str(request.base_url)).rstrip("/")
+    base = (os.environ.get("ORCHESTRATOR_PUBLIC_URL") or str(request.base_url)).rstrip(
+        "/"
+    )
     tarball_url = f"{base}/api/v1/workflows/{workflow_id}/tarball"
     return await _quick_demo_via_docker_sandbox(tarball_url=tarball_url)
 
@@ -2440,12 +3157,15 @@ async def quick_demo_api(request: Request, body: QuickDemoBody | None = None) ->
 @app.post("/api/v1/workflows/{workflow_id}/debug-sandbox")
 async def debug_sandbox_api(workflow_id: str, request: Request) -> dict[str, Any]:
     """Create a sandbox pre-loaded with the workflow's generated code and failing audit.
-    Use when audit fails so user can fix in a browser-based IDE. Uses Contabo Docker Sandbox API."""
+    Use when audit fails so user can fix in a browser-based IDE. Uses Contabo Docker Sandbox API.
+    """
     w = get_workflow(workflow_id)
     if not w:
         raise HTTPException(status_code=404, detail="Workflow not found")
     _assert_workflow_owner(w, request)
-    base = (os.environ.get("ORCHESTRATOR_PUBLIC_URL") or str(request.base_url)).rstrip("/")
+    base = (os.environ.get("ORCHESTRATOR_PUBLIC_URL") or str(request.base_url)).rstrip(
+        "/"
+    )
     tarball_url = f"{base}/api/v1/workflows/{workflow_id}/tarball"
     out = await _quick_demo_via_docker_sandbox(tarball_url=tarball_url)
     out["workflow_id"] = workflow_id
@@ -2480,6 +3200,7 @@ def _check_redis_health() -> dict[str, Any]:
         return {"status": "not_configured"}
     try:
         from redis import Redis
+
         r = Redis.from_url(url)
         r.ping()
         return {"status": "ok"}
@@ -2526,5 +3247,7 @@ def health_detailed() -> dict[str, Any]:
         tools_status = _check_tools_health()
         services["tools"] = tools_status
         if tools_status.get("status") == "offline":
-            services["tools"]["message"] = "Toolchain offline; compile/audit may fail when using remote tools"
+            services["tools"][
+                "message"
+            ] = "Toolchain offline; compile/audit may fail when using remote tools"
     return {"status": "ok", "services": services, "registries": versions}

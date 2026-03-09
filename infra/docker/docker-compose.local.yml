@@ -10,7 +10,7 @@
 # FULL LOCAL: Include local postgres, redis, vectordb (heavier).
 #   make up-local
 #
-# REMOTE TOOLS: Set TOOLS_BASE_URL to use remote hyperagent-tools (Render/Fly).
+# REMOTE TOOLS: Set TOOLS_BASE_URL to use remote hyperagent-tools (Contabo/Coolify or fly.io).
 #   Or run locally: make up-tools (adds hyperagent-tools on port 9000).
 
 services:

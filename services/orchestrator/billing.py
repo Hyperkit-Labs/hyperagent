@@ -40,6 +40,7 @@ def get_endpoint_price(path: str, method: str = "POST") -> float | None:
     if resource_id:
         try:
             from registries import get_resource_price
+
             return get_resource_price(resource_id)
         except ImportError:
             pass
@@ -57,7 +58,9 @@ def is_internal_caller(request_headers: dict[str, str], user_id: str | None) -> 
     True if caller is internal (Studio user with X-User-Id) and uses credits.
     False if external agent; should get x402 402 challenge.
     """
-    if user_id and (request_headers.get("X-User-Id") or request_headers.get("x-user-id")):
+    if user_id and (
+        request_headers.get("X-User-Id") or request_headers.get("x-user-id")
+    ):
         return True
     if request_headers.get("X-Internal-Token"):
         return True

@@ -14,7 +14,7 @@ The **only** source of "which networks exist" and their metadata is:
 The API returns for each network: `network` (slug), `name`, `chain_id`, `currency`, `tier`, `category`, `is_mainnet`. The frontend must not maintain a separate list of supported networks; it uses the API (e.g. `useNetworks()` in Studio) for the selectable list.
 
 - **Deploy service:** Should default to the same registry (e.g. `CHAIN_REGISTRY_PATH` pointing at `infra/registries/network/chains.yaml` or `/app/registries/network/chains.yaml` in Docker).
-- **Default network:** Frontend uses the first testnet from the API (`is_mainnet === false`) or the fallback slug from the registry. On Render, set `REGISTRIES_PATH` so the registry is found.
+- **Default network:** Frontend uses the first testnet from the API (`is_mainnet === false`) or the fallback slug from the registry. In production (Contabo/Coolify), set `REGISTRIES_PATH` so the registry is found.
 - **Testnet default:** Network selectors and deploy flows default to testnets from the registry.
 
 The deprecated `chain_config` table was removed; it was a duplicate source and caused confusion. All chain metadata comes from the YAML via the API.

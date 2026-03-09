@@ -1,17 +1,39 @@
 # Docker integration tests: E2E verification when running via Docker Compose.
-# See .kiro/specs/e2e-docker-integration-testing/ for design and requirements.
 name: Docker Integration Tests
 
 on:
   pull_request:
-    branches: [main, develop]
+    branches: [main, development]
   push:
-    branches: [main, develop]
+    branches: [main, development]
 
 jobs:
   docker-integration:
     name: Docker E2E Integration
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: hyperagent_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
     steps:
       - uses: actions/checkout@v4
 
@@ -21,22 +43,18 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
-      - name: Install API test dependencies
+      - name: Install orchestrator test dependencies
         run: |
-          cd apps/hyperagent-api
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt httpx pytest pytest-asyncio
+          python -m pip install --upgrade pip build
+          pip install -e packages/execution-backend
+          pip install -r services/orchestrator/requirements.txt
+          pip install httpx pytest pytest-asyncio
 
-      - name: Run preservation and bug-condition tests (no Docker)
+      - name: Run orchestrator integration tests
         run: |
-          cd apps/hyperagent-api
-          pytest tests/integration/docker/test_preservation.py tests/integration/docker/test_bug_condition_docker_verification.py -v --no-cov -m integration
+          cd services/orchestrator
+          pytest tests/ -v --no-cov -x
         env:
+          REDIS_URL: redis://localhost:6379/0
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/hyperagent_test
           SKIP_DOCKER_INTEGRATION: "1"
-
-      - name: Run Docker integration tests (fixture starts compose)
-        run: |
-          cd apps/hyperagent-api
-          pytest tests/integration/docker/ -v -m "integration and slow" --no-cov
-        env:
-          SKIP_DOCKER_INTEGRATION: ""

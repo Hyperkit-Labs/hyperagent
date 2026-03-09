@@ -6,7 +6,7 @@ Public deployment and operations guide for HyperAgent.
 
 ## Build History Persistence
 
-Workflows and runs persist in Supabase. Set these on the orchestrator service (e.g. `hyperagent-api` on Render):
+Workflows and runs persist in Supabase. Set these on the orchestrator service (e.g. `api-gateway` or `orchestrator` in Contabo/Coolify):
 
 | Variable | Required | Purpose |
 |----------|----------|---------|

@@ -1,8 +1,9 @@
 """AgentState for LangGraph and agent protocol."""
-from typing import Annotated, Awaitable, Protocol, Sequence, TypedDict
-from langchain_core.messages import BaseMessage
-import operator
 
+import operator
+from typing import Annotated, Awaitable, Protocol, Sequence, TypedDict
+
+from langchain_core.messages import BaseMessage
 
 MAX_AUTOFIX_CYCLES = 3
 

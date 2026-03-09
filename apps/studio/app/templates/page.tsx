@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ROUTES } from "@/constants/routes";
@@ -48,20 +48,23 @@ function TemplatesContent() {
 
   useEffect(() => {
     if (!searchQuery.trim()) {
-      setSearchResults(null);
+      queueMicrotask(() => {
+        setSearchResults(null);
+        setSearching(false);
+      });
       return;
     }
     let cancelled = false;
-    setSearching(true);
+    queueMicrotask(() => setSearching(true));
     searchTemplates(searchQuery)
       .then((res) => {
-        if (!cancelled) setSearchResults(Array.isArray(res) ? res : []);
+        if (!cancelled) queueMicrotask(() => setSearchResults(Array.isArray(res) ? res : []));
       })
       .catch(() => {
-        if (!cancelled) setSearchResults([]);
+        if (!cancelled) queueMicrotask(() => setSearchResults([]));
       })
       .finally(() => {
-        if (!cancelled) setSearching(false);
+        if (!cancelled) queueMicrotask(() => setSearching(false));
       });
     return () => {
       cancelled = true;

@@ -21,7 +21,7 @@ import {
   Server,
   BookOpen,
 } from "lucide-react";
-import { ROUTES } from "@/constants/routes";
+import { ROUTES, CLI_VERSION } from "@/constants/routes";
 
 function SidebarBackToProject() {
   const pathname = usePathname();
@@ -169,7 +169,7 @@ export function Sidebar() {
       </nav>
 
       <div className="shrink-0 px-4 py-3 border-t border-[var(--color-border-subtle)] text-[11px] text-[var(--color-text-dim)]">
-        Hyperkit CLI v2.4.0
+        {`Hyperkit CLI v${CLI_VERSION}`}
       </div>
     </aside>
   );

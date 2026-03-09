@@ -2,6 +2,7 @@
 Supabase persistence for runs, deployments, simulations, security_findings.
 Uses service role key; RLS still applies to user reads via anon key.
 """
+
 from __future__ import annotations
 
 import logging
@@ -22,12 +23,15 @@ def _client():
         if not url or not key:
             return None
         from supabase import create_client
+
         _supabase = create_client(url, key)
     return _supabase
 
 
 def is_configured() -> bool:
-    return bool(os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_SERVICE_KEY"))
+    return bool(
+        os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_SERVICE_KEY")
+    )
 
 
 def _is_uuid(s: str) -> bool:
@@ -45,7 +49,9 @@ def is_uuid(s: str) -> bool:
     return _is_uuid(s)
 
 
-def ensure_user_profile(user_id: str, wallet_address: str | None = None, display_name: str | None = None) -> bool:
+def ensure_user_profile(
+    user_id: str, wallet_address: str | None = None, display_name: str | None = None
+) -> bool:
     """Ensure user_profiles row exists for auth user. No-op for SIWE (wallet_users)."""
     if not _is_uuid(user_id):
         return False
@@ -68,13 +74,19 @@ def ensure_user_profile(user_id: str, wallet_address: str | None = None, display
 def ensure_project(project_id: str, user_id: str) -> bool:
     """Ensure project exists (for run FK). Uses project_id and user_id.
     When SIWE: user_id is wallet_users.id; upsert sets wallet_user_id and user_id=null (or SUPABASE_SYSTEM_USER_ID).
-    When auth: user_id is auth.users.id; upsert sets user_id. Requires projects_wallet_owner migration for SIWE."""
+    When auth: user_id is auth.users.id; upsert sets user_id. Requires projects_wallet_owner migration for SIWE.
+    """
     if not _is_uuid(project_id) or not _is_uuid(user_id):
         return False
     client = _client()
     if not client:
         return False
-    payload_base = {"id": project_id, "name": "Default", "description": "", "status": "draft"}
+    payload_base = {
+        "id": project_id,
+        "name": "Default",
+        "description": "",
+        "status": "draft",
+    }
     system_user = os.environ.get("SUPABASE_SYSTEM_USER_ID", "").strip() or None
     if system_user and _is_uuid(system_user):
         payload_base["user_id"] = system_user
@@ -88,7 +100,13 @@ def ensure_project(project_id: str, user_id: str) -> bool:
     except Exception as e:
         logger.warning("[db] ensure_project failed: %s", e)
         try:
-            fallback = {"id": project_id, "user_id": user_id, "name": "Default", "description": "", "status": "draft"}
+            fallback = {
+                "id": project_id,
+                "user_id": user_id,
+                "name": "Default",
+                "description": "",
+                "status": "draft",
+            }
             client.table("projects").upsert(fallback, on_conflict="id").execute()
             return True
         except Exception as e:
@@ -108,14 +126,20 @@ def insert_run(
     if not client:
         return None
     try:
-        r = client.table("runs").insert({
-            "id": run_id,
-            "project_id": project_id,
-            "trigger": trigger,
-            "status": status,
-            "current_stage": "spec",
-            "workflow_version": workflow_version,
-        }).execute()
+        r = (
+            client.table("runs")
+            .insert(
+                {
+                    "id": run_id,
+                    "project_id": project_id,
+                    "trigger": trigger,
+                    "status": status,
+                    "current_stage": "spec",
+                    "workflow_version": workflow_version,
+                }
+            )
+            .execute()
+        )
         return r.data[0] if r.data else None
     except Exception as e:
         logger.warning("[db] insert_run failed: %s", e)
@@ -262,7 +286,8 @@ def insert_project_artifact(
     metadata: dict[str, Any] | None = None,
 ) -> str | None:
     """Insert a project_artifacts row. Returns artifact id or None.
-    artifact_type: spec, design_doc, contract, audit_report, simulation_report, deployment_record."""
+    artifact_type: spec, design_doc, contract, audit_report, simulation_report, deployment_record.
+    """
     client = _client()
     if not client or not _is_uuid(project_id):
         return None
@@ -272,7 +297,11 @@ def insert_project_artifact(
             "run_id": run_id if _is_uuid(run_id or "") else None,
             "type": artifact_type,
             "name": name,
-            "content": (content[:65535] if content and len(content) > 65535 else content) if content else None,
+            "content": (
+                (content[:65535] if content and len(content) > 65535 else content)
+                if content
+                else None
+            ),
             "ipfs_cid": ipfs_cid,
             "metadata": metadata or {},
         }
@@ -298,14 +327,16 @@ def insert_agent_log(
     if log_level not in ("debug", "info", "warning", "error"):
         log_level = "info"
     try:
-        client.table("agent_logs").insert({
-            "run_id": run_id,
-            "agent_name": agent_name,
-            "stage": stage,
-            "message": message[:4096] if len(message) > 4096 else message,
-            "log_level": log_level,
-            "metadata": metadata or {},
-        }).execute()
+        client.table("agent_logs").insert(
+            {
+                "run_id": run_id,
+                "agent_name": agent_name,
+                "stage": stage,
+                "message": message[:4096] if len(message) > 4096 else message,
+                "log_level": log_level,
+                "metadata": metadata or {},
+            }
+        ).execute()
         return True
     except Exception as e:
         logger.warning("[db] insert_agent_log failed: %s", e)
@@ -326,6 +357,7 @@ def insert_step(
         return None
     try:
         from datetime import UTC, datetime
+
         row = {
             "run_id": run_id,
             "step_index": step_index,
@@ -334,8 +366,16 @@ def insert_step(
             "started_at": started_at or datetime.now(UTC).isoformat(),
         }
         if input_summary is not None:
-            row["input_summary"] = input_summary[:4096] if len(input_summary or "") > 4096 else input_summary
-        r = client.table("run_steps").upsert(row, on_conflict="run_id,step_type").execute()
+            row["input_summary"] = (
+                input_summary[:4096]
+                if len(input_summary or "") > 4096
+                else input_summary
+            )
+        r = (
+            client.table("run_steps")
+            .upsert(row, on_conflict="run_id,step_type")
+            .execute()
+        )
         return r.data[0] if r.data else None
     except Exception as e:
         logger.warning("[db] insert_step failed: %s", e)
@@ -359,11 +399,16 @@ def update_step(
         return False
     try:
         from datetime import UTC, datetime
+
         payload = {"status": status}
         if output_summary is not None:
-            payload["output_summary"] = output_summary[:4096] if len(output_summary) > 4096 else output_summary
+            payload["output_summary"] = (
+                output_summary[:4096] if len(output_summary) > 4096 else output_summary
+            )
         if error_message is not None:
-            payload["error_message"] = error_message[:2048] if len(error_message) > 2048 else error_message
+            payload["error_message"] = (
+                error_message[:2048] if len(error_message) > 2048 else error_message
+            )
         payload["completed_at"] = completed_at or datetime.now(UTC).isoformat()
         if trace_blob_id is not None:
             payload["trace_blob_id"] = trace_blob_id
@@ -371,7 +416,9 @@ def update_step(
             payload["trace_da_cert"] = trace_da_cert
         if trace_reference_block is not None:
             payload["trace_reference_block"] = trace_reference_block
-        client.table("run_steps").update(payload).eq("run_id", run_id).eq("step_type", step_type).execute()
+        client.table("run_steps").update(payload).eq("run_id", run_id).eq(
+            "step_type", step_type
+        ).execute()
         return True
     except Exception as e:
         logger.warning("[db] unknown failed: %s", e)
@@ -384,7 +431,13 @@ def get_steps(run_id: str) -> list[dict[str, Any]]:
     if not client:
         return []
     try:
-        r = client.table("run_steps").select("*").eq("run_id", run_id).order("step_index").execute()
+        r = (
+            client.table("run_steps")
+            .select("*")
+            .eq("run_id", run_id)
+            .order("step_index")
+            .execute()
+        )
         return list(r.data) if r.data else []
     except Exception as e:
         logger.warning("[db] get_steps failed: %s", e)
@@ -404,15 +457,29 @@ def _to_ts(val: Any) -> str:
 def _run_steps_to_log_entries(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     out = []
     for row in rows:
-        ts = _to_ts(row.get("completed_at") or row.get("started_at") or row.get("created_at"))
-        msg = row.get("output_summary") or row.get("error_message") or row.get("status") or ""
+        ts = _to_ts(
+            row.get("completed_at") or row.get("started_at") or row.get("created_at")
+        )
+        msg = (
+            row.get("output_summary")
+            or row.get("error_message")
+            or row.get("status")
+            or ""
+        )
         step = row.get("step_type") or ""
         if step and msg:
             msg = f"[{step}] {msg}"
         elif step:
             msg = f"[{step}] {row.get('status', '')}"
         level = "error" if row.get("status") == "failed" else "info"
-        out.append({"message": msg[:2048] if msg else "-", "level": level, "timestamp": ts, "service": step or "orchestrator"})
+        out.append(
+            {
+                "message": msg[:2048] if msg else "-",
+                "level": level,
+                "timestamp": ts,
+                "service": step or "orchestrator",
+            }
+        )
     return out
 
 
@@ -427,7 +494,14 @@ def _agent_logs_to_log_entries(rows: list[dict[str, Any]]) -> list[dict[str, Any
             msg = f"[{agent}] {msg}"
         elif agent:
             msg = f"[{agent}] {row.get('stage', '')}"
-        out.append({"message": msg[:2048] if msg else "-", "level": level, "timestamp": ts, "service": agent or "agent"})
+        out.append(
+            {
+                "message": msg[:2048] if msg else "-",
+                "level": level,
+                "timestamp": ts,
+                "service": agent or "agent",
+            }
+        )
     return out
 
 
@@ -452,7 +526,9 @@ def upsert_workflow_state(run_id: str, state: dict[str, Any]) -> bool:
     if not client:
         return False
     try:
-        client.table("runs").update({"workflow_state": state}).eq("id", run_id).execute()
+        client.table("runs").update({"workflow_state": state}).eq(
+            "id", run_id
+        ).execute()
         return True
     except Exception as e:
         logger.warning("[db] upsert_workflow_state failed: %s", e)
@@ -473,14 +549,21 @@ def _store_status_to_run_status(store_status: str) -> str:
     return "running"
 
 
-def list_workflow_states(limit: int = 50, status: str | None = None) -> list[dict[str, Any]]:
+def list_workflow_states(
+    limit: int = 50, status: str | None = None
+) -> list[dict[str, Any]]:
     """List runs with workflow_state, newest first. status filters runs.status (store status mapped to run status)."""
     client = _client()
     if not client:
         return []
     try:
         run_status = _store_status_to_run_status(status) if status else None
-        q = client.table("runs").select("id, workflow_state, status, created_at").order("created_at", desc=True).limit(min(limit, 100))
+        q = (
+            client.table("runs")
+            .select("id, workflow_state, status, created_at")
+            .order("created_at", desc=True)
+            .limit(min(limit, 100))
+        )
         if run_status:
             q = q.eq("status", run_status)
         r = q.execute()
@@ -494,7 +577,14 @@ def list_workflow_states(limit: int = 50, status: str | None = None) -> list[dic
                 state["run_id"] = str(row.get("id", ""))
                 out.append(state)
             elif row.get("id"):
-                out.append({"workflow_id": str(row["id"]), "run_id": str(row["id"]), "status": row.get("status"), "created_at": row.get("created_at")})
+                out.append(
+                    {
+                        "workflow_id": str(row["id"]),
+                        "run_id": str(row["id"]),
+                        "status": row.get("status"),
+                        "created_at": row.get("created_at"),
+                    }
+                )
         return out
     except Exception as e:
         logger.warning("[db] list_workflow_states failed: %s", e)
@@ -523,7 +613,9 @@ def get_recent_activity_logs(limit: int = 50) -> list[dict[str, Any]]:
         entries = []
         r = (
             client.table("run_steps")
-            .select("run_id, step_type, status, output_summary, error_message, started_at, completed_at, created_at")
+            .select(
+                "run_id, step_type, status, output_summary, error_message, started_at, completed_at, created_at"
+            )
             .order("created_at", desc=True)
             .limit(limit)
             .execute()

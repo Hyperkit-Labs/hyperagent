@@ -1,4 +1,5 @@
 """Integration tests: orchestrator HTTP API. Run from services/orchestrator with pytest."""
+
 from __future__ import annotations
 
 import os
@@ -7,13 +8,16 @@ import sys
 import pytest
 
 # Run from services/orchestrator so imports resolve
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(
+    0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
 
 @pytest.fixture
 def client():
     from fastapi.testclient import TestClient
     from main import app
+
     return TestClient(app)
 
 

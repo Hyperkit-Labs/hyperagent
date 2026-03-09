@@ -1,4 +1,5 @@
 """Contract read (eth_call) and call (build transaction) via chain RPC. Uses registry for RPC URL."""
+
 from __future__ import annotations
 
 import logging
@@ -86,7 +87,11 @@ def contract_call_build_tx(
         except Exception:
             value_wei = 0
         tx_params = {"value": value_wei}
-        from_addr = caller_address if caller_address else "0x0000000000000000000000000000000000000000"
+        from_addr = (
+            caller_address
+            if caller_address
+            else "0x0000000000000000000000000000000000000000"
+        )
         tx_params["from"] = Web3.to_checksum_address(_normalize_address(from_addr))
         if gas_limit is not None and gas_limit > 0:
             tx_params["gas"] = gas_limit

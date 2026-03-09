@@ -1,0 +1,16 @@
+# Ruff config for CI. See https://docs.astral.sh/ruff/
+target-version = "py312"
+line-length = 100
+exclude = ["*/data/*", "*/__pycache__/*", "*.egg-info"]
+
+[lint]
+select = ["E", "F", "I", "W"]
+ignore = [
+    "E501",  # line too long (handled by black)
+    "E731",  # lambda assignment (common in fallback patterns)
+    "E402",  # import not at top (orchestrator uses lazy/dotenv imports)
+    "F841",  # unused variable (some intentional for control flow)
+]
+
+[lint.per-file-ignores]
+"services/orchestrator/llm_keys_encryption.py" = ["E731"]

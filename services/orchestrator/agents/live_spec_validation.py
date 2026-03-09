@@ -1,11 +1,14 @@
 """Live spec validation: shadow simulation before design.
 When OPENSANDBOX_ENABLED, compiles a minimal Solidity stub derived from spec to validate feasibility."""
+
 import logging
 import os
 
 logger = logging.getLogger(__name__)
 
-OPENSANDBOX_ENABLED = os.environ.get("OPENSANDBOX_ENABLED", "false").strip().lower() in ("1", "true", "yes")
+OPENSANDBOX_ENABLED = os.environ.get(
+    "OPENSANDBOX_ENABLED", "false"
+).strip().lower() in ("1", "true", "yes")
 
 
 def _stub_from_spec(spec: dict) -> str:

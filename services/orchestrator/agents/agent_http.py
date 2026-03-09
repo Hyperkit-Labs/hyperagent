@@ -1,4 +1,5 @@
 """Shared headers for agent-runtime HTTP calls. Ensures X-Internal-Token for service-to-service auth."""
+
 from __future__ import annotations
 
 import os

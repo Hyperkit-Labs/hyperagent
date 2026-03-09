@@ -3,6 +3,7 @@ Toolkit interfaces (capability abstraction) for simulation, deploy, and storage.
 Implementations are thin HTTP clients calling existing services; actual Tenderly/Pinata
 logic stays inside the respective services. Propagate x-request-id for trace correlation.
 """
+
 from __future__ import annotations
 
 import logging
@@ -10,7 +11,6 @@ import os
 from typing import Any, Protocol
 
 import httpx
-
 from registries import get_timeout
 from trace_context import get_request_id
 
@@ -26,9 +26,11 @@ def _trace_headers() -> dict[str, str]:
         headers["X-Internal-Token"] = token
     return headers
 
+
 # ---------------------------------------------------------------------------
 # Simulation
 # ---------------------------------------------------------------------------
+
 
 class SimulationProvider(Protocol):
     """Protocol: simulate(network, from_addr, data, to_addr?, value?, design_rationale?) -> SimulateTxResult."""
@@ -50,7 +52,10 @@ class SimulationHttpProvider:
     """HTTP client calling the simulation service (same URL as before)."""
 
     def __init__(self, base_url: str | None = None) -> None:
-        self.base_url = (base_url or os.environ.get("SIMULATION_SERVICE_URL", "http://localhost:8002")).rstrip("/")
+        self.base_url = (
+            base_url
+            or os.environ.get("SIMULATION_SERVICE_URL", "http://localhost:8002")
+        ).rstrip("/")
 
     async def simulate(
         self,
@@ -78,7 +83,11 @@ class SimulationHttpProvider:
                 json=payload,
             )
             if r.status_code == 503:
-                return {"success": False, "error": "Tenderly not configured", "gasUsed": 0}
+                return {
+                    "success": False,
+                    "error": "Tenderly not configured",
+                    "gasUsed": 0,
+                }
             r.raise_for_status()
             return r.json()
 
@@ -86,6 +95,7 @@ class SimulationHttpProvider:
 # ---------------------------------------------------------------------------
 # Deploy
 # ---------------------------------------------------------------------------
+
 
 class DeployProvider(Protocol):
     """Protocol: get_deploy_plan(chain_id, bytecode, abi, constructor_args?) -> DeployPlanResult."""
@@ -105,7 +115,9 @@ class DeployHttpProvider:
     """HTTP client calling the deploy service."""
 
     def __init__(self, base_url: str | None = None) -> None:
-        self.base_url = (base_url or os.environ.get("DEPLOY_SERVICE_URL", "http://localhost:8003")).rstrip("/")
+        self.base_url = (
+            base_url or os.environ.get("DEPLOY_SERVICE_URL", "http://localhost:8003")
+        ).rstrip("/")
 
     async def get_deploy_plan(
         self,
@@ -142,6 +154,7 @@ class DeployHttpProvider:
 # Storage (orchestrator may call later; agent-runtime calls today)
 # ---------------------------------------------------------------------------
 
+
 class StorageProvider(Protocol):
     """Protocol: pin(content, name) -> PinResult, unpin(cid) -> None."""
 
@@ -158,7 +171,9 @@ class StorageHttpProvider:
     """HTTP client calling the storage service."""
 
     def __init__(self, base_url: str | None = None) -> None:
-        self.base_url = (base_url or os.environ.get("STORAGE_SERVICE_URL", "http://localhost:4005")).rstrip("/")
+        self.base_url = (
+            base_url or os.environ.get("STORAGE_SERVICE_URL", "http://localhost:4005")
+        ).rstrip("/")
 
     async def pin(self, content: str, name: str) -> dict[str, Any]:
         headers = _trace_headers()

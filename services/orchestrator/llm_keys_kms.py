@@ -9,6 +9,7 @@ Flow:
 
 Stored format (single string in DB): JSON with v=1, data_key (base64 KMS blob), payload (base64), nonce (base64).
 """
+
 from __future__ import annotations
 
 import base64
@@ -34,6 +35,7 @@ def _is_kms_configured() -> bool:
 def _get_kms_client():
     try:
         import boto3
+
         return boto3.client("kms")
     except ImportError:
         logger.warning("[byok] boto3 not installed; KMS backend unavailable")
@@ -43,6 +45,7 @@ def _get_kms_client():
 def _local_encrypt(dek: bytes, plaintext: bytes) -> tuple[bytes, bytes]:
     """Encrypt plaintext with DEK using AES-256-GCM. Returns (nonce, ciphertext_with_tag)."""
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
     nonce = secrets.token_bytes(NONCE_BYTES)
     aes = AESGCM(dek)
     ct = aes.encrypt(nonce, plaintext, None)
@@ -52,6 +55,7 @@ def _local_encrypt(dek: bytes, plaintext: bytes) -> tuple[bytes, bytes]:
 def _local_decrypt(dek: bytes, nonce: bytes, ciphertext: bytes) -> bytes:
     """Decrypt ciphertext (includes 16-byte tag) with DEK and nonce."""
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
     aes = AESGCM(dek)
     return aes.decrypt(nonce, ciphertext, None)
 
@@ -65,7 +69,12 @@ def _is_envelope_blob(ciphertext: str) -> bool:
         return False
     try:
         obj = json.loads(stripped)
-        return isinstance(obj, dict) and obj.get("v") == 1 and "data_key" in obj and "payload" in obj
+        return (
+            isinstance(obj, dict)
+            and obj.get("v") == 1
+            and "data_key" in obj
+            and "payload" in obj
+        )
     except (json.JSONDecodeError, TypeError):
         return False
 
@@ -118,7 +127,9 @@ def decrypt_llm_keys_kms(ciphertext: str) -> dict[str, str]:
         raise RuntimeError("KMS client unavailable (install boto3)")
 
     if not _is_envelope_blob(ciphertext):
-        raise ValueError("Stored value is not KMS envelope format (v1); re-save keys with KMS enabled")
+        raise ValueError(
+            "Stored value is not KMS envelope format (v1); re-save keys with KMS enabled"
+        )
 
     obj = json.loads(ciphertext.strip())
     data_key_b64 = obj.get("data_key")

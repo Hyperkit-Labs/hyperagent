@@ -51,7 +51,7 @@ HyperAgent is an AI-powered multi-agent platform that turns natural-language spe
 
 **Pipeline:** SpecAgent (versioned Spec Lock) → Design and Proposal agents → CodegenAgent (streaming guardrails) → Autofixer and audit agents (Slither, Mythril, MythX, Echidna) → TenderlySimAgent → DeployAgent and VerifyAgent → MonitorAgent. Safety is enforced through Spec Lock, simulation-first validation via Tenderly, and mandatory security tooling.
 
-**Deployment:** Vercel (frontend), Render (backend).
+**Deployment:** Vercel (frontend), Contabo/Coolify (backend).
 
 **Networks:** SKALE Base Roadmap includes Mantle, Avalanche, BNB, Arbitrum, and other EVM-compatible chains via chain registry and SDK capability registry (x402, AA, Thirdweb first-class).
 

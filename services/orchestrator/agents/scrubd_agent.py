@@ -1,5 +1,6 @@
 """SCRUBD validation agent: mandatory RE/UX pattern checks against SCRUBD dataset.
 Validates generated contracts against known reentrancy and unhandled-exception patterns."""
+
 import csv
 import logging
 import os
@@ -29,13 +30,26 @@ def _ensure_scrubd() -> Path:
     base.mkdir(parents=True, exist_ok=True)
     try:
         subprocess.run(
-            ["git", "clone", "--depth", "1", "--branch", SCRUBD_VERSION, SCRUBD_REPO, str(base)],
+            [
+                "git",
+                "clone",
+                "--depth",
+                "1",
+                "--branch",
+                SCRUBD_VERSION,
+                SCRUBD_REPO,
+                str(base),
+            ],
             check=True,
             capture_output=True,
             text=True,
             timeout=120,
         )
-    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired) as e:
+    except (
+        subprocess.CalledProcessError,
+        FileNotFoundError,
+        subprocess.TimeoutExpired,
+    ) as e:
         logger.error("[scrubd] clone failed: %s", e)
         raise RuntimeError(f"SCRUBD clone failed: {e}") from e
 
@@ -55,12 +69,14 @@ def _load_scrubd_patterns(path: Path) -> list[dict[str, Any]]:
             ux_val = str(row.get("UX", "")).strip()
             if re_val == "1" or ux_val == "1":
                 comment = (row.get("Comments") or "").strip()
-                patterns.append({
-                    "re": re_val == "1",
-                    "ux": ux_val == "1",
-                    "comment": comment,
-                    "function": row.get("Function Name", ""),
-                })
+                patterns.append(
+                    {
+                        "re": re_val == "1",
+                        "ux": ux_val == "1",
+                        "comment": comment,
+                        "function": row.get("Function Name", ""),
+                    }
+                )
     return patterns
 
 
@@ -103,12 +119,14 @@ def _structural_check(code: str) -> list[dict[str, Any]]:
                 for j in range(i + 1, min(i + 20, len(lines))):
                     for sw in state_write_patterns:
                         if re.search(sw, lines[j]):
-                            findings.append({
-                                "type": "structural",
-                                "pattern": f"external {name} before state update",
-                                "line": i + 1,
-                                "description": f"Possible reentrancy: {name} at line {i + 1} followed by state update at line {j + 1}",
-                            })
+                            findings.append(
+                                {
+                                    "type": "structural",
+                                    "pattern": f"external {name} before state update",
+                                    "line": i + 1,
+                                    "description": f"Possible reentrancy: {name} at line {i + 1} followed by state update at line {j + 1}",
+                                }
+                            )
                             break
                 break
     return findings
@@ -121,8 +139,19 @@ def _match_finding_to_scrubd(finding: dict, patterns: list[dict]) -> bool:
     desc = (finding.get("description") or "").lower()
     text = f"{cat} {title} {desc}"
 
-    re_keywords = ["reentrancy", "reentrancy-eth", "reentrancy-no-eth", "reentrancy-benign"]
-    ux_keywords = ["unchecked-transfer", "unchecked-send", "unchecked-lowlevel", "unhandled", "return value"]
+    re_keywords = [
+        "reentrancy",
+        "reentrancy-eth",
+        "reentrancy-no-eth",
+        "reentrancy-benign",
+    ]
+    ux_keywords = [
+        "unchecked-transfer",
+        "unchecked-send",
+        "unchecked-lowlevel",
+        "unhandled",
+        "return value",
+    ]
 
     for p in patterns:
         if p.get("re") and any(k in text for k in re_keywords):
@@ -168,8 +197,12 @@ async def run_scrubd_validation(
     SCRUBD dataset must be available (clone during build or set SCRUBD_PATH)."""
     path = _ensure_scrubd()
     patterns = _load_scrubd_patterns(path)
-    passed, findings = await _validate_against_scrubd(contracts, patterns, framework, run_id)
-    logger.info("[scrubd] run_id=%s passed=%s findings=%d", run_id, passed, len(findings))
+    passed, findings = await _validate_against_scrubd(
+        contracts, patterns, framework, run_id
+    )
+    logger.info(
+        "[scrubd] run_id=%s passed=%s findings=%d", run_id, passed, len(findings)
+    )
     return passed, findings
 
 
@@ -192,7 +225,15 @@ def get_scrubd_fix_hints(error_context: str) -> str:
         )
 
     selected: list[str] = []
-    keywords = ["no re", "no ext", "modifier", "checks-effects", "non-reentrant", "nonReentrant", "transfer"]
+    keywords = [
+        "no re",
+        "no ext",
+        "modifier",
+        "checks-effects",
+        "non-reentrant",
+        "nonReentrant",
+        "transfer",
+    ]
     for h in hints[:20]:
         h_lower = h.lower()
         if any(k in h_lower for k in keywords):

@@ -452,6 +452,8 @@ def get_erc8004_agent_id(chain_id: int) -> str | None:
 def get_erc8004_agent_registry(chain_id: int) -> str | None:
     """Return agentRegistry string (eip155:chainId:identityRegistry) for chain_id."""
     c = _get_erc8004_chain(chain_id)
+    if c is None:
+        return None
     return (c.get("agentRegistry") or "").strip() or None
 
 

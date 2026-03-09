@@ -65,14 +65,13 @@ export function SpendingTrends({ history, summary }: SpendingTrendsProps) {
 
   // Process data for cumulative spending area chart
   const cumulativeData = useMemo(() => {
-    let currentCumulative = 0;
-    return dailyData.map((item) => {
-      currentCumulative += item.amount;
-      return {
-        ...item,
-        cumulative: currentCumulative,
-      };
-    });
+    return dailyData.reduce<Array<{ date: string; fullDate: string; amount: number; cumulative: number }>>(
+      (acc, item) => {
+        const prev = acc.length > 0 ? acc[acc.length - 1].cumulative : 0;
+        return [...acc, { ...item, cumulative: prev + item.amount }];
+      },
+      []
+    );
   }, [dailyData]);
 
   // Process data for weekly/monthly bar chart

@@ -9,7 +9,7 @@ export interface UseDataFetchOptions<T, R> {
   transformer?: (data: T) => R;
   autoRefresh?: boolean;
   refreshInterval?: number;
-  filters?: any;
+  filters?: Record<string, unknown>;
   initialData?: R;
 }
 

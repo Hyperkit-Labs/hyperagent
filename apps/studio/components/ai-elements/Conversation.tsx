@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState, ReactNode, Children, cloneElement } from 'react';
+import { useRef, useEffect, useState, useCallback, ReactNode, Children, cloneElement } from 'react';
 
 export function ConversationContent({ children }: { children: ReactNode }) {
   return <>{children}</>;
@@ -81,10 +81,10 @@ export function Conversation({
     return () => el.removeEventListener('scroll', onScroll);
   }, [childCount]);
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
     wasNearBottom.current = true;
-  };
+  }, []);
 
   const scrollButtonElement = hasScrollButton
     ? Children.map(children, (child) =>

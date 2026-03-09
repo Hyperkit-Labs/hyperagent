@@ -11,6 +11,29 @@ jobs:
   docker-integration:
     name: Docker E2E Integration
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: hyperagent_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
     steps:
       - uses: actions/checkout@v4
 
@@ -31,5 +54,5 @@ jobs:
           pytest tests/ -v --no-cov -x
         env:
           REDIS_URL: redis://localhost:6379/0
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/hyperagent_test
           SKIP_DOCKER_INTEGRATION: "1"
-        continue-on-error: true

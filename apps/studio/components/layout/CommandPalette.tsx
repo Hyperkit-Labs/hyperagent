@@ -86,8 +86,12 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
   useEffect(() => {
     if (!open) {
-      setSearch("");
-      setSelectedItem(null);
+      // Reset state when palette closes; deferred to avoid cascading renders
+      const t = setTimeout(() => {
+        setSearch("");
+        setSelectedItem(null);
+      }, 0);
+      return () => clearTimeout(t);
     }
   }, [open]);
 

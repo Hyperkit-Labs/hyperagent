@@ -1,6 +1,7 @@
 """SCV-1-2000 sync: load Smart Contract Vulnerability Dataset from Hugging Face into RAG.
 Run weekly via cron: 0 0 * * 0 (Sunday midnight).
 Set SCV_SYNC_ENABLED=true to enable."""
+
 from __future__ import annotations
 
 import asyncio
@@ -9,7 +10,11 @@ import os
 
 logger = logging.getLogger(__name__)
 
-SCV_SYNC_ENABLED = os.environ.get("SCV_SYNC_ENABLED", "false").strip().lower() in ("1", "true", "yes")
+SCV_SYNC_ENABLED = os.environ.get("SCV_SYNC_ENABLED", "false").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+)
 SCV_DATASET = "darkknight25/Smart_Contract_Vulnerability_Dataset"
 SCV_LIBRARY_VERSION = "scv-2025"
 
@@ -28,6 +33,7 @@ async def sync_scv_dataset() -> int:
         return 0
 
     import rag_client
+
     if not rag_client.is_configured():
         logger.warning("[scv_sync] VECTORDB_URL not configured, skipping")
         return 0
@@ -44,9 +50,19 @@ async def sync_scv_dataset() -> int:
         try:
             row_dict = row if isinstance(row, dict) else dict(zip(columns, row))
             spec_id = f"scv-{row_dict.get('id', i)}"
-            category = str(row_dict.get("category", row_dict.get("label", row_dict.get("vulnerability_type", ""))))
+            category = str(
+                row_dict.get(
+                    "category",
+                    row_dict.get("label", row_dict.get("vulnerability_type", "")),
+                )
+            )
             severity = str(row_dict.get("severity", "medium")).lower()
-            code = str(row_dict.get("source_code", row_dict.get("code", row_dict.get("code_snippet", ""))))
+            code = str(
+                row_dict.get(
+                    "source_code",
+                    row_dict.get("code", row_dict.get("code_snippet", "")),
+                )
+            )
             desc = str(row_dict.get("description", row_dict.get("vul", "")))
             text = f"{category} {severity} {desc} {code[:500]}".strip()
 

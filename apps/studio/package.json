@@ -19,7 +19,7 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^1.0.0",
     "@ai-sdk/google": "^1.0.0",
-    "@ai-sdk/openai": "^1.0.0",
+    "@ai-sdk/openai": "^3.0.41",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@emotion/use-insertion-effect-with-fallbacks": "^1.2.0",

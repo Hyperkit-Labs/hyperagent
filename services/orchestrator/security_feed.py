@@ -3,6 +3,7 @@ Fetches recent exploit advisories from DeFiLlama (public API) and
 injects them into the DesignAgent system prompt.
 
 Run via: python security_feed.py (standalone) or import and call update_feed() from a scheduler."""
+
 from __future__ import annotations
 
 import logging
@@ -11,13 +12,15 @@ from datetime import datetime, timezone
 from typing import Any
 
 import httpx
-
 import rag_client
 
 logger = logging.getLogger(__name__)
 
 FEED_SOURCES: list[dict[str, str]] = [
-    {"name": "defillama", "url": os.environ.get("DEFILLAMA_FEED_URL", "https://api.llama.fi/hacks")},
+    {
+        "name": "defillama",
+        "url": os.environ.get("DEFILLAMA_FEED_URL", "https://api.llama.fi/hacks"),
+    },
 ]
 
 FEED_TIMEOUT = float(os.environ.get("SECURITY_FEED_TIMEOUT", "10"))
@@ -26,7 +29,8 @@ MAX_RECENT_EXPLOITS = int(os.environ.get("SECURITY_FEED_MAX_EXPLOITS", "5"))
 
 async def fetch_recent_exploits() -> list[dict[str, Any]]:
     """Fetch recent exploit advisories from configured security feeds.
-    Returns a list of exploit summaries with title, description, severity, and source."""
+    Returns a list of exploit summaries with title, description, severity, and source.
+    """
     exploits: list[dict[str, Any]] = []
 
     for source in FEED_SOURCES:
@@ -38,7 +42,11 @@ async def fetch_recent_exploits() -> list[dict[str, Any]]:
                 r = await client.get(url)
                 r.raise_for_status()
                 data = r.json()
-                items = data if isinstance(data, list) else data.get("exploits", data.get("items", []))
+                items = (
+                    data
+                    if isinstance(data, list)
+                    else data.get("exploits", data.get("items", []))
+                )
                 ts_key = "date"
                 if items and isinstance(items[0].get(ts_key), (int, float)):
                     items = sorted(items, key=lambda x: x.get(ts_key, 0), reverse=True)
@@ -46,19 +54,25 @@ async def fetch_recent_exploits() -> list[dict[str, Any]]:
                     title = item.get("title", item.get("name", ""))
                     desc = item.get("description", item.get("summary", ""))
                     if not desc and item.get("technique"):
-                        desc = f"{item.get('technique', '')} | {item.get('classification', '')}".strip(" |")
+                        desc = f"{item.get('technique', '')} | {item.get('classification', '')}".strip(
+                            " |"
+                        )
                     url_val = item.get("url", item.get("source", ""))
                     date_val = item.get("date", datetime.now(timezone.utc).isoformat())
                     if isinstance(date_val, (int, float)):
-                        date_val = datetime.fromtimestamp(date_val, tz=timezone.utc).isoformat()
-                    exploits.append({
-                        "source": source["name"],
-                        "title": title,
-                        "description": desc,
-                        "severity": item.get("severity", "high"),
-                        "date": date_val,
-                        "url": url_val,
-                    })
+                        date_val = datetime.fromtimestamp(
+                            date_val, tz=timezone.utc
+                        ).isoformat()
+                    exploits.append(
+                        {
+                            "source": source["name"],
+                            "title": title,
+                            "description": desc,
+                            "severity": item.get("severity", "high"),
+                            "date": date_val,
+                            "url": url_val,
+                        }
+                    )
         except Exception as e:
             logger.warning("[security_feed] %s fetch failed: %s", source["name"], e)
             continue
@@ -72,7 +86,9 @@ def format_threats_prompt(exploits: list[dict[str, Any]]) -> str:
         return ""
     lines = ["Current Threats to Avoid (from recent on-chain exploits):"]
     for i, ex in enumerate(exploits, 1):
-        lines.append(f"{i}. [{ex.get('severity', 'high').upper()}] {ex.get('title', 'Unknown')} ({ex.get('source', '')})")
+        lines.append(
+            f"{i}. [{ex.get('severity', 'high').upper()}] {ex.get('title', 'Unknown')} ({ex.get('source', '')})"
+        )
         desc = ex.get("description", "")
         if desc:
             lines.append(f"   {desc[:200]}")
@@ -106,7 +122,10 @@ async def update_feed() -> dict[str, Any]:
 
 if __name__ == "__main__":
     import asyncio
+
     result = asyncio.run(update_feed())
-    print(f"Security feed update: {result['fetched']} fetched, {result['indexed']} indexed")
+    print(
+        f"Security feed update: {result['fetched']} fetched, {result['indexed']} indexed"
+    )
     if result["threats_prompt"]:
         print("\n" + result["threats_prompt"])

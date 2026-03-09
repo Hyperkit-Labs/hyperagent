@@ -28,7 +28,7 @@
     "@hyperagent/config": "workspace:*",
     "@hyperagent/sdk-ts": "workspace:*",
     "@hyperagent/shared-ui": "workspace:*",
-    "@supabase/supabase-js": "^2.47.0",
+    "@supabase/supabase-js": "^2.98.0",
     "@vercel/analytics": "^1.6.1",
     "ai": "^4.0.0",
     "axios": "^1.13.5",

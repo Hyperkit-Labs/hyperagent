@@ -2,6 +2,7 @@
 x402 payment history and spending controls persistence.
 Uses wallet_users.id (X-User-Id from gateway). Reads/writes payment_history and spending_controls.
 """
+
 from __future__ import annotations
 
 import logging
@@ -46,7 +47,11 @@ def get_payment_history(
         items = list(r.data) if r.data else []
         total = int(getattr(r, "count", None) or 0)
         for row in items:
-            if "amount" in row and row["amount"] is not None and not isinstance(row["amount"], (int, float)):
+            if (
+                "amount" in row
+                and row["amount"] is not None
+                and not isinstance(row["amount"], (int, float))
+            ):
                 try:
                     row["amount"] = float(Decimal(str(row["amount"])))
                 except Exception:
@@ -75,7 +80,11 @@ def get_payment_summary(user_id: str) -> dict[str, Any]:
         rows = list(r.data) if r.data else []
         total = sum(float(Decimal(str(row.get("amount") or 0))) for row in rows)
         currency = (rows[0].get("currency") or "USD") if rows else "USD"
-        return {"total": str(round(total, 2)), "currency": currency, "total_count": len(rows)}
+        return {
+            "total": str(round(total, 2)),
+            "currency": currency,
+            "total_count": len(rows),
+        }
     except Exception as e:
         logger.warning("[payments] get_payment_summary user_id=%s error=%s", user_id, e)
         return {"total": "0", "currency": "USD", "total_count": 0}
@@ -89,7 +98,12 @@ def get_spending_control(user_id: str) -> dict[str, Any] | None:
     if not client:
         return None
     try:
-        r = client.table("spending_controls").select("*").eq("user_id", user_id).execute()
+        r = (
+            client.table("spending_controls")
+            .select("*")
+            .eq("user_id", user_id)
+            .execute()
+        )
         row = (r.data or [None])[0] if r.data else None
         if row and "budget_amount" in row and row["budget_amount"] is not None:
             if not isinstance(row["budget_amount"], (int, float)):
@@ -99,7 +113,9 @@ def get_spending_control(user_id: str) -> dict[str, Any] | None:
                     row["budget_amount"] = 0.0
         return row
     except Exception as e:
-        logger.warning("[payments] get_spending_control user_id=%s error=%s", user_id, e)
+        logger.warning(
+            "[payments] get_spending_control user_id=%s error=%s", user_id, e
+        )
         return None
 
 
@@ -135,30 +151,46 @@ def upsert_spending_control(
             data = r.data
             if data is None:
                 return _upsert_spending_control_fallback(
-                    user_id, budget_amount, budget_currency, period, alert_threshold_percent
+                    user_id,
+                    budget_amount,
+                    budget_currency,
+                    period,
+                    alert_threshold_percent,
                 )
             row = data[0] if isinstance(data, list) and data else data
             if not isinstance(row, dict):
                 return _upsert_spending_control_fallback(
-                    user_id, budget_amount, budget_currency, period, alert_threshold_percent
+                    user_id,
+                    budget_amount,
+                    budget_currency,
+                    period,
+                    alert_threshold_percent,
                 )
             return {
                 "user_id": user_id,
                 "budget_amount": float(row.get("budget_amount", budget_amount)),
                 "budget_currency": str(row.get("budget_currency", budget_currency)),
                 "period": str(row.get("period", period)),
-                "alert_threshold_percent": int(row.get("alert_threshold_percent", alert_threshold_percent)),
+                "alert_threshold_percent": int(
+                    row.get("alert_threshold_percent", alert_threshold_percent)
+                ),
             }
         except Exception as e:
             logger.warning(
                 "[payments] upsert_spending_control RPC attempt=%s user_id=%s error=%s",
-                attempt + 1, user_id, e,
+                attempt + 1,
+                user_id,
+                e,
             )
             if attempt < 4:
                 time.sleep(0.15 * (attempt + 1))
             else:
                 return _upsert_spending_control_fallback(
-                    user_id, budget_amount, budget_currency, period, alert_threshold_percent
+                    user_id,
+                    budget_amount,
+                    budget_currency,
+                    period,
+                    alert_threshold_percent,
                 )
 
 
@@ -183,12 +215,18 @@ def _upsert_spending_control_fallback(
                 "alert_threshold_percent": alert_threshold_percent,
                 "updated_at": datetime.now(UTC).isoformat(),
             }
-            r = client.table("spending_controls").upsert(payload, on_conflict="user_id").execute()
+            r = (
+                client.table("spending_controls")
+                .upsert(payload, on_conflict="user_id")
+                .execute()
+            )
             return r.data[0] if r.data else None
         except Exception as e:
             logger.warning(
                 "[payments] upsert_spending_control fallback attempt=%s user_id=%s error=%s",
-                attempt + 1, user_id, e,
+                attempt + 1,
+                user_id,
+                e,
             )
             if attempt < 3:
                 time.sleep(0.2 * (attempt + 1))

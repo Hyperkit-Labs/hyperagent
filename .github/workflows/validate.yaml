@@ -57,10 +57,14 @@ jobs:
             const fs = require('fs');
             const path = require('path');
             const prTitle = context.payload.pull_request.title;
+            // Allow merge-style titles: "Merge X into Y"
+            if (/^Merge\s+.+\s+into\s+.+$/i.test(prTitle)) {
+              console.log('✅ PR title is merge format, skipping directory check');
+              return;
+            }
             const titleRegex = /^([\w\s,{}/.]+): .+/;
-            
             if (!titleRegex.test(prTitle)) {
-              core.setFailed(`PR title "${prTitle}" does not match required format: directory, ...: description`);
+              core.setFailed(`PR title "${prTitle}" does not match required format: directory, ...: description (or Merge X into Y)`);
               return;
             }
 
@@ -86,6 +90,11 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            const prTitle = context.payload.pull_request.title;
+            if (/^Merge\s+.+\s+into\s+.+$/i.test(prTitle)) {
+              console.log('✅ Merge PR, skipping body template check');
+              return;
+            }
             const body = context.payload.pull_request.body || '';
             const required = [
               { name: 'Context/Description', test: () => /##\s*(Context|Description|Context\s*\/\s*Description)/i.test(body) },

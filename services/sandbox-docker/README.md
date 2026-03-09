@@ -1,6 +1,6 @@
 # Docker Sandbox API
 
-Runs on Contabo VPS. Accepts tarball URLs from the Render orchestrator, spawns ephemeral Docker containers, and returns preview URLs.
+Runs on Contabo VPS. Accepts tarball URLs from the orchestrator, spawns ephemeral Docker containers, and returns preview URLs.
 
 ## Endpoints
 

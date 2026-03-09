@@ -1,6 +1,7 @@
 """
 Request/trace ID for propagation to downstream services. Set at pipeline start, read in providers.
 """
+
 from contextvars import ContextVar
 
 _request_id: ContextVar[str | None] = ContextVar("request_id", default=None)

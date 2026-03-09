@@ -1,30 +1,25 @@
-# Run from repo root: docker-compose -f infra/docker/docker-compose.yml up
-# Backend only. Run Studio locally: make run-web (or pnpm --filter hyperagent-studio dev from apps/studio)
+# Production stack for Contabo VPS (Coolify or manual deploy).
+# Run from repo root: docker compose -f infra/docker/docker-compose.yml up -d
 #
-# LITE (default): 5-6 services. ROMA/codegen in-process. Cloud Supabase + Redis.
-#   make up
+# Coolify: Add as "Docker Compose" resource, path: infra/docker/docker-compose.yml
+# Set env vars in Coolify UI (Shared Env Group) or use env_file: ../../.env
 #
-# FULL: All services including roma-service, codegen (legacy).
-#   make up-full
-#
-# FULL LOCAL: Include local postgres, redis, vectordb (heavier).
-#   make up-local
-#
-# REMOTE TOOLS: Set TOOLS_BASE_URL to use remote hyperagent-tools (Render/Fly).
-#   Or run locally: make up-tools (adds hyperagent-tools on port 9000).
+# External: Supabase (DB), Redis Cloud. Qdrant runs locally in this stack.
 
 services:
   api-gateway:
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.api-gateway
-    container_name: hyperagent-api
+    container_name: hyperagent-gateway
+    restart: unless-stopped
     ports:
       - "4000:4000"
     env_file:
       - ../../.env
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
+      - PORT=4000
       - ORCHESTRATOR_URL=http://orchestrator:8000
       - AGENT_RUNTIME_URL=http://agent-runtime:4001
       - STORAGE_SERVICE_URL=http://agent-runtime:4001
@@ -33,41 +28,47 @@ services:
         condition: service_healthy
     networks:
       - hyperagent
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:4000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   orchestrator:
     build:
-      context: ../../services/orchestrator
-      dockerfile: ../../infra/docker/Dockerfile.orchestrator
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.orchestrator.monorepo
     container_name: hyperagent-orchestrator
-    ports:
-      - "8000:8000"
+    restart: unless-stopped
     env_file:
       - ../../.env
     environment:
       - PYTHONUNBUFFERED=1
-      - REGISTRIES_PATH=/app/registries
+      - REGISTRIES_PATH=/app/services/orchestrator/registries
       - AGENT_RUNTIME_URL=http://agent-runtime:4001
       - COMPILE_SERVICE_URL=http://compile:8004
       - AUDIT_SERVICE_URL=http://audit:8001
-      # LITE: agent-runtime hosts simulate/deploy/storage; FULL: use separate services
       - SIMULATION_SERVICE_URL=http://agent-runtime:4001
       - DEPLOY_SERVICE_URL=http://agent-runtime:4001
       - STORAGE_SERVICE_URL=http://agent-runtime:4001
-      - TOOLS_BASE_URL=${TOOLS_BASE_URL:-}
+      - VECTORDB_URL=http://vectordb:8080
+      - ROMA_URL=http://roma-service:8080
     volumes:
-      - ../../services/orchestrator:/app
-      - ../../infra/registries:/app/registries:ro
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+      - ../../infra/registries:/app/services/orchestrator/registries:ro
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 10s
+      interval: 15s
       timeout: 5s
       retries: 3
-      start_period: 15s
+      start_period: 30s
     depends_on:
       - agent-runtime
       - compile
       - audit
+      - roma-service
+      - vectordb
     networks:
       - hyperagent
 
@@ -76,82 +77,37 @@ services:
       context: ../..
       dockerfile: infra/docker/Dockerfile.agent-runtime.monorepo
     container_name: hyperagent-agent-runtime
-    ports:
-      - "4001:4001"
+    restart: unless-stopped
+    env_file:
+      - ../../.env
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - AUDIT_SERVICE_URL=http://audit:8001
       - COMPILE_SERVICE_URL=http://compile:8004
       - CHAIN_REGISTRY_PATH=/app/registries/network/chains.yaml
-      # Tools call self for simulate/deploy/storage (merged into agent-runtime)
       - SIMULATION_SERVICE_URL=http://localhost:4001
       - DEPLOY_SERVICE_URL=http://localhost:4001
       - STORAGE_SERVICE_URL=http://localhost:4001
     volumes:
       - ../../infra/registries:/app/registries:ro
-    env_file:
-      - ../../.env
-    depends_on:
-      - compile
     networks:
       - hyperagent
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:4001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   compile:
     build:
       context: ../../services/compile
       dockerfile: ../../infra/docker/Dockerfile.compile.lite
     container_name: hyperagent-compile
-    ports:
-      - "8004:8004"
-    environment:
-      - COMPILE_MODE=lite
-      - TOOLS_BASE_URL=${TOOLS_BASE_URL:-}
-      - TOOLS_API_KEY=${TOOLS_API_KEY:-}
-    volumes:
-      - ../../services/compile:/app
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8004", "--reload"]
-    networks:
-      - hyperagent
-
-  codegen:
-    profiles:
-      - full
-    build:
-      context: ../../services/codegen
-      dockerfile: ../../infra/docker/Dockerfile.codegen
-    container_name: hyperagent-codegen
-    ports:
-      - "8005:8005"
-    environment:
-      - AGENT_RUNTIME_URL=http://agent-runtime:4001
-      - COMPILE_SERVICE_URL=http://compile:8004
-    depends_on:
-      - agent-runtime
-      - compile
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8005", "--reload"]
-    volumes:
-      - ../../services/codegen:/app
-    networks:
-      - hyperagent
-
-  roma-service:
-    profiles:
-      - full
-    build:
-      context: ../../services/roma-service
-      dockerfile: ../../infra/docker/Dockerfile.roma
-    container_name: hyperagent-roma
-    ports:
-      - "8080:8080"
+    restart: unless-stopped
     env_file:
       - ../../.env
-    environment:
-      - AGENT_RUNTIME_URL=http://agent-runtime:4001
-    volumes:
-      - ../../services/roma-service:/app
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
-    depends_on:
-      - agent-runtime
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8004"]
     networks:
       - hyperagent
 
@@ -160,131 +116,81 @@ services:
       context: ../../services/audit
       dockerfile: ../../infra/docker/Dockerfile.audit
     container_name: hyperagent-audit
-    ports:
-      - "8001:8001"
-    environment:
-      - AUDIT_MODE=mythx
-      - TOOLS_BASE_URL=${TOOLS_BASE_URL:-}
-      - TOOLS_API_KEY=${TOOLS_API_KEY:-}
-    volumes:
-      - ../../services/audit:/app
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
     networks:
       - hyperagent
 
   hyperagent-tools:
-    profiles:
-      - tools
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.hyperagent-tools
     container_name: hyperagent-tools
-    ports:
-      - "9000:9000"
-    environment:
-      - TOOLS_API_KEY=${TOOLS_API_KEY:-}
-    volumes:
-      - ../../services/hyperagent-tools:/app
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "9000", "--reload"]
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "9000"]
     networks:
       - hyperagent
 
-  simulation:
-    profiles:
-      - full
+  roma-service:
     build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.simulation
-    container_name: hyperagent-simulation
-    ports:
-      - "8002:8002"
+      context: ../../services/roma-service
+      dockerfile: ../../infra/docker/Dockerfile.roma
+    container_name: hyperagent-roma
+    restart: unless-stopped
     env_file:
       - ../../.env
     environment:
-      - TENDERLY_API_URL=https://api.tenderly.co
+      - AGENT_RUNTIME_URL=http://agent-runtime:4001
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+    depends_on:
+      - agent-runtime
     networks:
       - hyperagent
 
-  deploy:
-    profiles:
-      - full
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.deploy
-    container_name: hyperagent-deploy
-    ports:
-      - "8003:8003"
-    env_file:
-      - ../../.env
-    environment:
-      - CHAIN_REGISTRY_PATH=/app/registries/network/chains.yaml
-    volumes:
-      - ../../infra/registries:/app/registries:ro
-    networks:
-      - hyperagent
-
-  storage:
-    profiles:
-      - full
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.storage
-    container_name: hyperagent-storage
-    ports:
-      - "4005:4005"
-    env_file:
-      - ../../.env
-    networks:
-      - hyperagent
-
-  supabase:
-    image: supabase/postgres:15.1.0.117
-    container_name: hyperagent-supabase
-    profiles:
-      - local-db
-    ports:
-      - "54322:5432"
-    environment:
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=hyperagent
-    volumes:
-      - supabase_data:/var/lib/postgresql/data
-      - ../../platform/supabase/migrations:/docker-entrypoint-initdb.d
-    networks:
-      - hyperagent
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    container_name: hyperagent-redis
-    profiles:
-      - local-db
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - hyperagent
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  vectordb:
+  qdrant:
     image: qdrant/qdrant:latest
-    container_name: hyperagent-vectordb
-    profiles:
-      - local-db
-    ports:
-      - "6333:6333"
-      - "6334:6334"
+    container_name: hyperagent-qdrant
+    restart: unless-stopped
     volumes:
       - qdrant_data:/qdrant/storage
+    networks:
+      - hyperagent
+
+  vectordb:
+    build:
+      context: ../../services/vectordb
+      dockerfile: ../../infra/docker/Dockerfile.vectordb
+    container_name: hyperagent-vectordb
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+    depends_on:
+      - qdrant
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+    networks:
+      - hyperagent
+
+  sandbox-api:
+    build:
+      context: ../../services/sandbox-docker
+      dockerfile: Dockerfile
+    container_name: hyperagent-sandbox
+    restart: unless-stopped
+    ports:
+      - "8005:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - sandbox-data:/var/lib/sandbox-docker
+    env_file:
+      - ../../.env
+    environment:
+      - SANDBOX_WORK_DIR=/var/lib/sandbox-docker
     networks:
       - hyperagent
 
@@ -293,6 +199,5 @@ networks:
     driver: bridge
 
 volumes:
-  supabase_data:
-  redis_data:
-  qdrant_data:
+  sandbox-data: {}
+  qdrant_data: {}

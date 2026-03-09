@@ -1,6 +1,7 @@
 """Pashov solidity-auditor integration: AI-driven security review using attack vectors.
 Uses pashov/skills solidity-auditor references for pre-deployment safety gates.
 Set PASHOV_AUDIT_ENABLED=true to enable. Requires packages/pashov-skills submodule."""
+
 from __future__ import annotations
 
 import logging
@@ -15,11 +16,20 @@ from agents.agent_http import agent_runtime_headers
 
 logger = logging.getLogger(__name__)
 
-PASHOV_AUDIT_ENABLED = os.environ.get("PASHOV_AUDIT_ENABLED", "false").strip().lower() in ("1", "true", "yes")
-AGENT_RUNTIME_URL = os.environ.get("AGENT_RUNTIME_URL", "http://localhost:4001").rstrip("/")
+PASHOV_AUDIT_ENABLED = os.environ.get(
+    "PASHOV_AUDIT_ENABLED", "false"
+).strip().lower() in ("1", "true", "yes")
+AGENT_RUNTIME_URL = os.environ.get("AGENT_RUNTIME_URL", "http://localhost:4001").rstrip(
+    "/"
+)
 PASHOV_SKILLS_PATH = os.environ.get(
     "PASHOV_SKILLS_PATH",
-    str(Path(__file__).resolve().parent.parent.parent.parent / "packages" / "pashov-skills" / "solidity-auditor"),
+    str(
+        Path(__file__).resolve().parent.parent.parent.parent
+        / "packages"
+        / "pashov-skills"
+        / "solidity-auditor"
+    ),
 )
 
 
@@ -46,7 +56,13 @@ def _load_pashov_refs() -> tuple[str, str, str, str] | None:
     return tuple(parts)
 
 
-def _build_bundle(contracts: dict, vector_agent: str, judging: str, report_fmt: str, attack_vectors: str) -> str:
+def _build_bundle(
+    contracts: dict,
+    vector_agent: str,
+    judging: str,
+    report_fmt: str,
+    attack_vectors: str,
+) -> str:
     """Build the audit bundle: contracts + judging + report-formatting + attack vectors."""
     contracts_section = []
     for name, code in (contracts or {}).items():
@@ -71,15 +87,17 @@ def _parse_findings(text: str) -> list[dict[str, Any]]:
         location = m.group(4).strip()
         description = m.group(5).strip()
         if confidence >= 75:
-            findings.append({
-                "tool": "pashov-auditor",
-                "severity": "high" if confidence >= 90 else "medium",
-                "title": title,
-                "description": description,
-                "location": location,
-                "category": "pashov",
-                "confidence": confidence,
-            })
+            findings.append(
+                {
+                    "tool": "pashov-auditor",
+                    "severity": "high" if confidence >= 90 else "medium",
+                    "title": title,
+                    "description": description,
+                    "location": location,
+                    "category": "pashov",
+                    "confidence": confidence,
+                }
+            )
     return findings
 
 
@@ -123,7 +141,11 @@ async def run_pashov_audit(
                 headers=headers,
             )
             if r.status_code != 200:
-                logger.warning("[pashov] agent-runtime returned %s: %s", r.status_code, r.text[:200])
+                logger.warning(
+                    "[pashov] agent-runtime returned %s: %s",
+                    r.status_code,
+                    r.text[:200],
+                )
                 return [], True
             data = r.json()
             text = data.get("text", "")

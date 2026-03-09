@@ -31,6 +31,9 @@ export const ROUTES = {
   DOCS: '/docs',
 } as const;
 
+/** Hyperkit CLI version shown in sidebar. Align with root package.json. */
+export const CLI_VERSION = "0.1.0";
+
 /** Routes that render full-page (no AppBar/Sidebar). */
 export const FULL_PAGE_ROUTES: string[] = [ROUTES.HOME, ROUTES.LOGIN];
 

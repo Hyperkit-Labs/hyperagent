@@ -39,9 +39,8 @@ skills-lock.json
 .env
 .env.*
 !.env.example
-!.env.template
-!.env.*.example
-!.env.render
+  !.env.template
+  !.env.*.example
 .env.deployer
 .env.local
 .env.*.local

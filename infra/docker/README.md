@@ -11,7 +11,7 @@ From repo root:
 ```bash
 cp .env.example .env
 # Edit .env with Supabase, Redis, and API keys
-docker-compose -f infra/docker/docker-compose.yml up --build
+docker compose -f infra/docker/docker-compose.yml up --build
 ```
 
 - Studio: http://localhost:3000

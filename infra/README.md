@@ -12,7 +12,7 @@ This directory contains Infrastructure as Code (IaC) and deployment configuratio
 
 ## Deployment
 
-- **Contabo/Coolify:** Use `docker-compose.coolify.yml` (repo root) for Coolify; see `external/docs/Fixes/coolify-contabo-migration.md`. Local: `infra/docker/docker-compose.yml`.
+- **Contabo/Coolify:** Use `infra/docker/docker-compose.yml`; see `external/docs/Fixes/coolify-contabo-migration.md`.
 - **Kubernetes:** Build and push container images, create secrets in the target namespace, then sync via ArgoCD. See `docs/production-deployment.md`.
 - **Local:** From repo root, `make up` (Docker Compose), `make run-web` (Studio). See `docs/docker-scenarios.md` and `.cursor/skills/docker-compose-scenarios`.
 

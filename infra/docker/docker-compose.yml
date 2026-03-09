@@ -1,9 +1,14 @@
 # Production stack for Contabo VPS (Coolify or manual deploy).
-# Run from repo root: docker compose -f infra/docker/docker-compose.yml up -d
+# All paths are relative to this compose file's directory (infra/docker/).
 #
-# Coolify: Use docker-compose.coolify.yml (repo root) to avoid path resolution issues.
-# Compose path: docker-compose.coolify.yml, Base Directory: empty.
-# Disable Git submodules and LFS in app Git settings. Set env vars in Shared Env.
+# Run from repo root:
+#   docker compose -f infra/docker/docker-compose.yml up -d
+#
+# Coolify:
+#   - Base Directory: / (repo root)
+#   - Compose path: infra/docker/docker-compose.yml
+#   - Disable Git submodules and LFS in Advanced > Git (Coolify #4746)
+#   - Set env vars in Shared Env
 #
 # External: Supabase (DB), Redis Cloud. Qdrant runs locally in this stack.
 
@@ -65,11 +70,16 @@ services:
       retries: 3
       start_period: 30s
     depends_on:
-      - agent-runtime
-      - compile
-      - audit
-      - roma-service
-      - vectordb
+      agent-runtime:
+        condition: service_healthy
+      compile:
+        condition: service_started
+      audit:
+        condition: service_started
+      roma-service:
+        condition: service_started
+      vectordb:
+        condition: service_started
     networks:
       - hyperagent
 
@@ -148,7 +158,8 @@ services:
       - AGENT_RUNTIME_URL=http://agent-runtime:4001
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
     depends_on:
-      - agent-runtime
+      agent-runtime:
+        condition: service_healthy
     networks:
       - hyperagent
 

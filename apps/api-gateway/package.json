@@ -13,7 +13,7 @@
     "cors": "^2.8.5",
     "http-proxy-middleware": "^2.0.6",
     "jsonwebtoken": "^9.0.2",
-    "ioredis": "^5.3.2",
+    "ioredis": "^5.10.0",
     "@supabase/supabase-js": "^2.47.0",
     "siwe": "^2.1.6",
     "ethers": "^6.0.0"

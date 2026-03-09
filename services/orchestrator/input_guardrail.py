@@ -1,5 +1,5 @@
 """Deterministic input guardrail: blocks malicious prompts before they reach the LLM.
-Per Render security best practices: validate input before data enters the LLM context window.
+Validate input before data enters the LLM context window.
 Uses deny-list for known attack phrases; optional allow-list for domain-specific topics."""
 
 from __future__ import annotations
@@ -59,7 +59,8 @@ FORBIDDEN_PATTERNS: tuple[str, ...] = (
 
 def validate_input(user_prompt: str) -> Tuple[bool, str | None]:
     """Validate user prompt against deny-list. Returns (passed, violation_message).
-    If passed=True, violation_message is None. If passed=False, violation_message describes the block."""
+    If passed=True, violation_message is None. If passed=False, violation_message describes the block.
+    """
     if not user_prompt or not isinstance(user_prompt, str):
         return False, "Empty or invalid input"
 
@@ -72,7 +73,10 @@ def validate_input(user_prompt: str) -> Tuple[bool, str | None]:
     for term in FORBIDDEN_TERMS:
         if term.lower() in lower:
             logger.warning("[guardrail] blocked prompt: forbidden term=%r", term)
-            return False, f"Security policy violation: input contains prohibited content"
+            return (
+                False,
+                "Security policy violation: input contains prohibited content",
+            )
 
     for pattern in FORBIDDEN_PATTERNS:
         if re.search(pattern, text, re.IGNORECASE | re.DOTALL):

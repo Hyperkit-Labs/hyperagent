@@ -342,7 +342,7 @@ function ChatPageContent() {
     return content.trim();
   })();
 
-  const canCreateWorkflow = !creatingWorkflow && (lastUserPromptFromHistory || input.trim());
+  const canCreateWorkflow = !creatingWorkflow && !!(lastUserPromptFromHistory || input.trim());
 
   const handleCreateWorkflowFromChat = async () => {
     const promptForWorkflow = lastUserPromptFromHistory || input.trim();

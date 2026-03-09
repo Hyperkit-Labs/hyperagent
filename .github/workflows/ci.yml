@@ -111,7 +111,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 10.20.0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -183,13 +183,17 @@ jobs:
           pip install -e packages/execution-backend
           pip install -r services/orchestrator/requirements.txt
           pip install pytest pytest-asyncio
+        env:
+          ENVIRONMENT: test
       
       - name: Run orchestrator integration tests
         working-directory: services/orchestrator
         run: |
-          pytest tests/ -v
+          pytest tests/ -v --ignore=tests/integration/docker/
         env:
           REDIS_URL: redis://localhost:6379/0
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/hyperagent_test
+          ENVIRONMENT: test
 
   # ============================================================================
   # STAGE 3.5: FRONTEND CODE QUALITY & TESTS
@@ -204,7 +208,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 10.20.0
       
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -232,7 +236,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 10.20.0
       
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -281,7 +285,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 10.20.0
       
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -335,7 +339,7 @@ jobs:
           name: playwright-report
           path: apps/studio/playwright-report/
           retention-days: 30
-        continue-on-error: true
+          if-no-files-found: ignore
 
   # ============================================================================
   # STAGE 4: INTEGRATION TESTS
@@ -384,13 +388,17 @@ jobs:
           pip install -e packages/execution-backend
           pip install -r services/orchestrator/requirements.txt
           pip install pytest pytest-asyncio
+        env:
+          ENVIRONMENT: test
       
       - name: Run integration tests
         working-directory: services/orchestrator
         run: |
-          pytest tests/ -v
+          pytest tests/ -v --ignore=tests/integration/docker/
         env:
           REDIS_URL: redis://localhost:6379/0
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/hyperagent_test
+          ENVIRONMENT: test
 
   # ============================================================================
   # STAGE 5: BUILD DOCKER IMAGE

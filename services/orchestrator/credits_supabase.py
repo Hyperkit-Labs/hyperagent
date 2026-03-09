@@ -3,6 +3,7 @@ Credit-based system for workflow and agent usage.
 Users top up credits off-chain (fiat / USDC / USDT); each workflow step or agent action consumes credits.
 x402 is used separately for fine-grained pay-per-call from external agents or third-party integrations.
 """
+
 from __future__ import annotations
 
 import logging
@@ -37,7 +38,12 @@ def get_balance(user_id: str) -> dict[str, Any]:
     if not client:
         return {"balance": 0.0, "currency": "USD", "user_id": user_id}
     try:
-        r = client.table("user_credits").select("balance, currency").eq("user_id", user_id).execute()
+        r = (
+            client.table("user_credits")
+            .select("balance, currency")
+            .eq("user_id", user_id)
+            .execute()
+        )
         row = (r.data or [None])[0] if r.data else None
         if row:
             bal = row.get("balance")
@@ -45,7 +51,12 @@ def get_balance(user_id: str) -> dict[str, Any]:
                 try:
                     bal = float(Decimal(str(bal)))
                 except Exception as e:
-                    logger.warning("[credits] balance parse failed user_id=%s raw=%r: %s", user_id, bal, e)
+                    logger.warning(
+                        "[credits] balance parse failed user_id=%s raw=%r: %s",
+                        user_id,
+                        bal,
+                        e,
+                    )
                     bal = 0.0
             return {
                 "balance": float(bal) if bal is not None else 0.0,
@@ -66,13 +77,22 @@ def ensure_user_credits_row(user_id: str) -> bool:
     if not client:
         return False
     try:
-        r = client.table("user_credits").select("user_id").eq("user_id", user_id).execute()
+        r = (
+            client.table("user_credits")
+            .select("user_id")
+            .eq("user_id", user_id)
+            .execute()
+        )
         if r.data and len(r.data) > 0:
             return True
-        client.table("user_credits").insert({"user_id": user_id, "balance": 0, "currency": "USD"}).execute()
+        client.table("user_credits").insert(
+            {"user_id": user_id, "balance": 0, "currency": "USD"}
+        ).execute()
         return True
     except Exception as e:
-        logger.warning("[credits] ensure_user_credits_row user_id=%s error=%s", user_id, e)
+        logger.warning(
+            "[credits] ensure_user_credits_row user_id=%s error=%s", user_id, e
+        )
         return False
 
 
@@ -117,7 +137,12 @@ def top_up(
                 "user_id": user_id,
             }
         except Exception as e:
-            logger.warning("[credits] top_up RPC attempt=%s user_id=%s error=%s", attempt + 1, user_id, e)
+            logger.warning(
+                "[credits] top_up RPC attempt=%s user_id=%s error=%s",
+                attempt + 1,
+                user_id,
+                e,
+            )
             if attempt < 2:
                 time.sleep(0.1 * (attempt + 1))
             else:
@@ -143,27 +168,40 @@ def _top_up_fallback(
         return None
     ensure_user_credits_row(user_id)
     try:
-        r = client.table("user_credits").select("balance, currency").eq("user_id", user_id).execute()
+        r = (
+            client.table("user_credits")
+            .select("balance, currency")
+            .eq("user_id", user_id)
+            .execute()
+        )
         row = (r.data or [None])[0] if r.data else None
         if not row:
             return None
         current = float(Decimal(str(row.get("balance") or 0)))
         new_balance = current + amount
-        client.table("user_credits").update({
-            "balance": str(new_balance),
+        client.table("user_credits").update(
+            {
+                "balance": str(new_balance),
+                "currency": currency or "USD",
+                "updated_at": datetime.now(UTC).isoformat(),
+            }
+        ).eq("user_id", user_id).execute()
+        client.table("credit_transactions").insert(
+            {
+                "user_id": user_id,
+                "amount_delta": str(amount),
+                "balance_after": str(new_balance),
+                "type": "top_up",
+                "reference_id": reference_id,
+                "reference_type": reference_type or "manual",
+                "metadata": metadata or {},
+            }
+        ).execute()
+        return {
+            "balance": new_balance,
             "currency": currency or "USD",
-            "updated_at": datetime.now(UTC).isoformat(),
-        }).eq("user_id", user_id).execute()
-        client.table("credit_transactions").insert({
             "user_id": user_id,
-            "amount_delta": str(amount),
-            "balance_after": str(new_balance),
-            "type": "top_up",
-            "reference_id": reference_id,
-            "reference_type": reference_type or "manual",
-            "metadata": metadata or {},
-        }).execute()
-        return {"balance": new_balance, "currency": currency or "USD", "user_id": user_id}
+        }
     except Exception as e:
         logger.warning("[credits] top_up fallback user_id=%s error=%s", user_id, e)
         return None
@@ -183,7 +221,12 @@ def consume(
     if not client:
         return False, 0.0
     try:
-        r = client.table("user_credits").select("balance, currency").eq("user_id", user_id).execute()
+        r = (
+            client.table("user_credits")
+            .select("balance, currency")
+            .eq("user_id", user_id)
+            .execute()
+        )
         row = (r.data or [None])[0] if r.data else None
         if not row:
             ensure_user_credits_row(user_id)
@@ -192,26 +235,32 @@ def consume(
         if current < amount:
             return False, current
         new_balance = current - amount
-        client.table("user_credits").update({
-            "balance": str(new_balance),
-            "updated_at": datetime.now(UTC).isoformat(),
-        }).eq("user_id", user_id).execute()
-        client.table("credit_transactions").insert({
-            "user_id": user_id,
-            "amount_delta": str(-amount),
-            "balance_after": str(new_balance),
-            "type": "consume",
-            "reference_id": reference_id,
-            "reference_type": reference_type or "workflow_step",
-            "metadata": metadata or {},
-        }).execute()
+        client.table("user_credits").update(
+            {
+                "balance": str(new_balance),
+                "updated_at": datetime.now(UTC).isoformat(),
+            }
+        ).eq("user_id", user_id).execute()
+        client.table("credit_transactions").insert(
+            {
+                "user_id": user_id,
+                "amount_delta": str(-amount),
+                "balance_after": str(new_balance),
+                "type": "consume",
+                "reference_id": reference_id,
+                "reference_type": reference_type or "workflow_step",
+                "metadata": metadata or {},
+            }
+        ).execute()
         return True, new_balance
     except Exception as e:
         logger.warning("[credits] consume user_id=%s error=%s", user_id, e)
         return False, 0.0
 
 
-def has_sufficient_credits(user_id: str, amount: float = DEFAULT_CREDITS_PER_STEP) -> bool:
+def has_sufficient_credits(
+    user_id: str, amount: float = DEFAULT_CREDITS_PER_STEP
+) -> bool:
     """Return True if user has at least amount credits (for pre-check before running a step)."""
     info = get_balance(user_id)
     return (info.get("balance") or 0) >= amount

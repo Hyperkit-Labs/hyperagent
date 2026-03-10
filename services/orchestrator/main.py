@@ -541,7 +541,8 @@ def workflows_generate(
         request.headers.get("X-User-Id") or request.headers.get("x-user-id") or ""
     ).strip() or None
     workflow_id = str(uuid.uuid4())
-    user_id = body.user_id or x_user_id or "anonymous"
+    # Never trust client-passed user_id. Gateway sets X-User-Id from JWT sub (wallet_users.id).
+    user_id = x_user_id or "anonymous"
     project_id = body.project_id or workflow_id
     if credits_supabase.is_configured() and user_id and db._is_uuid(user_id):
         if not credits_supabase.has_sufficient_credits(user_id, CREDITS_PER_RUN):
@@ -589,12 +590,13 @@ def workflows_generate(
             if db._is_uuid(user_id)
             else os.environ.get("SUPABASE_SYSTEM_USER_ID")
         )
+        if effective_user:
+            db.ensure_wallet_user_profile(effective_user)
         if effective_user and db.ensure_project(project_id, effective_user):
             db.insert_run(
                 workflow_id, project_id, status="running", workflow_version="0.1.0"
             )
-        if user_id and db._is_uuid(user_id):
-            db.ensure_user_profile(user_id)
+        # wallet_users.id is the only application principal; no ensure_user_profile (auth.users)
     create_workflow(
         workflow_id=workflow_id,
         intent=body.nlp_input,
@@ -2089,6 +2091,22 @@ def get_run_steps_api(run_id: str, request: Request = None) -> dict[str, Any]:
     return {"run_id": run_id, "steps": steps}
 
 
+@app.get("/api/v1/security/findings")
+def get_security_findings_api(
+    request: Request,
+    x_user_id: str | None = Header(None, alias="X-User-Id"),
+    run_id: str | None = None,
+    limit: int = 100,
+) -> dict[str, Any]:
+    """Return security findings for authenticated user's runs. Scoped by wallet_user_id when X-User-Id present."""
+    findings = db.list_security_findings(
+        wallet_user_id=x_user_id if (x_user_id and x_user_id.strip()) else None,
+        run_id=run_id,
+        limit=min(200, max(1, limit)),
+    )
+    return {"findings": findings}
+
+
 # ---------------------------------------------------------------------------
 # Networks, metrics, presets
 # ---------------------------------------------------------------------------
@@ -2454,6 +2472,7 @@ def get_llm_keys(
         raise
     wid = x_workspace_id or DEFAULT_WORKSPACE
     if x_user_id and llm_keys_supabase._is_configured():
+        db.ensure_wallet_user_profile(x_user_id)
         _log_byok_event("byok_access", x_user_id, "get_configured_providers")
         providers = llm_keys_supabase.get_configured_providers(x_user_id)
         _trace_llm_keys(
@@ -2510,6 +2529,7 @@ def post_llm_keys(
             )
     wid = x_workspace_id or DEFAULT_WORKSPACE
     if x_user_id and llm_keys_supabase._is_configured():
+        db.ensure_wallet_user_profile(x_user_id)
         _log_byok_event("byok_access", x_user_id, "set_keys")
         providers = llm_keys_supabase.set_keys_for_user(x_user_id, body.keys or {})
         if body.keys and not providers:
@@ -2568,6 +2588,7 @@ def delete_llm_keys(
         raise
     wid = x_workspace_id or DEFAULT_WORKSPACE
     if x_user_id and llm_keys_supabase._is_configured():
+        db.ensure_wallet_user_profile(x_user_id)
         _log_byok_event("byok_access", x_user_id, "delete_keys")
         ok = llm_keys_supabase.delete_keys_for_user(x_user_id)
         if not ok:
@@ -2963,74 +2984,11 @@ def contract_call_api(body: ContractCallBody) -> dict[str, Any]:
 
 @app.post("/run")
 def create_run_legacy(req: RunRequest) -> dict[str, Any]:
-    """Legacy POST /run; returns run_id. Prefer POST /api/v1/workflows/generate."""
-    workflow_id = str(uuid.uuid4())
-    project_id = req.project_id or workflow_id
-    passed, violation = guardrail_validate_input(req.user_prompt)
-    if not passed:
-        raise HTTPException(
-            status_code=400, detail=violation or "Security policy violation"
-        )
-    api_keys = req.api_keys or _get_keys_for_run(req.user_id or "", DEFAULT_WORKSPACE)
-    if not api_keys:
-        raise HTTPException(
-            status_code=422,
-            detail="LLM API keys are required to run the pipeline. Add keys in Settings (workspace LLM keys).",
-        )
-    agent_session_jwt = _create_agent_session_jwt_if_configured(
-        req.user_id, workflow_id, api_keys
+    """Deprecated. Use POST /api/v1/workflows/generate. Returns 410 Gone."""
+    raise HTTPException(
+        status_code=410,
+        detail="POST /run is deprecated. Use POST /api/v1/workflows/generate for workflow creation.",
     )
-    create_workflow(
-        workflow_id=workflow_id,
-        intent=req.user_prompt,
-        user_id=req.user_id,
-        project_id=project_id,
-    )
-    if db.is_configured():
-        effective_user = (
-            req.user_id
-            if db._is_uuid(req.user_id)
-            else os.environ.get("SUPABASE_SYSTEM_USER_ID")
-        )
-        if effective_user and db.ensure_project(project_id, effective_user):
-            db.insert_run(
-                workflow_id, project_id, status="running", workflow_version="0.1.0"
-            )
-    try:
-        final = run_pipeline(
-            req.user_prompt,
-            req.user_id,
-            req.project_id,
-            workflow_id,
-            api_keys,
-            req.pipeline_id,
-            agent_session_jwt=agent_session_jwt,
-        )
-        stage = final.get("current_stage", "unknown")
-        status = (
-            "success"
-            if stage in ("deployed", "design_review", "audit", "simulation", "deploy")
-            else ("running" if stage == "spec_review" else "failed")
-        )
-        store_status = "completed" if status == "success" else "failed"
-        update_workflow(workflow_id, status=store_status)
-        if db.is_configured():
-            db.update_run(
-                workflow_id,
-                status="success" if status == "success" else "failed",
-                current_stage=stage,
-            )
-        return {
-            "run_id": workflow_id,
-            "status": status,
-            "current_stage": stage,
-            "message": "Pipeline completed",
-        }
-    except Exception as e:
-        update_workflow(workflow_id, status="failed", error=str(e))
-        if db.is_configured():
-            db.update_run(workflow_id, status="failed", error_message=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 def _approve_spec_impl(run_id: str, request: Request | None = None) -> dict[str, Any]:
@@ -3307,7 +3265,21 @@ def health_detailed() -> dict[str, Any]:
     services["simulation"] = _check_service_health("simulation", sim_url)
     deploy_url = os.environ.get("DEPLOY_SERVICE_URL", "http://localhost:8003").strip()
     services["deploy"] = _check_service_health("deploy", deploy_url)
-    services["rag"] = _check_service_health("rag", VECTORDB_URL)
+    # RAG/vectordb: NOT_APPLICABLE when not configured for MVP; else check health
+    try:
+        from rag_client import is_configured as rag_configured
+        if not rag_configured():
+            services["rag"] = {"status": "NOT_APPLICABLE", "message": "RAG/vectordb not configured for MVP"}
+        else:
+            services["rag"] = _check_service_health("rag", VECTORDB_URL)
+    except ImportError:
+        services["rag"] = {"status": "NOT_APPLICABLE", "message": "RAG client not available"}
+    # Exploit simulation: NOT_APPLICABLE when disabled
+    exploit_enabled = os.environ.get("EXPLOIT_SIM_ENABLED", "false").lower() in ("true", "1", "yes")
+    services["exploit_sim"] = {"status": "NOT_APPLICABLE", "message": "Exploit simulation disabled"} if not exploit_enabled else {"status": "ok", "message": "Enabled"}
+    # Trace writer: stub when IPFS not configured (no health endpoint)
+    pinata_ok = bool(os.environ.get("PINATA_API_KEY") or os.environ.get("PINATA_JWT"))
+    services["trace_writer"] = {"status": "NOT_APPLICABLE", "message": "IPFS not configured; traces use stub IDs"} if not pinata_ok else {"status": "ok", "message": "IPFS configured"}
     if TOOLS_BASE_URL:
         tools_status = _check_tools_health()
         services["tools"] = tools_status

@@ -80,6 +80,7 @@ services:
       - STORAGE_SERVICE_URL=http://agent-runtime:4001
       - VECTORDB_URL=http://vectordb:8080
       - ROMA_URL=http://roma-service:8080
+      - TOOLS_BASE_URL=http://hyperagent-tools:9000
     volumes:
       - ./infra/registries:/app/services/orchestrator/registries:ro
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -60,6 +60,11 @@ function isAllowedOrigin(origin: string | undefined): boolean {
 }
 
 const app = express();
+
+// Trust first proxy hop (Coolify/Traefik) so req.ip and X-Forwarded-For resolve to real client IP.
+// Without this, all requests appear as the proxy's internal Docker IP.
+app.set("trust proxy", 1);
+
 app.use(
   cors({
     origin: (origin, cb) => {

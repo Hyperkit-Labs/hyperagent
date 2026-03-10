@@ -6,3 +6,13 @@ export { DataTable } from "./DataTable";
 export { LiveIndicator } from "./LiveIndicator";
 export { BentoGrid, BentoCard } from "./BentoGrid";
 export { NetworkTopologyMap } from "./NetworkTopologyMap";
+export { NumberTicker } from "./NumberTicker";
+export { SpotlightCard } from "./SpotlightCard";
+export { ConfettiBurst } from "./ConfettiBurst";
+export { GlowingBorder } from "./aceternity/GlowingBorder";
+export { RadialProgress } from "./RadialProgress";
+export { PipelineDemo } from "./PipelineDemo";
+export { FlickeringGrid } from "./react-bits/FlickeringGrid";
+export { ShinyText } from "./react-bits/ShinyText";
+
+

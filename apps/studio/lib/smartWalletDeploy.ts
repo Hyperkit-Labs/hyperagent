@@ -7,6 +7,7 @@ import {
   mantleMainnet,
   mantleSepoliaTestnet,
   skaleBaseSepolia,
+  skaleBaseMainnet,
   filecoinMainnet,
   filecoinCalibration,
 } from '@/lib/chains';
@@ -29,7 +30,9 @@ const NETWORK_TO_CHAIN: Record<string, Chain> = {
   'mantle-sepolia': mantleSepoliaTestnet,
   'mantle-sepolia-testnet': mantleSepoliaTestnet,
   skale: skaleBaseSepolia,
-  'skale-base': skaleBaseSepolia,
+  'skale-base': skaleBaseMainnet,
+  'skale-base-mainnet': skaleBaseMainnet,
+  'skalebase-mainnet': skaleBaseMainnet,
   'skale-base-sepolia': skaleBaseSepolia,
   'skalebase-sepolia': skaleBaseSepolia,
   filecoin: filecoinMainnet,

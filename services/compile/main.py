@@ -267,6 +267,23 @@ def _normalize_errors(errors: list[str]) -> list[CompileErrorItem]:
     return [CompileErrorItem(message=e, sourceLocation=None) for e in errors]
 
 
+def _safe_contract_name(name: str) -> str:
+    """
+    Sanitize a user-provided contract name so it is safe to use in filesystem paths.
+    Allows only alphanumeric characters, underscore and hyphen.
+    """
+    if not isinstance(name, str):
+        raise HTTPException(status_code=400, detail="Invalid contract name")
+    name = name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Contract name cannot be empty")
+    # Remove any characters that are not safe for filenames
+    safe = re.sub(r"[^A-Za-z0-9_-]", "_", name)
+    if not safe:
+        raise HTTPException(status_code=400, detail="Contract name is not valid")
+    return safe
+
+
 def _compile_via_tools(req: CompileRequest, code: str, contract_name: str) -> CompileResponse | None:
     """When TOOLS_BASE_URL is set, call remote hyperagent-tools and map response."""
     if not TOOLS_BASE_URL:
@@ -331,6 +348,10 @@ def compile_contract(req: CompileRequest) -> CompileResponse:
         contract_name = entry_contract
     else:
         contract_name = entry_contract or _extract_contract_name(code or next(iter(files.values()), ""))
+
+    # Sanitize contract name before it is used in any filesystem paths or passed to compilers
+    if contract_name:
+        contract_name = _safe_contract_name(contract_name)
 
     remote = _compile_via_tools(req, code or next(iter(files.values()), ""), contract_name)
     if remote is not None:

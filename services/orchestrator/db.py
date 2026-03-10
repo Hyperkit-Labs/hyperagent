@@ -637,6 +637,47 @@ def count_security_findings() -> int:
         return 0
 
 
+def count_distinct_auditors() -> int:
+    """Count distinct users (wallet_user_id) who have completed at least one audit run."""
+    client = _client()
+    if not client:
+        return 0
+    try:
+        r = (
+            client.table("run_steps")
+            .select("run_id, runs!inner(project_id, projects!inner(wallet_user_id))")
+            .eq("step_type", "audit")
+            .eq("status", "completed")
+            .execute()
+        )
+        user_ids = set()
+        for row in r.data or []:
+            runs_data = row.get("runs")
+            if isinstance(runs_data, dict):
+                projects_data = runs_data.get("projects")
+                if isinstance(projects_data, dict):
+                    uid = projects_data.get("wallet_user_id") or projects_data.get("user_id")
+                    if uid:
+                        user_ids.add(str(uid))
+        return len(user_ids)
+    except Exception as e:
+        logger.warning("[db] count_distinct_auditors failed: %s", e)
+        return 0
+
+
+def count_deployments() -> int:
+    """Total deployment records (contracts deployed)."""
+    client = _client()
+    if not client:
+        return 0
+    try:
+        r = client.table("deployments").select("id", count="exact").execute()
+        return int(getattr(r, "count", 0) or 0)
+    except Exception as e:
+        logger.warning("[db] count_deployments failed: %s", e)
+        return 0
+
+
 def get_recent_activity_logs(limit: int = 50) -> list[dict[str, Any]]:
     """Return recent activity from run_steps and agent_logs for GET /api/v1/logs. Empty list if not configured or on error."""
     client = _client()

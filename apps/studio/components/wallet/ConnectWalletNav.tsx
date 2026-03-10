@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useConnectModal, useActiveAccount, useDisconnect, useActiveWallet } from "thirdweb/react";
 import { toast } from "sonner";
 import { getThirdwebClient } from "@/lib/thirdwebClient";
-import { CONNECT_WALLETS } from "@/lib/connectWallets";
+import { getConnectConfig } from "@/lib/connectWallets";
 import { useSignInWithWallet } from "@/hooks/useSignInWithWallet";
 import { clearStoredSession, clearSessionOnlyLLMKey } from "@/lib/session-store";
 import { deleteLLMKeys } from "@/lib/api";
@@ -48,7 +48,7 @@ export function ConnectWalletNav() {
 
   const handleConnect = () => {
     if (client) {
-      connect({ client, wallets: CONNECT_WALLETS });
+      connect(getConnectConfig(client));
     } else {
       toast.error(
         "Wallet connection is not configured. Set NEXT_PUBLIC_THIRDWEB_CLIENT_ID in .env and restart the app."

@@ -563,11 +563,12 @@ def workflows_generate(
             )
     api_keys = body.api_keys or _get_keys_for_run(user_id, DEFAULT_WORKSPACE)
     logger.info(
-        "[generate] user_id=%s body_keys=%s supabase_keys=%s resolved=%s",
+        "[generate] user_id=%s body_has_keys=%s body_key_count=%s supabase_keys=%s resolved_key_count=%s",
         user_id,
-        list(body.api_keys.keys()) if body.api_keys else "none",
+        bool(body.api_keys),
+        len(body.api_keys) if body.api_keys else 0,
         "yes" if (not body.api_keys and api_keys) else "skipped",
-        list(api_keys.keys()) if api_keys else "empty",
+        len(api_keys) if api_keys else 0,
     )
     if not api_keys:
         raise HTTPException(

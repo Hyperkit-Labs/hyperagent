@@ -52,22 +52,34 @@ def is_uuid(s: str) -> bool:
 def ensure_user_profile(
     user_id: str, wallet_address: str | None = None, display_name: str | None = None
 ) -> bool:
-    """Ensure user_profiles row exists for auth user. No-op for SIWE (wallet_users)."""
-    if not _is_uuid(user_id):
+    """Deprecated. Use wallet_users + wallet_user_profiles. Kept for backward compat; no-op."""
+    logger.debug("[db] ensure_user_profile deprecated; wallet_users is the only principal")
+    return True
+
+
+def ensure_wallet_user_profile(
+    wallet_user_id: str,
+    display_name: str | None = None,
+    preferences: dict | None = None,
+) -> bool:
+    """Idempotent upsert of wallet_user_profiles. Use after bootstrap for wallet-native principal."""
+    if not _is_uuid(wallet_user_id):
         return False
     client = _client()
     if not client:
         return False
     try:
-        payload = {"id": user_id}
-        if wallet_address is not None:
-            payload["wallet_address"] = wallet_address
+        payload: dict[str, Any] = {"wallet_user_id": wallet_user_id}
         if display_name is not None:
             payload["display_name"] = display_name
-        client.table("user_profiles").upsert(payload, on_conflict="id").execute()
+        if preferences is not None:
+            payload["preferences"] = preferences
+        client.table("wallet_user_profiles").upsert(
+            payload, on_conflict="wallet_user_id"
+        ).execute()
         return True
     except Exception as e:
-        logger.warning("[db] ensure_user_profile failed: %s", e)
+        logger.warning("[db] ensure_wallet_user_profile failed: %s", e)
         return False
 
 
@@ -102,7 +114,8 @@ def ensure_project(project_id: str, user_id: str) -> bool:
         try:
             fallback = {
                 "id": project_id,
-                "user_id": user_id,
+                "wallet_user_id": user_id,
+                "user_id": None,
                 "name": "Default",
                 "description": "",
                 "status": "draft",
@@ -635,6 +648,67 @@ def count_security_findings() -> int:
     except Exception as e:
         logger.warning("[db] count_security_findings failed: %s", e)
         return 0
+
+
+def list_security_findings(
+    wallet_user_id: str | None = None,
+    run_id: str | None = None,
+    limit: int = 100,
+) -> list[dict[str, Any]]:
+    """List security findings for user's runs (via projects.wallet_user_id) or a specific run."""
+    client = _client()
+    if not client:
+        return []
+    try:
+        if run_id and _is_uuid(run_id):
+            r = (
+                client.table("security_findings")
+                .select("id, run_id, tool, severity, category, title, description, location, status, created_at")
+                .eq("run_id", run_id)
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            return list(r.data) if r.data else []
+        if wallet_user_id and _is_uuid(wallet_user_id):
+            r_projects = (
+                client.table("projects")
+                .select("id")
+                .eq("wallet_user_id", wallet_user_id)
+                .execute()
+            )
+            project_ids = [p["id"] for p in (r_projects.data or []) if p.get("id")]
+            if not project_ids:
+                return []
+            r_runs = (
+                client.table("runs")
+                .select("id")
+                .in_("project_id", project_ids)
+                .execute()
+            )
+            run_ids = [r["id"] for r in (r_runs.data or []) if r.get("id")]
+            if not run_ids:
+                return []
+            r = (
+                client.table("security_findings")
+                .select("id, run_id, tool, severity, category, title, description, location, status, created_at")
+                .in_("run_id", run_ids[:500])
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            return list(r.data) if r.data else []
+        r = (
+            client.table("security_findings")
+            .select("id, run_id, tool, severity, category, title, description, location, status, created_at")
+            .order("created_at", desc=True)
+            .limit(min(limit, 500))
+            .execute()
+        )
+        return list(r.data) if r.data else []
+    except Exception as e:
+        logger.warning("[db] list_security_findings failed: %s", e)
+        return []
 
 
 def count_distinct_auditors() -> int:

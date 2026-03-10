@@ -48,6 +48,9 @@ importers:
       cors:
         specifier: ^2.8.5
         version: 2.8.6
+      dotenv:
+        specifier: ^16.0.0
+        version: 16.6.1
       ethers:
         specifier: ^6.0.0
         version: 6.16.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
@@ -130,6 +133,9 @@ importers:
       ai:
         specifier: ^4.0.0
         version: 4.3.19(react@19.2.3)(zod@4.3.6)
+      animejs:
+        specifier: ^3.2.2
+        version: 3.2.2
       axios:
         specifier: '>=1.13.5'
         version: 1.13.6
@@ -185,9 +191,6 @@ importers:
         specifier: ^5.112.4
         version: 5.118.1(@hey-api/openapi-ts@0.92.3(typescript@5.9.3))(@solana/sysvars@5.5.1(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))(@tanstack/query-core@5.81.5)(@types/react-dom@19.2.3(@types/react@19.2.13))(@types/react@19.2.13)(@vercel/blob@2.3.0)(bufferutil@4.1.0)(ethers@6.16.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(fastestsmallesttextencoderdecoder@1.0.22)(immer@11.1.3)(ioredis@5.10.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(typescript@5.9.3)(use-sync-external-store@1.4.0(react@19.2.3))(utf-8-validate@5.0.10)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))
     devDependencies:
-      '@playwright/test':
-        specifier: ^1.58.2
-        version: 1.58.2
       '@tailwindcss/postcss':
         specifier: ^4
         version: 4.1.18
@@ -197,6 +200,9 @@ importers:
       '@testing-library/react':
         specifier: ^16.3.0
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.13))(@types/react@19.2.13)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      '@types/animejs':
+        specifier: ^3.1.13
+        version: 3.1.13
       '@types/node':
         specifier: ^20
         version: 20.19.32
@@ -221,9 +227,6 @@ importers:
       jest-environment-jsdom:
         specifier: ^29.7.0
         version: 29.7.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
-      playwright:
-        specifier: ^1.58.2
-        version: 1.58.2
       prettier:
         specifier: ^3.2.5
         version: 3.8.1
@@ -3278,6 +3281,9 @@ packages:
   '@tybys/wasm-util@0.10.1':
     resolution: {integrity: sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg==}
 
+  '@types/animejs@3.1.13':
+    resolution: {integrity: sha512-yWg9l1z7CAv/TKpty4/vupEh24jDGUZXv4r26StRkpUPQm04ztJaftgpto8vwdFs8SiTq6XfaPKCSI+wjzNMvQ==}
+
   '@types/aria-query@5.0.4':
     resolution: {integrity: sha512-rfT93uj5s0PRL7EzccGMs3brplhcrghnDoV26NqKhCAS1hVo+WdNsPvE/yb6ilfr5hi2MEk6d5EWJTKdxg8jVw==}
 
@@ -4054,6 +4060,9 @@ packages:
 
   ajv@8.18.0:
     resolution: {integrity: sha512-PlXPeEWMXMZ7sPYOHqmDyCJzcfNrUr3fGNKtezX14ykXOEIvyK81d+qydx89KY5O71FKMPaQ2vBfBFI5NHR63A==}
+
+  animejs@3.2.2:
+    resolution: {integrity: sha512-Ao95qWLpDPXXM+WrmwcKbl6uNlC5tjnowlaRYtuVDHHoygjtIPfDUoK9NthrlZsQSKjZXlmji2TrBUAVbiH0LQ==}
 
   ansi-colors@4.1.3:
     resolution: {integrity: sha512-/6w/C21Pm1A7aZitlI5Ni/2J6FFQN8i1Cvz3kHABAAbw93v/NlvKdVOqz7CCWz/3iv/JplRSEEZ83XION15ovw==}
@@ -4867,6 +4876,10 @@ packages:
     resolution: {integrity: sha512-A2is4PLG+eeSfoTMA95/s4pvAoSo2mKtiM5jlHkAVewmiO8ISFTFKZjH7UAM1Atli/OT/7JHOrJRJiMKUZKYBw==}
     engines: {node: '>=12'}
     deprecated: Use your platform's native DOMException instead
+
+  dotenv@16.6.1:
+    resolution: {integrity: sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==}
+    engines: {node: '>=12'}
 
   dotenv@17.3.1:
     resolution: {integrity: sha512-IO8C/dzEb6O3F9/twg6ZLXz164a2fhTnEWb95H23Dm4OuN+92NmEAlTrupP9VW6Jm3sO26tQlqyvyi4CsnY9GA==}
@@ -10247,6 +10260,7 @@ snapshots:
   '@playwright/test@1.58.2':
     dependencies:
       playwright: 1.58.2
+    optional: true
 
   '@radix-ui/primitive@1.1.2': {}
 
@@ -11968,6 +11982,8 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
+  '@types/animejs@3.1.13': {}
+
   '@types/aria-query@5.0.4': {}
 
   '@types/babel__core@7.20.5':
@@ -13636,6 +13652,8 @@ snapshots:
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
 
+  animejs@3.2.2: {}
+
   ansi-colors@4.1.3: {}
 
   ansi-escapes@4.3.2:
@@ -14420,6 +14438,8 @@ snapshots:
   domexception@4.0.0:
     dependencies:
       webidl-conversions: 7.0.0
+
+  dotenv@16.6.1: {}
 
   dotenv@17.3.1: {}
 
@@ -17110,13 +17130,15 @@ snapshots:
       exsolve: 1.0.8
       pathe: 2.0.3
 
-  playwright-core@1.58.2: {}
+  playwright-core@1.58.2:
+    optional: true
 
   playwright@1.58.2:
     dependencies:
       playwright-core: 1.58.2
     optionalDependencies:
       fsevents: 2.3.2
+    optional: true
 
   pngjs@5.0.0: {}
 

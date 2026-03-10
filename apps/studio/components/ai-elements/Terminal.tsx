@@ -27,6 +27,13 @@ function formatLine(entry: TerminalLine): string {
   return parts.join(' ');
 }
 
+function getSeverityBorderColor(level?: string): string {
+  const l = (level ?? "").toLowerCase();
+  if (l === "error" || l === "err") return "var(--color-semantic-error)";
+  if (l === "warn" || l === "warning") return "var(--color-semantic-warning)";
+  return "var(--color-semantic-success)";
+}
+
 export function Terminal({ lines, onClear, noScroll = false, className = '' }: TerminalProps) {
   const [copied, setCopied] = useState(false);
 
@@ -69,7 +76,8 @@ export function Terminal({ lines, onClear, noScroll = false, className = '' }: T
         {lines.map((entry, i) => (
           <div
             key={i}
-            className="flex items-start gap-3 px-4 py-3 border-b border-[var(--color-border-subtle)] hover:bg-[var(--color-bg-panel)] transition-colors log-row"
+            className="flex items-start gap-3 pl-4 pr-4 py-3 border-b border-l-2 border-[var(--color-border-subtle)] hover:bg-[var(--color-bg-panel)] transition-colors log-row"
+            style={{ borderLeftColor: getSeverityBorderColor(entry.level) }}
           >
             {entry.timestamp && (
               <span className="text-[10px] text-[var(--color-text-muted)] font-mono shrink-0 whitespace-nowrap">

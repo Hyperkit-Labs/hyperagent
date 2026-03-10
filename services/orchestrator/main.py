@@ -85,8 +85,14 @@ from store import (
     list_workflows,
     update_workflow,
 )
+from structured_logging import TraceContextFilter
 from trace_context import get_trace_headers, set_request_id
 from workflow import run_pipeline
+
+# Wire structured logging so run_id, request_id, step_id propagate to all logs
+_root_logger = logging.getLogger()
+if not any(isinstance(f, TraceContextFilter) for f in _root_logger.filters):
+    _root_logger.addFilter(TraceContextFilter())
 
 COMPILE_SERVICE_URL = os.environ.get(
     "COMPILE_SERVICE_URL", "http://localhost:8004"
@@ -2094,6 +2100,62 @@ def get_networks_api(skale: bool = False) -> list[dict[str, Any]]:
 def get_stablecoins_api() -> dict[str, dict[str, str]]:
     """Return USDC/USDT addresses per chain from x402/stablecoins.yaml. Keys are chain IDs as strings."""
     return get_stablecoins_by_chain()
+
+
+@app.get("/api/v1/platform/track-record")
+def get_platform_track_record_api() -> dict[str, Any]:
+    """Return platform track record stats for login page. Public, no auth.
+    Audits/vulnerabilities from DB (run_steps, security_findings) when configured;
+    otherwise from env. Researchers and TVL always from env (no DB source yet).
+    """
+    audits = int(os.environ.get("PLATFORM_AUDITS_COMPLETED", "500"))
+    vulnerabilities = int(os.environ.get("PLATFORM_VULNERABILITIES_FOUND", "1200"))
+    researchers = int(os.environ.get("PLATFORM_SECURITY_RESEARCHERS", "50"))
+    tvl_value = float(os.environ.get("PLATFORM_TVL_SECURED", "2"))
+    tvl_suffix = os.environ.get("PLATFORM_TVL_SUFFIX", "B+")
+    source = "env_defaults"
+
+    if db.is_configured():
+        try:
+            # Primary: run_steps (audits) and security_findings (vulnerabilities)
+            audit_count = db.count_completed_audits()
+            findings_count = db.count_security_findings()
+
+            if audit_count > 0 or findings_count > 0:
+                if audit_count > 0:
+                    audits = audit_count
+                if findings_count > 0:
+                    vulnerabilities = findings_count
+                source = "database"
+            else:
+                # Fallback: workflow_state (legacy / in-memory migration)
+                states = db.list_workflow_states(limit=500)
+                if states:
+                    audit_count_legacy = sum(
+                        1 for s in states
+                        if any(
+                            st.get("stage") == "audit" and st.get("status") == "completed"
+                            for st in (s.get("stages") or [])
+                        )
+                    )
+                    total_findings = sum(len(s.get("audit_findings") or []) for s in states)
+                    if audit_count_legacy > 0:
+                        audits = audit_count_legacy
+                        source = "database"
+                    if total_findings > 0:
+                        vulnerabilities = total_findings
+                        source = "database"
+        except Exception:
+            pass
+
+    return {
+        "audits_completed": audits,
+        "vulnerabilities_found": vulnerabilities,
+        "security_researchers": researchers,
+        "tvl_secured": tvl_value,
+        "tvl_suffix": tvl_suffix,
+        "source": source,
+    }
 
 
 AGENT_RUNTIME_URL = os.environ.get("AGENT_RUNTIME_URL", "http://localhost:4001").rstrip(

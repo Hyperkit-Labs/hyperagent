@@ -2109,30 +2109,32 @@ def get_stablecoins_api() -> dict[str, dict[str, str]]:
 @app.get("/api/v1/platform/track-record")
 def get_platform_track_record_api() -> dict[str, Any]:
     """Return platform track record stats for login page. Public, no auth.
-    Audits/vulnerabilities from DB (run_steps, security_findings) when configured;
-    otherwise from env. Researchers and TVL always from env (no DB source yet).
+    All metrics from DB when configured: audits (run_steps), vulnerabilities (security_findings),
+    security_researchers (distinct users with completed audits), contracts_deployed (deployments table).
+    Uses real DB values (including 0) when configured; env fallbacks only when DB not configured.
     """
-    audits = int(os.environ.get("PLATFORM_AUDITS_COMPLETED", "500"))
-    vulnerabilities = int(os.environ.get("PLATFORM_VULNERABILITIES_FOUND", "1200"))
-    researchers = int(os.environ.get("PLATFORM_SECURITY_RESEARCHERS", "50"))
-    tvl_value = float(os.environ.get("PLATFORM_TVL_SECURED", "2"))
-    tvl_suffix = os.environ.get("PLATFORM_TVL_SUFFIX", "B+")
+    audits = int(os.environ.get("PLATFORM_AUDITS_COMPLETED", "0"))
+    vulnerabilities = int(os.environ.get("PLATFORM_VULNERABILITIES_FOUND", "0"))
+    researchers = int(os.environ.get("PLATFORM_SECURITY_RESEARCHERS", "0"))
+    contracts_deployed = int(os.environ.get("PLATFORM_CONTRACTS_DEPLOYED", "0"))
     source = "env_defaults"
 
     if db.is_configured():
         try:
-            # Primary: run_steps (audits) and security_findings (vulnerabilities)
             audit_count = db.count_completed_audits()
             findings_count = db.count_security_findings()
+            researchers_count = db.count_distinct_auditors()
+            deployments_count = db.count_deployments()
 
-            if audit_count > 0 or findings_count > 0:
-                if audit_count > 0:
-                    audits = audit_count
-                if findings_count > 0:
-                    vulnerabilities = findings_count
-                source = "database"
-            else:
-                # Fallback: workflow_state (legacy / in-memory migration)
+            # Use real DB values for all metrics (including 0)
+            audits = audit_count
+            vulnerabilities = findings_count
+            researchers = researchers_count
+            contracts_deployed = deployments_count
+            source = "database"
+
+            # Legacy: if run_steps/security_findings empty, try workflow_state
+            if audit_count == 0 and findings_count == 0:
                 states = db.list_workflow_states(limit=500)
                 if states:
                     audit_count_legacy = sum(
@@ -2145,10 +2147,8 @@ def get_platform_track_record_api() -> dict[str, Any]:
                     total_findings = sum(len(s.get("audit_findings") or []) for s in states)
                     if audit_count_legacy > 0:
                         audits = audit_count_legacy
-                        source = "database"
                     if total_findings > 0:
                         vulnerabilities = total_findings
-                        source = "database"
         except Exception:
             pass
 
@@ -2156,8 +2156,7 @@ def get_platform_track_record_api() -> dict[str, Any]:
         "audits_completed": audits,
         "vulnerabilities_found": vulnerabilities,
         "security_researchers": researchers,
-        "tvl_secured": tvl_value,
-        "tvl_suffix": tvl_suffix,
+        "contracts_deployed": contracts_deployed,
         "source": source,
     }
 

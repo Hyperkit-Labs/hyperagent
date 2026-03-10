@@ -957,6 +957,9 @@ def _build_viem_wagmi_zip(
     """Add viem + wagmi Next.js scaffold to zip. Returns list of file paths written."""
     files_written: list[str] = []
     abi_json = json.dumps(abi)
+    rpc_url_escaped = rpc_url.replace('"', '\\"')
+    explorer_url_escaped = explorer_url.rstrip("/").replace('"', '\\"')
+    chain_name_escaped = chain_name.replace('"', '\\"')
 
     deps = {
         "next": "14.2.0",
@@ -1044,8 +1047,8 @@ def _build_viem_wagmi_zip(
         f'''export const CONTRACTS = {contracts_json} as const;
 export const CONTRACT_ADDRESS = "{contract_addr}" as const;
 export const CHAIN_ID = {chain_id};
-export const RPC_URL = "{rpc_url.replace('"', '\\"')}";
-export const EXPLORER_URL = "{explorer_url.rstrip("/").replace('"', '\\"')}";
+export const RPC_URL = "{rpc_url_escaped}";
+export const EXPLORER_URL = "{explorer_url_escaped}";
 export const ABI = {abi_json} as const;
 ''',
     )
@@ -1060,10 +1063,10 @@ import {{ CHAIN_ID, RPC_URL }} from "./contract";
 export const config = createConfig({{
   chains: [{{
     id: CHAIN_ID,
-    name: "{chain_name.replace('"', '\\"')}",
+    name: "{chain_name_escaped}",
     nativeCurrency: {{ decimals: 18, name: "ETH", symbol: "ETH" }},
     rpcUrls: {{ default: {{ http: [RPC_URL] }} }},
-    blockExplorers: {{ default: {{ url: "{explorer_url.rstrip("/").replace('"', '\\"')}" }} }},
+    blockExplorers: {{ default: {{ url: "{explorer_url_escaped}" }} }},
   }}],
   connectors: [injected()],
   transports: {{

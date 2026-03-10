@@ -3,8 +3,11 @@
 -- Skips existing tables/constraints/indexes; safe to re-run.
 -- Merged from: full_schema, wallet_users, user_profile, user_api_key, projects, runs,
 -- run_steps, run_steps_artifacts, agent_logs, deployments, security_findings,
--- storage_records, 20250306_storage_records_run_artifact, payment_history,
--- spending_controls, simulations, agent_context, z_projects_wallet_owner.
+-- storage_records, payment_history, spending_controls, simulations, agent_context,
+-- 001_deployments_deployment_order, 20250308_agent_context_wallet_user,
+-- 20250308_credits_tables_and_rpc, 20250308_run_steps_step_type, 20250308_wallet_users_plan_id,
+-- 20250309_rls_policies, 20250310_wallet_users_auth_provider, 20250311_bootstrap_user_credits_rpc,
+-- 20250312_production_hardening (wallet_user_profiles, drop user_api_keys).
 
 -- ---------------------------------------------------------------------------
 -- Extensions
@@ -44,6 +47,14 @@ create table if not exists public.wallet_users (
 );
 create index if not exists idx_wallet_users_wallet_address on public.wallet_users using btree (wallet_address);
 
+-- wallet_users: plan_id (x402), auth_provider (SIWE vs thirdweb)
+alter table public.wallet_users add column if not exists plan_id text null default 'free';
+create index if not exists idx_wallet_users_plan_id on public.wallet_users using btree (plan_id);
+comment on column public.wallet_users.plan_id is 'x402 plan id (free, starter, pro). Used by pricing/usage API.';
+alter table public.wallet_users add column if not exists auth_provider text null default 'siwe_eoa';
+create index if not exists idx_wallet_users_auth_provider on public.wallet_users using btree (auth_provider);
+comment on column public.wallet_users.auth_provider is 'siwe_eoa | thirdweb_inapp. Used for onboarding debug and dual auth lane support.';
+
 -- ---------------------------------------------------------------------------
 -- 2. user_profiles (auth.users from Supabase)
 -- ---------------------------------------------------------------------------
@@ -64,20 +75,23 @@ create trigger update_user_profiles_updated_at before update on public.user_prof
   for each row execute function public.update_updated_at_column();
 
 -- ---------------------------------------------------------------------------
--- 3. user_api_keys
+-- 3. user_api_keys (dead: BYOK in wallet_users.encrypted_llm_keys) – dropped
 -- ---------------------------------------------------------------------------
-create table if not exists public.user_api_keys (
-  id uuid not null default gen_random_uuid(),
-  user_id uuid not null,
-  key_hash text not null,
-  name text not null,
-  last_used_at timestamptz null,
+drop table if exists public.user_api_keys;
+
+-- ---------------------------------------------------------------------------
+-- 3b. wallet_user_profiles (wallet-native principal; replaces user_profiles for SIWE)
+-- ---------------------------------------------------------------------------
+create table if not exists public.wallet_user_profiles (
+  wallet_user_id uuid not null,
+  display_name text null,
+  preferences jsonb null default '{}'::jsonb,
   created_at timestamptz null default now(),
-  expires_at timestamptz null,
-  is_active boolean null default true,
-  constraint user_api_keys_pkey primary key (id),
-  constraint user_api_keys_user_id_fkey foreign key (user_id) references auth.users (id) on delete cascade
+  updated_at timestamptz null default now(),
+  constraint wallet_user_profiles_pkey primary key (wallet_user_id),
+  constraint wallet_user_profiles_wallet_user_id_fkey foreign key (wallet_user_id) references public.wallet_users (id) on delete cascade
 );
+create index if not exists idx_wallet_user_profiles_wallet_user_id on public.wallet_user_profiles using btree (wallet_user_id);
 
 -- ---------------------------------------------------------------------------
 -- 4. projects
@@ -191,6 +205,16 @@ create unique index if not exists idx_run_steps_run_type on public.run_steps usi
 create index if not exists idx_run_steps_run_id on public.run_steps using btree (run_id);
 create index if not exists idx_run_steps_status on public.run_steps using btree (run_id, status);
 
+-- run_steps: extend step_type to include test_generation (idempotent)
+alter table public.run_steps drop constraint if exists run_steps_step_type_check;
+alter table public.run_steps add constraint run_steps_step_type_check check (
+  step_type = any (array[
+    'spec'::text, 'design'::text, 'codegen'::text, 'test_generation'::text, 'scrubd'::text,
+    'audit'::text, 'debate'::text, 'simulation'::text, 'exploit_sim'::text,
+    'deploy'::text, 'ui_scaffold'::text, 'guardian'::text
+  ])
+);
+
 -- ---------------------------------------------------------------------------
 -- 8. agent_logs
 -- ---------------------------------------------------------------------------
@@ -236,6 +260,8 @@ create table if not exists public.deployments (
   constraint deployments_status_check check (status = any (array['pending','client-deployed','deployed']))
 );
 create index if not exists idx_deployments_chain_address on public.deployments using btree (chain_id, contract_address);
+alter table public.deployments add column if not exists deployment_order integer not null default 0;
+comment on column public.deployments.deployment_order is 'Order for multi-contract deployment; lower values deploy first.';
 
 -- ---------------------------------------------------------------------------
 -- 10. security_findings
@@ -386,6 +412,19 @@ create table if not exists public.agent_context (
 );
 create index if not exists agent_context_embeddings_idx on public.agent_context using ivfflat (embeddings extensions.vector_cosine_ops) with (lists = 100);
 
+-- agent_context: wallet_user_id for SIWE users (no auth.users row)
+alter table public.agent_context add column if not exists wallet_user_id uuid null;
+alter table public.agent_context alter column user_id drop not null;
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'agent_context_wallet_user_id_fkey') then
+    alter table public.agent_context add constraint agent_context_wallet_user_id_fkey
+      foreign key (wallet_user_id) references public.wallet_users (id) on delete cascade;
+  end if;
+end $$;
+create index if not exists idx_agent_context_wallet_user_id on public.agent_context using btree (wallet_user_id);
+comment on column public.agent_context.wallet_user_id is 'Primary for SIWE users. Use when user_id is null. Both may be set for OAuth users with auth.users row.';
+
 -- ---------------------------------------------------------------------------
 -- 16. projects: wallet_user_id (SIWE ownership) – idempotent add
 -- ---------------------------------------------------------------------------
@@ -399,7 +438,7 @@ begin
   end if;
 end $$;
 create index if not exists idx_projects_wallet_user_id on public.projects using btree (wallet_user_id);
-comment on column public.projects.wallet_user_id is 'Owner when created via SIWE (gateway JWT sub = wallet_users.id). user_id used for auth.users.';
+comment on column public.projects.wallet_user_id is 'Canonical owner (wallet_users.id). Single application principal for all ownership.';
 
 -- ---------------------------------------------------------------------------
 -- 17. user_credits (credit-based system: top-up off-chain, consume per workflow step)
@@ -515,3 +554,141 @@ begin
   return v_row;
 end;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- bootstrap_user_credits: Idempotent freemium grant on first sign-up
+-- ---------------------------------------------------------------------------
+create or replace function public.bootstrap_user_credits(
+  p_user_id uuid,
+  p_initial_credits numeric default 100
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_balance numeric;
+  v_currency text := 'USD';
+begin
+  insert into public.user_credits (user_id, balance, currency)
+  values (p_user_id, greatest(0, coalesce(p_initial_credits, 100)), v_currency)
+  on conflict (user_id) do nothing
+  returning balance into v_balance;
+
+  if v_balance is not null then
+    insert into public.credit_transactions (
+      user_id, amount_delta, balance_after, type, reference_type, reference_id, metadata
+    )
+    values (
+      p_user_id,
+      v_balance,
+      v_balance,
+      'top_up',
+      'freemium_grant',
+      'onboarding',
+      jsonb_build_object('source', 'auth_bootstrap', 'plan', 'free')
+    );
+  end if;
+
+  return (
+    select jsonb_build_object('balance', balance, 'currency', currency, 'user_id', user_id)
+    from public.user_credits
+    where user_id = p_user_id
+  );
+end;
+$$;
+comment on function public.bootstrap_user_credits(uuid, numeric) is
+  'Idempotent freemium credit grant on first sign-up. Called from auth bootstrap for new wallet_users.';
+
+-- ---------------------------------------------------------------------------
+-- RLS policies (multi-tenant isolation; service role bypasses)
+-- wallet_users.id is the only application principal. JWT sub = wallet_users.id.
+-- Policies bind to current_wallet_user_id() (from app.current_setting). Service role bypasses RLS.
+-- ---------------------------------------------------------------------------
+create or replace function public.current_wallet_user_id() returns uuid as $$
+  select nullif(trim(current_setting('app.current_wallet_user_id', true)), '')::uuid;
+$$ language sql stable security definer set search_path = public;
+
+alter table public.wallet_users enable row level security;
+alter table public.wallet_user_profiles enable row level security;
+alter table public.projects enable row level security;
+alter table public.runs enable row level security;
+alter table public.run_steps enable row level security;
+alter table public.project_artifacts enable row level security;
+alter table public.security_findings enable row level security;
+alter table public.deployments enable row level security;
+
+drop policy if exists wallet_users_select_own on public.wallet_users;
+create policy wallet_users_select_own on public.wallet_users for select using (id = public.current_wallet_user_id());
+drop policy if exists wallet_users_insert_own on public.wallet_users;
+create policy wallet_users_insert_own on public.wallet_users for insert with check (id = public.current_wallet_user_id());
+drop policy if exists wallet_users_update_own on public.wallet_users;
+create policy wallet_users_update_own on public.wallet_users for update using (id = public.current_wallet_user_id());
+
+drop policy if exists wallet_user_profiles_select_own on public.wallet_user_profiles;
+create policy wallet_user_profiles_select_own on public.wallet_user_profiles for select using (wallet_user_id = public.current_wallet_user_id());
+drop policy if exists wallet_user_profiles_insert_own on public.wallet_user_profiles;
+create policy wallet_user_profiles_insert_own on public.wallet_user_profiles for insert with check (wallet_user_id = public.current_wallet_user_id());
+drop policy if exists wallet_user_profiles_update_own on public.wallet_user_profiles;
+create policy wallet_user_profiles_update_own on public.wallet_user_profiles for update using (wallet_user_id = public.current_wallet_user_id());
+
+drop policy if exists projects_select_own on public.projects;
+create policy projects_select_own on public.projects for select using (wallet_user_id = public.current_wallet_user_id());
+drop policy if exists projects_insert_own on public.projects;
+create policy projects_insert_own on public.projects for insert with check (wallet_user_id = public.current_wallet_user_id());
+drop policy if exists projects_update_own on public.projects;
+create policy projects_update_own on public.projects for update using (wallet_user_id = public.current_wallet_user_id());
+
+drop policy if exists runs_select_via_project on public.runs;
+create policy runs_select_via_project on public.runs for select using (
+  exists (select 1 from public.projects p where p.id = runs.project_id and p.wallet_user_id = public.current_wallet_user_id())
+);
+drop policy if exists runs_insert_via_project on public.runs;
+create policy runs_insert_via_project on public.runs for insert with check (
+  exists (select 1 from public.projects p where p.id = runs.project_id and p.wallet_user_id = public.current_wallet_user_id())
+);
+drop policy if exists runs_update_via_project on public.runs;
+create policy runs_update_via_project on public.runs for update using (
+  exists (select 1 from public.projects p where p.id = runs.project_id and p.wallet_user_id = public.current_wallet_user_id())
+);
+
+drop policy if exists run_steps_select_via_run on public.run_steps;
+create policy run_steps_select_via_run on public.run_steps for select using (
+  exists (select 1 from public.runs r join public.projects p on p.id = r.project_id where r.id = run_steps.run_id and p.wallet_user_id = public.current_wallet_user_id())
+);
+drop policy if exists run_steps_insert_via_run on public.run_steps;
+create policy run_steps_insert_via_run on public.run_steps for insert with check (
+  exists (select 1 from public.runs r join public.projects p on p.id = r.project_id where r.id = run_steps.run_id and p.wallet_user_id = public.current_wallet_user_id())
+);
+drop policy if exists run_steps_update_via_run on public.run_steps;
+create policy run_steps_update_via_run on public.run_steps for update using (
+  exists (select 1 from public.runs r join public.projects p on p.id = r.project_id where r.id = run_steps.run_id and p.wallet_user_id = public.current_wallet_user_id())
+);
+
+drop policy if exists project_artifacts_select_via_project on public.project_artifacts;
+create policy project_artifacts_select_via_project on public.project_artifacts for select using (
+  exists (select 1 from public.projects p where p.id = project_artifacts.project_id and p.wallet_user_id = public.current_wallet_user_id())
+);
+drop policy if exists project_artifacts_insert_via_project on public.project_artifacts;
+create policy project_artifacts_insert_via_project on public.project_artifacts for insert with check (
+  exists (select 1 from public.projects p where p.id = project_artifacts.project_id and p.wallet_user_id = public.current_wallet_user_id())
+);
+
+drop policy if exists security_findings_select_via_run on public.security_findings;
+create policy security_findings_select_via_run on public.security_findings for select using (
+  exists (select 1 from public.runs r join public.projects p on p.id = r.project_id where r.id = security_findings.run_id and p.wallet_user_id = public.current_wallet_user_id())
+);
+drop policy if exists security_findings_insert_via_run on public.security_findings;
+create policy security_findings_insert_via_run on public.security_findings for insert with check (
+  exists (select 1 from public.runs r join public.projects p on p.id = r.project_id where r.id = security_findings.run_id and p.wallet_user_id = public.current_wallet_user_id())
+);
+
+drop policy if exists deployments_select_via_project on public.deployments;
+create policy deployments_select_via_project on public.deployments for select using (
+  exists (select 1 from public.projects p where p.id = deployments.project_id and p.wallet_user_id = public.current_wallet_user_id())
+);
+drop policy if exists deployments_insert_via_project on public.deployments;
+create policy deployments_insert_via_project on public.deployments for insert with check (
+  exists (select 1 from public.projects p where p.id = deployments.project_id and p.wallet_user_id = public.current_wallet_user_id())
+);

@@ -48,7 +48,9 @@ def _get_supabase():
 
 
 class StoreContextRequest(BaseModel):
-    user_id: str
+    """user_id and wallet_user_id are the same (wallet_users.id) in wallet-native mode."""
+    user_id: str | None = None
+    wallet_user_id: str | None = None
     context_type: str = Field(..., description="conversation | learning | template | pattern")
     content: dict[str, Any]
     agent_name: str | None = None
@@ -62,22 +64,33 @@ class StoreContextResponse(BaseModel):
 
 
 class SearchContextRequest(BaseModel):
-    user_id: str
+    """user_id and wallet_user_id are the same (wallet_users.id) in wallet-native mode."""
+    user_id: str | None = None
+    wallet_user_id: str | None = None
     query: str | None = None
     context_type: str | None = None
     agent_name: str | None = None
     limit: int = Field(default=10, ge=1, le=100)
 
 
+def _principal_id(req: StoreContextRequest | SearchContextRequest) -> str:
+    """Resolve wallet_users.id from request. wallet_user_id preferred; user_id is alias."""
+    wid = getattr(req, "wallet_user_id", None) or getattr(req, "user_id", None)
+    if not wid:
+        raise HTTPException(status_code=400, detail="wallet_user_id or user_id required")
+    return wid
+
+
 @app.post("/context", response_model=StoreContextResponse)
 def store_context(req: StoreContextRequest) -> StoreContextResponse:
     if req.context_type not in ("conversation", "learning", "template", "pattern"):
         raise HTTPException(status_code=400, detail="context_type must be one of: conversation, learning, template, pattern")
+    principal = _principal_id(req)
     if _use_acontext():
         try:
             from acontext_adapter import store_context as acontext_store  # noqa: PLC0415
             mid, created = acontext_store(
-                req.user_id,
+                principal,
                 req.context_type,
                 req.content,
                 agent_name=req.agent_name,
@@ -89,7 +102,7 @@ def store_context(req: StoreContextRequest) -> StoreContextResponse:
     sb = _get_supabase()
     if sb:
         row = {
-            "user_id": req.user_id,
+            "wallet_user_id": principal,
             "context_type": req.context_type,
             "content": req.content,
             "agent_name": req.agent_name,
@@ -105,20 +118,20 @@ def store_context(req: StoreContextRequest) -> StoreContextResponse:
     # In-memory fallback (bounded per user)
     _memory.append({
         "id": str(len(_memory)),
-        "user_id": req.user_id,
+        "wallet_user_id": principal,
         "context_type": req.context_type,
         "content": req.content,
         "agent_name": req.agent_name,
         "metadata": req.metadata,
     })
     # Trim oldest entries for this user when exceeding limit
-    user_items = [m for m in _memory if m["user_id"] == req.user_id]
+    user_items = [m for m in _memory if m.get("wallet_user_id") == principal]
     if len(user_items) > _MEMORY_MAX_PER_USER:
         to_remove = len(user_items) - _MEMORY_MAX_PER_USER
         for m in list(_memory):
             if to_remove <= 0:
                 break
-            if m["user_id"] == req.user_id:
+            if m.get("wallet_user_id") == principal:
                 _memory.remove(m)
                 to_remove -= 1
     rec = _memory[-1]
@@ -126,11 +139,12 @@ def store_context(req: StoreContextRequest) -> StoreContextResponse:
 
 @app.post("/context/search")
 def search_context(req: SearchContextRequest) -> list[dict]:
+    principal = _principal_id(req)
     if _use_acontext():
         try:
             from acontext_adapter import search_context as acontext_search  # noqa: PLC0415
             rows = acontext_search(
-                req.user_id,
+                principal,
                 query=req.query,
                 context_type=req.context_type,
                 agent_name=req.agent_name,
@@ -141,15 +155,16 @@ def search_context(req: SearchContextRequest) -> list[dict]:
             raise HTTPException(status_code=502, detail=f"Acontext search failed: {e!s}")
     sb = _get_supabase()
     if sb:
-        q = sb.table("agent_context").select("*").eq("user_id", req.user_id).order("accessed_at", desc=True).limit(req.limit)
+        # Match wallet_user_id (SIWE) or user_id (legacy OAuth) for backward compat
+        q = sb.table("agent_context").select("*").or_(f"wallet_user_id.eq.{principal},user_id.eq.{principal}").order("accessed_at", desc=True).limit(req.limit)
         if req.context_type:
             q = q.eq("context_type", req.context_type)
         if req.agent_name:
             q = q.eq("agent_name", req.agent_name)
         r = q.execute()
         return r.data or []
-    # In-memory: filter by user_id and type
-    out = [m for m in _memory if m["user_id"] == req.user_id]
+    # In-memory: filter by wallet_user_id and type
+    out = [m for m in _memory if m.get("wallet_user_id") == principal]
     if req.context_type:
         out = [m for m in out if m.get("context_type") == req.context_type]
     return out[: req.limit]

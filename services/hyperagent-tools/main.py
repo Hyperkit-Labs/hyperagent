@@ -47,6 +47,19 @@ class CompileResponse(BaseModel):
 
 _MD_FENCE_RE = re.compile(r"^```(?:solidity|sol)?\s*\n?", re.MULTILINE)
 _MD_FENCE_END_RE = re.compile(r"\n?```\s*$", re.MULTILINE)
+_SAFE_SOL_PATTERN = re.compile(r"^[a-zA-Z0-9_.-]+\.sol$")
+
+
+def _safe_sol_filename(name: str) -> str:
+    """Return a safe .sol basename for path construction. Reject path traversal."""
+    if not name or not isinstance(name, str):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    base = Path(name).name
+    if ".." in name or name.startswith("/") or (os.sep in name) or (os.altsep and os.altsep in name):
+        raise HTTPException(status_code=400, detail="Filename must not contain path traversal")
+    if not _SAFE_SOL_PATTERN.match(base):
+        raise HTTPException(status_code=400, detail="Filename must match [a-zA-Z0-9_.-]+.sol")
+    return base
 
 
 def _strip_markdown_fences(source: str) -> str:
@@ -99,11 +112,11 @@ def _compile_solcx(contract_name: str, contract_code: str) -> tuple[bool, str | 
 
 def _run_slither(workdir: Path, files: dict[str, str], entry: str) -> list[dict]:
     """Run Slither on contract files. Returns list of {severity, title, description, location, category}."""
+    contracts_dir = workdir / "contracts"
+    contracts_dir.mkdir(parents=True, exist_ok=True)
     for path, content in files.items():
-        if ".." in path or path.startswith("/"):
-            continue
-        dst = workdir / path
-        dst.parent.mkdir(parents=True, exist_ok=True)
+        safe = _safe_sol_filename(path)
+        dst = contracts_dir / safe
         code = content.strip()
         if "pragma solidity" not in code.lower():
             code = "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n" + code

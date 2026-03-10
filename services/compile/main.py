@@ -33,6 +33,22 @@ def _strip_markdown_fences(source: str) -> str:
 
 # Safe filename: basename only, [a-zA-Z0-9_.-]+\\.sol (path traversal prevention)
 _SAFE_SOL_PATTERN = re.compile(r"^[a-zA-Z0-9_.-]+\.sol$")
+# Safe contract name: Solidity identifier [a-zA-Z0-9_]+ (path traversal prevention)
+_SAFE_CONTRACT_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_]+$")
+
+
+def _safe_contract_name(name: str | None) -> str:
+    """Validate and return a safe contract name for path construction. Reject path traversal."""
+    if name is None or not isinstance(name, str):
+        raise HTTPException(status_code=400, detail="Invalid contract name")
+    s = name.strip()
+    if not s:
+        raise HTTPException(status_code=400, detail="Contract name must not be empty")
+    if ".." in s or "/" in s or ("\\" in s) or s.startswith("."):
+        raise HTTPException(status_code=400, detail="Contract name must not contain path components")
+    if not _SAFE_CONTRACT_NAME_PATTERN.match(s):
+        raise HTTPException(status_code=400, detail="Contract name must match [a-zA-Z0-9_]+")
+    return s
 
 
 def _safe_sol_filename(name: str) -> str:
@@ -113,6 +129,7 @@ def _compile_solcx(contract_name: str, contract_code: str) -> tuple[bool, str | 
 
 def _compile_foundry_multi(workdir: Path, files: dict[str, str], entry_contract: str) -> tuple[bool, str | None, list | None, list[str]]:
     """Compile multiple interdependent files with Foundry. Returns artifact for entry_contract."""
+    safe_entry = _safe_contract_name(entry_contract)
     src = workdir / "src"
     src.mkdir(parents=True, exist_ok=True)
     for name, content in files.items():
@@ -130,18 +147,19 @@ def _compile_foundry_multi(workdir: Path, files: dict[str, str], entry_contract:
     if result.returncode != 0:
         return False, None, None, [result.stderr or result.stdout or "forge build failed"]
     for name in files:
-        base = Path(name).stem
+        safe = _safe_sol_filename(name)
+        base = Path(safe).stem
         out_dir = workdir / "out" / f"{base}.sol"
         if out_dir.exists():
             artifact = out_dir / f"{base}.json"
-            if artifact.exists() and base == entry_contract:
+            if artifact.exists() and base == safe_entry:
                 data = json.loads(artifact.read_text())
                 bc = data.get("bytecode", {}) if isinstance(data.get("bytecode"), dict) else data.get("bytecode")
                 bytecode = bc.get("object") if isinstance(bc, dict) else bc
                 if isinstance(bytecode, dict):
                     bytecode = bytecode.get("object")
                 return True, bytecode, data.get("abi", []), []
-    return False, None, None, [f"Contract {entry_contract} not found in compiled output"]
+    return False, None, None, [f"Contract {safe_entry} not found in compiled output"]
 
 
 def _compile_foundry_impl(workdir: Path, contract_name: str, contract_code: str) -> tuple[bool, str | None, list | None, list[str]]:
@@ -331,6 +349,10 @@ def compile_contract(req: CompileRequest) -> CompileResponse:
         contract_name = entry_contract
     else:
         contract_name = entry_contract or _extract_contract_name(code or next(iter(files.values()), ""))
+
+    contract_name = _safe_contract_name(contract_name)
+    if len(files) > 1:
+        entry_contract = contract_name
 
     remote = _compile_via_tools(req, code or next(iter(files.values()), ""), contract_name)
     if remote is not None:

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, Suspense, useCallback, useContext, useState } from "react";
+import { createContext, Suspense, useCallback, useContext, useEffect, useState } from "react";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 import { MobileNavDrawer } from "@/components/layout/MobileNavDrawer";
 
@@ -40,6 +40,17 @@ export function LayoutProvider({ children }: { children: React.ReactNode }) {
   const toggleMobileNav = useCallback(() => {
     setMobileNavOpen((v) => !v);
   }, []);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        openCommandPalette();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [openCommandPalette]);
 
   const value: LayoutContextValue = {
     contextSidebarOpen,

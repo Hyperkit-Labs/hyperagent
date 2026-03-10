@@ -605,10 +605,13 @@ def workflows_generate(
     request_id = (
         request.headers.get("x-request-id") or request.headers.get("X-Request-Id") or ""
     ).strip() or None
+    api_keys_present = bool(api_keys)
+    api_keys_provider_count = len(api_keys) if api_keys else 0
     logger.info(
-        "[generate] pipeline job queued workflow_id=%s api_keys_providers=%s agent_session_jwt=%s",
+        "[generate] pipeline job queued workflow_id=%s api_keys_present=%s api_keys_provider_count=%s agent_session_jwt=%s",
         workflow_id,
-        list(api_keys.keys()) if api_keys else [],
+        api_keys_present,
+        api_keys_provider_count,
         "yes" if agent_session_jwt else "no",
     )
     background_tasks.add_task(

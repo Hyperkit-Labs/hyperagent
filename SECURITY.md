@@ -58,7 +58,7 @@ Studio is a thin client. All pipeline logic, BYOK handling, and safety gates liv
 | Component | Security responsibility |
 |-----------|-------------------------|
 | **JWT auth** | `AUTH_JWT_SECRET` required for production. Validates `Authorization: Bearer` on all `/api/v1` routes except public paths. |
-| **Public paths** | `/health`, `/api/v1/auth/siwe`, `/api/v1/config`, `/api/v1/networks`, `/api/v1/tokens/stablecoins` are unauthenticated. |
+| **Public paths** | `/health`, `/api/v1/auth/bootstrap`, `/api/v1/config`, `/api/v1/networks`, `/api/v1/tokens/stablecoins` are unauthenticated. |
 | **Rate limiting** | Redis-backed. Per-IP and per-user limits. Stricter limits for LLM keys, workflow start, and deploy prepare. Fail-closed when Redis unavailable in production. |
 | **Request validation** | Request ID for tracing; structured security event logging. |
 
@@ -128,7 +128,7 @@ Policy: `infra/registries/security.yaml` defines `tieredGates`, `mandatoryTools`
 
 | Store | Security responsibility |
 |-------|-------------------------|
-| **Supabase (Postgres)** | RLS on `wallet_users`, `user_profiles`; only owning user can read/update `encrypted_llm_keys`. No LLM keys in logs or responses. |
+| **Supabase (Postgres)** | RLS on `wallet_users`, `wallet_user_profiles`; only owning user can read/update `encrypted_llm_keys`. No LLM keys in logs or responses. |
 | **Redis** | Rate limit state; no persistent user data. Required in production for rate limiting. |
 | **IPFS (Pinata)** | Artifacts by CID; gateway URLs. No secrets in pinned content. |
 
@@ -156,7 +156,7 @@ See `docs/runbooks/BYOK-key-lifecycle.md` for rotation and re-key procedures.
 4. Set `REQUIRE_AUTH=true` or leave unset (default: enforced).
 5. Set `CORS_ORIGINS` to production domains.
 6. Do not disable rate limiting in production.
-7. Ensure Supabase RLS is enabled on `wallet_users` and `user_profiles`.
+7. Ensure Supabase RLS is enabled on `wallet_users` and `wallet_user_profiles`.
 8. Set `TOOLS_API_KEY` if using remote hyperagent-tools for audit.
 9. Set `TENDERLY_API_KEY` for simulation service. For Layer 5 fail-closed, set `TENDERLY_SIMULATION_REQUIRED=true`.
 10. Set `PINATA_JWT` or equivalent for storage service when using IPFS.

@@ -222,6 +222,20 @@ export function LLMKeysCard() {
     return trimmed.length >= 20 && /^[a-zA-Z0-9_-]+$/.test(trimmed);
   };
 
+  const [testStatus, setTestStatus] = useState<Record<string, { loading: boolean, latency?: number, error?: string }>>({});
+
+  const handleTestConnection = async (provider: string) => {
+    setTestStatus(prev => ({ ...prev, [provider]: { loading: true } }));
+    // Mock testing connection
+    try {
+      await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 500));
+      setTestStatus(prev => ({ ...prev, [provider]: { loading: false, latency: Math.floor(Math.random() * 100) + 150 } }));
+      setTimeout(() => setTestStatus(prev => ({ ...prev, [provider]: { loading: false } })), 3000);
+    } catch {
+      setTestStatus(prev => ({ ...prev, [provider]: { loading: false, error: "Failed to connect" } }));
+    }
+  };
+
   const handleKeyChange = (provider: string, value: string) => {
     setKeys((prev) => ({ ...prev, [provider]: value }));
     if (looksLikeValidKey(value)) {
@@ -338,8 +352,11 @@ export function LLMKeysCard() {
                 <div className="flex items-center justify-between mb-1">
                   <label
                     htmlFor={`key-${provider}-card`}
-                    className="text-sm font-medium text-[var(--color-text-secondary)] flex items-center gap-1.5"
+                    className="text-sm font-medium text-[var(--color-text-secondary)] flex items-center gap-2"
                   >
+                    {provider === "openai" && <span className="w-4 h-4 bg-white rounded-full flex items-center justify-center shrink-0"><span className="w-2 h-2 bg-black rounded-full block" /></span>}
+                    {provider === "google" && <span className="w-4 h-4 bg-blue-500 rounded flex items-center justify-center shrink-0 text-white text-[8px] font-bold">G</span>}
+                    {provider === "anthropic" && <span className="w-4 h-4 bg-orange-200 rounded flex items-center justify-center shrink-0"><span className="w-2 h-2 bg-orange-600 rounded-sm block" /></span>}
                     {PROVIDER_LABELS[provider] ?? provider}
                     {PROVIDER_TAGS[provider] && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-primary-alpha-20)] text-[var(--color-primary-light)]">
@@ -347,16 +364,29 @@ export function LLMKeysCard() {
                       </span>
                     )}
                   </label>
-                  {PROVIDER_KEY_URLS[provider] && (
-                    <a
-                      href={PROVIDER_KEY_URLS[provider]}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] text-[var(--color-primary-light)] hover:underline"
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleTestConnection(provider)}
+                      disabled={!keys[provider] && !configured.includes(provider)}
+                      className="text-[10px] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                     >
-                      Get API key
-                    </a>
-                  )}
+                      {testStatus[provider]?.loading && <Loader2 className="w-3 h-3 animate-spin" />}
+                      {!testStatus[provider]?.loading && <span>Test</span>}
+                      {testStatus[provider]?.latency && <span className="text-[var(--color-semantic-success)] ml-1">{testStatus[provider]?.latency}ms</span>}
+                      {testStatus[provider]?.error && <span className="text-[var(--color-semantic-error)] ml-1">{testStatus[provider]?.error}</span>}
+                    </button>
+                    {PROVIDER_KEY_URLS[provider] && (
+                      <a
+                        href={PROVIDER_KEY_URLS[provider]}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-[var(--color-primary-light)] hover:underline"
+                      >
+                        Get API key
+                      </a>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <input

@@ -38,8 +38,9 @@ const SIWE_PATH = "/api/v1/auth/siwe";
 const RATE_LIMIT_SIWE_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_SIWE_MAX_IP) || 5) * RATE_LIMIT_MULTIPLIER);
 const RATE_LIMIT_SIWE_WINDOW_SEC = Number(process.env.RATE_LIMIT_SIWE_WINDOW_SEC) || 60;
 
-/** Lightweight reads (GET /config, /networks, /tokens/stablecoins). Higher limit; these are read-only and frequently polled. */
-const RATE_LIMIT_LIGHT_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_LIGHT_MAX_IP) || 1000) * RATE_LIMIT_MULTIPLIER);
+/** Lightweight reads (GET /config, /networks, /tokens/stablecoins). Tiered: strict IP for unauthenticated, user-based for authenticated. */
+const RATE_LIMIT_LIGHT_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_LIGHT_MAX_IP) || 100) * RATE_LIMIT_MULTIPLIER);
+const RATE_LIMIT_LIGHT_MAX_USER = Math.round((Number(process.env.RATE_LIMIT_LIGHT_MAX_USER) || 500) * RATE_LIMIT_MULTIPLIER);
 
 /** After Redis failure, skip reconnects for this many ms to avoid log spam. */
 const REDIS_BACKOFF_MS = 60_000;
@@ -139,7 +140,7 @@ export async function rateLimitMiddleware(
   }
   const isSiwe = req.method === "POST" && req.path === SIWE_PATH;
   if (isSiwe) {
-    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+    const ip = req.ip || (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
     const siweKey = `rl:ip:${ip}:siwe`;
     const siweOk = await checkLimit(siweKey, RATE_LIMIT_SIWE_MAX_IP, RATE_LIMIT_SIWE_WINDOW_SEC);
     if (!siweOk) {
@@ -159,17 +160,36 @@ export async function rateLimitMiddleware(
     req.method === "GET" &&
     (req.path === "/api/v1/config" || req.path === "/api/v1/config/integrations-debug" || req.path === "/api/v1/networks" || req.path === "/api/v1/tokens/stablecoins");
   if (isLightweightRead) {
-    const lightKey = `rl:ip:${(req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown"}:light`;
-    const lightOk = await checkLimit(lightKey, RATE_LIMIT_LIGHT_MAX_IP, RATE_LIMIT_WINDOW_SEC);
-    if (!lightOk) {
-      logSecurityEvent("rate_limit_light", 429, req.path, req.requestId, req.userId);
-      res.setHeader("Retry-After", String(RATE_LIMIT_WINDOW_SEC));
-      res.status(429).json({
-        error: "Too Many Requests",
-        message: "Config/networks rate limit exceeded. Try again later.",
-        requestId: req.requestId,
-      });
-      return;
+    const ip = req.ip || (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+    const userId = req.userId || "";
+
+    // Tiered: authenticated users get user-based limit; unauthenticated get strict IP limit
+    if (userId) {
+      const userKey = `rl:user:${userId}:light`;
+      const userOk = await checkLimit(userKey, RATE_LIMIT_LIGHT_MAX_USER, RATE_LIMIT_WINDOW_SEC);
+      if (!userOk) {
+        logSecurityEvent("rate_limit_light", 429, req.path, req.requestId, userId);
+        res.setHeader("Retry-After", String(RATE_LIMIT_WINDOW_SEC));
+        res.status(429).json({
+          error: "Too Many Requests",
+          message: "Config/networks rate limit exceeded. Try again later.",
+          requestId: req.requestId,
+        });
+        return;
+      }
+    } else {
+      const lightKey = `rl:ip:${ip}:light`;
+      const lightOk = await checkLimit(lightKey, RATE_LIMIT_LIGHT_MAX_IP, RATE_LIMIT_WINDOW_SEC);
+      if (!lightOk) {
+        logSecurityEvent("rate_limit_light", 429, req.path, req.requestId, undefined);
+        res.setHeader("Retry-After", String(RATE_LIMIT_WINDOW_SEC));
+        res.status(429).json({
+          error: "Too Many Requests",
+          message: "Config/networks rate limit exceeded. Try again later.",
+          requestId: req.requestId,
+        });
+        return;
+      }
     }
     next();
     return;
@@ -191,7 +211,7 @@ export async function rateLimitMiddleware(
       return;
     }
   }
-  const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+  const ip = req.ip || (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
   const userId = req.userId || "";
   const isLlmKeysPost = req.method === "POST" && req.path === LLM_KEYS_PATH;
   const isWorkflowGenerate = req.method === "POST" && req.path === "/api/v1/workflows/generate";

@@ -52,9 +52,9 @@ export default function DeploymentsPage() {
       </div>
 
       <div className="flex flex-1 min-h-0 gap-4">
-        <section className="w-[40%] min-w-[240px] flex flex-col rounded-2xl bg-slate-900/60 border border-white/5 backdrop-blur-md overflow-hidden">
-          <header className="flex items-center justify-between px-3 py-2 border-b border-white/5 shrink-0">
-            <h2 className="text-sm font-medium text-slate-100">All deployments</h2>
+        <section className="w-[40%] min-w-[240px] flex flex-col rounded-2xl glass-panel overflow-hidden">
+          <header className="flex items-center justify-between px-3 py-2 border-b border-[var(--color-border-subtle)] shrink-0">
+            <h2 className="text-sm font-medium text-[var(--color-text-primary)]">All deployments</h2>
             <div className="flex gap-1 text-[11px]">
               {(["all", "success", "failed", "pending"] as const).map((f) => (
                 <button
@@ -64,8 +64,8 @@ export default function DeploymentsPage() {
                   className={cn(
                     "px-2 py-1 rounded-full capitalize transition-colors",
                     statusFilter === f
-                      ? "bg-violet-500/20 text-violet-400"
-                      : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                      ? "bg-[var(--color-primary-alpha-20)] text-[var(--color-primary-light)]"
+                      : "text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-secondary)]"
                   )}
                 >
                   {f}
@@ -80,9 +80,9 @@ export default function DeploymentsPage() {
               </div>
             ) : deployments.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                <Rocket className="w-8 h-8 text-slate-500 mb-3" />
-                <p className="text-sm text-slate-400">No deployments yet</p>
-                <p className="text-xs text-slate-500 mt-1">Deploy a workflow to see deployments here.</p>
+                <Rocket className="w-8 h-8 text-[var(--color-text-muted)] mb-3" />
+                <p className="text-sm text-[var(--color-text-tertiary)]">No deployments yet</p>
+                <p className="text-xs text-[var(--color-text-muted)] mt-1">Deploy a workflow to see deployments here.</p>
                 <Link
                   href={ROUTES.HOME}
                   className="mt-4 px-4 py-2 rounded-lg btn-primary-gradient text-[var(--color-text-primary)] text-xs font-medium"
@@ -99,16 +99,16 @@ export default function DeploymentsPage() {
                     onClick={() => setSelectedId(d.id)}
                     className={cn(
                       "w-full flex items-center gap-2 px-3 py-2 border-l-2 border-transparent text-left transition-colors",
-                      selectedId === d.id && "border-violet-500 bg-violet-500/5",
-                      "hover:bg-white/5"
+                      selectedId === d.id && "border-[var(--color-primary)] bg-[var(--color-primary-alpha-05)]",
+                      "hover:bg-[var(--color-bg-hover)]"
                     )}
                   >
-                    <span className="truncate text-slate-100 flex-1 min-w-0">
+                    <span className="truncate text-[var(--color-text-primary)] flex-1 min-w-0">
                       {d.workflowId}
                     </span>
                     <span className="ml-auto flex items-center gap-2 shrink-0">
                       <StatusBadge status={d.status} />
-                      <span className="text-slate-500">{d.network ?? "-"}</span>
+                      <span className="text-[var(--color-text-muted)]">{d.network ?? "-"}</span>
                     </span>
                   </button>
                 ))}
@@ -117,11 +117,11 @@ export default function DeploymentsPage() {
           </div>
         </section>
 
-        <section className="flex-1 flex flex-col rounded-2xl bg-slate-900/60 border border-white/5 backdrop-blur-md overflow-hidden min-w-0">
+        <section className="flex-1 flex flex-col rounded-2xl glass-panel overflow-hidden min-w-0">
           {selectedDeployment ? (
             <DeploymentDetails deployment={selectedDeployment} />
           ) : (
-            <div className="flex flex-1 items-center justify-center text-sm text-slate-500 px-6">
+            <div className="flex flex-1 items-center justify-center text-sm text-[var(--color-text-muted)] px-6">
               Select a deployment to inspect logs, contracts, and actions.
             </div>
           )}

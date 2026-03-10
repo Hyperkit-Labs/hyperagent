@@ -198,9 +198,13 @@ export async function testAgent(
   const result = await generateText({
     model,
     system: `You are a Solidity test agent. Generate Foundry (forge test) or Hardhat tests for the given contracts.
-Output only test code. Use forge-std for Foundry or Hardhat's expect. Include: deployment setup, basic unit tests for main functions, edge cases.
+Output only test code. Use forge-std for Foundry or Hardhat's expect. Include:
+- Deployment setup, basic unit tests for main functions, edge cases
+- Assertion-heavy tests (assert(...)) for invariants and pre/post conditions
+- Echidna-style invariant_ functions when applicable (e.g. invariant_balance(), invariant_totalSupply())
+Echidna invariants must be executable properties; use invariant_ prefix for fuzzing.
 Use // FILE: Contract.t.sol before each test file. Output only code with file markers.`,
-    prompt: `Spec: ${JSON.stringify(spec)}\nDesign: ${JSON.stringify(design)}\n\nContracts:\n${contractSummary}\n\nGenerate comprehensive tests.`,
+    prompt: `Spec: ${JSON.stringify(spec)}\nDesign: ${JSON.stringify(design)}\n\nContracts:\n${contractSummary}\n\nGenerate comprehensive tests including invariant_ functions for security properties.`,
     maxTokens: 8192,
   });
   return parseMultiFileOutput(result.text);

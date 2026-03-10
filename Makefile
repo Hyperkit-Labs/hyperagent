@@ -91,9 +91,10 @@ up-local:
 	@echo "[+] Backend up (full local). Gateway: http://localhost:4000"
 	@echo "    Local postgres:54322  redis:6379  vectordb:6333"
 
-# Start Contabo production stack (for local testing; Coolify uses docker-compose.yml on server).
+# Start Contabo production stack (for local testing; Coolify uses infra/docker/docker-compose.yml).
+# Run from repo root with --project-directory . so paths resolve correctly.
 up-contabo:
-	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE) up -d
+	@docker compose --project-directory . --env-file $(ENV_FILE) -f $(COMPOSE_DIR)/$(COMPOSE_FILE) up -d
 	@echo "[+] Contabo stack up. Gateway: http://localhost:4000  Sandbox: http://localhost:8005"
 
 # Stop local dev stack
@@ -102,7 +103,7 @@ down:
 
 # Stop Contabo stack (use after make up-contabo)
 down-contabo:
-	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE) down
+	@docker compose --project-directory . --env-file $(ENV_FILE) -f $(COMPOSE_DIR)/$(COMPOSE_FILE) down
 
 restart:
 	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) restart

@@ -5,25 +5,23 @@ import { useState } from "react";
 import { ROUTES } from "@/constants/routes";
 import { useMetrics } from "@/hooks/useMetrics";
 import { useNetworks } from "@/hooks/useNetworks";
-import { Shield, FileCheck, AlertTriangle, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { useSecurityFindings } from "@/hooks/useSecurityFindings";
+import { Shield, FileCheck, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { EmptyState, NetworkTopologyMap, RadialProgress } from "@/components/ui";
 import { Shimmer } from "@/components/ai-elements";
 
 export default function SecurityPage() {
   const { metrics, loading, error, refetch } = useMetrics();
+  const { findings, loading: findingsLoading, error: findingsError, refetch: refetchFindings } = useSecurityFindings({ limit: 100 });
   const { networks } = useNetworks();
   const [expandedReport, setExpandedReport] = useState<string | null>(null);
   const total = metrics?.workflows?.total ?? 0;
   const completed = metrics?.workflows?.completed ?? 0;
   const failed = metrics?.workflows?.failed ?? 0;
   const hasData = total > 0;
-
-  const mockVulnerabilities = [
-    { id: "v1", severity: "High", type: "Reentrancy", contract: "Vault.sol", status: "Open", suggestion: "Use a reentrancy guard modifier or the checks-effects-interactions pattern." },
-    { id: "v2", severity: "Medium", type: "Timestamp Dependence", contract: "Lottery.sol", status: "Fixed", suggestion: "Avoid relying on block.timestamp for randomness." },
-    { id: "v3", severity: "Low", type: "Floating Pragma", contract: "Token.sol", status: "Open", suggestion: "Lock the pragma version to specific compiler version (e.g., ^0.8.20)." }
-  ];
+  const securityScore = metrics?.security?.score ?? null;
+  const hasFindings = findings.length > 0;
 
   return (
     <div className="p-6 lg:p-8">
@@ -40,9 +38,9 @@ export default function SecurityPage() {
           </div>
         </div>
 
-        <ApiErrorBanner error={error} onRetry={refetch} />
+        <ApiErrorBanner error={error ?? findingsError} onRetry={() => { refetch(); refetchFindings(); }} />
 
-        {loading && (
+        {(loading || findingsLoading) && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
               <Shimmer key={i} className="h-28 rounded-xl" />
@@ -69,8 +67,16 @@ export default function SecurityPage() {
               <div className="glass-panel rounded-xl p-5 flex flex-col items-center justify-center">
                 <span className="text-[var(--color-text-tertiary)] text-xs font-medium mb-3">Security Score</span>
                 <div className="relative flex items-center justify-center w-24 h-24">
-                  <RadialProgress progress={85} size={96} strokeWidth={8} color="var(--color-semantic-success)" />
-                  <div className="absolute inset-0 flex items-center justify-center text-3xl font-bold text-[var(--color-semantic-success)]">A-</div>
+                  {securityScore != null && securityScore > 0 ? (
+                    <>
+                      <RadialProgress progress={securityScore} size={96} strokeWidth={8} color="var(--color-semantic-success)" />
+                      <div className="absolute inset-0 flex items-center justify-center text-3xl font-bold text-[var(--color-semantic-success)]">
+                        {securityScore >= 90 ? "A" : securityScore >= 80 ? "B" : securityScore >= 70 ? "C" : "D"}
+                      </div>
+                    </>
+                  ) : (
+                    <span className="text-sm text-[var(--color-text-muted)]">—</span>
+                  )}
                 </div>
               </div>
               <div className="glass-panel rounded-xl p-5 flex flex-col">
@@ -117,23 +123,31 @@ export default function SecurityPage() {
               <div className="glass-panel rounded-xl p-6 overflow-y-auto">
                 <h3 className="text-sm font-medium text-[var(--color-text-primary)] mb-4">Vulnerability Breakdown</h3>
                 <div className="space-y-3">
-                  {mockVulnerabilities.map((vuln) => (
-                    <div key={vuln.id} className="bg-[var(--color-bg-base)] border border-[var(--color-border-subtle)] rounded-lg p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${vuln.severity === 'High' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : vuln.severity === 'Medium' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'}`}>
-                            {vuln.severity}
-                          </span>
-                          <span className="text-xs font-medium text-[var(--color-text-primary)]">{vuln.type}</span>
+                  {hasFindings ? (
+                    findings.map((vuln) => (
+                      <div key={vuln.id ?? vuln.run_id ?? Math.random()} className="bg-[var(--color-bg-base)] border border-[var(--color-border-subtle)] rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${(vuln.severity ?? "").toLowerCase() === "high" || (vuln.severity ?? "").toLowerCase() === "critical" ? "bg-red-500/10 text-red-400 border border-red-500/20" : (vuln.severity ?? "").toLowerCase() === "medium" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : "bg-blue-500/10 text-blue-400 border border-blue-500/20"}`}>
+                              {vuln.severity ?? "Info"}
+                            </span>
+                            <span className="text-xs font-medium text-[var(--color-text-primary)]">{vuln.category ?? vuln.title ?? vuln.tool ?? "Finding"}</span>
+                          </div>
+                          <span className={`text-[10px] ${(vuln.status ?? "open").toLowerCase() === "open" || (vuln.status ?? "").toLowerCase() === "fixed" ? ((vuln.status ?? "").toLowerCase() === "fixed" ? "text-emerald-400" : "text-amber-400") : "text-[var(--color-text-tertiary)]"}`}>{vuln.status ?? "Open"}</span>
                         </div>
-                        <span className={`text-[10px] ${vuln.status === 'Open' ? 'text-amber-400' : 'text-emerald-400'}`}>{vuln.status}</span>
+                        {(vuln.location ?? vuln.title) && (
+                          <div className="text-[10px] text-[var(--color-text-tertiary)] mb-2 font-mono">{vuln.location ?? vuln.title}</div>
+                        )}
+                        {vuln.description && (
+                          <div className="bg-[var(--color-bg-panel)] p-2 rounded text-[11px] text-[var(--color-text-secondary)]">
+                            <span className="text-[var(--color-semantic-violet)] font-medium mr-1">Fix:</span> {vuln.description}
+                          </div>
+                        )}
                       </div>
-                      <div className="text-[10px] text-[var(--color-text-tertiary)] mb-2 font-mono">{vuln.contract}</div>
-                      <div className="bg-[var(--color-bg-panel)] p-2 rounded text-[11px] text-[var(--color-text-secondary)]">
-                        <span className="text-[var(--color-semantic-violet)] font-medium mr-1">Fix:</span> {vuln.suggestion}
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <p className="text-xs text-[var(--color-text-muted)]">No security findings yet. Run an audit pipeline to see results.</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -143,25 +157,34 @@ export default function SecurityPage() {
                 <h3 className="text-sm font-medium text-[var(--color-text-primary)]">Audit Report Viewer</h3>
               </div>
               <div className="border border-[var(--color-border-subtle)] rounded-lg overflow-hidden">
-                <button 
-                  onClick={() => setExpandedReport(expandedReport === 'slither' ? null : 'slither')}
-                  className="w-full bg-[var(--color-bg-panel)] p-3 flex items-center justify-between hover:bg-[var(--color-bg-hover)] transition-colors text-xs font-medium text-[var(--color-text-primary)]"
-                >
-                  <div className="flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-[var(--color-semantic-violet)]" />
-                    Slither Report - run_89a3f2b
-                  </div>
-                  {expandedReport === 'slither' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                </button>
-                {expandedReport === 'slither' && (
-                  <div className="p-4 bg-[var(--color-bg-base)] text-[11px] font-mono text-[var(--color-text-secondary)] whitespace-pre-wrap">
-                    {`INFO:Detectors:
-Reentrancy in Vault.withdraw(uint256) (contracts/Vault.sol#45-55):
-        External calls:
-        - payable(msg.sender).call{value: amount}("") (contracts/Vault.sol#50)
-        State variables written after the call(s):
-        - balances[msg.sender] -= amount (contracts/Vault.sol#53)
-Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-1`}
+                {hasFindings ? (
+                  findings.slice(0, 5).map((f, i) => {
+                    const key = f.id ?? f.run_id ?? `f-${i}`;
+                    const reportId = `${f.tool ?? "audit"}-${(f.run_id ?? "").slice(0, 8)}`;
+                    const isExpanded = expandedReport === key;
+                    return (
+                      <div key={key} className="border-b border-[var(--color-border-subtle)] last:border-b-0">
+                        <button
+                          onClick={() => setExpandedReport(isExpanded ? null : key)}
+                          className="w-full bg-[var(--color-bg-panel)] p-3 flex items-center justify-between hover:bg-[var(--color-bg-hover)] transition-colors text-xs font-medium text-[var(--color-text-primary)]"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Shield className="w-4 h-4 text-[var(--color-semantic-violet)]" />
+                            {(f.tool ?? "Audit")} Report - {reportId}
+                          </div>
+                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </button>
+                        {isExpanded && (
+                          <div className="p-4 bg-[var(--color-bg-base)] text-[11px] font-mono text-[var(--color-text-secondary)] whitespace-pre-wrap">
+                            {[f.title, f.category, f.description, f.location].filter(Boolean).join("\n\n") || "No details available."}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="p-4 bg-[var(--color-bg-panel)] text-xs text-[var(--color-text-muted)]">
+                    No audit reports yet. Run the audit pipeline to generate Slither and other tool reports.
                   </div>
                 )}
               </div>

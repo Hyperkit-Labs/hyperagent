@@ -33,6 +33,11 @@ const RATE_LIMIT_WORKFLOW_GENERATE_MAX_USER = Math.round((Number(process.env.RAT
 const RATE_LIMIT_DEPLOY_PREPARE_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_DEPLOY_PREPARE_MAX_IP) || 30) * RATE_LIMIT_MULTIPLIER);
 const RATE_LIMIT_DEPLOY_PREPARE_MAX_USER = Math.round((Number(process.env.RATE_LIMIT_DEPLOY_PREPARE_MAX_USER) || 50) * RATE_LIMIT_MULTIPLIER);
 
+/** SIWE sign-in: strict per-IP limit to prevent brute force. No auth yet so IP-only. */
+const SIWE_PATH = "/api/v1/auth/siwe";
+const RATE_LIMIT_SIWE_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_SIWE_MAX_IP) || 5) * RATE_LIMIT_MULTIPLIER);
+const RATE_LIMIT_SIWE_WINDOW_SEC = Number(process.env.RATE_LIMIT_SIWE_WINDOW_SEC) || 60;
+
 /** Lightweight reads (GET /config, /networks, /tokens/stablecoins). Higher limit; these are read-only and frequently polled. */
 const RATE_LIMIT_LIGHT_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_LIGHT_MAX_IP) || 1000) * RATE_LIMIT_MULTIPLIER);
 
@@ -129,6 +134,24 @@ export async function rateLimitMiddleware(
     return;
   }
   if (req.path === "/health") {
+    next();
+    return;
+  }
+  const isSiwe = req.method === "POST" && req.path === SIWE_PATH;
+  if (isSiwe) {
+    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+    const siweKey = `rl:ip:${ip}:siwe`;
+    const siweOk = await checkLimit(siweKey, RATE_LIMIT_SIWE_MAX_IP, RATE_LIMIT_SIWE_WINDOW_SEC);
+    if (!siweOk) {
+      logSecurityEvent("rate_limit_siwe", 429, req.path, req.requestId, undefined);
+      res.setHeader("Retry-After", String(RATE_LIMIT_SIWE_WINDOW_SEC));
+      res.status(429).json({
+        error: "Too Many Requests",
+        message: "Too many sign-in attempts. Try again later.",
+        requestId: req.requestId,
+      });
+      return;
+    }
     next();
     return;
   }

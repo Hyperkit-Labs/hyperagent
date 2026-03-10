@@ -144,8 +144,30 @@ def _compile_foundry_multi(workdir: Path, files: dict[str, str], entry_contract:
     return False, None, None, [f"Contract {entry_contract} not found in compiled output"]
 
 
+def _safe_contract_name(name: str) -> str:
+    """
+    Sanitize a user-provided contract name so it cannot influence directory structure.
+
+    Allows only Solidity-identifier-style names: letters, digits, and underscore,
+    and forbids path separators or traversal tokens.
+    """
+    if name is None:
+        raise ValueError("contract name is required")
+    name = name.strip()
+    if not name:
+        raise ValueError("contract name must not be empty")
+    # Disallow obvious path-manipulation patterns
+    if "/" in name or "\\" in name or ".." in name or name.startswith("."):
+        raise ValueError("invalid contract name")
+    # Restrict to a conservative pattern: starts with letter or underscore, then letters/digits/underscore
+    if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", name):
+        raise ValueError("invalid contract name")
+    return name
+
+
 def _compile_foundry_impl(workdir: Path, contract_name: str, contract_code: str) -> tuple[bool, str | None, list | None, list[str]]:
     """Compile using Foundry (forge build)."""
+    contract_name = _safe_contract_name(contract_name)
     src = workdir / "src"
     src.mkdir(parents=True, exist_ok=True)
     if "pragma solidity" not in contract_code.strip().lower():
@@ -331,6 +353,11 @@ def compile_contract(req: CompileRequest) -> CompileResponse:
         contract_name = entry_contract
     else:
         contract_name = entry_contract or _extract_contract_name(code or next(iter(files.values()), ""))
+
+    try:
+        contract_name = _safe_contract_name(contract_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     remote = _compile_via_tools(req, code or next(iter(files.values()), ""), contract_name)
     if remote is not None:

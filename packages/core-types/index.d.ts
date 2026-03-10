@@ -14,6 +14,31 @@ export interface SimulateTxResult {
   error?: string;
 }
 
+export interface SimulateBundleTx {
+  network_id: string;
+  from: string;
+  to?: string;
+  input: string;
+  value?: string;
+  gas?: number;
+  save?: boolean;
+  save_if_fails?: boolean;
+  simulation_type?: "full" | "quick" | "abi";
+  state_objects?: Record<string, { stateDiff?: Record<string, string>; storage?: Record<string, string> }>;
+}
+
+export interface SimulateBundleRequest {
+  simulations: SimulateBundleTx[];
+}
+
+export interface SimulateBundleResult {
+  success: boolean;
+  gasUsed?: number;
+  simulations?: Array<{ success: boolean; gas_used?: number; error?: string }>;
+  simulationUrl?: string | null;
+  error?: string;
+}
+
 export interface DeployPlanRequest {
   chainId: number;
   bytecode: string;

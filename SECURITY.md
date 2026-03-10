@@ -97,19 +97,30 @@ Cross-service URLs (`COMPILE_SERVICE_URL`, `AUDIT_SERVICE_URL`, etc.) are config
 
 ---
 
-## Layer 5: Security Tools
+## Layer 5: Security Tools (Tiered Gate Model)
 
-| Tool | Where used | Purpose |
-|------|------------|---------|
-| **Slither** | Audit service, `infra/registries/security.yaml` | Static analysis; reentrancy, access control, gas. |
-| **Mythril** | Audit service | Symbolic execution; SWC mapping. |
-| **MythX** | Audit service (when `AUDIT_MODE=mythx`) | Cloud analysis. |
-| **Echidna** | Audit service | Fuzzing. |
-| **Tenderly** | Simulation service | Pre-deploy simulation; failure blocks deploy. |
-| **SCRUBD** | Orchestrator (mandatory step) | RE/UX validation; reentrancy and unhandled exceptions. |
-| **Pashov solidity-auditor** | Orchestrator (when `PASHOV_AUDIT_ENABLED=true`) | AI-driven security review; merged with Slither/Mythril. |
+HyperAgent enforces a three-tier security model: deterministic static analysis (Slither), deterministic symbolic execution (Mythril), and deterministic runtime validation (Tenderly simulation) are mandatory deployment gates; property-based fuzzing (Echidna) is mandatory when invariant harnesses are available; AI review (Pashov `solidity-auditor`) is always executed but becomes deploy-blocking only when corroborated or manually confirmed.
 
-Policy: `infra/registries/security.yaml` defines `mandatoryTools`, `deployBlockSeverity`, `maxAllowedSeverityForDeploy`, and `requireSimulationSuccess`. High-severity SWC findings block deployment.
+| Tool | Trust level | Deploy rule | Purpose |
+|------|-------------|-------------|---------|
+| **Slither** | High | Block on High/Critical | Mandatory static gate for reentrancy, access control, and related classes. |
+| **Mythril** | High | Block on High/Critical | Mandatory symbolic gate; findings stored with raw JSON evidence, SWC identifiers, and transaction sequences. |
+| **Echidna** | Medium-high | Block when harness fails | Mandatory only when harness exists. Echidna is not considered successful unless HyperAgent generated or attached executable properties, assertions, or invariant functions. If no harness, return NOT_APPLICABLE. |
+| **Tenderly** | High | Always block on failure | Mandatory predeploy execution gate; any failed simulation blocks deploy. |
+| **SCRUBD** | Internal-high | Block on matched patterns | Mandatory policy/pattern gate for curated RE/UX checks; label as internal-policy. |
+| **Pashov solidity-auditor** | Medium | Block only when corroborated | Always-on reviewer; block only when corroborated by Slither/Mythril/Echidna/Tenderly or escalated by human review. |
+| **ROMA** | Internal | Never block | Spec bootstrap and requirement shaping; not a security control. |
+| **MythX** | Optional | Never block | Optional compatibility backend; not a hard dependency. |
+
+**Hard rules:**
+- Slither or Mythril High/Critical finding blocks deploy unless explicitly waived by a signed human override with evidence attached.
+- Echidna property failure blocks deploy, but missing properties cannot be counted as success.
+- Tenderly simulation failure always blocks deploy.
+- Pashov findings become deploy-blocking only if reproduced by deterministic tooling, matched to known policy categories, or confirmed in manual review.
+
+Policy: `infra/registries/security.yaml` defines `tieredGates`, `mandatoryTools`, `deployBlockSeverity`, `maxAllowedSeverityForDeploy`, and `requireSimulationSuccess`.
+
+**Security policy evaluator:** A dedicated `security_policy_evaluator` stage runs after simulation and before exploit_simulation. It produces a single normalized `SecurityVerdict` from audit, SCRUBD, and simulation outputs. Deterministic tools and simulation are the hard gate; AI review (Pashov) is mandatory context that can escalate risk but must not silently substitute for reproducible evidence. `NOT_APPLICABLE` is never treated as `PASS`. `WAIVED` must always carry human evidence (approver_id, reason, expiry_at, evidence_refs). Deploy approval reads from `security_verdict.approvedForDeploy`. Module: `services/orchestrator/security/` (evaluator, policy_loader, finding_normalizers, finding_correlation, waiver_validation, schemas).
 
 ---
 
@@ -147,7 +158,7 @@ See `docs/runbooks/BYOK-key-lifecycle.md` for rotation and re-key procedures.
 6. Do not disable rate limiting in production.
 7. Ensure Supabase RLS is enabled on `wallet_users` and `user_profiles`.
 8. Set `TOOLS_API_KEY` if using remote hyperagent-tools for audit.
-9. Set `TENDERLY_API_KEY` for simulation service.
+9. Set `TENDERLY_API_KEY` for simulation service. For Layer 5 fail-closed, set `TENDERLY_SIMULATION_REQUIRED=true`.
 10. Set `PINATA_JWT` or equivalent for storage service when using IPFS.
 
 ---

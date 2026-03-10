@@ -22,8 +22,9 @@ import type { AgentStatus } from "@/lib/api";
 import { ROUTES } from "@/constants/routes";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { ShimmerGrid } from "@/components/ai-elements";
-import { EmptyState } from "@/components/ui";
+import { EmptyState, GlowingBorder, RadialProgress, NetworkTopologyMap } from "@/components/ui";
 import { PageTitle } from "@/components/layout/PageTitle";
+import { LineChart, Line, ResponsiveContainer, YAxis } from "recharts";
 
 type AgentCategory = "all" | "generators" | "auditors" | "deployers";
 
@@ -52,11 +53,30 @@ function categoryLabel(cat: AgentCategory): string {
 export default function AgentsPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<AgentCategory>("all");
-  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [viewMode, setViewMode] = useState<"list" | "grid" | "graph">("list");
   const [enabledMap, setEnabledMap] = useState<Record<string, boolean>>({});
   const [selectedName, setSelectedName] = useState<string | null>(null);
+  const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set());
   const router = useRouter();
   const { agents, loading, error, refetch } = useAgents();
+
+  const toggleSelectAgent = useCallback((name: string) => {
+    setSelectedAgents((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }, []);
+
+  const selectAll = useCallback(() => {
+    if (!agents) return;
+    if (selectedAgents.size === agents.length) {
+      setSelectedAgents(new Set());
+    } else {
+      setSelectedAgents(new Set(agents.map(a => a.name ?? "")));
+    }
+  }, [agents, selectedAgents]);
 
   const toggleEnabled = useCallback((name: string) => {
     setEnabledMap((prev) => ({ ...prev, [name]: !prev[name] }));
@@ -103,6 +123,15 @@ export default function AgentsPage() {
           <ApiErrorBanner error={error ?? null} onRetry={refetch} />
 
           <div className="flex flex-wrap items-center gap-3 pb-4 border-b border-[var(--color-border-subtle)]">
+            <div className="flex items-center gap-2 pr-2 border-r border-[var(--color-border-subtle)]">
+              <input 
+                type="checkbox" 
+                checked={agents && agents.length > 0 && selectedAgents.size === agents.length}
+                onChange={selectAll}
+                className="w-4 h-4 rounded border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] text-[var(--color-primary)] focus:ring-[var(--color-primary-alpha-50)] cursor-pointer"
+                title="Select all"
+              />
+            </div>
             <div className="relative w-64 group">
               <Search className="w-3.5 h-3.5 text-[var(--color-text-muted)] absolute left-3 top-2.5" />
               <input
@@ -230,6 +259,9 @@ export default function AgentsPage() {
               const name = agent.name ?? "Agent";
               const toggleId = `agent-toggle-${String(agent.name ?? "").replace(/\s/g, "-")}-${i}`;
               const isSelected = selectedName === (agent.name ?? null);
+              const isChecked = selectedAgents.has(name);
+              const progress = isOk ? 98 : 75;
+
               return (
                 <div
                   key={agent.name ?? i}
@@ -241,6 +273,14 @@ export default function AgentsPage() {
                     i === 0 ? "delay-75" : i === 1 ? "delay-100" : i === 2 ? "delay-150" : "delay-200"
                   } ${isSelected ? "ring-1 ring-[var(--color-primary-alpha-30)] bg-[var(--color-bg-panel)] border-[var(--color-primary-alpha-20)]" : "glass-panel glass-panel-hover bg-[var(--color-bg-panel)] border-[var(--color-border-subtle)]"}`}
                 >
+                  <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => toggleSelectAgent(name)}
+                      className="w-4 h-4 rounded border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] text-[var(--color-primary)] focus:ring-[var(--color-primary-alpha-50)] cursor-pointer"
+                    />
+                  </div>
                   <div className={`w-10 h-10 rounded-lg border flex items-center justify-center shrink-0 ${bgClass}`}>
                     <Icon className="w-5 h-5 text-current opacity-90" />
                   </div>
@@ -250,12 +290,7 @@ export default function AgentsPage() {
                         <h3 className={`text-sm font-medium ${enabled ? "text-[var(--color-text-primary)]" : "text-[var(--color-text-muted)]"}`}>
                           {name}
                         </h3>
-                        {enabled && isOk && (
-                          <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-semantic-success)]" title="Healthy" />
-                        )}
-                        {!enabled && (
-                          <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-text-muted)]" title="Disabled" />
-                        )}
+                        <RadialProgress progress={progress} size={16} strokeWidth={2} color={isOk ? "var(--color-semantic-success)" : "var(--color-semantic-warning)"} />
                       </div>
                       <div className="text-[10px] text-[var(--color-text-tertiary)] flex items-center gap-1.5 mt-0.5">
                         <span className={`px-1.5 py-px rounded border ${cat === "generators" ? "bg-purple-500/10 text-purple-400 border-purple-500/20" : cat === "auditors" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" : cat === "deployers" ? "bg-orange-500/10 text-orange-400 border-orange-500/20" : "bg-[var(--color-primary-alpha-10)] text-[var(--color-semantic-violet)] border-[var(--color-primary-alpha-20)]"}`}>
@@ -356,23 +391,73 @@ export default function AgentsPage() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-5 space-y-4">
-              <div>
-                <div className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] font-semibold mb-1.5">Status</div>
-                <div className="text-xs text-[var(--color-text-secondary)]">{selectedAgent.status ?? "Unknown"}</div>
+            <div className="flex-1 overflow-y-auto p-5 space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-[var(--color-bg-panel)] p-3 rounded-lg border border-[var(--color-border-subtle)]">
+                  <div className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] font-semibold mb-1.5">Status</div>
+                  <div className="text-xs text-[var(--color-text-primary)] font-medium flex items-center gap-1.5">
+                    <div className={`w-1.5 h-1.5 rounded-full ${selectedAgent.status?.toLowerCase() === 'healthy' || selectedAgent.status?.toLowerCase() === 'ok' ? 'bg-[var(--color-semantic-success)]' : 'bg-[var(--color-semantic-warning)]'}`} />
+                    {selectedAgent.status ?? "Unknown"}
+                  </div>
+                </div>
+                <div className="bg-[var(--color-bg-panel)] p-3 rounded-lg border border-[var(--color-border-subtle)]">
+                  <div className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] font-semibold mb-1.5">Category</div>
+                  <span className={`inline-block px-2 py-1 rounded text-[10px] border ${agentCategory(selectedAgent.name) === "generators" ? "bg-purple-500/10 text-purple-400 border-purple-500/20" : agentCategory(selectedAgent.name) === "auditors" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" : agentCategory(selectedAgent.name) === "deployers" ? "bg-orange-500/10 text-orange-400 border-orange-500/20" : "bg-[var(--color-bg-hover)] text-[var(--color-text-secondary)] border-[var(--color-border-subtle)]"}`}>
+                    {categoryLabel(agentCategory(selectedAgent.name))}
+                  </span>
+                </div>
               </div>
+
               <div>
-                <div className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] font-semibold mb-1.5">Category</div>
-                <span className={`inline-block px-2 py-1 rounded text-xs border ${agentCategory(selectedAgent.name) === "generators" ? "bg-purple-500/10 text-purple-400 border-purple-500/20" : agentCategory(selectedAgent.name) === "auditors" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" : agentCategory(selectedAgent.name) === "deployers" ? "bg-orange-500/10 text-orange-400 border-orange-500/20" : "bg-[var(--color-bg-hover)] text-[var(--color-text-secondary)] border-[var(--color-border-subtle)]"}`}>
-                  {categoryLabel(agentCategory(selectedAgent.name))}
-                </span>
+                <div className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] font-semibold mb-3">Execution History (Last 7 Days)</div>
+                <div className="h-24 bg-[var(--color-bg-panel)] rounded-lg border border-[var(--color-border-subtle)] p-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={[
+                      { time: 'Mon', count: 12 },
+                      { time: 'Tue', count: 19 },
+                      { time: 'Wed', count: 15 },
+                      { time: 'Thu', count: 25 },
+                      { time: 'Fri', count: 22 },
+                      { time: 'Sat', count: 30 },
+                      { time: 'Sun', count: 28 },
+                    ]}>
+                      <Line type="monotone" dataKey="count" stroke="var(--color-semantic-violet)" strokeWidth={2} dot={{ r: 2, fill: "var(--color-semantic-violet)" }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-              <div className="pt-2 border-t border-[var(--color-border-subtle)]">
+
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] font-semibold mb-3 flex items-center justify-between">
+                  <span>Configuration</span>
+                  <button className="text-[10px] text-[var(--color-primary)] hover:underline">Edit</button>
+                </div>
+                <div className="bg-[#0d1117] rounded-lg p-3 overflow-x-auto border border-[var(--color-border-subtle)]">
+                  <pre className="text-[10px] text-[var(--color-text-secondary)] font-mono leading-relaxed">
+                    {JSON.stringify({
+                      model: "gpt-4-turbo-preview",
+                      temperature: 0.2,
+                      maxTokens: 4096,
+                      capabilities: ["solidity", "erc20", "erc721"],
+                      tools: ["slither", "mythril"],
+                      timeout: "120s"
+                    }, null, 2)}
+                  </pre>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-[var(--color-border-subtle)] flex items-center gap-3">
+                <button
+                  type="button"
+                  className="flex-1 btn-primary-gradient text-xs px-4 py-2 rounded-lg flex items-center justify-center gap-2"
+                >
+                  <Play className="w-3.5 h-3.5" /> Test Agent
+                </button>
                 <Link
                   href={ROUTES.MONITORING}
-                  className="text-xs font-medium text-[var(--color-semantic-violet)] hover:underline"
+                  className="flex-1 bg-[var(--color-bg-panel)] hover:bg-[var(--color-bg-hover)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] text-xs px-4 py-2 rounded-lg flex items-center justify-center transition-colors"
                 >
-                  View logs
+                  View Logs
                 </Link>
               </div>
             </div>

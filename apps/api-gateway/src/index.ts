@@ -17,7 +17,7 @@ import { createProxyMiddleware, responseInterceptor } from "http-proxy-middlewar
 import { requestIdMiddleware, RequestWithId } from "./requestId.js";
 import { authMiddleware, RequestWithUser } from "./auth.js";
 import { rateLimitMiddleware } from "./rateLimit.js";
-import { siweAuthHandler } from "./siweAuth.js";
+import { authBootstrapHandler } from "./authBootstrap.js";
 
 const ORCHESTRATOR_URL = process.env.ORCHESTRATOR_URL || "http://localhost:8000";
 const NODE_ENV = process.env.NODE_ENV || "development";
@@ -76,7 +76,7 @@ app.use(
 );
 
 // Body parsing is NOT applied globally. Proxy routes need the raw request stream intact.
-// Only non-proxied routes (SIWE, health) use express.json() via per-route middleware.
+// Only non-proxied routes (auth bootstrap, health) use express.json() via per-route middleware.
 const jsonParser = express.json({ limit: "2mb" });
 
 app.use(requestIdMiddleware);
@@ -131,8 +131,8 @@ function proxyOptions(): Record<string, unknown> {
   };
 }
 
-// SIWE: wallet sign-in (public, no auth). Needs parsed body, so jsonParser is applied here only.
-app.post("/api/v1/auth/siwe", jsonParser, siweAuthHandler);
+// Single auth entrypoint: SIWE and thirdweb OAuth/in-app. Both upsert wallet_users and issue session JWT.
+app.post("/api/v1/auth/bootstrap", jsonParser, authBootstrapHandler);
 
 // Primary: versioned API (proxied; raw body stream forwarded to orchestrator)
 app.use("/api/v1", createProxyMiddleware(proxyOptions()));

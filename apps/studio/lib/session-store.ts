@@ -34,6 +34,39 @@ export interface SessionOnlyLLMKey {
   apiKey: string;
 }
 
+// Lightweight encoding/decoding to avoid storing the API key in clear text in sessionStorage.
+// Note: This is obfuscation, not strong cryptography, but it prevents trivial inspection of the key at rest.
+const API_KEY_MASK = 0x5a;
+
+function encodeApiKeyForStorage(plain: string): string {
+  try {
+    const bytes = new TextEncoder().encode(plain);
+    const masked = bytes.map((b) => b ^ API_KEY_MASK);
+    let binary = "";
+    masked.forEach((b) => {
+      binary += String.fromCharCode(b);
+    });
+    return btoa(binary);
+  } catch {
+    // Fallback: if encoding fails for any reason, return the original string.
+    return plain;
+  }
+}
+
+function decodeApiKeyFromStorage(encoded: string): string | null {
+  try {
+    const binary = atob(encoded);
+    const masked = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      masked[i] = binary.charCodeAt(i) ^ API_KEY_MASK;
+    }
+    return new TextDecoder().decode(masked);
+  } catch {
+    // If decoding fails, treat the stored value as invalid.
+    return null;
+  }
+}
+
 export function getSessionOnlyLLMKey(): SessionOnlyLLMKey | null {
   if (typeof window === "undefined") return null;
   try {
@@ -42,9 +75,12 @@ export function getSessionOnlyLLMKey(): SessionOnlyLLMKey | null {
     const data = JSON.parse(raw) as unknown;
     if (data && typeof data === "object" && "provider" in data && "apiKey" in data) {
       const provider = (data as { provider: string }).provider;
-      const apiKey = (data as { apiKey: string }).apiKey;
-      if (["openai", "google", "anthropic"].includes(provider) && typeof apiKey === "string" && apiKey.trim()) {
-        return { provider: provider as SessionLLMProvider, apiKey: apiKey.trim() };
+      const apiKeyEncoded = (data as { apiKey: string }).apiKey;
+      if (["openai", "google", "anthropic"].includes(provider) && typeof apiKeyEncoded === "string" && apiKeyEncoded.trim()) {
+        const apiKey = decodeApiKeyFromStorage(apiKeyEncoded.trim());
+        if (apiKey && apiKey.trim()) {
+          return { provider: provider as SessionLLMProvider, apiKey: apiKey.trim() };
+        }
       }
     }
   } catch {
@@ -56,9 +92,10 @@ export function getSessionOnlyLLMKey(): SessionOnlyLLMKey | null {
 export function setSessionOnlyLLMKey(payload: SessionOnlyLLMKey): void {
   if (typeof window === "undefined") return;
   try {
+    const apiKeyEncoded = encodeApiKeyForStorage(payload.apiKey);
     sessionStorage.setItem(
       SESSION_LLM_PASS_THROUGH_STORAGE_KEY,
-      JSON.stringify({ provider: payload.provider, apiKey: payload.apiKey })
+      JSON.stringify({ provider: payload.provider, apiKey: apiKeyEncoded })
     );
     window.dispatchEvent(new Event(SESSION_LLM_PASS_THROUGH_UPDATED_EVENT));
   } catch {

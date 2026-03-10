@@ -144,6 +144,18 @@ def _compile_foundry_multi(workdir: Path, files: dict[str, str], entry_contract:
     return False, None, None, [f"Contract {entry_contract} not found in compiled output"]
 
 
+def _safe_contract_name(name: str) -> str:
+    """
+    Restrict contract names to a safe identifier format to avoid path traversal
+    when they are used in file paths.
+    """
+    name = (name or "").strip()
+    # Solidity identifiers: start with letter or underscore, then letters/digits/underscore.
+    if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", name):
+        raise ValueError("Invalid contract name")
+    return name
+
+
 def _compile_foundry_impl(workdir: Path, contract_name: str, contract_code: str) -> tuple[bool, str | None, list | None, list[str]]:
     """Compile using Foundry (forge build)."""
     src = workdir / "src"
@@ -328,9 +340,14 @@ def compile_contract(req: CompileRequest) -> CompileResponse:
         entry_contract = entry_contract or next((Path(n).stem for n in files if n.endswith(".sol")), None)
         if not entry_contract:
             raise HTTPException(status_code=400, detail="entryContract required when compiling multiple files")
-        contract_name = entry_contract
+        contract_name_raw = entry_contract
     else:
-        contract_name = entry_contract or _extract_contract_name(code or next(iter(files.values()), ""))
+        contract_name_raw = entry_contract or _extract_contract_name(code or next(iter(files.values()), ""))
+
+    try:
+        contract_name = _safe_contract_name(contract_name_raw)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid contract name")
 
     remote = _compile_via_tools(req, code or next(iter(files.values()), ""), contract_name)
     if remote is not None:

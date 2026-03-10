@@ -6,9 +6,13 @@ Single policy for where data lives so traces, artifacts, and indexes stay consis
 
 ## Rule
 
-- **Traces** – Stub blob IDs stored in Supabase (`run_steps.trace_blob_id`). No external DA layer.
+- **Traces** – Stub blob IDs stored in Supabase (`run_steps.trace_blob_id`). In production, IPFS (Pinata) is required for verifiable provenance; stub mode logs runs as unverifiable.
 - **Artifacts (files, IPFS)** – IPFS (e.g. Pinata). CID and gateway URL stored in Supabase or returned in API.
 - **Indexes and relational data** – Supabase (Postgres). Projects, runs, run_steps, deployments, simulations, user_profiles, etc.
+
+## Production
+
+- Configure `PINATA_API_KEY` and `PINATA_JWT` (or equivalent) so trace writer pins to IPFS. Without IPFS, traces use stub IDs and runs are marked unverifiable in logs.
 
 ---
 

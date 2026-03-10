@@ -129,7 +129,7 @@ If instead you run **only the orchestrator** on 8000 (no gateway), leave `NEXT_P
 **Checks:**
 
 1. **Gateway upstream URL**  
-   Run `make logs` (or `docker compose -f infra/docker/docker-compose.yml logs api-gateway`) and look for the startup line:
+   Run `make logs` (or `docker compose --project-directory . -f infra/docker/docker-compose.yml logs api-gateway`) and look for the startup line:
    - **Good:** `[API Gateway] listening on 4000, forwarding to http://orchestrator:8000`  
    - **Bad:** `forwarding to http://localhost:8000` — inside Docker, localhost is the gateway container itself, so the orchestrator is never reached.  
    Fix: Do not override `ORCHESTRATOR_URL` for the gateway in Docker; `infra/docker/docker-compose.yml` sets `ORCHESTRATOR_URL=http://orchestrator:8000` for the api-gateway service. If you see localhost, ensure your `.env` is not being applied in a way that overrides the compose `environment` (compose environment section should override env_file).
@@ -199,8 +199,8 @@ If instead you run **only the orchestrator** on 8000 (no gateway), leave `NEXT_P
 2. **Docker (backend only)**  
    From repo root:
    ```bash
-   docker compose -f infra/docker/docker-compose.yml logs api-gateway
-   docker compose -f infra/docker/docker-compose.yml logs orchestrator
+   docker compose --project-directory . -f infra/docker/docker-compose.yml logs api-gateway
+   docker compose --project-directory . -f infra/docker/docker-compose.yml logs orchestrator
    ```
    Use these for **workflow create**, **BYOK get/set/delete**, and other gateway/orchestrator calls. They do **not** show chat errors.
 

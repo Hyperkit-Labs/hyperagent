@@ -130,7 +130,10 @@ def _compile_foundry_multi(workdir: Path, files: dict[str, str], entry_contract:
     if result.returncode != 0:
         return False, None, None, [result.stderr or result.stdout or "forge build failed"]
     for name in files:
-        base = Path(name).stem
+        # Use the same safe filename logic as when writing sources, to avoid
+        # uncontrolled paths derived from untrusted `name` and to match Foundry's output.
+        safe_name = _safe_sol_filename(name)
+        base = Path(safe_name).stem
         out_dir = workdir / "out" / f"{base}.sol"
         if out_dir.exists():
             artifact = out_dir / f"{base}.json"

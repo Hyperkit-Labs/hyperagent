@@ -73,7 +73,13 @@ def _run_slither_impl(workdir: Path, contract_name: str, code: str, detectors: s
     src.mkdir(parents=True, exist_ok=True)
     if "pragma solidity" not in code.strip().lower():
         code = "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n" + code
-    (src / f"{contract_name}.sol").write_text(code)
+    sol_path = src / f"{contract_name}.sol"
+    # Normalize and ensure the file path stays within the expected source directory
+    src_root = src.resolve()
+    sol_path_resolved = sol_path.resolve()
+    if os.path.commonpath([str(src_root), str(sol_path_resolved)]) != str(src_root):
+        raise HTTPException(status_code=400, detail="Invalid contract name path")
+    sol_path.write_text(code)
     (workdir / "foundry.toml").write_text('[profile.default]\nsolc = "0.8.24"\n')
     cmd = ["slither", str(src), "--json", "-"]
     if detectors:

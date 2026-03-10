@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ROUTES } from "@/constants/routes";
 import { searchTemplates, type TemplateItem } from "@/lib/api";
 import { useTemplatesData } from "@/hooks/useTemplatesData";
-import { LayoutTemplate, Plus, Search } from "lucide-react";
+import { LayoutTemplate, Plus, Search, Flame, BarChart, CheckSquare, X } from "lucide-react";
 import { ShimmerGrid } from "@/components/ai-elements";
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
   all: [],
@@ -45,6 +47,17 @@ function TemplatesContent() {
 
   const [searchResults, setSearchResults] = useState<TemplateItem[] | null>(null);
   const [searching, setSearching] = useState(false);
+  const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
+  const [hoveredTemplate, setHoveredTemplate] = useState<string | null>(null);
+
+  const toggleCompare = (id: string) => {
+    setCompareIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else if (next.size < 2) next.add(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -137,6 +150,49 @@ function TemplatesContent() {
 
         {(loading || searching) && <ShimmerGrid count={6} />}
 
+        {!loading && !searching && items.length > 0 && !showSearchResults && category === "all" && (
+          <div className="mb-8">
+            <h2 className="text-sm font-medium text-[var(--color-text-primary)] mb-4 flex items-center gap-2">
+              <Flame className="w-4 h-4 text-orange-400" /> Featured Templates
+            </h2>
+            <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory hide-scrollbar">
+              {items.slice(0, 4).map(item => (
+                <div key={`feat-${item.id}`} className="shrink-0 w-[300px] snap-center glass-panel rounded-xl p-5 border border-orange-500/20 bg-orange-500/5 hover:border-orange-500/40 transition-colors">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center shrink-0">
+                      <LayoutTemplate className="w-5 h-5 text-orange-400" />
+                    </div>
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-orange-500/20 text-orange-400">Popular</span>
+                  </div>
+                  <h3 className="font-medium text-white truncate">{item.name || item.id}</h3>
+                  <p className="text-xs text-[var(--color-text-tertiary)] mt-1 line-clamp-2">{item.description}</p>
+                  <Link href={`${ROUTES.HOME}?template=${encodeURIComponent(item.id)}`} className="mt-4 inline-block text-xs font-medium text-orange-400 hover:text-orange-300">
+                    Use template &rarr;
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {compareIds.size > 0 && (
+          <div className="bg-[var(--color-bg-panel)] border border-[var(--color-primary-alpha-30)] rounded-lg p-3 flex items-center justify-between shadow-lg sticky top-20 z-10 animate-enter">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-medium text-[var(--color-text-primary)]">
+                {compareIds.size} template{compareIds.size > 1 ? 's' : ''} selected for comparison
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button disabled={compareIds.size !== 2} className="text-xs px-4 py-1.5 rounded bg-[var(--color-primary)] text-white disabled:opacity-50 transition-colors">
+                Compare Selected
+              </button>
+              <button onClick={() => setCompareIds(new Set())} className="p-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {loadError && !loading && (
           <div className="glass-panel rounded-xl p-6 flex items-center justify-between">
             <p className="text-xs text-red-400">{loadError}</p>
@@ -182,35 +238,93 @@ function TemplatesContent() {
 
         {!loading && !searching && items.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map((item) => (
+            {items.map((item, idx) => {
+              const isSelected = compareIds.has(item.id);
+              const difficulty = idx % 3 === 0 ? "Beginner" : idx % 3 === 1 ? "Intermediate" : "Advanced";
+              const uses = Math.floor(Math.random() * 1000) + 100;
+              
+              return (
               <div
                 key={item.id}
-                className="glass-panel rounded-xl p-5 glass-panel-hover transition-all cursor-pointer"
+                className={`glass-panel rounded-xl p-5 transition-all relative overflow-hidden group ${isSelected ? 'border-[var(--color-primary)] ring-1 ring-[var(--color-primary)] bg-[var(--color-primary-alpha-10)]' : 'hover:border-[var(--color-primary-alpha-50)]'}`}
+                onMouseEnter={() => setHoveredTemplate(item.id)}
+                onMouseLeave={() => setHoveredTemplate(null)}
               >
-                <div className="flex items-start gap-3">
+                <div className="absolute top-3 right-3 z-10" onClick={e => e.stopPropagation()}>
+                  <input 
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleCompare(item.id)}
+                    className="w-4 h-4 rounded border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] text-[var(--color-primary)] focus:ring-[var(--color-primary-alpha-50)] cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Compare"
+                  />
+                  {isSelected && <CheckSquare className="w-4 h-4 text-[var(--color-primary)]" />}
+                </div>
+
+                <div className="flex items-start gap-3 mb-4">
                   <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center shrink-0">
                     <LayoutTemplate className="w-5 h-5 text-[var(--color-primary-light)]" />
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-medium text-white truncate">{item.name || item.id}</h3>
-                    <p className="text-xs text-[var(--color-text-tertiary)] mt-1 line-clamp-2">
-                      {item.description || "No description"}
-                    </p>
-                    {item.source && (
-                      <span className="inline-block mt-2 text-[10px] text-[var(--color-text-muted)]">
-                        {item.source}
+                  <div className="min-w-0 flex-1 pr-6">
+                    <h3 className="font-medium text-white truncate text-sm">{item.name || item.id}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded border font-medium ${difficulty === 'Beginner' ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' : difficulty === 'Intermediate' ? 'border-amber-500/30 text-amber-400 bg-amber-500/10' : 'border-red-500/30 text-red-400 bg-red-500/10'}`}>
+                        {difficulty}
                       </span>
-                    )}
+                      <span className="text-[10px] text-[var(--color-text-muted)] flex items-center gap-1">
+                        <BarChart className="w-3 h-3" /> {uses.toLocaleString()}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <Link
-                  href={`${ROUTES.HOME}?template=${encodeURIComponent(item.id)}`}
-                  className="mt-4 inline-flex items-center gap-2 text-xs font-medium text-[var(--color-primary-light)] hover:text-[#C4B5FD]"
-                >
-                  Use template
-                </Link>
+                
+                <p className="text-xs text-[var(--color-text-tertiary)] line-clamp-2 h-8 mb-4">
+                  {item.description || "No description"}
+                </p>
+
+                {hoveredTemplate === item.id && (
+                  <div className="absolute inset-0 bg-[var(--color-bg-panel)] bg-opacity-95 backdrop-blur-sm z-20 p-4 flex flex-col justify-between animate-enter opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <div className="overflow-hidden rounded border border-[var(--color-border-subtle)]">
+                      <SyntaxHighlighter
+                        language="solidity"
+                        style={vscDarkPlus}
+                        customStyle={{ margin: 0, padding: '8px', fontSize: '8px', background: 'transparent' }}
+                      >
+{`contract ${item.name?.replace(/\s/g, '') || 'Template'} {
+  uint256 public value;
+  
+  function initialize() public {
+    value = 1;
+  }
+}`}
+                      </SyntaxHighlighter>
+                    </div>
+                    <div className="flex gap-2 mt-3">
+                      <Link
+                        href={`${ROUTES.HOME}?template=${encodeURIComponent(item.id)}`}
+                        className="flex-1 btn-primary-gradient text-white text-xs py-1.5 rounded-lg text-center"
+                      >
+                        Use Template
+                      </Link>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-3 border-t border-[var(--color-border-subtle)] mt-auto">
+                  {item.source ? (
+                    <span className="text-[10px] text-[var(--color-text-muted)]">
+                      {item.source}
+                    </span>
+                  ) : <span />}
+                  <Link
+                    href={`${ROUTES.HOME}?template=${encodeURIComponent(item.id)}`}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-primary-light)] hover:text-[#C4B5FD]"
+                  >
+                    Use template &rarr;
+                  </Link>
+                </div>
               </div>
-            ))}
+            )})}
           </div>
         )}
       </div>

@@ -488,8 +488,7 @@ backup-*/
 # ============================================================
 # DOCUMENTATION & SCRIPTS (Project-specific ignores)
 # ============================================================
-# E2E tests and scripts (local/dev only, not main-level)
-e2e/
+# Scripts (local/dev only, not main-level)
 scripts/
 # Planning documents
 external/*

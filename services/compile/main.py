@@ -227,9 +227,10 @@ def _compile_hardhat(workdir: Path, contract_name: str, contract_code: str) -> t
     """Compile using Hardhat (npx hardhat compile). Uses pre-built template for local node_modules."""
     contracts_dir = workdir / "contracts"
     contracts_dir.mkdir(parents=True, exist_ok=True)
+    safe_contract_name = _safe_contract_name(contract_name)
     if "pragma solidity" not in contract_code.strip().lower():
         contract_code = "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n" + contract_code
-    (contracts_dir / f"{contract_name}.sol").write_text(contract_code)
+    (contracts_dir / f"{safe_contract_name}.sol").write_text(contract_code)
     (workdir / "hardhat.config.js").write_text(
         """module.exports = { solidity: "0.8.24", paths: { sources: "./contracts" } };\n"""
     )
@@ -252,7 +253,7 @@ def _compile_hardhat(workdir: Path, contract_name: str, contract_code: str) -> t
         return False, None, None, ["Node/npx not installed or not in PATH"]
     if result.returncode != 0:
         return False, None, None, [result.stderr or result.stdout or "hardhat compile failed"]
-    artifact_path = workdir / "artifacts" / "contracts" / f"{contract_name}.sol" / f"{contract_name}.json"
+    artifact_path = workdir / "artifacts" / "contracts" / f"{safe_contract_name}.sol" / f"{safe_contract_name}.json"
     if not artifact_path.exists():
         return False, None, None, ["Artifact not found after compile"]
     data = json.loads(artifact_path.read_text())
@@ -265,6 +266,21 @@ def _compile_hardhat(workdir: Path, contract_name: str, contract_code: str) -> t
 
 def _normalize_errors(errors: list[str]) -> list[CompileErrorItem]:
     return [CompileErrorItem(message=e, sourceLocation=None) for e in errors]
+
+
+def _safe_contract_name(name: str) -> str:
+    """
+    Sanitize a user-provided contract name so it can be safely used as a filename.
+    Only allow alphanumeric characters and underscores; replace others with '_'.
+    """
+    name = (name or "").strip()
+    if not name:
+        return "Contract"
+    # Replace any disallowed character with underscore
+    safe = re.sub(r"[^A-Za-z0-9_]", "_", name)
+    # Collapse multiple underscores and strip leading/trailing ones
+    safe = re.sub(r"_+", "_", safe).strip("_")
+    return safe or "Contract"
 
 
 def _compile_via_tools(req: CompileRequest, code: str, contract_name: str) -> CompileResponse | None:

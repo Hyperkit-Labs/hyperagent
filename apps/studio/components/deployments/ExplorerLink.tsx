@@ -14,7 +14,7 @@ export function ExplorerLink({ network, type, value, label }: ExplorerLinkProps)
   const url = getExplorerUrl(network, type, value);
 
   if (!url) {
-    return <span className="text-gray-500">{value}</span>;
+    return <span className="text-[var(--color-text-muted)]">{value}</span>;
   }
 
   return (
@@ -22,7 +22,7 @@ export function ExplorerLink({ network, type, value, label }: ExplorerLinkProps)
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline"
+      className="inline-flex items-center gap-1 text-[var(--color-primary-light)] hover:text-[var(--color-primary)] hover:underline"
     >
       {label || value}
       <ExternalLink className="w-4 h-4" />

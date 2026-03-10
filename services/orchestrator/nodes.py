@@ -244,9 +244,9 @@ async def design_agent(state: AgentState) -> AgentState:
             api_keys = state.get("api_keys") or {}
             agent_session_jwt = state.get("agent_session_jwt") or None
             logger.info(
-                "[pipeline] design_agent run_id=%s api_keys_providers=%s agent_session_jwt=%s",
+                "[pipeline] design_agent run_id=%s has_api_keys=%s agent_session_jwt=%s",
                 run_id,
-                list(api_keys.keys()) if api_keys else [],
+                "yes" if api_keys else "no",
                 "yes" if agent_session_jwt else "no",
             )
             target_chains = spec.get("chains", [])

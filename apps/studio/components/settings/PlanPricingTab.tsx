@@ -112,20 +112,16 @@ export function PlanPricingTab({
                         )}
                       </ul>
                       {plan.features.length > 0 && (
-                        <div className="flex flex-wrap gap-1 pt-1">
+                        <ul className="pt-3 border-t border-[var(--color-border-subtle)] space-y-2">
                           {plan.features.map((f) => (
-                            <span
-                              key={f}
-                              className={`text-[10px] px-1.5 py-0.5 rounded transition-all duration-200 ${
-                                isHovered || isCurrent
-                                  ? "bg-[var(--color-bg-panel)] text-[var(--color-text-secondary)] opacity-100"
-                                  : "bg-[var(--color-bg-panel)] text-[var(--color-text-muted)] opacity-70"
-                              }`}
-                            >
-                              {f}
-                            </span>
+                            <li key={f} className="flex items-start gap-2 text-xs">
+                              <span className="text-[var(--color-primary)] mt-0.5">✓</span>
+                              <span className={isHovered || isCurrent ? "text-[var(--color-text-secondary)]" : "text-[var(--color-text-muted)]"}>
+                                {f}
+                              </span>
+                            </li>
                           ))}
-                        </div>
+                        </ul>
                       )}
                     </div>
                   );

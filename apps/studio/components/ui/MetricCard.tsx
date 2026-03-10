@@ -4,6 +4,8 @@ import { type ReactNode, useState } from "react";
 import { motion } from "framer-motion";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
 import { GlassCard } from "./GlassCard";
+import { NumberTicker } from "./NumberTicker";
+import { TrendingUp, TrendingDown } from "lucide-react";
 
 export interface MetricCardProps {
   label: string;
@@ -14,9 +16,13 @@ export interface MetricCardProps {
   hover?: boolean;
   /** Optional sparkline data: array of { value: number } for mini chart. */
   sparklineData?: { value: number }[];
+  /** Optional trend: up (green), down (red), or neutral. */
+  trend?: "up" | "down" | "neutral";
+  /** When true and value is number, use NumberTicker for animated count-up. */
+  animateValue?: boolean;
 }
 
-export function MetricCard({ label, value, sublabel, icon, className = "", hover = true, sparklineData }: MetricCardProps) {
+export function MetricCard({ label, value, sublabel, icon, className = "", hover = true, sparklineData, trend, animateValue }: MetricCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const scale = hover && isHovered ? 1.02 : 1;
 
@@ -35,7 +41,19 @@ export function MetricCard({ label, value, sublabel, icon, className = "", hover
           {icon}
         </div>
         <div>
-          <div className="text-2xl font-semibold text-[var(--color-text-primary)] tracking-tight">{value}</div>
+          <div className="text-2xl font-semibold text-[var(--color-text-primary)] tracking-tight flex items-center gap-2">
+            {animateValue && typeof value === "number" && !Number.isNaN(value) ? (
+              <NumberTicker value={value} />
+            ) : (
+              value
+            )}
+            {trend === "up" && (
+              <TrendingUp className="w-4 h-4 text-[var(--color-semantic-success)] shrink-0" aria-hidden />
+            )}
+            {trend === "down" && (
+              <TrendingDown className="w-4 h-4 text-[var(--color-semantic-error)] shrink-0" aria-hidden />
+            )}
+          </div>
           {sublabel && (
             <span className="text-[11px] text-[var(--color-text-dim)] mt-1 block">{sublabel}</span>
           )}

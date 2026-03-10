@@ -21,6 +21,7 @@ except ImportError:
 _REGISTRIES_PATH = os.environ.get("REGISTRIES_PATH", "")
 _PIPELINES: dict[str, Any] | None = None
 _CHAINS: dict[str, Any] | None = None
+_CAPABILITIES: dict[str, Any] | None = None
 _SECURITY: dict[str, Any] | None = None
 _TOKENS: dict[str, Any] | None = None
 _X402_SETTINGS: dict[str, Any] | None = None
@@ -49,11 +50,13 @@ def _load_yaml(name: str) -> dict[str, Any]:
 
 
 def _ensure_loaded() -> None:
-    global _PIPELINES, _CHAINS, _SECURITY, _TOKENS, _X402_SETTINGS, _X402_PRODUCTS, _STABLECOINS, _ROMA, _ORCHESTRATOR, _ERC8004
+    global _PIPELINES, _CHAINS, _CAPABILITIES, _SECURITY, _TOKENS, _X402_SETTINGS, _X402_PRODUCTS, _STABLECOINS, _ROMA, _ORCHESTRATOR, _ERC8004
     if _PIPELINES is None:
         _PIPELINES = _load_yaml("pipelines.yaml")
     if _CHAINS is None:
         _CHAINS = _load_yaml("network/chains.yaml")
+    if _CAPABILITIES is None:
+        _CAPABILITIES = _load_yaml("network/capabilities.yaml")
     if _SECURITY is None:
         _SECURITY = _load_yaml("security.yaml")
     if _TOKENS is None:
@@ -212,6 +215,41 @@ def get_slither_to_swc(category: str) -> str | None:
     return mapping.get(category) if isinstance(mapping, dict) else None
 
 
+def get_tiered_gate(tool: str) -> dict[str, Any] | None:
+    """Return tiered gate config for tool. Source: security.yaml spec.tieredGates."""
+    _ensure_loaded()
+    spec = (_SECURITY or {}).get("spec", {})
+    gates = spec.get("tieredGates") or {}
+    return gates.get(tool) if isinstance(gates, dict) else None
+
+
+def get_tool_deploy_rule(tool: str) -> str:
+    """Deploy rule for tool: block_on_high_critical, block_only_when_corroborated, etc."""
+    gate = get_tiered_gate(tool)
+    if gate and isinstance(gate, dict):
+        return str(gate.get("deployRule", "never_block"))
+    return "never_block"
+
+
+def get_deterministic_tools() -> list[str]:
+    """Tools that produce deterministic, reproducible evidence (Slither, Mythril, Echidna, Tenderly)."""
+    return ["slither", "mythril", "echidna", "tenderly"]
+
+
+def get_security_mandatory_tools() -> list[str]:
+    """Mandatory tools for deploy approval from security policy (scrubd, slither, mythril, tenderly)."""
+    _ensure_loaded()
+    spec = (_SECURITY or {}).get("spec", {})
+    sec = spec.get("security", {})
+    tools = sec.get("tools", {}).get("mandatory")
+    if tools:
+        return list(tools)
+    for p in spec.get("policies", []) or []:
+        if p.get("id") == "default":
+            return list(p.get("mandatoryTools", ["slither", "mythril", "tenderly"]))
+    return ["scrubd", "slither", "mythril", "tenderly"]
+
+
 def get_high_severity_swc() -> list[str]:
     """SWC IDs that block deploy when matched. Source: security.yaml spec.highSeveritySwc."""
     _ensure_loaded()
@@ -220,11 +258,86 @@ def get_high_severity_swc() -> list[str]:
     return [str(x) for x in swcs if x]
 
 
-def get_chain(chain_id: int) -> dict[str, Any] | None:
-    """Return chain entry by numeric chain id (chainlist + hyperagent)."""
-    _ensure_loaded()
+# Static chain metadata for chains where thirdweb/capabilities lack rpc/explorer/name.
+# Used when capabilities.yaml is the source and does not override these fields.
+_CHAIN_ID_METADATA: dict[int, dict[str, Any]] = {
+    1: {"name": "Ethereum Mainnet", "symbol": "ETH", "rpc": "https://ethereum.publicnode.com", "explorer": "https://etherscan.io"},
+    56: {"name": "BNB Smart Chain", "symbol": "BNB", "rpc": "https://bsc-dataseed.binance.org", "explorer": "https://bscscan.com"},
+    204: {"name": "opBNB", "symbol": "BNB", "rpc": "https://opbnb-mainnet-rpc.bnbchain.org", "explorer": "https://opbnb.bscscan.com"},
+    314: {"name": "Filecoin", "symbol": "FIL", "rpc": "https://api.node.glif.io/rpc/v1", "explorer": "https://filfox.info"},
+    5000: {"name": "Mantle", "symbol": "MNT", "rpc": "https://rpc.mantle.xyz", "explorer": "https://explorer.mantle.xyz"},
+    8453: {"name": "Base", "symbol": "ETH", "rpc": "https://mainnet.base.org", "explorer": "https://basescan.org"},
+    43113: {"name": "Avalanche Fuji", "symbol": "AVAX", "rpc": "https://api.avax-test.network/ext/bc/C/rpc", "explorer": "https://testnet.snowtrace.io"},
+    43114: {"name": "Avalanche C-Chain", "symbol": "AVAX", "rpc": "https://api.avax.network/ext/bc/C/rpc", "explorer": "https://snowtrace.io"},
+    42161: {"name": "Arbitrum One", "symbol": "ETH", "rpc": "https://arb1.arbitrum.io/rpc", "explorer": "https://arbiscan.io"},
+    324705682: {"name": "SKALE Base Sepolia", "symbol": "CREDIT", "rpc": "https://base-sepolia-testnet.skalenodes.com/v1/jubilant-horrible-ancha", "explorer": "https://base-sepolia-testnet-explorer.skalenodes.com/"},
+    1187947933: {"name": "SKALE Base", "symbol": "CREDIT", "rpc": "https://skale-base.skalenodes.com/v1/base", "explorer": "https://skale-base-explorer.skalenodes.com/"},
+}
+
+
+def _capabilities_has_chains() -> bool:
+    """True if capabilities.yaml has spec.chains with entries."""
+    spec = (_CAPABILITIES or {}).get("spec", {})
+    chains = spec.get("chains") or {}
+    return bool(chains and isinstance(chains, dict))
+
+
+def _chain_list_from_capabilities() -> list[dict[str, Any]]:
+    """Build unified chain list from capabilities.yaml (slug-keyed)."""
+    spec = (_CAPABILITIES or {}).get("spec", {})
+    chains = spec.get("chains") or {}
+    if not isinstance(chains, dict):
+        return []
+    out = []
+    for slug, cap in chains.items():
+        chain_id = cap.get("chainId")
+        if chain_id is None:
+            continue
+        enabled = cap.get("enabled", True)
+        tier = cap.get("tier") or "supported"
+        category = cap.get("category") or "mainnet"
+        native = cap.get("nativeCurrency") or {}
+        static = _CHAIN_ID_METADATA.get(chain_id)
+        name = cap.get("name") or (static.get("name") if static else None) or slug.replace("-", " ").title()
+        symbol = (native.get("symbol") if native else None) or (static.get("symbol") if static else "ETH")
+        rpc = (cap.get("rpcUrl") or "").strip() or (static.get("rpc") if static else "")
+        explorer = (cap.get("explorerUrl") or "").strip() or (static.get("explorer") if static else "")
+        cl = {
+            "name": name,
+            "chainId": chain_id,
+            "rpcUrls": [rpc] if rpc else [],
+            "blockExplorerUrls": [explorer] if explorer else [],
+            "nativeCurrency": {"name": native.get("name") or name, "symbol": symbol, "decimals": native.get("decimals", 18)},
+        }
+        ha = {
+            "slug": slug,
+            "tier": tier,
+            "category": category,
+            "capabilities": cap.get("capabilities") or {},
+            "defaults": cap.get("defaults") or {},
+            "aa": cap.get("aa"),
+        }
+        out.append({"id": chain_id, "enabled": enabled, "chainlist": cl, "hyperagent": ha})
+    return out
+
+
+def _chain_list_from_chains() -> list[dict[str, Any]]:
+    """Build chain list from chains.yaml (legacy format)."""
     spec = (_CHAINS or {}).get("spec", {})
-    for c in spec.get("chains", []):
+    return list(spec.get("chains", []))
+
+
+def _get_chain_list() -> list[dict[str, Any]]:
+    """Prefer capabilities when present; else chains.yaml."""
+    _ensure_loaded()
+    if _capabilities_has_chains():
+        return _chain_list_from_capabilities()
+    return _chain_list_from_chains()
+
+
+def get_chain(chain_id: int) -> dict[str, Any] | None:
+    """Return chain entry by numeric chain id (capabilities or chainlist + hyperagent)."""
+    for c in _get_chain_list():
         if c.get("id") == chain_id:
             return c
     return None
@@ -241,9 +354,15 @@ def get_chain_rpc_explorer(chain_id: int) -> tuple[str, str] | None:
     rpc = (rpc_urls[0] or "").strip() if rpc_urls else ""
     explorer = (explorer_urls[0] or "").strip() if explorer_urls else ""
     if not rpc:
-        return None
+        static = _CHAIN_ID_METADATA.get(chain_id)
+        if static:
+            rpc = (static.get("rpc") or "").strip()
+        if not rpc:
+            return None
     if not explorer:
-        explorer = ""
+        static = _CHAIN_ID_METADATA.get(chain_id)
+        if static:
+            explorer = (static.get("explorer") or "").strip()
     return (rpc, explorer)
 
 
@@ -258,7 +377,7 @@ def get_chain_id_by_network_slug(network_slug: str) -> int | None:
         return None
     slug = network_slug.strip().lower()
     norm = _normalize_slug(slug)
-    for c in list_chains(enabled_only=False):
+    for c in _get_chain_list():
         cid = c.get("id")
         ha = c.get("hyperagent") or {}
         s = (ha.get("slug") or "").strip().lower()
@@ -274,11 +393,9 @@ def get_chain_id_by_network_slug(network_slug: str) -> int | None:
 
 
 def list_chains(enabled_only: bool = True) -> list[dict[str, Any]]:
-    """List chains from registry; optionally only enabled."""
-    _ensure_loaded()
-    spec = (_CHAINS or {}).get("spec", {})
+    """List chains from registry (capabilities preferred, else chains.yaml); optionally only enabled."""
     out = []
-    for c in spec.get("chains", []):
+    for c in _get_chain_list():
         if enabled_only and not c.get("enabled", True):
             continue
         out.append(c)
@@ -292,7 +409,10 @@ def get_registry_versions() -> dict[str, str]:
     if _PIPELINES:
         meta = (_PIPELINES or {}).get("metadata", {})
         versions["pipelines_version"] = meta.get("version", "unknown")
-    if _CHAINS:
+    if _capabilities_has_chains():
+        meta = (_CAPABILITIES or {}).get("metadata", {})
+        versions["chains_version"] = meta.get("version", "unknown")
+    elif _CHAINS:
         meta = (_CHAINS or {}).get("metadata", {})
         versions["chains_version"] = meta.get("version", "unknown")
     if _ERC8004:

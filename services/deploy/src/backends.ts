@@ -1,10 +1,9 @@
 /**
- * Deploy plan backend: chain config from registry only (CHAIN_REGISTRY_PATH / CHAIN_REGISTRY_URL).
- * No duplicate RPC/explorer in code or env; one loader, one cache. Add chain to registry to support it.
+ * Deploy plan backend: hybrid chain registry (capabilities first, chains.yaml fallback).
+ * thirdweb supplies chain metadata; HyperAgent capabilities supply policy. No duplicate RPC/explorer.
  */
 import type { DeployPlanRequest, DeployPlanResult } from "@hyperagent/core-types";
-import { DeployToolkit } from "@hyperagent/web3-utils";
-import { loadChainRegistry } from "./chainRegistry.js";
+import { DeployToolkit, loadHybridChainRegistry } from "@hyperagent/web3-utils";
 
 export type { DeployPlanRequest, DeployPlanResult };
 
@@ -14,7 +13,7 @@ export interface DeployBackend {
 
 export function createDefaultBackend(): DeployBackend {
   const toolkit = new DeployToolkit({
-    registryLoader: loadChainRegistry,
+    registryLoader: loadHybridChainRegistry,
     rpcFallback: {},
     explorerFallback: {},
     getEnvRpc: (chainId: number) => process.env[`RPC_URL_${chainId}`],

@@ -8,7 +8,7 @@ import express from "express";
 import { specAgent, designAgent, codegenAgent, testAgent, autofixAgent, estimateAgent, pashovAuditAgent, type AgentContext, type DesignProposal, type AutofixInput } from "./agents.js";
 import { resolveAgentSession } from "./agentSession.js";
 import { generateFromWizard } from "./ozWizard.js";
-import { simulate, getDeployPlan, pin, unpin } from "./simulateDeploy.js";
+import { simulate, simulateBundle, getDeployPlan, pin, unpin } from "./simulateDeploy.js";
 
 const REQUEST_ID_HEADER = "x-request-id";
 
@@ -196,6 +196,24 @@ async function handleSimulate(req: express.Request, res: express.Response): Prom
 
 app.post("/agents/simulate", handleSimulate);
 app.post("/simulate", handleSimulate);
+
+async function handleSimulateBundle(req: express.Request, res: express.Response): Promise<void> {
+  try {
+    const { simulations } = req.body as { simulations?: Array<{ network_id: string; from: string; to?: string; input: string; value?: string; gas?: number }> };
+    if (!simulations || !Array.isArray(simulations) || simulations.length === 0) {
+      res.status(400).json({ success: false, error: "simulations array is required and must not be empty" });
+      return;
+    }
+    const result = await simulateBundle({ simulations });
+    res.json(result);
+  } catch (e: unknown) {
+    console.error("[simulate-bundle]", e);
+    res.status(500).json({ success: false, error: e instanceof Error ? e.message : "Bundled simulation failed" });
+  }
+}
+
+app.post("/agents/simulate-bundle", handleSimulateBundle);
+app.post("/simulate-bundle", handleSimulateBundle);
 
 async function handleDeploy(req: express.Request, res: express.Response): Promise<void> {
   try {

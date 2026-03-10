@@ -1,15 +1,19 @@
 """
 Trace writer: build AgentTraceBlob-shaped payload, pin to IPFS when configured.
 Returns real CID as blob_id when IPFS configured; otherwise stub for run_steps.
+In production, stub mode is logged as unverifiable; IPFS is required for provenance.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+IS_PRODUCTION = os.environ.get("NODE_ENV") == "production" or os.environ.get("ENV") == "production"
 
 
 def build_trace_payload(
@@ -74,7 +78,13 @@ async def write_trace(
                 return cid, None, None
     except Exception as e:
         logger.warning("[trace_writer] IPFS pin failed: %s", e)
-    return _stub_trace_id(run_id, step_type, step_index), None, None
+    stub_id = _stub_trace_id(run_id, step_type, step_index)
+    if IS_PRODUCTION:
+        logger.warning(
+            "[trace_writer] production stub: trace unverifiable run_id=%s step=%s index=%s blob_id=%s",
+            run_id, step_type, step_index, stub_id,
+        )
+    return stub_id, None, None
 
 
 def write_trace_sync(

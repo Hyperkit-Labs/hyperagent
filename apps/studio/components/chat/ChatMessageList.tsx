@@ -1,6 +1,7 @@
 'use client';
 
 import { Conversation, ConversationContent, ConversationScrollButton, Message, Tool, Shimmer } from '@/components/ai-elements';
+import { GlowingBorder } from '@/components/ui';
 
 export type ChatMessageRole = 'user' | 'assistant' | 'system';
 
@@ -88,7 +89,7 @@ export function ChatMessageList({
                 HyperAgent
               </span>
             </div>
-            <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/10 backdrop-blur-sm px-4 py-3 max-w-[90%] w-full">
+            <GlowingBorder active={true} className="rounded-xl border border-indigo-500/20 bg-indigo-500/10 backdrop-blur-sm px-4 py-3 max-w-[90%] w-full">
               <div className="rounded-lg bg-black/40 border border-white/5 font-mono text-[11px] leading-relaxed overflow-hidden">
                 <div className="px-2 py-1.5 border-b border-white/5 text-[var(--color-text-muted)]">
                   HyperAgent is thinking
@@ -104,7 +105,7 @@ export function ChatMessageList({
                   {typeof streamingContent === 'string' ? streamingContent : String(streamingContent)}
                 </div>
               )}
-            </div>
+            </GlowingBorder>
           </div>
         )}
       </ConversationContent>

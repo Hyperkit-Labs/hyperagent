@@ -4,6 +4,30 @@ Public deployment and operations guide for HyperAgent.
 
 ---
 
+## Redis (Rate Limit + LangGraph Checkpointer)
+
+HyperAgent uses Redis for API rate limiting and LangGraph workflow checkpoints. On Contabo/Coolify, **local Redis** (colocated in docker-compose) is the recommended default.
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `REDIS_URL` | Yes (prod) | Connection string. Use `redis://redis:6379` for local Redis in the stack. |
+
+### Local Redis (Contabo/Coolify)
+
+The production stack includes a Redis container. Set in Coolify Shared Env:
+
+```env
+REDIS_URL=redis://redis:6379
+```
+
+Redis is internal-only (no public ports). See `docs/redis-local.md`.
+
+### Managed Redis
+
+Use `rediss://` for TLS (Redis Cloud, Upstash). Remove or disable the `redis` service in compose if using managed Redis.
+
+---
+
 ## Build History Persistence
 
 Workflows and runs persist in Supabase. Set these on the orchestrator service (e.g. `api-gateway` or `orchestrator` in Contabo/Coolify):

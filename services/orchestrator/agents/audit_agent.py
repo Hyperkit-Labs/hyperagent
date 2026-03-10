@@ -1,5 +1,5 @@
 """Audit agent: call audit service (Slither + Mythril); persist to security_findings.
-Includes weighted-evidence consensus resolution for conflicting tool results.
+Tiered gate model: Slither/Mythril block on High/Critical; Pashov blocks only when corroborated.
 When OPENSANDBOX_ENABLED, routes through ExecutionBackend for gVisor/Firecracker isolation."""
 
 import logging
@@ -8,7 +8,7 @@ from collections import defaultdict
 
 import httpx
 from db import insert_security_finding, is_configured
-from registries import get_timeout
+from registries import get_deterministic_tools, get_timeout, get_tool_deploy_rule
 from trace_context import get_trace_headers
 
 logger = logging.getLogger(__name__)
@@ -67,6 +67,103 @@ def _resolve_consensus(findings: list[dict]) -> list[dict]:
         resolved.append(merged)
 
     return resolved
+
+
+def _is_pashov_corroborated(
+    pashov_finding: dict,
+    deterministic_findings: list[dict],
+) -> bool:
+    """True if Pashov finding is corroborated by Slither/Mythril/Echidna/Tenderly.
+    Corroboration: same or overlapping location/title/category from a deterministic tool."""
+    det_tools = set(get_deterministic_tools())
+    p_title = (pashov_finding.get("title") or "").lower()
+    p_desc = (pashov_finding.get("description") or "").lower()
+    p_loc = (pashov_finding.get("location") or "").lower()
+
+    for f in deterministic_findings:
+        tool = (f.get("tool") or "").lower()
+        if not any(dt in tool for dt in det_tools):
+            continue
+        d_title = (f.get("title") or "").lower()
+        d_desc = (f.get("description") or "").lower()
+        d_loc = (f.get("location") or "").lower()
+        d_cat = (f.get("category") or "").lower()
+
+        if p_title and d_title and (p_title in d_title or d_title in p_title):
+            return True
+        if p_desc and d_desc and (p_desc[:80] in d_desc or d_desc[:80] in p_desc):
+            return True
+        if p_loc and d_loc and (p_loc in d_loc or d_loc in p_loc):
+            return True
+        keywords = ["reentrancy", "access", "overflow", "unchecked", "transfer", "call"]
+        if any(k in p_title or k in p_desc for k in keywords) and any(
+            k in d_title or k in d_desc or k in d_cat for k in keywords
+        ):
+            return True
+    return False
+
+
+def _tool_to_gate_key(tool: str) -> str:
+    """Map finding tool string to tiered gate key."""
+    t = (tool or "").lower()
+    if "pashov" in t:
+        return "pashov"
+    if "slither" in t:
+        return "slither"
+    if "mythril" in t:
+        return "mythril"
+    if "echidna" in t:
+        return "echidna"
+    if "scrubd" in t:
+        return "scrubd"
+    return "unknown"
+
+
+def _finding_blocks_deploy(
+    finding: dict,
+    all_findings: list[dict],
+    echidna_harness_available: bool = False,
+) -> bool:
+    """Apply tiered gate: return True if this finding blocks deploy."""
+    tool = (finding.get("tool") or "").lower()
+    severity = (finding.get("severity") or "info").lower()
+    gate_key = _tool_to_gate_key(tool)
+    deploy_rule = get_tool_deploy_rule(gate_key)
+
+    if "slither" in tool or "mythril" in tool:
+        if deploy_rule == "block_on_high_critical" and severity in ("high", "critical"):
+            return True
+
+    if "echidna" in tool:
+        if deploy_rule == "block_when_harness_fails":
+            if echidna_harness_available and severity in ("medium", "high", "critical"):
+                return True
+            if not echidna_harness_available:
+                return False
+
+    if "pashov" in tool:
+        if deploy_rule == "block_only_when_corroborated":
+            if _is_pashov_corroborated(finding, [f for f in all_findings if f != finding]):
+                return severity in ("high", "critical")
+            return False
+
+    if "scrubd" in tool or finding.get("scrubd_matched"):
+        if deploy_rule == "block_on_matched_patterns":
+            return severity in ("medium", "high", "critical")
+
+    return False
+
+
+def compute_audit_deploy_blocked(
+    findings: list[dict],
+    echidna_harness_available: bool = False,
+) -> tuple[bool, list[dict]]:
+    """Apply tiered gate model. Returns (deploy_blocked, blocking_findings)."""
+    blocking: list[dict] = []
+    for f in findings:
+        if _finding_blocks_deploy(f, findings, echidna_harness_available):
+            blocking.append(f)
+    return len(blocking) > 0, blocking
 
 
 async def _run_audit_via_execution_backend(

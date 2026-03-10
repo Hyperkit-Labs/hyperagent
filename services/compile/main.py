@@ -47,6 +47,31 @@ def _safe_sol_filename(name: str) -> str:
     return base
 
 
+def _safe_join_src(root: Path, name: str) -> Path:
+    """
+    Join a user-provided Solidity filename to a root directory safely.
+
+    Ensures the filename is valid and that the resulting path stays within the root.
+    """
+    base = _safe_sol_filename(name)
+    # Construct and resolve the full path to eliminate any symlinks or relative components.
+    full_path = (root / base).resolve()
+    try:
+        # Python 3.9+: Path.is_relative_to
+        is_inside = full_path.is_relative_to(root.resolve())
+    except AttributeError:
+        # Fallback for older Python versions
+        root_resolved = root.resolve()
+        try:
+            full_path.relative_to(root_resolved)
+            is_inside = True
+        except ValueError:
+            is_inside = False
+    if not is_inside:
+        raise HTTPException(status_code=400, detail="Resolved path escapes root directory")
+    return full_path
+
+
 class CompileRequest(BaseModel):
     contractCode: str = Field("", description="Solidity source code (optional when files provided)", alias="contractCode")
     framework: str = Field(..., description="hardhat or foundry")
@@ -362,8 +387,8 @@ def compile_contract(req: CompileRequest) -> CompileResponse:
                 src.mkdir(parents=True, exist_ok=True)
                 for name, content in req.files.items():
                     if isinstance(content, str):
-                        safe_name = _safe_sol_filename(name)
-                        (src / safe_name).write_text(content, encoding="utf-8")
+                        safe_path = _safe_join_src(src, name)
+                        safe_path.write_text(content, encoding="utf-8")
             if req.framework == "foundry":
                 success, bytecode, abi, errors = _compile_foundry_impl(workdir, contract_name, code_single)
             else:

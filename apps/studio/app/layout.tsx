@@ -1,15 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
-import { ApiAuthProvider } from "@/components/providers/ApiAuthProvider";
-import { ConfigProvider } from "@/components/providers/ConfigProvider";
-import { LayoutProvider } from "@/components/providers/LayoutProvider";
-import { NetworksProvider } from "@/components/providers/NetworksProvider";
-import { PipelineStateProvider } from "@/components/providers/PipelineStateProvider";
-import { ThirdwebProviderWrapper } from "@/components/providers/ThirdwebProviderWrapper";
-import { Toaster } from "sonner";
-import { LayoutSwitcher } from "@/components/layout/LayoutSwitcher";
+import { ClientProviders } from "@/components/providers/ClientProviders";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -37,21 +29,7 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body className="antialiased min-h-screen flex flex-col bg-[var(--color-bg-base)] text-[var(--color-text-secondary)] font-sans">
         <div className="flex flex-col flex-1 min-h-0 min-w-0 w-full">
-          <ConfigProvider>
-          <ThirdwebProviderWrapper>
-            <ApiAuthProvider>
-              <NetworksProvider>
-                <PipelineStateProvider>
-                  <LayoutProvider>
-                    <LayoutSwitcher>{children}</LayoutSwitcher>
-                  </LayoutProvider>
-                </PipelineStateProvider>
-              </NetworksProvider>
-              <Toaster position="top-right" richColors />
-              <Analytics />
-            </ApiAuthProvider>
-          </ThirdwebProviderWrapper>
-          </ConfigProvider>
+          <ClientProviders>{children}</ClientProviders>
         </div>
       </body>
     </html>

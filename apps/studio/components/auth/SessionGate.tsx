@@ -3,16 +3,14 @@
 import { useActiveAccount, useConnectModal } from "thirdweb/react";
 import { useSignInWithWallet } from "@/hooks/useSignInWithWallet";
 import { getThirdwebClient } from "@/lib/thirdwebClient";
-import { CONNECT_WALLETS } from "@/lib/connectWallets";
-import { Loader2, Wallet, Smartphone, CreditCard, Globe } from "lucide-react";
+import { getConnectConfig } from "@/lib/connectWallets";
+import { Loader2, Wallet } from "lucide-react";
 
 export interface SessionGateProps {
   title?: string;
   description?: string;
   noWrapper?: boolean;
 }
-
-const WALLET_LABELS = ["MetaMask", "WalletConnect", "Coinbase Wallet", "Google"];
 
 /**
  * Connect wallet + Sign in gate. Used on /login and by RequireApiSession.
@@ -29,7 +27,7 @@ export function SessionGate({
 
   const handleConnect = () => {
     if (client) {
-      connect({ client, wallets: CONNECT_WALLETS });
+      connect(getConnectConfig(client));
     }
   };
 
@@ -72,27 +70,6 @@ export function SessionGate({
             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {isLoading ? "Signing in..." : "Sign in with wallet"}
           </button>
-        )}
-        {isConnectState && client && (
-          <div className="flex flex-col items-center gap-2 mt-2">
-            <p className="text-[10px] text-[var(--color-text-muted)] text-center">
-              Supported: {WALLET_LABELS.join(", ")}
-            </p>
-            <div className="flex items-center justify-center gap-3">
-              <span className="w-7 h-7 rounded-lg bg-[var(--color-bg-hover)] flex items-center justify-center text-[var(--color-text-tertiary)]" title="MetaMask">
-                <Wallet className="w-3.5 h-3.5" />
-              </span>
-              <span className="w-7 h-7 rounded-lg bg-[var(--color-bg-hover)] flex items-center justify-center text-[var(--color-text-tertiary)]" title="WalletConnect">
-                <Smartphone className="w-3.5 h-3.5" />
-              </span>
-              <span className="w-7 h-7 rounded-lg bg-[var(--color-bg-hover)] flex items-center justify-center text-[var(--color-text-tertiary)]" title="Coinbase Wallet">
-                <CreditCard className="w-3.5 h-3.5" />
-              </span>
-              <span className="w-7 h-7 rounded-lg bg-[var(--color-bg-hover)] flex items-center justify-center text-[var(--color-text-tertiary)]" title="Google">
-                <Globe className="w-3.5 h-3.5" />
-              </span>
-            </div>
-          </div>
         )}
       </div>
       {!client && (

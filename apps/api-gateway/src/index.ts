@@ -3,6 +3,14 @@
  * Versioned proxy /api/v1 to orchestrator; legacy /run, /runs.
  * Required: JWT auth (AUTH_JWT_SECRET), Redis rate limit (REDIS_URL). Security is mandatory.
  */
+import { config } from "dotenv";
+import { dirname, resolve } from "path";
+import { fileURLToPath } from "url";
+
+// Load .env from repo root when running locally (pnpm start from apps/api-gateway)
+const __dirname = dirname(fileURLToPath(import.meta.url));
+config({ path: resolve(__dirname, "../../../.env") });
+
 import cors from "cors";
 import express from "express";
 import { createProxyMiddleware, responseInterceptor } from "http-proxy-middleware";

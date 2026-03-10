@@ -24,6 +24,23 @@ def is_configured() -> bool:
     ) or bool(os.environ.get("IPFS_ENABLED"))
 
 
+async def _do_pin_json(
+    content: str, name: str, metadata: dict[str, str] | None
+) -> str | None:
+    async with httpx.AsyncClient(timeout=IPFS_TIMEOUT) as client:
+        r = await client.post(
+            f"{STORAGE_SERVICE_URL}/ipfs/pin",
+            json={
+                "content": content,
+                "name": name,
+                "metadata": metadata or {},
+            },
+        )
+        r.raise_for_status()
+        result = r.json()
+        return result.get("cid") or result.get("IpfsHash") or result.get("ipfs_hash")
+
+
 async def pin_json(
     data: dict | list | str, name: str, metadata: dict[str, str] | None = None
 ) -> str | None:
@@ -32,21 +49,16 @@ async def pin_json(
         return None
     content = data if isinstance(data, str) else json.dumps(data, default=str)
     try:
-        async with httpx.AsyncClient(timeout=IPFS_TIMEOUT) as client:
-            r = await client.post(
-                f"{STORAGE_SERVICE_URL}/ipfs/pin",
-                json={
-                    "content": content,
-                    "name": name,
-                    "metadata": metadata or {},
-                },
-            )
-            r.raise_for_status()
-            result = r.json()
-            cid = result.get("cid") or result.get("IpfsHash") or result.get("ipfs_hash")
-            if cid:
-                logger.info("[ipfs] pinned %s → %s", name, cid)
-            return cid
+        from circuit_breaker import CircuitOpenError, get_breaker
+
+        breaker = get_breaker("ipfs")
+        cid = await breaker.call(_do_pin_json, content, name, metadata)
+        if cid:
+            logger.info("[ipfs] pinned %s → %s", name, cid)
+        return cid
+    except CircuitOpenError:
+        logger.warning("[ipfs] circuit open, skipping pin for %s", name)
+        return None
     except Exception as e:
         logger.warning("[ipfs] pin_json failed for %s: %s", name, e)
         return None

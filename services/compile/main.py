@@ -146,11 +146,13 @@ def _compile_foundry_multi(workdir: Path, files: dict[str, str], entry_contract:
 
 def _compile_foundry_impl(workdir: Path, contract_name: str, contract_code: str) -> tuple[bool, str | None, list | None, list[str]]:
     """Compile using Foundry (forge build)."""
+    # Sanitize the contract name to a safe filename stem to avoid path traversal.
+    safe_contract_name = re.sub(r"[^A-Za-z0-9_]", "_", contract_name or "Contract")
     src = workdir / "src"
     src.mkdir(parents=True, exist_ok=True)
     if "pragma solidity" not in contract_code.strip().lower():
         contract_code = "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n" + contract_code
-    (src / f"{contract_name}.sol").write_text(contract_code)
+    (src / f"{safe_contract_name}.sol").write_text(contract_code)
     (workdir / "foundry.toml").write_text("[profile.default]\nsolc = \"0.8.24\"\n")
     try:
         result = subprocess.run(
@@ -164,10 +166,10 @@ def _compile_foundry_impl(workdir: Path, contract_name: str, contract_code: str)
         return False, None, None, ["Foundry (forge) not installed or not in PATH"]
     if result.returncode != 0:
         return False, None, None, [result.stderr or result.stdout or "forge build failed"]
-    out_dir = workdir / "out" / f"{contract_name}.sol"
+    out_dir = workdir / "out" / f"{safe_contract_name}.sol"
     if not out_dir.exists():
         return False, None, None, ["No output artifact; check contract name"]
-    artifact = out_dir / f"{contract_name}.json"
+    artifact = out_dir / f"{safe_contract_name}.json"
     if not artifact.exists():
         return False, None, None, ["Artifact JSON not found"]
     data = json.loads(artifact.read_text())

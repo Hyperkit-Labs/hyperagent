@@ -109,7 +109,13 @@ async def record_storage(
             )
         client = db._client()
         if client:
-            gateway_url = f"https://gateway.pinata.cloud/ipfs/{cid}"
+            gateway_base = os.environ.get("PINATA_GATEWAY_BASE", "").strip()
+            gateway_domain = os.environ.get("PINATA_GATEWAY_DOMAIN", "gateway.pinata.cloud").strip()
+            gateway_url = (
+                f"{gateway_base.rstrip('/')}/{cid}"
+                if gateway_base
+                else f"https://{gateway_domain}/ipfs/{cid}"
+            )
             row = {
                 "run_id": run_id,
                 "artifact_type": stage,

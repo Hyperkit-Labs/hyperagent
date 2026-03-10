@@ -12,9 +12,25 @@
 #   - Disable Git submodules and LFS in Advanced > Git (Coolify #4746)
 #   - Set env vars in Shared Env
 #
-# External: Supabase (DB), Redis Cloud. Qdrant runs locally in this stack.
+# External: Supabase (DB). Redis runs locally (colocated) for rate limit + LangGraph checkpointer.
+# Set REDIS_URL=redis://redis:6379 for local Redis. Use managed Redis (rediss://) when scaling to multi-node.
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: hyperagent-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - hyperagent
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Internal only; no ports exposed to host. Use redis://redis:6379 from other services.
+
   api-gateway:
     build:
       context: .
@@ -32,6 +48,8 @@ services:
       - AGENT_RUNTIME_URL=http://agent-runtime:4001
       - STORAGE_SERVICE_URL=http://agent-runtime:4001
     depends_on:
+      redis:
+        condition: service_healthy
       orchestrator:
         condition: service_healthy
     networks:
@@ -72,6 +90,8 @@ services:
       retries: 5
       start_period: 60s
     depends_on:
+      redis:
+        condition: service_healthy
       agent-runtime:
         condition: service_healthy
       compile:
@@ -215,3 +235,4 @@ networks:
 volumes:
   sandbox-data: {}
   qdrant_data: {}
+  redis_data: {}

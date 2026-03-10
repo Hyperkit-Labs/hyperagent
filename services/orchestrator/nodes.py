@@ -11,7 +11,6 @@ from langchain_core.messages import AIMessage
 logger = logging.getLogger(__name__)
 
 from registries import (
-    get_audit_max_severity,
     get_default_pipeline_id,
     get_high_severity_swc,
     get_roma_complexity_indicators,
@@ -31,6 +30,7 @@ STEP_ORDER = (
     "audit",
     "debate",
     "simulation",
+    "security_policy_evaluator",
     "exploit_sim",
     "deploy",
     "ui_scaffold",
@@ -105,7 +105,7 @@ async def _step_complete(
 
 import ipfs_client
 import rag_client
-from agents.audit_agent import run_security_audits
+from agents.audit_agent import compute_audit_deploy_blocked, run_security_audits
 from agents.codegen_agent import generate_contracts
 from agents.debate_agent import run_debate
 from agents.deploy_agent import deploy_contracts
@@ -114,7 +114,7 @@ from agents.exploit_simulation_agent import run_exploit_simulation
 from agents.oz_wizard_client import generate_contracts_oz
 from agents.pashov_audit_agent import run_pashov_audit
 from agents.scrubd_agent import run_scrubd_validation
-from agents.simulation_agent import run_tenderly_simulations
+from agents.simulation_agent import run_tenderly_simulations, run_tenderly_simulations_bundle
 from agents.test_generation_agent import generate_tests
 from agents.ui_scaffold_agent import generate_ui_schema
 from roma_inprocess import invoke_roma_spec
@@ -493,6 +493,21 @@ async def scrubd_validation_agent(state: AgentState) -> AgentState:
         raise
 
 
+def _has_echidna_harness(test_files: dict) -> bool:
+    """True if test files contain Echidna invariants or assertion-heavy properties.
+    Echidna is not considered successful unless executable properties exist."""
+    if not test_files or not isinstance(test_files, dict):
+        return False
+    combined = " ".join(
+        str(v) for v in test_files.values() if isinstance(v, str)
+    ).lower()
+    return (
+        "invariant_" in combined
+        or "echidna" in combined
+        or ("assert(" in combined and "test" in combined)
+    )
+
+
 def _severity_fails_gate(severity: str, max_allowed: str) -> bool:
     order = ("info", "low", "medium", "high", "critical")
     try:
@@ -531,14 +546,13 @@ async def audit_agent(state: AgentState) -> AgentState:
             if swc and swc in high_swc:
                 f["matches_known_exploit"] = True
         state["audit_findings"] = findings
-        pipeline_id = state.get("pipeline_id") or get_default_pipeline_id()
-        max_severity = get_audit_max_severity(pipeline_id)
-        severity_fail = any(
-            _severity_fails_gate(f.get("severity", "info"), max_severity)
-            for f in findings
+
+        echidna_harness_available = _has_echidna_harness(state.get("test_files") or {})
+        deploy_blocked, blocking_findings = compute_audit_deploy_blocked(
+            findings, echidna_harness_available=echidna_harness_available
         )
-        exploit_fail = any(f.get("matches_known_exploit") for f in findings)
-        state["audit_passed"] = not (severity_fail or exploit_fail)
+        state["audit_passed"] = not deploy_blocked
+        state["audit_blocking_findings"] = blocking_findings
         state["current_stage"] = (
             "simulation" if state["audit_passed"] else "audit_failed"
         )
@@ -583,14 +597,30 @@ async def simulation_agent(state: AgentState) -> AgentState:
     _step_start(run_id, "simulation")
     try:
         contracts = _ensure_contracts_dict(state.get("contracts"))
-        results = await run_tenderly_simulations(
-            contracts,
-            state.get("spec", {}),
-            state.get("spec", {}).get("chains", []),
-            deployments=state.get("deployments"),
-            run_id=run_id,
-            design_rationale=state.get("design_rationale", "") or "",
+        deployments = state.get("deployments") or []
+        use_bundle = (
+            os.environ.get("SIMULATION_USE_BUNDLE", "false").strip().lower()
+            in ("1", "true", "yes")
         )
+        has_init_txs = any(
+            (d.get("plan") or d).get("init_txs")
+            for d in deployments
+            if isinstance(d.get("plan"), dict) or d
+        )
+        if use_bundle and has_init_txs:
+            results = await run_tenderly_simulations_bundle(
+                deployments=deployments,
+                run_id=run_id,
+            )
+        else:
+            results = await run_tenderly_simulations(
+                contracts,
+                state.get("spec", {}),
+                state.get("spec", {}).get("chains", []),
+                deployments=deployments,
+                run_id=run_id,
+                design_rationale=state.get("design_rationale", "") or "",
+            )
         state["simulation_results"] = results
         state["simulation_passed"] = results.get("passed", True)
         state["current_stage"] = (
@@ -649,6 +679,72 @@ async def simulation_agent(state: AgentState) -> AgentState:
         return state
     except Exception as e:
         await _step_complete(run_id, "simulation", error_message=str(e))
+        raise
+
+
+async def security_policy_evaluator_agent(state: AgentState) -> AgentState:
+    """Produce normalized SecurityVerdict from audit, scrubd, simulation.
+    Deterministic tools and simulation are the hard gate; AI review is mandatory context.
+    NOT_APPLICABLE is never treated as PASS; Pashov blocks only when corroborated."""
+    run_id = state.get("run_id") or ""
+    _step_start(run_id, "security_policy_evaluator")
+    try:
+        from security.evaluator import evaluate_security_policy  # noqa: PLC0415
+
+        step_outputs = {
+            "audit_findings": state.get("audit_findings") or [],
+            "scrubd_validation_passed": state.get("scrubd_validation_passed", True),
+            "scrubd_findings": state.get("scrubd_findings") or [],
+            "simulation_results": state.get("simulation_results") or {},
+            "simulation": state.get("simulation_results") or {},
+            "test_files": state.get("test_files") or {},
+        }
+        verdict = evaluate_security_policy(run_id, step_outputs)
+        state["security_verdict"] = verdict
+        state["security_approved_for_deploy"] = verdict.get("approvedForDeploy", False)
+        state["current_stage"] = (
+            "exploit_sim" if verdict.get("approvedForDeploy") else "security_failed"
+        )
+        from store import update_workflow
+
+        eval_status = "completed" if verdict.get("approvedForDeploy") else "failed"
+        update_workflow(
+            run_id,
+            status="building",
+            security_verdict=verdict,
+            stages=[
+                {"stage": "simulation", "status": "completed"},
+                {"stage": "security_policy_evaluator", "status": eval_status},
+            ],
+        )
+        state["messages"] = list(state.get("messages", [])) + [
+            AIMessage(
+                content=f"Security verdict: {verdict.get('finalDecision', 'REJECTED')}"
+            )
+        ]
+        try:
+            import ipfs_client
+
+            cid = await ipfs_client.pin_artifact(run_id, "security_verdict", verdict)
+            if cid:
+                await ipfs_client.record_storage(
+                    run_id, "security_verdict", cid, project_id=state.get("project_id")
+                )
+        except Exception as pin_err:
+            logger.warning("[security_policy_evaluator] pin failed: %s", pin_err)
+        await _step_complete(
+            run_id,
+            "security_policy_evaluator",
+            output_summary=f"decision={verdict.get('finalDecision')} approved={verdict.get('approvedForDeploy')}",
+        )
+        return state
+    except Exception as e:
+        await _step_complete(
+            run_id, "security_policy_evaluator", error_message=str(e)
+        )
+        state["security_verdict"] = None
+        state["security_approved_for_deploy"] = False
+        state["current_stage"] = "security_failed"
         raise
 
 

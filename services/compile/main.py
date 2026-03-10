@@ -223,13 +223,31 @@ def _compile_hardhat_multi(workdir: Path, files: dict[str, str], entry_contract:
     return True, bytecode, data.get("abi", []), []
 
 
+def _safe_contract_name(name: str | None) -> str:
+    """
+    Normalize a user-provided contract name for safe filesystem usage.
+
+    Keeps only alphanumeric characters and underscores and strips any
+    path components. Falls back to 'Contract' if the result is empty.
+    """
+    if not name:
+        return "Contract"
+    # Strip any directory components
+    base = Path(name).name
+    # Replace unsafe characters with underscore
+    safe = re.sub(r"[^A-Za-z0-9_]", "_", base)
+    safe = safe.strip("_") or "Contract"
+    return safe
+
+
 def _compile_hardhat(workdir: Path, contract_name: str, contract_code: str) -> tuple[bool, str | None, list | None, list[str]]:
     """Compile using Hardhat (npx hardhat compile). Uses pre-built template for local node_modules."""
     contracts_dir = workdir / "contracts"
     contracts_dir.mkdir(parents=True, exist_ok=True)
     if "pragma solidity" not in contract_code.strip().lower():
         contract_code = "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n" + contract_code
-    (contracts_dir / f"{contract_name}.sol").write_text(contract_code)
+    safe_contract_name = _safe_contract_name(contract_name)
+    (contracts_dir / f"{safe_contract_name}.sol").write_text(contract_code)
     (workdir / "hardhat.config.js").write_text(
         """module.exports = { solidity: "0.8.24", paths: { sources: "./contracts" } };\n"""
     )
@@ -252,7 +270,7 @@ def _compile_hardhat(workdir: Path, contract_name: str, contract_code: str) -> t
         return False, None, None, ["Node/npx not installed or not in PATH"]
     if result.returncode != 0:
         return False, None, None, [result.stderr or result.stdout or "hardhat compile failed"]
-    artifact_path = workdir / "artifacts" / "contracts" / f"{contract_name}.sol" / f"{contract_name}.json"
+    artifact_path = workdir / "artifacts" / "contracts" / f"{safe_contract_name}.sol" / f"{safe_contract_name}.json"
     if not artifact_path.exists():
         return False, None, None, ["Artifact not found after compile"]
     data = json.loads(artifact_path.read_text())

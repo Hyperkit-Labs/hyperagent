@@ -336,9 +336,9 @@ def _run_workflow_pipeline_job(
     """Background job: run LangGraph pipeline and persist workflow + run status."""
     set_request_id(request_id)
     logger.info(
-        "[pipeline] job start workflow_id=%s api_keys_providers=%s agent_session_jwt=%s",
+        "[pipeline] job start workflow_id=%s api_keys_count=%s agent_session_jwt=%s",
         workflow_id,
-        list(api_keys.keys()) if api_keys else [],
+        len(api_keys or {}),
         "yes" if agent_session_jwt else "no",
     )
     if request_id:

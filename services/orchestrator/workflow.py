@@ -286,9 +286,9 @@ def run_pipeline(
     import logging
 
     logging.getLogger(__name__).info(
-        "[pipeline] run_pipeline start run_id=%s api_keys_providers=%s agent_session_jwt=%s",
+        "[pipeline] run_pipeline start run_id=%s api_keys_count=%s agent_session_jwt=%s",
         run_id,
-        list(initial.get("api_keys") or {}).keys(),
+        len(initial.get("api_keys") or {}),
         "yes" if initial.get("agent_session_jwt") else "no",
     )
     config = {"configurable": {"thread_id": run_id}}

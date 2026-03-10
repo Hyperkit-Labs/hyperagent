@@ -562,12 +562,15 @@ def workflows_generate(
                 detail="Failed to deduct credits. Top up and try again.",
             )
     api_keys = body.api_keys or _get_keys_for_run(user_id, DEFAULT_WORKSPACE)
+    body_keys_present = bool(body.api_keys)
+    supabase_keys_used = bool(not body.api_keys and api_keys)
+    resolved_has_keys = bool(api_keys)
     logger.info(
-        "[generate] user_id=%s body_keys=%s supabase_keys=%s resolved=%s",
+        "[generate] user_id=%s body_keys_present=%s supabase_keys_used=%s resolved_has_keys=%s",
         user_id,
-        list(body.api_keys.keys()) if body.api_keys else "none",
-        "yes" if (not body.api_keys and api_keys) else "skipped",
-        list(api_keys.keys()) if api_keys else "empty",
+        body_keys_present,
+        supabase_keys_used,
+        resolved_has_keys,
     )
     if not api_keys:
         raise HTTPException(

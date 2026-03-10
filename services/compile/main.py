@@ -213,7 +213,9 @@ def _compile_hardhat_multi(workdir: Path, files: dict[str, str], entry_contract:
         return False, None, None, ["Node/npx not installed or not in PATH"]
     if result.returncode != 0:
         return False, None, None, [result.stderr or result.stdout or "hardhat compile failed"]
-    artifact_path = workdir / "artifacts" / "contracts" / f"{entry_contract}.sol" / f"{entry_contract}.json"
+    # Sanitize entry_contract before using it in a filesystem path
+    safe_entry_name = _safe_sol_filename(f"{entry_contract}.sol").rsplit(".sol", 1)[0]
+    artifact_path = workdir / "artifacts" / "contracts" / f"{safe_entry_name}.sol" / f"{safe_entry_name}.json"
     if not artifact_path.exists():
         return False, None, None, [f"Contract {entry_contract} not found in compiled output"]
     data = json.loads(artifact_path.read_text())

@@ -9,6 +9,7 @@ import { createWorkflow, DEFAULT_NETWORK, getErrorMessage, handleApiError, requi
 import { getSessionOnlyLLMKey, SESSION_LLM_PASS_THROUGH_UPDATED_EVENT } from "@/lib/session-store";
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
 import { StarterGrid } from "@/components/chat/StarterGrid";
+import { NumberTicker, ConfettiBurst, ShinyText } from "@/components/ui";
 import { PipelineStepper } from "@/components/chat/PipelineStepper";
 import { ChatCommandBar } from "@/components/chat/ChatCommandBar";
 import { WorkflowActivityList } from "@/components/chat/WorkflowActivityList";
@@ -383,6 +384,7 @@ function ChatPageContent() {
 
   return (
     <div className="bg-[var(--color-bg-base)] text-[var(--color-text-primary)] h-screen w-full flex flex-col overflow-hidden text-[13px] selection:bg-indigo-500/30">
+      <ConfettiBurst active={showCelebration} onComplete={() => setShowCelebration(false)} />
       <Dialog open={settingsOpen} onClose={() => setSettingsOpen(false)} className="relative z-[100]">
         <div className="fixed inset-0 bg-black/60" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
@@ -562,11 +564,24 @@ function ChatPageContent() {
             <div className="max-w-5xl mx-auto space-y-6">
               {!selectedWorkflowId ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-8">
-                  <div className="text-center">
-                    <p className="text-sm font-medium text-[var(--color-text-primary)] mb-1">What would you like to build?</p>
-                    <p className="text-xs text-[var(--color-text-tertiary)] mb-2">Choose a starter or describe your contract below.</p>
-                    <p className="text-xs text-[var(--color-text-muted)]">Try: &quot;Deploy an ERC20 token&quot; or &quot;Audit my vault contract&quot;</p>
-                  </div>
+                  <motion.div
+                    className="text-center space-y-3"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4 }}
+                  >
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--color-primary-alpha-20)] bg-[var(--color-primary-alpha-10)] text-xs font-medium text-[var(--color-primary-light)] mb-2">
+                      <Bot className="w-3.5 h-3.5" />
+                      HyperAgent Engine Active
+                    </div>
+                    <h2 className="text-3xl font-semibold text-[var(--color-text-primary)] tracking-tight">
+                      <ShinyText text="From idea to production in " className="text-[var(--color-text-primary)]" />
+                      <span className="text-[var(--color-primary-light)]"><NumberTicker value={2} /></span> minutes
+                    </h2>
+                    <p className="text-sm text-[var(--color-text-tertiary)] max-w-lg mx-auto">
+                      Describe your smart contract, and I'll generate, audit, and prepare it for deployment on any EVM chain.
+                    </p>
+                  </motion.div>
                   <StarterGrid
                     onSelect={(prompt) => {
                       if (!hasActiveByokKey()) {

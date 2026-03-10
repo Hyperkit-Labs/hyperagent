@@ -15,5 +15,11 @@ export interface IPFSStorage {
 export function createDefaultStorage(): IPFSStorage | null {
   const jwt = process.env.PINATA_JWT;
   if (!jwt) return null;
-  return new IpfsPinataToolkit(jwt);
+  const gatewayBase = process.env.PINATA_GATEWAY_BASE?.trim();
+  const gatewayDomain = process.env.PINATA_GATEWAY_DOMAIN?.trim();
+  return new IpfsPinataToolkit(jwt, {
+    baseUrl: process.env.PINATA_API_URL || "https://api.pinata.cloud",
+    gatewayBase: gatewayBase || undefined,
+    gatewayDomain: gatewayDomain || "gateway.pinata.cloud",
+  });
 }

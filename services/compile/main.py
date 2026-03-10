@@ -144,13 +144,28 @@ def _compile_foundry_multi(workdir: Path, files: dict[str, str], entry_contract:
     return False, None, None, [f"Contract {entry_contract} not found in compiled output"]
 
 
+def _safe_single_contract_name(name: str) -> str:
+    """
+    Sanitize a single contract name for use as a Solidity source filename.
+    Restricts to a safe subset of characters to avoid path traversal or
+    directory manipulation when writing files.
+    """
+    # Take only the final path component in case any separators are present.
+    base = os.path.basename(name)
+    # Allow only alphanumeric characters and underscore; replace others with '_'.
+    safe = re.sub(r"[^0-9A-Za-z_]", "_", base)
+    # Ensure we have a non-empty filename.
+    return safe or "Contract"
+
+
 def _compile_foundry_impl(workdir: Path, contract_name: str, contract_code: str) -> tuple[bool, str | None, list | None, list[str]]:
     """Compile using Foundry (forge build)."""
     src = workdir / "src"
     src.mkdir(parents=True, exist_ok=True)
     if "pragma solidity" not in contract_code.strip().lower():
         contract_code = "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n" + contract_code
-    (src / f"{contract_name}.sol").write_text(contract_code)
+    safe_contract_name = _safe_single_contract_name(contract_name)
+    (src / f"{safe_contract_name}.sol").write_text(contract_code)
     (workdir / "foundry.toml").write_text("[profile.default]\nsolc = \"0.8.24\"\n")
     try:
         result = subprocess.run(

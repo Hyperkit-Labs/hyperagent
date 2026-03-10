@@ -182,6 +182,21 @@ def _compile_foundry_impl(workdir: Path, contract_name: str, contract_code: str)
 _HARDHAT_TEMPLATE = Path("/opt/hardhat-template")
 
 
+def _safe_contract_name(name: str) -> str:
+    """
+    Validate a contract name used in artifact paths to avoid path traversal or
+    unexpected filesystem access. Allows only alphanumerics and underscores.
+    """
+    if not name or not isinstance(name, str):
+        raise HTTPException(status_code=400, detail="Invalid entryContract: empty or missing")
+    # Disallow path separators or dots to avoid directory traversal and extension tricks
+    if "/" in name or "\\" in name or ".." in name or "." in name:
+        raise HTTPException(status_code=400, detail="Invalid entryContract: illegal characters")
+    if not re.fullmatch(r"[A-Za-z0-9_]+", name):
+        raise HTTPException(status_code=400, detail="Invalid entryContract: only letters, digits, and '_' are allowed")
+    return name
+
+
 def _compile_hardhat_multi(workdir: Path, files: dict[str, str], entry_contract: str) -> tuple[bool, str | None, list | None, list[str]]:
     """Compile multiple interdependent files with Hardhat. Returns artifact for entry_contract."""
     contracts_dir = workdir / "contracts"
@@ -213,7 +228,8 @@ def _compile_hardhat_multi(workdir: Path, files: dict[str, str], entry_contract:
         return False, None, None, ["Node/npx not installed or not in PATH"]
     if result.returncode != 0:
         return False, None, None, [result.stderr or result.stdout or "hardhat compile failed"]
-    artifact_path = workdir / "artifacts" / "contracts" / f"{entry_contract}.sol" / f"{entry_contract}.json"
+    safe_entry_contract = _safe_contract_name(entry_contract)
+    artifact_path = workdir / "artifacts" / "contracts" / f"{safe_entry_contract}.sol" / f"{safe_entry_contract}.json"
     if not artifact_path.exists():
         return False, None, None, [f"Contract {entry_contract} not found in compiled output"]
     data = json.loads(artifact_path.read_text())

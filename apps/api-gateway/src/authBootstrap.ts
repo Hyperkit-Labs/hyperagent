@@ -138,30 +138,33 @@ async function ensureWalletUserProvisioned(supabase: SupabaseClient, userId: str
     }
   };
   await run(
-    () =>
-      supabase.rpc("bootstrap_user_credits", {
+    async () => {
+      await supabase.rpc("bootstrap_user_credits", {
         p_user_id: userId,
         p_initial_credits: FREEMIUM_INITIAL_CREDITS,
-      }),
+      });
+    },
     "bootstrap_user_credits"
   );
   await run(
-    () =>
-      supabase.rpc("upsert_spending_control", {
+    async () => {
+      await supabase.rpc("upsert_spending_control", {
         p_user_id: userId,
         p_budget_amount: 0,
         p_budget_currency: "USD",
         p_period: "monthly",
         p_alert_threshold_percent: 80,
-      }),
+      });
+    },
     "upsert_spending_control"
   );
   await run(
-    () =>
-      supabase.from("wallet_user_profiles").upsert(
+    async () => {
+      await supabase.from("wallet_user_profiles").upsert(
         { wallet_user_id: userId },
         { onConflict: "wallet_user_id" }
-      ),
+      );
+    },
     "wallet_user_profiles"
   );
 }

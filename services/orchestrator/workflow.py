@@ -24,6 +24,7 @@ from nodes import (
     exploit_simulation_agent,
     guardian_agent,
     scrubd_validation_agent,
+    security_policy_evaluator_agent,
     simulation_agent,
     spec_agent,
     test_generation_agent,
@@ -71,12 +72,19 @@ def _after_audit(state: AgentState) -> str:
 
 
 def _after_simulation(state: AgentState) -> str:
-    """Route after simulation: pass -> exploit_simulation, fail -> autofix (if cycles remain) or END."""
+    """Route after simulation: pass -> security_policy_evaluator, fail -> autofix or END."""
     if state.get("simulation_passed", True):
-        return "exploit_simulation"
+        return "security_policy_evaluator"
     cycle = state.get("autofix_cycle", 0)
     if cycle < MAX_AUTOFIX_CYCLES:
         return "autofix"
+    return "failed"
+
+
+def _after_security_policy_evaluator(state: AgentState) -> str:
+    """Route after security policy evaluator: approved -> exploit_simulation, else failed."""
+    if state.get("security_approved_for_deploy", False):
+        return "exploit_simulation"
     return "failed"
 
 
@@ -116,6 +124,7 @@ def create_workflow():
     workflow.add_node("guardian", guardian_agent)
     workflow.add_node("deploy_gate", deploy_gate_agent)
     workflow.add_node("simulation", simulation_agent)
+    workflow.add_node("security_policy_evaluator", security_policy_evaluator_agent)
     workflow.add_node("exploit_simulation", exploit_simulation_agent)
     workflow.add_node("deploy", deploy_agent)
     workflow.add_node("ui_scaffold", ui_scaffold_agent)
@@ -176,8 +185,16 @@ def create_workflow():
         "simulation",
         _after_simulation,
         {
-            "exploit_simulation": "exploit_simulation",
+            "security_policy_evaluator": "security_policy_evaluator",
             "autofix": "autofix",
+            "failed": END,
+        },
+    )
+    workflow.add_conditional_edges(
+        "security_policy_evaluator",
+        _after_security_policy_evaluator,
+        {
+            "exploit_simulation": "exploit_simulation",
             "failed": END,
         },
     )

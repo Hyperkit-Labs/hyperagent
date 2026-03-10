@@ -1,11 +1,16 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
+import useSWR from 'swr';
 import { getConfig } from '@/lib/api';
 import { setRuntimeFeatures, setRuntimeConfig } from '@/config/environment';
 import { ROUTES } from '@/constants/routes';
 import type { RuntimeConfig } from '@/lib/api';
+
+const CONFIG_SWR_KEY = 'config';
+/** Cache config for 24h. Feature flags and defaults rarely change. */
+const CONFIG_STALE_TIME_MS = 24 * 60 * 60 * 1000;
 
 interface ConfigContextValue {
   config: RuntimeConfig | null;
@@ -27,23 +32,32 @@ export function useConfig(): ConfigContextValue {
 
 /**
  * Fetches GET /api/v1/config and provides config via context.
- * Updates runtime feature flags and config for non-React consumers.
+ * Uses SWR: 1 request per session (24h cache), skips fetch on login page.
  */
 export function ConfigProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [config, setConfig] = useState<RuntimeConfig | null>(null);
-  const [loading, setLoading] = useState(true);
+  const shouldFetch = pathname !== ROUTES.LOGIN;
 
-  const fetchConfig = useCallback(async () => {
+  const { data, error, isLoading, mutate } = useSWR(
+    shouldFetch ? CONFIG_SWR_KEY : null,
+    getConfig,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: true,
+      revalidateOnMount: false,
+      dedupingInterval: CONFIG_STALE_TIME_MS,
+      errorRetryCount: 1,
+      keepPreviousData: true,
+    }
+  );
+
+  useEffect(() => {
     if (pathname === ROUTES.LOGIN) {
       setRuntimeFeatures({ x402: false, monitoring: false });
       setRuntimeConfig({});
-      setConfig(null);
-      setLoading(false);
       return;
     }
-    try {
-      const data = await getConfig();
+    if (data) {
       setRuntimeFeatures({
         x402: data.x402_enabled,
         monitoring: data.monitoring_enabled ?? false,
@@ -55,26 +69,24 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
         a2a_default_chain_id: data.a2a_default_chain_id,
         a2a_identity: data.a2a_identity,
       });
-      setConfig(data);
-    } catch {
+    } else if (error) {
       setRuntimeFeatures({ x402: false, monitoring: false });
       setRuntimeConfig({});
-      setConfig(null);
-    } finally {
-      setLoading(false);
     }
-  }, [pathname]);
+  }, [pathname, data, error]);
 
-  useEffect(() => {
-    void fetchConfig();
-  }, [fetchConfig]);
+  const config = pathname === ROUTES.LOGIN ? null : (data ?? null);
+  const loading = pathname === ROUTES.LOGIN ? false : isLoading;
 
-  const value: ConfigContextValue = {
-    config,
-    loading,
-    defaultNetworkId: config?.default_network_id,
-    defaultChainId: config?.default_chain_id,
-  };
+  const value: ConfigContextValue = useMemo(
+    () => ({
+      config,
+      loading,
+      defaultNetworkId: config?.default_network_id,
+      defaultChainId: config?.default_chain_id,
+    }),
+    [config, loading]
+  );
 
   return <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>;
 }

@@ -100,9 +100,15 @@ def _compile_solcx(contract_name: str, contract_code: str) -> tuple[bool, str | 
 def _run_slither(workdir: Path, files: dict[str, str], entry: str) -> list[dict]:
     """Run Slither on contract files. Returns list of {severity, title, description, location, category}."""
     for path, content in files.items():
-        if ".." in path or path.startswith("/"):
+        # Normalize the destination path and ensure it stays within workdir
+        try:
+            dst = (workdir / path).resolve()
+        except Exception:
+            # Skip paths that cannot be resolved
             continue
-        dst = workdir / path
+        # Ensure the resolved path is contained within the temporary workdir
+        if not str(dst).startswith(str(workdir.resolve()) + os.sep):
+            continue
         dst.parent.mkdir(parents=True, exist_ok=True)
         code = content.strip()
         if "pragma solidity" not in code.lower():

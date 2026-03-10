@@ -10,6 +10,14 @@ import type { Workflow } from '@/lib/types';
 import { getStoredSession } from '@/lib/session-store';
 
 export const getApiBase = (): string => getServiceUrl('backend').replace(/\/$/, '');
+
+/** Gateway origin (scheme + host + port) for bootstrap. Use this to build /api/v1/auth/bootstrap explicitly and avoid path doubling. */
+export const getGatewayOrigin = (): string => {
+  const base = getApiBase();
+  const origin = base.replace(/\/api\/v1\/?$/, '') || base;
+  return origin;
+};
+
 const base = () => getApiBase();
 
 /** URL for API reference (Swagger UI). Use NEXT_PUBLIC_DOCS_URL when set (e.g. http://localhost:8000/docs for orchestrator direct); else origin from getApiBase() + /docs (gateway proxies /docs to orchestrator). */
@@ -612,6 +620,35 @@ export async function createDebugSandbox(workflowId: string): Promise<DebugSandb
 
 export async function getMetrics(signal?: AbortSignal): Promise<Metrics> {
   return fetchJson('/metrics', signal ? { signal } : undefined);
+}
+
+/** Security finding from GET /api/v1/security/findings. Scoped by wallet_user_id via X-User-Id from session. */
+export interface SecurityFinding {
+  id?: string;
+  run_id?: string;
+  tool?: string;
+  severity?: string;
+  category?: string;
+  title?: string;
+  description?: string;
+  location?: string;
+  status?: string;
+  created_at?: string;
+  [key: string]: unknown;
+}
+
+export async function getSecurityFindings(params?: {
+  run_id?: string;
+  limit?: number;
+  signal?: AbortSignal;
+}): Promise<{ findings: SecurityFinding[] }> {
+  const qs = new URLSearchParams();
+  if (params?.run_id) qs.set('run_id', params.run_id);
+  if (params?.limit != null) qs.set('limit', String(params.limit));
+  const path = `/security/findings${qs.toString() ? `?${qs}` : ''}`;
+  return fetchJson<{ findings: SecurityFinding[] }>(path, params?.signal ? { signal: params.signal } : undefined).catch(
+    () => ({ findings: [] })
+  );
 }
 
 export async function getDetailedHealth(): Promise<{ status: string; services?: Record<string, { status: string }> }> {

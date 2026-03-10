@@ -388,6 +388,34 @@ export async function getPresets(): Promise<PresetItem[]> {
   return fetchJson<PresetItem[]>('/presets').catch(() => []);
 }
 
+export interface PlatformTrackRecord {
+  audits_completed: number;
+  vulnerabilities_found: number;
+  security_researchers: number;
+  tvl_secured: number;
+  tvl_suffix: string;
+  /** "database" when aggregated from DB; "env_defaults" when from env/fallback */
+  source?: 'database' | 'env_defaults';
+}
+
+const TRACK_RECORD_DEFAULTS: PlatformTrackRecord = {
+  audits_completed: 500,
+  vulnerabilities_found: 1200,
+  security_researchers: 50,
+  tvl_secured: 2,
+  tvl_suffix: 'B+',
+  source: 'env_defaults',
+};
+
+export async function getPlatformTrackRecord(signal?: AbortSignal): Promise<PlatformTrackRecord> {
+  return fetchJson<PlatformTrackRecord>('/platform/track-record', { signal }).catch((err) => {
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+      console.warn('[TrackRecord] API failed, using defaults:', err instanceof Error ? err.message : err);
+    }
+    return TRACK_RECORD_DEFAULTS;
+  });
+}
+
 export interface BlueprintItem {
   id: string;
   name?: string;

@@ -100,7 +100,7 @@ function proxyOptions(): Record<string, unknown> {
     },
     onError(err: Error, req: express.Request, res: express.Response) {
       const id = (req as RequestWithId).requestId;
-      console.error(`[gateway] proxy error path=${req.path} requestId=${id}`, err.message);
+      console.error("[gateway] proxy error path=%s requestId=%s %s", req.path, id ?? "", err.message);
       if (!res.headersSent) {
         res.status(502).json({ error: "Bad Gateway", message: "Backend unavailable. Try again or check server logs.", requestId: id ?? undefined });
       }

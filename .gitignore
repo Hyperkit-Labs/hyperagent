@@ -490,6 +490,7 @@ backup-*/
 # ============================================================
 # Scripts (local/dev only, not main-level)
 scripts/
+e2e/
 # Planning documents
 external/*
 artifacts/

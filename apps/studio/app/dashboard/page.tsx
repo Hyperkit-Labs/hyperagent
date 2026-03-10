@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import Link from "next/link";
 import { useConnectModal } from "thirdweb/react";
-import { Code, HardDrive, Package, Activity, Info, List, Rocket, GitBranch, ArrowRight, Loader2, ExternalLink, ChevronDown } from "lucide-react";
+import { Code, HardDrive, Package, Activity, Info, List, Rocket, GitBranch, ArrowRight, Loader2, ExternalLink, ChevronDown, FileCode, Shield, MessageSquare, CheckCircle, PlayCircle } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import { createQuickDemo } from "@/lib/api";
 import { getThirdwebClient } from "@/lib/thirdwebClient";
@@ -15,9 +16,10 @@ import { useLogs } from "@/hooks/useLogs";
 import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist";
 import { Terminal } from "@/components/ai-elements";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
-import { MetricCard, StatusBadge, LiveIndicator } from "@/components/ui";
+import { MetricCard, StatusBadge, LiveIndicator, GlowingBorder, FlickeringGrid } from "@/components/ui";
 import { PageTitle } from "@/components/layout/PageTitle";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
+import { AnimatePresence } from "framer-motion";
 import type { Workflow } from "@/lib/types";
 
 function DashboardCTAs({
@@ -95,15 +97,15 @@ export default function DashboardPage() {
   const recentDeployments = deployments.slice(0, 5);
   const apiError = dashboardError;
   const refetchAll = refetchDashboard;
-  const barValues = [
-    metrics?.workflows?.total ?? 0,
-    metrics?.workflows?.completed ?? 0,
-    metrics?.workflows?.failed ?? 0,
-    deployments.length,
-    metrics?.contracts?.deployed ?? 0,
-    metrics?.contracts?.verified ?? 0,
+  const trafficData = [
+    { name: "Workflows", value: metrics?.workflows?.total ?? 0 },
+    { name: "Completed", value: metrics?.workflows?.completed ?? 0 },
+    { name: "Failed", value: metrics?.workflows?.failed ?? 0 },
+    { name: "Deployments", value: deployments.length },
+    { name: "Contracts", value: metrics?.contracts?.deployed ?? 0 },
+    { name: "Verified", value: metrics?.contracts?.verified ?? 0 },
   ];
-  const maxBar = Math.max(1, ...barValues);
+  const maxBar = Math.max(1, ...trafficData.map((d) => d.value));
   const sparklineWorkflows = [
     { value: Math.max(0, (metrics?.workflows?.total ?? 0) - 2) },
     { value: Math.max(0, (metrics?.workflows?.completed ?? 0) - 1) },
@@ -133,8 +135,12 @@ export default function DashboardPage() {
 
   return (
     <RequireApiSession title="Sign in to view dashboard" description="Sign in with your wallet to see workflows, deployments, and metrics.">
-    <div className="p-6 lg:p-8">
-      <div className="max-w-[1200px] mx-auto space-y-6 animate-enter">
+      <div className="relative min-h-screen bg-[var(--color-bg-base)]">
+        <div className="absolute inset-0 pointer-events-none opacity-[0.03] z-0" aria-hidden>
+          <FlickeringGrid color="rgba(124, 58, 237, 1)" maxOpacity={1} flickerChance={0.1} squareSize={3} gridGap={6} />
+        </div>
+        <div className="relative z-10 p-6 lg:p-8">
+          <div className="max-w-[1200px] mx-auto space-y-6 animate-enter">
         <ApiErrorBanner error={apiError ?? quickDemoError ?? null} onRetry={() => { refetchAll(); setQuickDemoError(null); }} />
         <OnboardingChecklist
           onConnectClick={() => { if (client) void connect({ client, wallets: CONNECT_WALLETS }); }}
@@ -195,6 +201,8 @@ export default function DashboardPage() {
               sublabel: "Total in list",
               icon: <div className="w-2 h-2 rounded-full bg-[var(--color-semantic-success)] shadow-[0_0_8px_var(--color-semantic-success)]" />,
               sparkline: sparklineWorkflows,
+              animateValue: !dashboardLoading && typeof (workflowsTotal ?? workflows?.length ?? 0) === "number",
+              trend: (workflowsTotal ?? 0) > 0 ? "up" as const : undefined,
             },
             {
               label: "Deployments",
@@ -202,12 +210,15 @@ export default function DashboardPage() {
               sublabel: "Active",
               icon: <Code className="w-4 h-4 text-[var(--color-primary-mid)]" />,
               sparkline: sparklineDeployments,
+              animateValue: true,
+              trend: deployments.length > 0 ? "up" as const : undefined,
             },
             {
               label: "Metrics",
               value: dashboardLoading ? "..." : (typeof metrics?.workflows?.total === "number" ? metrics.workflows.total : "-"),
               sublabel: "From API",
               icon: <HardDrive className="w-4 h-4 text-[var(--color-semantic-violet)]" />,
+              animateValue: !dashboardLoading && typeof metrics?.workflows?.total === "number",
             },
             {
               label: "Status",
@@ -222,38 +233,87 @@ export default function DashboardPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25, delay: i * 0.05 }}
             >
-              <MetricCard label={card.label} value={card.value} sublabel={card.sublabel} icon={card.icon} sparklineData={"sparkline" in card ? card.sparkline : undefined} />
+              <MetricCard
+                label={card.label}
+                value={card.value}
+                sublabel={card.sublabel}
+                icon={card.icon}
+                sparklineData={"sparkline" in card ? card.sparkline : undefined}
+                trend={"trend" in card ? card.trend : undefined}
+                animateValue={"animateValue" in card ? card.animateValue : undefined}
+              />
             </motion.div>
           ))}
         </div>
 
         <motion.div
-          className="glass-panel rounded-xl overflow-hidden relative"
+          className="flex flex-wrap gap-2"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, delay: 0.15 }}
+        >
+          <Link
+            href={ROUTES.HOME}
+            className="group relative inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] text-xs font-medium text-[var(--color-text-secondary)] hover:border-[var(--color-primary-alpha-30)] hover:text-[var(--color-text-primary)] transition-all overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--color-primary-alpha-10)] to-transparent -translate-x-[100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+            <Rocket className="w-3.5 h-3.5 group-hover:text-[var(--color-primary-light)] transition-colors" />
+            New Workflow
+          </Link>
+          <Link
+            href={ROUTES.CONTRACTS}
+            className="group relative inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] text-xs font-medium text-[var(--color-text-secondary)] hover:border-[var(--color-primary-alpha-30)] hover:text-[var(--color-text-primary)] transition-all overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--color-primary-alpha-10)] to-transparent -translate-x-[100%] group-hover:translate-x-[100%] transition-transform duration-1000 delay-75" />
+            <FileCode className="w-3.5 h-3.5 group-hover:text-[var(--color-primary-light)] transition-colors" />
+            View Contracts
+          </Link>
+          <Link
+            href={ROUTES.SECURITY}
+            className="group relative inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] text-xs font-medium text-[var(--color-text-secondary)] hover:border-[var(--color-primary-alpha-30)] hover:text-[var(--color-text-primary)] transition-all overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--color-primary-alpha-10)] to-transparent -translate-x-[100%] group-hover:translate-x-[100%] transition-transform duration-1000 delay-150" />
+            <Shield className="w-3.5 h-3.5 group-hover:text-[var(--color-primary-light)] transition-colors" />
+            Check Security
+          </Link>
+          <Link
+            href={ROUTES.HOME}
+            className="group relative inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] text-xs font-medium text-[var(--color-text-secondary)] hover:border-[var(--color-primary-alpha-30)] hover:text-[var(--color-text-primary)] transition-all overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--color-primary-alpha-10)] to-transparent -translate-x-[100%] group-hover:translate-x-[100%] transition-transform duration-1000 delay-200" />
+            <MessageSquare className="w-3.5 h-3.5 group-hover:text-[var(--color-primary-light)] transition-colors" />
+            Open Chat
+          </Link>
+        </motion.div>
+
+        <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25, delay: 0.1 }}
         >
-          <div className="p-4 border-b border-[var(--color-border-subtle)] flex items-center justify-between gap-4">
-            <div>
-              <h3 className="font-medium text-[var(--color-text-primary)] text-sm">Live Log Stream</h3>
-              <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">Recent activity from backend (5 most recent)</p>
+          <GlowingBorder active={liveLogs.length > 0} className="glass-panel rounded-xl overflow-hidden relative border-0">
+            <div className="p-4 border-b border-[var(--color-border-subtle)] flex items-center justify-between gap-4">
+              <div>
+                <h3 className="font-medium text-[var(--color-text-primary)] text-sm">Live Log Stream</h3>
+                <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">Recent activity from backend (5 most recent)</p>
+              </div>
+              <div className="flex items-center gap-4 shrink-0">
+                {liveLogs.length > 0 && (
+                  <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-medium animate-pulse-subtle">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Live
+                  </span>
+                )}
+                <Link
+                  href={ROUTES.MONITORING}
+                  className="text-xs font-medium text-[var(--color-primary-light)] hover:text-[var(--color-primary)] transition-colors flex items-center gap-1"
+                >
+                  See all <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
             </div>
-            <div className="flex items-center gap-4 shrink-0">
-              {liveLogs.length > 0 && (
-                <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Live
-                </span>
-              )}
-              <Link
-                href={ROUTES.MONITORING}
-                className="text-xs font-medium text-[var(--color-primary-light)] hover:text-[var(--color-primary)] transition-colors flex items-center gap-1"
-              >
-                See all <ArrowRight className="w-3 h-3" />
-              </Link>
-            </div>
-          </div>
-          <Terminal lines={terminalLines} noScroll className="rounded-none border-0" />
+            <Terminal lines={terminalLines} noScroll className="rounded-none border-0 bg-transparent" />
+          </GlowingBorder>
         </motion.div>
 
         <motion.div
@@ -297,36 +357,95 @@ export default function DashboardPage() {
             variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
           >
             <LiveIndicator live={hasActiveWorkflows} />
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-4">
               <h3 className="font-medium text-[var(--color-text-primary)] flex items-center gap-2 text-sm">
                 <Activity className="w-4 h-4 text-[var(--color-primary)]" />
                 Traffic Overview
               </h3>
             </div>
-            <div className="flex-1 relative flex items-end justify-between gap-2 px-2">
-              {barValues.map((val, i) => (
-                <div
-                  key={i}
-                  className="flex-1 bg-[var(--color-border-subtle)] rounded-t chart-bar min-w-0"
-                  style={{ height: `${Math.round((val / maxBar) * 100)}%` }}
-                  title={`${val}`}
-                />
-              ))}
-            </div>
-            <div className="flex gap-2 mt-3 px-1 text-[10px] text-[var(--color-text-dim)]">
-              {["Workflows", "Completed", "Failed", "Deployments", "Contracts", "Verified"].map((label) => (
-                <span key={label} className="flex-1 min-w-0 text-center truncate" title={label}>{label}</span>
-              ))}
+            <div className="flex-1 min-h-0 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={trafficData} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                  <defs>
+                    <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--color-primary-mid)" stopOpacity={0.9} />
+                      <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0.6} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} />
+                  <YAxis tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} />
+                  <Tooltip
+                    contentStyle={{ background: "var(--color-bg-panel)", border: "1px solid var(--color-border-subtle)", borderRadius: 8 }}
+                    labelStyle={{ color: "var(--color-text-primary)" }}
+                    formatter={(val: number | undefined) => [val ?? 0, "Count"]}
+                  />
+                  <Bar dataKey="value" fill="url(#barGrad)" radius={[4, 4, 0, 0]}>
+                    {trafficData.map((_, i) => (
+                      <Cell key={i} className="chart-bar" />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </motion.div>
         </motion.div>
 
         <motion.div
-          className="glass-panel rounded-xl overflow-hidden"
+          className="grid grid-cols-1 lg:grid-cols-3 gap-6"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, delay: 0.2 }}
+          transition={{ duration: 0.25, delay: 0.18 }}
         >
+          <div className="glass-panel rounded-xl p-5 lg:col-span-1">
+            <h3 className="font-medium text-[var(--color-text-primary)] flex items-center gap-2 text-sm mb-4">
+              <Activity className="w-4 h-4 text-[var(--color-primary)]" />
+              Activity Timeline
+            </h3>
+            <div className="space-y-0 relative overflow-hidden">
+              <AnimatePresence initial={false}>
+              {[
+                ...recentDeployments.slice(0, 3).map((d) => ({
+                  type: "deploy" as const,
+                  label: `Contract deployed`,
+                  detail: `${d.network ?? "?"} · ${(d.contractAddress ?? "-").slice(0, 8)}...`,
+                  icon: CheckCircle,
+                })),
+                ...workflows.slice(0, 2).map((w) => ({
+                  type: "workflow" as const,
+                  label: "Workflow started",
+                  detail: w.intent?.slice(0, 30) ?? w.workflow_id?.slice(0, 8) ?? "-",
+                  icon: PlayCircle,
+                })),
+              ]
+                .slice(0, 5)
+                .map((ev, i) => {
+                  const Icon = ev.icon;
+                  return (
+                    <motion.div 
+                      key={`${ev.type}-${ev.detail}-${i}`}
+                      initial={{ height: 0, opacity: 0, scale: 0.95 }}
+                      animate={{ height: "auto", opacity: 1, scale: 1 }}
+                      exit={{ height: 0, opacity: 0, scale: 0.95 }}
+                      transition={{ type: "spring", bounce: 0, duration: 0.4 }}
+                      className="flex gap-3 py-2 border-b border-[var(--color-border-subtle)] last:border-0 overflow-hidden"
+                    >
+                      <div className="shrink-0 w-6 h-6 rounded-full bg-[var(--color-primary-alpha-15)] flex items-center justify-center mt-1">
+                        <Icon className="w-3 h-3 text-[var(--color-primary-light)]" />
+                      </div>
+                      <div className="min-w-0 py-1">
+                        <p className="text-xs font-medium text-[var(--color-text-primary)]">{ev.label}</p>
+                        <p className="text-[10px] text-[var(--color-text-muted)] truncate">{ev.detail}</p>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+              {recentDeployments.length === 0 && workflows.length === 0 && (
+                <p className="text-xs text-[var(--color-text-muted)] py-4">No recent activity</p>
+              )}
+            </div>
+          </div>
+          <div className="glass-panel rounded-xl overflow-hidden lg:col-span-2">
           <div className="p-5 border-b border-[var(--color-border-subtle)] flex items-center justify-between">
             <h3 className="font-medium text-[var(--color-text-primary)] flex items-center gap-2 text-sm">
               <List className="w-4 h-4 text-[var(--color-primary)]" />
@@ -379,9 +498,11 @@ export default function DashboardPage() {
               </tbody>
             </table>
           </div>
+          </div>
         </motion.div>
+          </div>
+        </div>
       </div>
-    </div>
     </RequireApiSession>
   );
 }

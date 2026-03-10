@@ -562,7 +562,7 @@ def list_workflow_states(
             client.table("runs")
             .select("id, workflow_state, status, created_at")
             .order("created_at", desc=True)
-            .limit(min(limit, 100))
+            .limit(min(limit, 500))
         )
         if run_status:
             q = q.eq("status", run_status)
@@ -601,6 +601,39 @@ def count_runs() -> int:
         return int(getattr(r, "count", 0) or 0)
     except Exception as e:
         logger.warning("[db] count_runs failed: %s", e)
+        return 0
+
+
+def count_completed_audits() -> int:
+    """Count distinct runs that have a completed audit step (run_steps). More reliable than workflow_state."""
+    client = _client()
+    if not client:
+        return 0
+    try:
+        r = (
+            client.table("run_steps")
+            .select("run_id")
+            .eq("step_type", "audit")
+            .eq("status", "completed")
+            .execute()
+        )
+        run_ids = {row.get("run_id") for row in (r.data or []) if row.get("run_id")}
+        return len(run_ids)
+    except Exception as e:
+        logger.warning("[db] count_completed_audits failed: %s", e)
+        return 0
+
+
+def count_security_findings() -> int:
+    """Total count of security findings from security_findings table."""
+    client = _client()
+    if not client:
+        return 0
+    try:
+        r = client.table("security_findings").select("id", count="exact").execute()
+        return int(getattr(r, "count", 0) or 0)
+    except Exception as e:
+        logger.warning("[db] count_security_findings failed: %s", e)
         return 0
 
 

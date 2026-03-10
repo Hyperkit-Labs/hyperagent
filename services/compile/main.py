@@ -111,6 +111,19 @@ def _compile_solcx(contract_name: str, contract_code: str) -> tuple[bool, str | 
     return False, None, None, ["Contract not found in compiled output"]
 
 
+def _safe_artifact_stem(name: str) -> str:
+    """
+    Derive a safe artifact base name from a potentially untrusted file name.
+
+    Keeps only alphanumeric characters, underscore and dash, replacing any
+    other character with an underscore. Falls back to "contract" if empty.
+    """
+    stem = Path(name).stem
+    # Replace any character that is not alphanumeric, underscore or dash.
+    safe_stem = re.sub(r"[^A-Za-z0-9_-]", "_", stem)
+    return safe_stem or "contract"
+
+
 def _compile_foundry_multi(workdir: Path, files: dict[str, str], entry_contract: str) -> tuple[bool, str | None, list | None, list[str]]:
     """Compile multiple interdependent files with Foundry. Returns artifact for entry_contract."""
     src = workdir / "src"
@@ -130,7 +143,7 @@ def _compile_foundry_multi(workdir: Path, files: dict[str, str], entry_contract:
     if result.returncode != 0:
         return False, None, None, [result.stderr or result.stdout or "forge build failed"]
     for name in files:
-        base = Path(name).stem
+        base = _safe_artifact_stem(name)
         out_dir = workdir / "out" / f"{base}.sol"
         if out_dir.exists():
             artifact = out_dir / f"{base}.json"

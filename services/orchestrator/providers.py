@@ -33,7 +33,7 @@ def _trace_headers() -> dict[str, str]:
 
 
 class SimulationProvider(Protocol):
-    """Protocol: simulate(network, from_addr, data, to_addr?, value?, design_rationale?) -> SimulateTxResult."""
+    """Protocol: simulate(...) and simulate_bundle(...) -> SimulateTxResult / SimulateBundleResult."""
 
     async def simulate(
         self,
@@ -44,7 +44,11 @@ class SimulationProvider(Protocol):
         value: str = "0",
         design_rationale: str = "",
     ) -> dict[str, Any]:
-        """Run simulation; returns SimulateTxResult-shaped dict."""
+        """Run single simulation; returns SimulateTxResult-shaped dict."""
+        ...
+
+    async def simulate_bundle(self, simulations: list[dict[str, Any]]) -> dict[str, Any]:
+        """Run bundled simulations; returns SimulateBundleResult-shaped dict."""
         ...
 
 
@@ -79,6 +83,31 @@ class SimulationHttpProvider:
         async with httpx.AsyncClient(timeout=get_timeout("simulation")) as client:
             r = await client.post(
                 f"{self.base_url}/simulate",
+                headers=headers,
+                json=payload,
+            )
+            if r.status_code == 503:
+                return {
+                    "success": False,
+                    "error": "Tenderly not configured",
+                    "gasUsed": 0,
+                }
+            r.raise_for_status()
+            return r.json()
+
+    async def simulate_bundle(
+        self,
+        simulations: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Tenderly Bundled Simulations: run multiple txs consecutively in one block.
+        Each item: network_id, from, to?, input, value?, gas?, state_objects?
+        See https://docs.tenderly.co/simulations/bundled-simulations
+        """
+        headers = _trace_headers()
+        payload: dict[str, Any] = {"simulations": simulations}
+        async with httpx.AsyncClient(timeout=get_timeout("simulation")) as client:
+            r = await client.post(
+                f"{self.base_url}/simulate-bundle",
                 headers=headers,
                 json=payload,
             )

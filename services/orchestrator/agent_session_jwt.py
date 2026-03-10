@@ -15,7 +15,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 JWT_ISSUER = "hyperagent-orchestrator"
 JWT_ALG = "HS256"
-AGENT_SESSION_EXP_MINUTES = 15
+AGENT_SESSION_EXP_MINUTES = int(os.environ.get("AGENT_SESSION_EXP_MINUTES", "5"))
 
 
 def _get_payload_key() -> bytes:

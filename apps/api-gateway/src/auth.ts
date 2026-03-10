@@ -25,7 +25,8 @@ function isPublicPath(path: string): boolean {
     p === "/api/v1/config" ||
     p === "/api/v1/config/integrations-debug" ||
     p === "/api/v1/networks" ||
-    p === "/api/v1/tokens/stablecoins"
+    p === "/api/v1/tokens/stablecoins" ||
+    p === "/api/v1/platform/track-record"
   );
 }
 

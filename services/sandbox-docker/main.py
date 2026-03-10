@@ -21,6 +21,9 @@ import httpx
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
+import ipaddress
+import socket
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -72,11 +75,48 @@ def _run_sync(cmd: list[str], cwd: str | None = None, timeout: int = 120) -> tup
         return -1, "", str(e)
 
 
+def _is_public_ip(ip_str: str) -> bool:
+    """
+    Return True if the given IP address is globally reachable (not private, loopback, etc.).
+    """
+    try:
+        ip_obj = ipaddress.ip_address(ip_str)
+    except ValueError:
+        return False
+    if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_multicast:
+        return False
+    if getattr(ip_obj, "is_reserved", False) or getattr(ip_obj, "is_unspecified", False):
+        return False
+    return True
+
+
+def _validate_tarball_url(tarball_url: str) -> None:
+    """
+    Validate that the tarball URL uses http/https and resolves only to public IP addresses.
+    Raises HTTPException(400) if the URL is not acceptable.
+    """
+    parsed = urlparse(tarball_url)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        raise HTTPException(status_code=400, detail="tarball_url must be an http(s) URL with a hostname")
+    hostname = parsed.hostname
+    try:
+        addr_info = socket.getaddrinfo(hostname, parsed.port or 80, proto=socket.IPPROTO_TCP)
+    except socket.gaierror:
+        raise HTTPException(status_code=400, detail="tarball_url host could not be resolved")
+    ips = {ai[4][0] for ai in addr_info if ai and ai[4]}
+    if not ips:
+        raise HTTPException(status_code=400, detail="tarball_url host has no IP addresses")
+    for ip in ips:
+        if not _is_public_ip(ip):
+            raise HTTPException(status_code=400, detail="tarball_url must not point to private or loopback addresses")
+
+
 async def _create_sandbox_container(tarball_url: str, timeout_minutes: int, port: int) -> tuple[str, int]:
     sandbox_id = f"sandbox-{uuid.uuid4().hex[:12]}"
     extract_dir = WORK_DIR / sandbox_id
     extract_dir.mkdir(parents=True, exist_ok=True)
     try:
+        _validate_tarball_url(tarball_url)
         tarball_path = extract_dir / "project.tar.gz"
         async with httpx.AsyncClient(timeout=60) as client:
             r = await client.get(tarball_url)

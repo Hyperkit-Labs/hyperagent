@@ -292,8 +292,8 @@ async function fetchJson<T>(path: string, options?: FetchJsonOptions): Promise<T
         if (process.env.NODE_ENV === 'development' && typeof console !== 'undefined') {
           console.warn(`[API] ${path} → ${res.status}`, message.slice(0, 80));
         }
-        // Don't retry on client errors (4xx) except 408, 429
-        if (res.status >= 400 && res.status < 500 && ![408, 429].includes(res.status)) {
+        // Don't retry on client errors (4xx) except 408. Never retry 429 (rate limit) to avoid amplification.
+        if (res.status >= 400 && res.status < 500 && res.status !== 408) {
           if (res.status === 401 && on401Callback) {
             try {
               on401Callback();
@@ -305,7 +305,7 @@ async function fetchJson<T>(path: string, options?: FetchJsonOptions): Promise<T
           throw error;
         }
 
-        // Retry on server errors (5xx) and specific client errors
+        // Retry on server errors (5xx) and 408 Request Timeout only
         if (attempt < maxRetries - 1) {
           lastError = error;
           await new Promise(resolve => setTimeout(resolve, retryDelay * (attempt + 1)));
@@ -392,18 +392,16 @@ export interface PlatformTrackRecord {
   audits_completed: number;
   vulnerabilities_found: number;
   security_researchers: number;
-  tvl_secured: number;
-  tvl_suffix: string;
+  contracts_deployed: number;
   /** "database" when aggregated from DB; "env_defaults" when from env/fallback */
   source?: 'database' | 'env_defaults';
 }
 
 const TRACK_RECORD_DEFAULTS: PlatformTrackRecord = {
-  audits_completed: 500,
-  vulnerabilities_found: 1200,
-  security_researchers: 50,
-  tvl_secured: 2,
-  tvl_suffix: 'B+',
+  audits_completed: 0,
+  vulnerabilities_found: 0,
+  security_researchers: 0,
+  contracts_deployed: 0,
   source: 'env_defaults',
 };
 

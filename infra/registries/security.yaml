@@ -1,13 +1,184 @@
-# Security & policy registry (GitOps). Mandatory tools per network/risk level, severity
-# thresholds that block deploy, allowed upgrade patterns, time-lock defaults.
-# slitherToSwc: Slither detector category -> SWC ID mapping for known exploit patterns.
-# highSeveritySwc: SWC IDs that block deploy when matched.
+# Security & policy registry (GitOps). Stricter deployment contract:
+# Deterministic tools and simulation are the hard gate; AI review is mandatory
+# context that can escalate risk but must not silently substitute for reproducible evidence.
+# NOT_APPLICABLE must never be treated as PASS; WAIVED must always carry human evidence.
 apiVersion: hyperagent.io/v1
 kind: SecurityPolicyRegistry
 metadata:
   name: evm-security-policies
-  version: "1"
+  version: "3"
 spec:
+  # Policy shape: mandatoryTools, deployBlockSeverity, maxAllowedSeverityForDeploy,
+  # requireSimulationSuccess drive deployment gating.
+  security:
+    version: 1
+    require_auth_for_deploy: true
+    require_simulation_success: true
+    require_artifact_provenance: true
+    require_trace_blob: true
+
+    deploy:
+      max_allowed_severity_for_deploy: medium
+      deploy_block_severity:
+        - high
+        - critical
+      allow_waiver_for:
+        - medium
+        - low
+        - info
+      waiver_requires:
+        - approver_id
+        - approver_role
+        - reason
+        - expiry_at
+        - evidence_refs
+        - linked_run_id
+
+    tools:
+      mandatory:
+        - scrubd
+        - slither
+        - mythril
+        - tenderly
+
+      conditional_mandatory:
+        echidna:
+          when:
+            - generated_invariants_present
+            - assertion_harness_present
+            - echidna_config_present
+          otherwise_status: NOT_APPLICABLE
+
+        pashov:
+          when:
+            - always
+          otherwise_status: NOT_APPLICABLE
+
+      advisory_only:
+        - mythx
+
+    trust:
+      deterministic_blocking:
+        - slither
+        - mythril
+        - echidna
+        - tenderly
+        - scrubd
+      ai_review_nonblocking_by_default:
+        - pashov
+
+    severity_weights:
+      critical: 1.00
+      high: 0.85
+      medium: 0.55
+      low: 0.25
+      info: 0.10
+
+    tool_weights:
+      slither: 0.90
+      mythril: 0.95
+      echidna: 1.00
+      tenderly: 1.00
+      scrubd: 0.80
+      pashov: 0.55
+
+    correlation:
+      same_issue_match_on:
+        - file
+        - contract
+        - function
+        - swc_id
+        - normalized_title
+      corroborated_threshold: 2
+      ai_requires_one_deterministic_match: true
+
+    statuses:
+      PASS:
+        description: "Tool ran successfully and found no blocking issues."
+      FAIL:
+        description: "Tool found blocking issues or the step itself failed."
+      WAIVED:
+        description: "Issue accepted temporarily with explicit human approval and evidence."
+      NOT_APPLICABLE:
+        description: "Tool is intentionally skipped because prerequisites are absent."
+
+    step_rules:
+      scrubd:
+        fail_if:
+          - mandatory_pattern_match
+          - reentrancy_before_state_update
+        pass_if:
+          - no_blocking_pattern_match
+
+      slither:
+        fail_if:
+          - finding.severity in [high, critical]
+          - mapped_policy_severity in [high, critical]
+        waive_if:
+          - finding.severity in [medium, low, info]
+
+      mythril:
+        fail_if:
+          - finding.severity in [high, critical]
+          - tx_sequence_present_and_exploitable == true
+        waive_if:
+          - finding.severity in [medium, low, info]
+
+      echidna:
+        fail_if:
+          - property_falsified == true
+          - assertion_failed == true
+        not_applicable_if:
+          - no_generated_invariants
+          - no_assertion_harness
+          - unsupported_backend
+        pass_if:
+          - executed == true
+          - property_falsified == false
+
+      pashov:
+        fail_if:
+          - confidence_gte_90_and_corroborated == true
+        waive_if:
+          - confidence_gte_75_and_uncorroborated == true
+        advisory_if:
+          - confidence_lt_75
+
+      tenderly:
+        fail_if:
+          - deploy_simulation_failed == true
+          - runtime_flow_failed == true
+          - revert_detected == true
+        pass_if:
+          - deploy_simulation_failed == false
+          - no_critical_runtime_anomalies == true
+
+    final_decision:
+      fail_if:
+        - any_mandatory_tool_status == FAIL
+        - require_simulation_success == true and tenderly.status != PASS
+        - any_unwaived_finding.severity in [high, critical]
+        - echidna.required == true and echidna.status != PASS
+      waived_if:
+        - no_fail_conditions
+        - findings_present
+        - all_blocking_candidates_resolved_or_waived
+      pass_if:
+        - all_mandatory_tools in [PASS, NOT_APPLICABLE]
+        - no_unwaived_blocking_findings
+        - tenderly.status == PASS
+
+  # Legacy policy keys (for backward compatibility with registries.py)
+  mandatoryTools:
+    - scrubd
+    - slither
+    - mythril
+    - tenderly
+  echidnaMandatoryWhenHarness: true
+  deployBlockSeverity: high
+  maxAllowedSeverityForDeploy: medium
+  requireSimulationSuccess: true
+
   slitherToSwc:
     reentrancy-eth: SWC-107
     reentrancy-no-eth: SWC-107
@@ -37,17 +208,52 @@ spec:
     - SWC-109
     - SWC-132
     - SWC-106
+
+  tieredGates:
+    roma:
+      trustLevel: internal
+      deployRule: never_block
+      role: "Spec bootstrap and requirement shaping; not a security control."
+    slither:
+      trustLevel: high
+      deployRule: block_on_high_critical
+      role: "Mandatory static gate for reentrancy, access control, and related classes."
+    mythril:
+      trustLevel: high
+      deployRule: block_on_high_critical
+      role: "Mandatory symbolic gate; block on High/Critical, especially when tx_sequence reproducible."
+    echidna:
+      trustLevel: medium_high
+      deployRule: block_when_harness_fails
+      role: "Mandatory property-fuzzing gate only when harness exists; NOT_APPLICABLE otherwise."
+    tenderly:
+      trustLevel: high
+      deployRule: always_block_on_failure
+      role: "Mandatory predeploy execution gate; any failed simulation blocks deploy."
+    scrubd:
+      trustLevel: internal_high
+      deployRule: block_on_matched_patterns
+      role: "Mandatory policy/pattern gate for curated RE/UX checks; label as internal-policy."
+    pashov:
+      trustLevel: medium
+      deployRule: block_only_when_corroborated
+      role: "Always-on reviewer; block only when corroborated by Slither/Mythril/Echidna/Tenderly."
+    mythx:
+      trustLevel: optional
+      deployRule: never_block
+      role: "Optional compatibility backend; not a hard dependency."
+
   policies:
     - id: default
       name: Default EVM
       mandatoryTools:
         - slither
         - mythril
-        - mythx
-        - echidna
         - tenderly
-      deployBlockSeverity: critical
-      maxAllowedSeverityForDeploy: high
+        - scrubd
+      echidnaMandatoryWhenHarness: true
+      deployBlockSeverity: high
+      maxAllowedSeverityForDeploy: medium
       requireSimulationSuccess: true
       allowedUpgradePatterns:
         - timelock
@@ -58,6 +264,8 @@ spec:
       mandatoryTools:
         - slither
         - tenderly
+        - scrubd
+      echidnaMandatoryWhenHarness: false
       deployBlockSeverity: critical
       maxAllowedSeverityForDeploy: high
       requireSimulationSuccess: true
@@ -67,9 +275,9 @@ spec:
       mandatoryTools:
         - slither
         - mythril
-        - mythx
-        - echidna
         - tenderly
+        - scrubd
+      echidnaMandatoryWhenHarness: true
       deployBlockSeverity: high
       maxAllowedSeverityForDeploy: medium
       requireSimulationSuccess: true

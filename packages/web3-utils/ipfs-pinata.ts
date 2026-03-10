@@ -17,6 +17,16 @@ export class IpfsPinataToolkit {
     private readonly gatewayBase = "https://gateway.pinata.cloud/ipfs"
   ) {}
 
+  private isValidCid(cid: string): boolean {
+    // Conservative validation for IPFS CIDs: non-empty, reasonable length, and safe characters only.
+    if (typeof cid !== "string") return false;
+    const trimmed = cid.trim();
+    if (!trimmed) return false;
+    if (trimmed.length < 10 || trimmed.length > 200) return false;
+    // Common CID encodings are base32/base58; restrict to alphanumeric characters for safety.
+    return /^[A-Za-z0-9]+$/.test(trimmed);
+  }
+
   async pin(content: string, name: string): Promise<PinResult> {
     const response = await fetch(`${this.baseUrl}/pinning/pinJSONToIPFS`, {
       method: "POST",
@@ -41,7 +51,11 @@ export class IpfsPinataToolkit {
   }
 
   async unpin(cid: string): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/pinning/unpin/${cid}`, {
+    if (!this.isValidCid(cid)) {
+      throw new Error("Invalid CID");
+    }
+    const safeCid = encodeURIComponent(cid.trim());
+    const response = await fetch(`${this.baseUrl}/pinning/unpin/${safeCid}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${this.jwt}` },
     });

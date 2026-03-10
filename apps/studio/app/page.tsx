@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useActiveAccount } from "thirdweb/react";
+import { useActiveAccountFromContext } from "@/components/providers/ActiveAccountContext";
 import { useAppChat, hasActiveByokKey } from "@/hooks/useAppChat";
 import { useWorkflowPolling } from "@/hooks/useWorkflowPolling";
 import { createWorkflow, DEFAULT_NETWORK, getErrorMessage, handleApiError, requireLLMKeys, LLM_KEYS_REQUIRED_MESSAGE, isByokStorageOrMigrationError, BYOK_SAVE_AGAIN_HINT, isCreditsError } from "@/lib/api";
@@ -157,7 +157,7 @@ function SpecReviewPanel({ workflow, onApproved, onError }: { workflow: Workflow
 function ChatPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const account = useActiveAccount();
+  const account = useActiveAccountFromContext();
   const [shellView, setShellView] = useState<ShellView>("code");
   const [workflowsSidebarOpen, setWorkflowsSidebarOpen] = useState(true);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(

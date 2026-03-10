@@ -9,6 +9,7 @@ import { SpendingControlCard } from "@/components/settings/SpendingControlCard";
 import { PaymentTopUpCard } from "@/components/settings/PaymentTopUpCard";
 import { ROUTES } from "@/constants/routes";
 import { ArrowRight, TrendingUp } from "lucide-react";
+import { NumberTicker } from "@/components/ui";
 import { usePaymentsDashboard } from "@/hooks/usePaymentsDashboard";
 import { cn } from "@/lib/utils";
 
@@ -58,10 +59,16 @@ function PaymentsHeroMetric({
   label,
   value,
   tone,
+  numericValue,
+  suffix,
+  loading,
 }: {
   label: string;
   value: string;
   tone: "primary" | "neutral" | "warning";
+  numericValue?: number;
+  suffix?: string;
+  loading?: boolean;
 }) {
   const accent =
     tone === "primary"
@@ -71,11 +78,17 @@ function PaymentsHeroMetric({
         : "from-slate-400/70 to-slate-500/70";
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/5 bg-slate-900/70 backdrop-blur-md px-4 py-3">
+    <div className="relative overflow-hidden rounded-2xl border border-[var(--color-border-subtle)] glass-panel px-4 py-3">
       <div className={cn("absolute inset-0 opacity-30 bg-gradient-to-br", accent)} />
       <div className="relative flex flex-col gap-1">
-        <span className="text-xs text-slate-400">{label}</span>
-        <span className="text-xl font-semibold tracking-tight text-slate-100">{value}</span>
+        <span className="text-xs text-[var(--color-text-muted)]">{label}</span>
+        <span className="text-xl font-semibold tracking-tight text-[var(--color-text-primary)]">
+          {loading ? "..." : numericValue != null && !Number.isNaN(numericValue) && suffix ? (
+            <>
+              <NumberTicker value={numericValue} /> {suffix}
+            </>
+          ) : value}
+        </span>
       </div>
     </div>
   );
@@ -130,9 +143,9 @@ export default function PaymentsPage() {
         <ApiErrorBanner error={error} onRetry={refetch} />
 
         <div className="grid grid-cols-3 gap-3">
-          <PaymentsHeroMetric label="Balance" value={balanceValue} tone="primary" />
-          <PaymentsHeroMetric label="This period spend" value={spendValue} tone="neutral" />
-          <PaymentsHeroMetric label="Budget" value={budgetValue} tone="warning" />
+          <PaymentsHeroMetric label="Balance" value={balanceValue} tone="primary" numericValue={balance?.balance} suffix={balance?.currency ?? "USD"} loading={loading} />
+          <PaymentsHeroMetric label="This period spend" value={spendValue} tone="neutral" numericValue={typeof summary.total === "number" ? summary.total : parseFloat(String(summary.total ?? 0)) || undefined} suffix={summary.currency ?? "USD"} loading={loading} />
+          <PaymentsHeroMetric label="Budget" value={budgetValue} tone="warning" numericValue={typeof control?.budget === "number" ? control.budget : parseFloat(String(control?.budget ?? 0)) || undefined} suffix={control?.currency ?? "USD"} loading={loading} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)] gap-6">

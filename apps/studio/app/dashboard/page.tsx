@@ -10,7 +10,7 @@ import { Code, HardDrive, Package, Activity, Info, List, Rocket, GitBranch, Arro
 import { ROUTES } from "@/constants/routes";
 import { createQuickDemo } from "@/lib/api";
 import { getThirdwebClient } from "@/lib/thirdwebClient";
-import { CONNECT_WALLETS } from "@/lib/connectWallets";
+import { getConnectConfig } from "@/lib/connectWallets";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useLogs } from "@/hooks/useLogs";
 import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist";
@@ -143,7 +143,7 @@ export default function DashboardPage() {
           <div className="max-w-[1200px] mx-auto space-y-6 animate-enter">
         <ApiErrorBanner error={apiError ?? quickDemoError ?? null} onRetry={() => { refetchAll(); setQuickDemoError(null); }} />
         <OnboardingChecklist
-          onConnectClick={() => { if (client) void connect({ client, wallets: CONNECT_WALLETS }); }}
+          onConnectClick={() => { if (client) void connect(getConnectConfig(client)); }}
           onByokClick={() => router.push(ROUTES.SETTINGS)}
           onPaymentClick={() => router.push(ROUTES.PAYMENTS)}
           onTryItNowClick={async () => {

@@ -1,6 +1,8 @@
 "use client";
 
 import { Code2, Shield, Bug, Rocket } from "lucide-react";
+import { motion } from "framer-motion";
+import { SpotlightCard } from "@/components/ui";
 
 export interface StarterCard {
   id: string;
@@ -44,21 +46,31 @@ export interface StarterGridProps {
 export function StarterGrid({ onSelect, className = "" }: StarterGridProps) {
   return (
     <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-3xl mx-auto ${className}`}>
-      {DEFAULT_STARTERS.map((card) => (
-        <button
+      {DEFAULT_STARTERS.map((card, i) => (
+        <motion.div
           key={card.id}
-          type="button"
-          onClick={() => onSelect(card.prompt)}
-          className="group flex flex-col items-start gap-3 p-6 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)]/60 backdrop-blur-sm hover:border-[var(--color-primary-alpha-30)] hover:bg-[var(--color-bg-panel)] transition-all duration-200 text-left"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: i * 0.06 }}
+          className="group relative"
         >
-          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--color-primary-alpha-15)] text-[var(--color-primary-light)] group-hover:bg-[var(--color-primary-alpha-25)] transition-colors">
-            {card.icon}
-          </span>
-          <div>
-            <p className="text-sm font-semibold text-[var(--color-text-primary)]">{card.label}</p>
-            <p className="text-xs text-[var(--color-text-tertiary)] mt-0.5 line-clamp-2">{card.prompt}</p>
-          </div>
-        </button>
+          <div className="absolute inset-0 bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-semantic-violet)] rounded-2xl blur-xl opacity-0 group-hover:opacity-20 transition-opacity duration-500" />
+          <SpotlightCard className="relative hover:shadow-[0_0_20px_var(--color-primary-alpha-20)] hover:-translate-y-1 transition-all duration-300 border-[var(--color-border-subtle)] hover:border-[var(--color-primary-alpha-30)]">
+            <button
+              type="button"
+              onClick={() => onSelect(card.prompt)}
+              className="flex flex-col items-start gap-3 p-6 w-full text-left"
+            >
+              <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--color-primary-alpha-10)] text-[var(--color-primary-light)] group-hover:bg-[var(--color-primary)] group-hover:text-white transition-colors shadow-sm">
+                {card.icon}
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-[var(--color-text-primary)] group-hover:text-[var(--color-primary-light)] transition-colors">{card.label}</p>
+                <p className="text-xs text-[var(--color-text-tertiary)] mt-0.5 line-clamp-2">{card.prompt}</p>
+              </div>
+            </button>
+          </SpotlightCard>
+        </motion.div>
       ))}
     </div>
   );

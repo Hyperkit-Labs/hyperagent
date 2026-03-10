@@ -30,6 +30,14 @@ export const skaleBaseSepolia = defineChain({
   testnet: true,
 });
 
+export const skaleBaseMainnet = defineChain({
+  id: 1187947933,
+  name: 'SKALE Base',
+  nativeCurrency: { decimals: 18, name: 'CREDIT', symbol: 'CREDIT' },
+  rpc: 'https://skale-base.skalenodes.com/v1/base',
+  blockExplorers: [{ name: 'SKALE Explorer', url: 'https://skale-base-explorer.skalenodes.com/' }],
+});
+
 export const filecoinMainnet = defineChain({
   id: 314,
   name: 'Filecoin',

@@ -57,7 +57,7 @@ function MonitoringContent() {
   }, [logs]);
 
   const recentErrors = useMemo(() => {
-    return (logs ?? []).filter((l: any) => l.level === "error").length; // mock last 5 mins
+    return (logs ?? []).filter((l: any) => l.level === "error").length;
   }, [logs]);
 
   return (

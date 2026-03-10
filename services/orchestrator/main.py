@@ -160,13 +160,14 @@ def _is_production() -> bool:
 @app.on_event("startup")
 def _validate_critical_services() -> None:
     """Log missing critical service URLs. Full lifecycle requires compile, audit, agent-runtime.
-    In production, REDIS_URL is required for checkpoint persistence."""
+    In production, REDIS_URL is required for checkpoint persistence (warn, don't crash)."""
     if _is_production():
         redis_url = os.environ.get("REDIS_URL", "").strip()
         if not redis_url:
-            raise RuntimeError(
-                "[orchestrator] REDIS_URL is required in production for checkpoint persistence. "
-                "Set REDIS_URL to a Redis instance (e.g. Redis Cloud)."
+            logger.error(
+                "[orchestrator] REDIS_URL is not set in production. "
+                "Checkpoint persistence will use in-memory fallback (data lost on restart). "
+                "Set REDIS_URL to a Redis instance (e.g. Redis Cloud) in Coolify Shared Env."
             )
     required = [
         ("COMPILE_SERVICE_URL", COMPILE_SERVICE_URL),

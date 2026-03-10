@@ -155,9 +155,9 @@ async def spec_agent(state: AgentState) -> AgentState:
         try:
             api_keys = state.get("api_keys") or {}
             logger.info(
-                "[pipeline] spec_agent run_id=%s api_keys_providers=%s",
+                "[pipeline] spec_agent run_id=%s api_keys_provider_count=%s",
                 run_id,
-                list(api_keys.keys()) if api_keys else [],
+                len(api_keys) if api_keys else 0,
             )
             agent_session_jwt = state.get("agent_session_jwt") or None
             template_id_from_state = (state.get("template_id") or "").strip()

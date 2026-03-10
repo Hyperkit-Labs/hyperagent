@@ -101,31 +101,42 @@ async def invoke_roma_spec(
     """
     if ROMA_URL:
         try:
-            async with httpx.AsyncClient(timeout=float(ROMA_SPEC_TIMEOUT)) as client:
-                r = await client.post(
-                    f"{ROMA_URL.rstrip('/')}/spec",
-                    json={
-                        "prompt": prompt,
-                        "context": context,
-                        "agent_session_jwt": agent_session_jwt,
-                    },
-                )
-                r.raise_for_status()
-                data = r.json()
-                spec = data.get("spec") or {}
-                if spec:
+            from circuit_breaker import CircuitOpenError, get_breaker
+
+            async def _call_roma() -> dict[str, Any] | None:
+                async with httpx.AsyncClient(timeout=float(ROMA_SPEC_TIMEOUT)) as client:
+                    r = await client.post(
+                        f"{ROMA_URL.rstrip('/')}/spec",
+                        json={
+                            "prompt": prompt,
+                            "context": context,
+                            "agent_session_jwt": agent_session_jwt,
+                        },
+                    )
+                    r.raise_for_status()
+                    data = r.json()
+                    spec = data.get("spec") or {}
+                    if not spec:
+                        return None
                     result: dict[str, Any] = {
                         "version": str(spec.get("version", "1.0")),
                         "chains": list(spec.get("chains") or []),
                         "token_type": str(spec.get("token_type", "ERC20")),
                         "features": list(spec.get("features") or []),
                         "invariants": list(spec.get("invariants") or []),
-                        "risk_profile": str(spec.get("risk_profile", "medium")),
+                        "risk_profile": "high",
                         "template_id": spec.get("template_id"),
                     }
                     if isinstance(spec.get("wizard_options"), dict):
                         result["wizard_options"] = spec["wizard_options"]
                     return result
+
+            breaker = get_breaker("roma")
+            out = await breaker.call(_call_roma)
+            if out:
+                return out
+        except CircuitOpenError:
+            logger.warning("ROMA circuit open, using fallback")
         except Exception as e:
             logger.warning("ROMA service call failed, fallback: %s", e)
 

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import { ROUTES } from "@/constants/routes";
 import { useMetrics } from "@/hooks/useMetrics";
 import { useNetworks } from "@/hooks/useNetworks";
@@ -24,6 +25,7 @@ export default function SecurityPage() {
   const hasFindings = findings.length > 0;
 
   return (
+    <RequireApiSession>
     <div className="p-6 lg:p-8">
       <div className="max-w-[1200px] mx-auto space-y-6 animate-enter">
         <div className="flex items-center justify-between">
@@ -193,5 +195,6 @@ export default function SecurityPage() {
         )}
       </div>
     </div>
+    </RequireApiSession>
   );
 }

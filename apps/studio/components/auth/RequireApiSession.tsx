@@ -21,7 +21,8 @@ export function RequireApiSession({ children }: RequireApiSessionProps) {
 
   useEffect(() => {
     if (!isReady || hasSession) return;
-    router.replace(ROUTES.LOGIN);
+    const next = typeof window !== 'undefined' ? encodeURIComponent(window.location.pathname + window.location.search) : '';
+    router.replace(next ? `${ROUTES.LOGIN}?next=${next}` : ROUTES.LOGIN);
   }, [isReady, hasSession, router]);
 
   if (!isReady || !hasSession) {

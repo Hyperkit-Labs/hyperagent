@@ -99,14 +99,14 @@ async function bootstrapUser(
     userId = existing.id;
     await supabase
       .from("wallet_users")
-      .update({ updated_at: new Date().toISOString(), auth_provider: authProvider })
+      .update({ updated_at: new Date().toISOString(), auth_method: authProvider })
       .eq("id", userId);
     // Idempotent provisioning for returning users: ensure credits/spending/profile exist
     await ensureWalletUserProvisioned(supabase, userId);
   } else {
     const { data: inserted, error: insertError } = await supabase
       .from("wallet_users")
-      .insert({ wallet_address: walletAddressNorm, auth_provider: authProvider })
+      .insert({ wallet_address: walletAddressNorm, auth_method: authProvider })
       .select("id")
       .single();
 

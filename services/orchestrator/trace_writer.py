@@ -78,13 +78,11 @@ async def write_trace(
                 return cid, None, None
     except Exception as e:
         logger.warning("[trace_writer] IPFS pin failed: %s", e)
-    stub_id = _stub_trace_id(run_id, step_type, step_index)
     if IS_PRODUCTION:
-        logger.warning(
-            "[trace_writer] production stub: trace unverifiable run_id=%s step=%s index=%s blob_id=%s",
-            run_id, step_type, step_index, stub_id,
-        )
-    return stub_id, None, None
+        raise RuntimeError(
+            "IPFS/Storage Provider unavailable. Verifiable trace is mandatory in production."
+        ) from None
+    return _stub_trace_id(run_id, step_type, step_index), None, None
 
 
 def write_trace_sync(
@@ -128,6 +126,8 @@ def write_trace_sync(
                     extra,
                 )
             )
+    except RuntimeError:
+        raise
     except Exception as e:
         logger.warning("[trace_writer] write_trace_sync failed: %s", e)
         return _stub_trace_id(run_id, step_type, step_index), None, None

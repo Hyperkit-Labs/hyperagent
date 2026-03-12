@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import { useNetworks } from "@/hooks/useNetworks";
-import { Globe, Activity, Loader2 } from "lucide-react";
+import { testNetworkRpc } from "@/lib/api";
+import { Globe, Activity, Loader2, Check, X } from "lucide-react";
 import Image from "next/image";
 import { ShimmerTableRows } from "@/components/ai-elements";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
@@ -30,14 +32,29 @@ export default function NetworksPage() {
   const { networks, loading, error, refetch } = useNetworks();
   const list = networks ?? [];
   const [testing, setTesting] = useState<string | null>(null);
+  const [rpcResult, setRpcResult] = useState<Record<string, { ok: boolean; latency_ms?: number; error?: string }>>({});
 
-  const handleTest = async (id: string) => {
-    setTesting(id);
-    await new Promise(r => setTimeout(r, 800));
-    setTesting(null);
-  };
+  const handleRpcTest = useCallback(async (networkId: string) => {
+    setTesting(networkId);
+    setRpcResult(prev => ({ ...prev, [networkId]: { ok: false, error: "Testing..." } }));
+    try {
+      const res = await testNetworkRpc(networkId);
+      setRpcResult(prev => ({
+        ...prev,
+        [networkId]: { ok: res.ok, latency_ms: res.latency_ms, error: res.error },
+      }));
+    } catch (e) {
+      setRpcResult(prev => ({
+        ...prev,
+        [networkId]: { ok: false, error: e instanceof Error ? e.message : "Request failed" },
+      }));
+    } finally {
+      setTesting(null);
+    }
+  }, []);
 
   return (
+    <RequireApiSession>
     <div className="p-6 lg:p-8">
       <div className="max-w-[1200px] mx-auto space-y-6 animate-enter">
         <PageTitle title="Networks" subtitle="Supported chains and network configuration." />
@@ -82,12 +99,26 @@ export default function NetworksPage() {
               <td className="px-6 py-4 text-[var(--color-text-tertiary)]">{n.currency ?? "-"}</td>
               <td className="px-6 py-4">
                 <button
-                  onClick={() => handleTest(n.id)}
-                  disabled={testing === n.id}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)] transition-colors disabled:opacity-50"
+                  type="button"
+                  onClick={() => handleRpcTest(n.id)}
+                  disabled={!!testing}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-panel)] hover:text-[var(--color-text-primary)] disabled:opacity-60 transition-colors"
+                  title="Test RPC connectivity"
                 >
-                  {testing === n.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Activity className="w-3.5 h-3.5" />}
-                  Test RPC
+                  {testing === n.id ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : rpcResult[n.id]?.ok ? (
+                    <Check className="w-3.5 h-3.5 text-[var(--color-semantic-success)]" />
+                  ) : rpcResult[n.id]?.error ? (
+                    <X className="w-3.5 h-3.5 text-[var(--color-semantic-error)]" />
+                  ) : (
+                    <Activity className="w-3.5 h-3.5" />
+                  )}
+                  {rpcResult[n.id]?.ok
+                    ? `${rpcResult[n.id].latency_ms ?? ""}ms`
+                    : rpcResult[n.id]?.error && !rpcResult[n.id].ok
+                      ? (rpcResult[n.id].error!.length > 20 ? "Failed" : rpcResult[n.id].error)
+                      : "RPC test"}
                 </button>
               </td>
             </tr>
@@ -95,5 +126,6 @@ export default function NetworksPage() {
         </DataTable>
       </div>
     </div>
+    </RequireApiSession>
   );
 }

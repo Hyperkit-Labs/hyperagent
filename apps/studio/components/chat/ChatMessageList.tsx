@@ -1,7 +1,40 @@
 'use client';
 
+import { useState } from 'react';
 import { Conversation, ConversationContent, ConversationScrollButton, Message, Tool, Shimmer } from '@/components/ai-elements';
 import { GlowingBorder } from '@/components/ui';
+import { XTermTerminal } from '@/components/chat/XTermTerminal';
+import { Check, Loader2 } from 'lucide-react';
+
+function SpecApproveButton({ workflowId, onApprove }: { workflowId: string; onApprove: (id: string) => Promise<void> }) {
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="space-y-2">
+      <p className="text-[11px] text-amber-400">Action required: approve spec to continue</p>
+      <button
+        type="button"
+        disabled={sending}
+        onClick={async () => {
+          setSending(true);
+          setError(null);
+          try {
+            await onApprove(workflowId);
+          } catch (e) {
+            setError(e instanceof Error ? e.message : 'Approval failed');
+          } finally {
+            setSending(false);
+          }
+        }}
+        className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+      >
+        {sending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+        Approve spec
+      </button>
+      {error && <p className="text-[10px] text-red-400">{error}</p>}
+    </div>
+  );
+}
 
 export type ChatMessageRole = 'user' | 'assistant' | 'system';
 
@@ -19,21 +52,37 @@ export interface ChatMessage {
   toolInvocations?: ToolInvocation[];
 }
 
+export interface AgentDiscussionEvent {
+  stage?: string;
+  message?: string;
+  status?: string;
+  [key: string]: unknown;
+}
+
 export interface ChatMessageListProps {
   messages: ChatMessage[];
   isLoading?: boolean;
   streamingContent?: string;
+  discussionEvents?: AgentDiscussionEvent[];
   emptyMessage?: string;
   onDownloadMarkdown?: () => void;
+  onApproveSpec?: (workflowId: string) => Promise<void>;
+  workflowIdForApproval?: string | null;
 }
 
 export function ChatMessageList({
   messages,
   isLoading = false,
   streamingContent,
+  discussionEvents = [],
   emptyMessage = 'No messages yet. Describe your contract or ask a question.',
   onDownloadMarkdown,
+  onApproveSpec,
+  workflowIdForApproval,
 }: ChatMessageListProps) {
+  const hasRequireAction = discussionEvents.some(
+    (e) => (e as { type?: string; action?: string }).type === 'require_action' && (e as { action?: string }).action === 'approve_spec'
+  );
   const handleDownloadMarkdown = () => {
     if (onDownloadMarkdown) {
       onDownloadMarkdown();
@@ -94,11 +143,23 @@ export function ChatMessageList({
                 <div className="px-2 py-1.5 border-b border-white/5 text-[var(--color-text-muted)]">
                   HyperAgent is thinking
                 </div>
-                <div className="px-2 py-2 space-y-1 text-[var(--color-text-tertiary)]">
-                  <div className="animate-pulse">[Firecracker] Booting VM...</div>
-                  <div className="animate-pulse" style={{ animationDelay: '150ms' }}>[Solc] Compiling...</div>
-                  <div className="animate-pulse" style={{ animationDelay: '300ms' }}>[Pipeline] Running design step...</div>
+                <div className="px-0 py-0 overflow-hidden rounded">
+                  {discussionEvents.length > 0 ? (
+                    <XTermTerminal events={discussionEvents} className="min-h-[180px]" />
+                  ) : (
+                    <div className="px-2 py-2 animate-pulse text-[var(--color-text-muted)] text-[10px]">
+                      Waiting for agent activity...
+                    </div>
+                  )}
                 </div>
+                {hasRequireAction && workflowIdForApproval && onApproveSpec && (
+                  <div className="mt-3 pt-3 border-t border-white/5">
+                    <SpecApproveButton
+                      workflowId={workflowIdForApproval}
+                      onApprove={onApproveSpec}
+                    />
+                  </div>
+                )}
               </div>
               {streamingContent != null && streamingContent !== '' && (
                 <div className="mt-3 text-[13px] text-[var(--color-text-secondary)] leading-relaxed whitespace-pre-wrap">

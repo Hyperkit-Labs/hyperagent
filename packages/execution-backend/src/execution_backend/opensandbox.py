@@ -290,7 +290,15 @@ class OpenSandboxBackend:
         """Run parallel exploit vectors (reentrancy, flashloan, oracle, frontrun) in OpenSandbox.
         Each vector runs in its own sandbox; findings are aggregated."""
         if not self._configured():
-            return ExploitSimResult(passed=True, findings=[])
+            return ExploitSimResult(
+                passed=False,
+                findings=[{
+                    "severity": "high",
+                    "title": "Exploit simulation not configured",
+                    "description": "Set OPENSANDBOX_API_URL and OPENSANDBOX_API_KEY to run exploit tests.",
+                    "tool": "opensandbox",
+                }],
+            )
         import asyncio
 
         vectors = [

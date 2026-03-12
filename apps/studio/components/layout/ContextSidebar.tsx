@@ -24,14 +24,14 @@ function ResourceInspectorChat({ workflowId }: { workflowId?: string | null }) {
             <Cpu className="w-3.5 h-3.5" />
             CPU
           </span>
-          <span className="text-[var(--color-text-primary)] font-mono">--</span>
+          <span className="text-[10px] text-[var(--color-text-muted)]">{workflowId ? "—" : "No active sandbox"}</span>
         </div>
         <div className="flex items-center justify-between text-xs">
           <span className="text-[var(--color-text-tertiary)] flex items-center gap-2">
             <HardDrive className="w-3.5 h-3.5" />
             RAM
           </span>
-          <span className="text-[var(--color-text-primary)] font-mono">--</span>
+          <span className="text-[10px] text-[var(--color-text-muted)]">{workflowId ? "—" : "No active sandbox"}</span>
         </div>
       </div>
       {workflowId && (
@@ -44,21 +44,26 @@ function ResourceInspectorChat({ workflowId }: { workflowId?: string | null }) {
 }
 
 function ResourceInspectorContracts({ functions }: { functions?: string[] }) {
-  const list = functions?.length ? functions : ["constructor", "transfer", "approve", "balanceOf"];
+  const list = functions?.length ? functions : [];
+  const placeholder = list.length === 0;
   return (
     <div className="space-y-4">
       <h3 className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">Functions</h3>
-      <ul className="space-y-1">
-        {list.map((fn, i) => (
-          <li
-            key={i}
-            className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-mono text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]"
-          >
-            <FunctionSquare className="w-3 h-3 text-[var(--color-text-muted)] shrink-0" />
-            {fn}
-          </li>
-        ))}
-      </ul>
+      {placeholder ? (
+        <p className="text-[10px] text-[var(--color-text-muted)] italic">Select a contract to view functions.</p>
+      ) : (
+        <ul className="space-y-1">
+          {list.map((fn, i) => (
+            <li
+              key={i}
+              className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-mono text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]"
+            >
+              <FunctionSquare className="w-3 h-3 text-[var(--color-text-muted)] shrink-0" />
+              {fn}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

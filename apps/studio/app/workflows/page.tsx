@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
+import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ExternalLink, Loader2, Bug } from "lucide-react";
@@ -19,6 +20,7 @@ import {
 import { ROUTES } from "@/constants/routes";
 import { useWorkflows } from "@/hooks/useWorkflows";
 import { cancelWorkflow, createQuickDemo, createDebugSandbox } from "@/lib/api";
+import { toast } from "sonner";
 import type { Workflow } from "@/lib/types";
 import { hasAuditOrSimFailure } from "@/lib/types";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
@@ -86,6 +88,7 @@ export default function WorkflowsPage() {
   const [quickDemoLoading, setQuickDemoLoading] = useState<string | null>(null);
   const [debugSandboxLoading, setDebugSandboxLoading] = useState<string | null>(null);
   const [sandboxError, setSandboxError] = useState<string | null>(null);
+  const [bulkLoading, setBulkLoading] = useState(false);
   const { workflows, loading, error, refetch } = useWorkflows({
     filters: { limit: 100, status: statusFilter || undefined },
   });
@@ -127,6 +130,7 @@ export default function WorkflowsPage() {
   }, [workflows, search, sortBy]);
 
   return (
+    <RequireApiSession>
     <div className="flex flex-1 overflow-hidden">
       <div className="flex-1 overflow-y-auto p-6 lg:p-8">
       <div className="max-w-6xl mx-auto flex flex-col">
@@ -220,8 +224,55 @@ export default function WorkflowsPage() {
             <div className="bg-[var(--color-bg-panel)] border border-[var(--color-primary-alpha-30)] rounded-lg p-3 flex items-center justify-between shadow-lg animate-enter">
               <span className="text-xs font-medium">{selectedWorkflows.size} selected</span>
               <div className="flex gap-2">
-                <button className="text-xs px-3 py-1.5 bg-red-500/10 text-red-500 rounded hover:bg-red-500/20">Delete</button>
-                <button className="text-xs px-3 py-1.5 bg-[var(--color-bg-hover)] text-[var(--color-text-primary)] rounded border border-[var(--color-border-subtle)]">Re-run</button>
+                <button
+                  type="button"
+                  disabled={bulkLoading}
+                  onClick={async () => {
+                    if (!window.confirm(`Cancel ${selectedWorkflows.size} selected workflow(s)? This cannot be undone.`)) return;
+                    setBulkLoading(true);
+                    let ok = 0;
+                    let fail = 0;
+                    for (const id of selectedWorkflows) {
+                      try { await cancelWorkflow(id); ok++; } catch { fail++; }
+                    }
+                    setBulkLoading(false);
+                    setSelectedWorkflows(new Set());
+                    refetch();
+                    if (fail) toast.error(`Cancelled ${ok}, failed ${fail}.`);
+                    else toast.success(`Cancelled ${ok} workflow(s).`);
+                  }}
+                  className="text-xs px-3 py-1.5 bg-red-500/10 text-red-500 rounded hover:bg-red-500/20 disabled:opacity-50 inline-flex items-center gap-1"
+                >
+                  {bulkLoading && <Loader2 className="w-3 h-3 animate-spin" />}
+                  Cancel Selected
+                </button>
+                <button
+                  type="button"
+                  disabled={bulkLoading}
+                  onClick={async () => {
+                    if (!window.confirm(`Re-run ${selectedWorkflows.size} selected workflow(s)?`)) return;
+                    setBulkLoading(true);
+                    let ok = 0;
+                    let fail = 0;
+                    for (const id of selectedWorkflows) {
+                      const wf = workflows.find(w => w.workflow_id === id);
+                      if (!wf?.intent) { fail++; continue; }
+                      try {
+                        await createQuickDemo(id);
+                        ok++;
+                      } catch { fail++; }
+                    }
+                    setBulkLoading(false);
+                    setSelectedWorkflows(new Set());
+                    refetch();
+                    if (fail) toast.error(`Re-ran ${ok}, failed ${fail}.`);
+                    else toast.success(`Re-ran ${ok} workflow(s).`);
+                  }}
+                  className="text-xs px-3 py-1.5 bg-[var(--color-bg-hover)] text-[var(--color-text-primary)] rounded border border-[var(--color-border-subtle)] disabled:opacity-50 inline-flex items-center gap-1"
+                >
+                  {bulkLoading && <Loader2 className="w-3 h-3 animate-spin" />}
+                  Re-run Selected
+                </button>
               </div>
             </div>
           )}
@@ -440,5 +491,6 @@ contract ${w.name?.replace(/\s/g, "") || "MyContract"} {
       </div>
       </div>
     </div>
+    </RequireApiSession>
   );
 }

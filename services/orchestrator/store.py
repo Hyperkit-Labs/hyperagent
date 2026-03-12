@@ -69,6 +69,7 @@ def _new_record(
         "spec": None,
         "spec_approved": False,
         "user_id": user_id,
+        "wallet_user_id": user_id,
         "project_id": project_id,
         "simulation_passed": False,
         "simulation_results": [],

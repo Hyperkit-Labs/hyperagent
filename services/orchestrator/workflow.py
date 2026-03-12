@@ -23,6 +23,7 @@ from nodes import (
     estimate_agent,
     exploit_simulation_agent,
     guardian_agent,
+    human_review_agent,
     scrubd_validation_agent,
     security_policy_evaluator_agent,
     simulation_agent,
@@ -115,6 +116,7 @@ def create_workflow():
     workflow.add_node("start", lambda s: s)
     workflow.add_node("estimate", estimate_agent)
     workflow.add_node("spec", spec_agent)
+    workflow.add_node("human_review", human_review_agent)
     workflow.add_node("design", design_agent)
     workflow.add_node("codegen", codegen_agent)
     workflow.add_node("test_generation", test_generation_agent)
@@ -144,10 +146,11 @@ def create_workflow():
         "spec",
         _should_approve_spec,
         {
-            "human_review": END,
+            "human_review": "human_review",
             "design": "design",
         },
     )
+    workflow.add_edge("human_review", END)
     workflow.add_edge("design", "codegen")
     workflow.add_edge("codegen", "test_generation")
     workflow.add_edge("test_generation", "scrubd_validation")

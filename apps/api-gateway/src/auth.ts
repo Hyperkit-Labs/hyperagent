@@ -52,7 +52,9 @@ function isPublicPathFromReq(req: Request): boolean {
   });
 }
 
-/** Trace: log auth path for protected routes so 401s can be diagnosed (missing header vs invalid token). */
+const IS_PRODUCTION = NODE_ENV === "production";
+
+/** Trace: log auth for non-pass outcomes, or all outcomes in dev. */
 function traceAuth(
   path: string,
   requestId: string | undefined,
@@ -60,6 +62,7 @@ function traceAuth(
   authScheme: "Bearer" | "none" | "other",
   outcome: "pass" | "401_missing_header" | "401_invalid_token" | "503_no_secret"
 ): void {
+  if (IS_PRODUCTION && outcome === "pass") return;
   const payload: Record<string, unknown> = {
     trace: "auth",
     path,
@@ -79,14 +82,16 @@ export function authMiddleware(
   const requestId = (req as Request & { requestId?: string }).requestId;
   const path = normalizePath(req.originalUrl || req.path || "");
 
-  console.warn("[auth] path check", {
-    requestId,
-    originalUrl: req.originalUrl,
-    baseUrl: req.baseUrl,
-    path: req.path,
-    url: req.url,
-    isPublic: isPublicPathFromReq(req),
-  });
+  if (!IS_PRODUCTION) {
+    console.warn("[auth] path check", {
+      requestId,
+      originalUrl: req.originalUrl,
+      baseUrl: req.baseUrl,
+      path: req.path,
+      url: req.url,
+      isPublic: isPublicPathFromReq(req),
+    });
+  }
 
   if (isPublicPathFromReq(req)) {
     next();

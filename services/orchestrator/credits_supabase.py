@@ -189,12 +189,10 @@ def _top_up_fallback(
         client.table("credit_transactions").insert(
             {
                 "user_id": user_id,
-                "amount_delta": str(amount),
+                "amount": str(amount),
                 "balance_after": str(new_balance),
-                "type": "top_up",
+                "tx_type": "top_up",
                 "reference_id": reference_id,
-                "reference_type": reference_type or "manual",
-                "metadata": metadata or {},
             }
         ).execute()
         return {
@@ -214,12 +212,63 @@ def consume(
     reference_type: str | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> tuple[bool, float]:
-    """Deduct credits for a workflow step or agent action. Returns (success, balance_after)."""
+    """Deduct credits for a workflow step or agent action. Returns (success, balance_after).
+    Uses atomic consume_credits RPC when available to prevent double-spend under concurrency."""
     if not user_id or not is_configured() or amount <= 0:
         return False, 0.0
     client = _client()
     if not client:
         return False, 0.0
+    for attempt in range(3):
+        try:
+            r = client.rpc(
+                "consume_credits",
+                {
+                    "p_user_id": user_id,
+                    "p_amount": str(amount),
+                    "p_reference_id": reference_id,
+                    "p_reference_type": reference_type or "workflow_step",
+                    "p_metadata": metadata or {},
+                },
+            ).execute()
+            data = r.data
+            if data is None:
+                break
+            row = data[0] if isinstance(data, list) and data else data
+            if not isinstance(row, dict):
+                break
+            success = row.get("success") is True
+            bal = row.get("balance_after")
+            balance_after = float(Decimal(str(bal))) if bal is not None else 0.0
+            return success, balance_after
+        except Exception as e:
+            logger.warning(
+                "[credits] consume RPC attempt=%s user_id=%s error=%s",
+                attempt + 1,
+                user_id,
+                e,
+            )
+            if attempt < 2:
+                time.sleep(0.1 * (attempt + 1))
+            else:
+                return _consume_fallback(
+                    user_id, amount, reference_id, reference_type, metadata
+                )
+    return _consume_fallback(user_id, amount, reference_id, reference_type, metadata)
+
+
+def _consume_fallback(
+    user_id: str,
+    amount: float,
+    reference_id: str | None,
+    reference_type: str | None,
+    metadata: dict[str, Any] | None,
+) -> tuple[bool, float]:
+    """Fallback when consume_credits RPC not available. Non-atomic, race-prone."""
+    client = _client()
+    if not client:
+        return False, 0.0
+    ensure_user_credits_row(user_id)
     try:
         r = (
             client.table("user_credits")
@@ -229,7 +278,6 @@ def consume(
         )
         row = (r.data or [None])[0] if r.data else None
         if not row:
-            ensure_user_credits_row(user_id)
             return False, 0.0
         current = float(Decimal(str(row.get("balance") or 0)))
         if current < amount:
@@ -244,17 +292,15 @@ def consume(
         client.table("credit_transactions").insert(
             {
                 "user_id": user_id,
-                "amount_delta": str(-amount),
+                "amount": str(-amount),
                 "balance_after": str(new_balance),
-                "type": "consume",
+                "tx_type": "consume",
                 "reference_id": reference_id,
-                "reference_type": reference_type or "workflow_step",
-                "metadata": metadata or {},
             }
         ).execute()
         return True, new_balance
     except Exception as e:
-        logger.warning("[credits] consume user_id=%s error=%s", user_id, e)
+        logger.warning("[credits] consume fallback user_id=%s error=%s", user_id, e)
         return False, 0.0
 
 

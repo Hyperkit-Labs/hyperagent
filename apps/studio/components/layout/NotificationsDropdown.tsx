@@ -2,11 +2,28 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Bell } from "lucide-react";
+import { getWorkflows } from "@/lib/api";
 
 export function NotificationsDropdown() {
   const [open, setOpen] = useState(false);
+  const [notifications, setNotifications] = useState<{ id: string; title: string; time?: string }[]>([]);
   const ref = useRef<HTMLDivElement>(null);
-  const notifications: { id: string; title: string; time?: string }[] = [];
+
+  useEffect(() => {
+    if (!open) return;
+    getWorkflows({ limit: 5 })
+      .then((res) => {
+        const wfs = res.workflows ?? [];
+        setNotifications(
+          wfs.slice(0, 5).map((w) => ({
+            id: w.workflow_id,
+            title: w.status === "completed" ? `Workflow completed` : w.status === "failed" ? `Workflow failed` : `Workflow ${w.status}`,
+            time: w.updated_at ?? w.created_at,
+          }))
+        );
+      })
+      .catch(() => setNotifications([]));
+  }, [open]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -39,7 +56,8 @@ export function NotificationsDropdown() {
           </div>
           {notifications.length === 0 ? (
             <div className="px-4 py-8 text-center text-[var(--color-text-tertiary)] text-sm">
-              No notifications yet.
+              <p className="font-medium text-[var(--color-text-secondary)] mb-1">No recent activity</p>
+              <p className="text-[11px] text-[var(--color-text-muted)]">Workflow status updates will appear here.</p>
             </div>
           ) : (
             <ul className="py-1">

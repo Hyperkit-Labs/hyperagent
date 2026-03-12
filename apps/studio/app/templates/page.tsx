@@ -2,11 +2,13 @@
 
 import { useState, useEffect, Suspense, useMemo } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
+import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import { useSearchParams } from "next/navigation";
 import { ROUTES } from "@/constants/routes";
 import { searchTemplates, type TemplateItem } from "@/lib/api";
 import { useTemplatesData } from "@/hooks/useTemplatesData";
-import { LayoutTemplate, Plus, Search, Flame, BarChart, CheckSquare, X } from "lucide-react";
+import { LayoutTemplate, Plus, Search, Flame, CheckSquare, X } from "lucide-react";
 import { ShimmerGrid } from "@/components/ai-elements";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -48,6 +50,7 @@ function TemplatesContent() {
   const [searchResults, setSearchResults] = useState<TemplateItem[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
+  const [compareModalOpen, setCompareModalOpen] = useState(false);
   const [hoveredTemplate, setHoveredTemplate] = useState<string | null>(null);
 
   const toggleCompare = (id: string) => {
@@ -183,7 +186,12 @@ function TemplatesContent() {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <button disabled={compareIds.size !== 2} className="text-xs px-4 py-1.5 rounded bg-[var(--color-primary)] text-white disabled:opacity-50 transition-colors">
+              <button
+                type="button"
+                disabled={compareIds.size !== 2}
+                onClick={() => compareIds.size === 2 && setCompareModalOpen(true)}
+                className="text-xs px-4 py-1.5 rounded bg-[var(--color-primary)] text-white disabled:opacity-50 transition-colors enabled:hover:opacity-90"
+              >
                 Compare Selected
               </button>
               <button onClick={() => setCompareIds(new Set())} className="p-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]">
@@ -192,6 +200,37 @@ function TemplatesContent() {
             </div>
           </div>
         )}
+
+        {compareModalOpen && compareIds.size === 2 && (() => {
+          const [a, b] = Array.from(compareIds);
+          const tA = items.find((t) => t.id === a);
+          const tB = items.find((t) => t.id === b);
+          if (!tA || !tB) return null;
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setCompareModalOpen(false)}>
+              <div className="glass-panel rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-auto border border-[var(--color-border-subtle)] shadow-xl" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-lg font-semibold text-white">Template Comparison</h2>
+                  <button onClick={() => setCompareModalOpen(false)} className="p-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] rounded-lg">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4"> <h3 className="font-medium text-[var(--color-text-primary)]">{tA.name || tA.id}</h3>
+                    <p className="text-xs text-[var(--color-text-tertiary)]">{tA.description || "No description"}</p>
+                    {tA.source && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] text-[var(--color-text-muted)]">{tA.source}</span>}
+                    <Link href={`${ROUTES.HOME}?template=${encodeURIComponent(tA.id)}`} className="inline-block text-xs font-medium text-[var(--color-primary-light)] hover:underline">Use template &rarr;</Link>
+                  </div>
+                  <div className="space-y-4"> <h3 className="font-medium text-[var(--color-text-primary)]">{tB.name || tB.id}</h3>
+                    <p className="text-xs text-[var(--color-text-tertiary)]">{tB.description || "No description"}</p>
+                    {tB.source && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] text-[var(--color-text-muted)]">{tB.source}</span>}
+                    <Link href={`${ROUTES.HOME}?template=${encodeURIComponent(tB.id)}`} className="inline-block text-xs font-medium text-[var(--color-primary-light)] hover:underline">Use template &rarr;</Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {loadError && !loading && (
           <div className="glass-panel rounded-xl p-6 flex items-center justify-between">
@@ -238,10 +277,8 @@ function TemplatesContent() {
 
         {!loading && !searching && items.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map((item, idx) => {
+            {items.map((item) => {
               const isSelected = compareIds.has(item.id);
-              const difficulty = idx % 3 === 0 ? "Beginner" : idx % 3 === 1 ? "Intermediate" : "Advanced";
-              const uses = Math.floor(Math.random() * 1000) + 100;
               
               return (
               <div
@@ -267,14 +304,13 @@ function TemplatesContent() {
                   </div>
                   <div className="min-w-0 flex-1 pr-6">
                     <h3 className="font-medium text-white truncate text-sm">{item.name || item.id}</h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className={`text-[9px] px-1.5 py-0.5 rounded border font-medium ${difficulty === 'Beginner' ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' : difficulty === 'Intermediate' ? 'border-amber-500/30 text-amber-400 bg-amber-500/10' : 'border-red-500/30 text-red-400 bg-red-500/10'}`}>
-                        {difficulty}
-                      </span>
-                      <span className="text-[10px] text-[var(--color-text-muted)] flex items-center gap-1">
-                        <BarChart className="w-3 h-3" /> {uses.toLocaleString()}
-                      </span>
-                    </div>
+                    {item.source && (
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded border border-[var(--color-border-subtle)] text-[var(--color-text-muted)] bg-[var(--color-bg-hover)] font-medium">
+                          {item.source}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 
@@ -334,8 +370,10 @@ function TemplatesContent() {
 
 export default function TemplatesPage() {
   return (
-    <Suspense fallback={<div className="p-6 flex items-center justify-center"><Search className="w-6 h-6 animate-pulse text-[var(--color-text-muted)]" /></div>}>
-      <TemplatesContent />
-    </Suspense>
+    <RequireApiSession>
+      <Suspense fallback={<div className="p-6 flex items-center justify-center"><Search className="w-6 h-6 animate-pulse text-[var(--color-text-muted)]" /></div>}>
+        <TemplatesContent />
+      </Suspense>
+    </RequireApiSession>
   );
 }

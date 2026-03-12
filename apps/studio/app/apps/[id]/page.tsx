@@ -318,7 +318,7 @@ export default function AppDetailPage() {
                     setPrepareError(null);
                     try {
                       const result = await deployUserContractEoa({
-                        account: { address: account.address, type: account.type },
+                        account: { address: account.address },
                         chain,
                         abi,
                         bytecode,

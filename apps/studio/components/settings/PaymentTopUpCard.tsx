@@ -11,11 +11,11 @@ import { topUpCreditsWithTx, getStablecoins, handleApiError } from "@/lib/api";
 import { useSession } from "@/hooks/useSession";
 import { useConfig } from "@/components/providers/ConfigProvider";
 import { useNetworks } from "@/hooks/useNetworks";
+import { useSelectedNetwork } from "@/components/providers/SelectedNetworkProvider";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { toast } from "sonner";
 import { getChainByChainId } from "@/lib/smartWalletDeploy";
 
-const STORAGE_KEY = "hyperkit_selected_network_id";
 const DECIMALS = 6;
 
 type Token = "USDC" | "USDT";
@@ -29,19 +29,11 @@ export interface PaymentTopUpCardProps {
   stablecoinsFromParent?: StablecoinsMap;
 }
 
-function getStoredNetworkId(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage.getItem(STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
-
 export function PaymentTopUpCard({ onTopUpSuccess, stablecoinsFromParent }: PaymentTopUpCardProps) {
   const account = useActiveAccount();
   const { hasSession } = useSession();
   const { networks } = useNetworks();
+  const { selectedNetworkId } = useSelectedNetwork();
   const { config } = useConfig();
   const [amount, setAmount] = useState("");
   const [token, setToken] = useState<Token>("USDC");
@@ -63,8 +55,7 @@ export function PaymentTopUpCard({ onTopUpSuccess, stablecoinsFromParent }: Paym
   const stablecoins = stablecoinsFromParent ?? stablecoinsLocal;
 
   const { selectedNetwork, chain, tokenAddress } = useMemo(() => {
-    const storedId = getStoredNetworkId();
-    const net = networks.find((n) => n.id === storedId || n.network_id === storedId) ?? networks.find((n) => !n.is_mainnet) ?? networks[0];
+    const net = networks.find((n) => n.id === selectedNetworkId || n.network_id === selectedNetworkId) ?? networks.find((n) => !n.is_mainnet) ?? networks[0];
     const cid = net?.chain_id;
     const ch = cid != null ? getChainByChainId(cid) : undefined;
     const addrs = cid != null ? stablecoins[String(cid)] : undefined;
@@ -74,7 +65,7 @@ export function PaymentTopUpCard({ onTopUpSuccess, stablecoinsFromParent }: Paym
       chain: ch,
       tokenAddress: addr,
     };
-  }, [networks, stablecoins, token]);
+  }, [networks, selectedNetworkId, stablecoins, token]);
 
   const handlePayWithStablecoin = async () => {
     const num = parseFloat(amount);
@@ -157,6 +148,18 @@ export function PaymentTopUpCard({ onTopUpSuccess, stablecoinsFromParent }: Paym
     );
   }
 
+  if (!account) {
+    return (
+      <div className="rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] p-4">
+        <div className="flex items-center gap-2 text-[var(--color-text-muted)]">
+          <Wallet className="w-5 h-5" />
+          <h3 className="text-sm font-medium">Add budget (USDC/USDT)</h3>
+        </div>
+        <p className="text-sm text-[var(--color-text-tertiary)] mt-2">Connect your wallet to top up with USDC or USDT.</p>
+      </div>
+    );
+  }
+
   const canPay = chain && tokenAddress && merchantAddress;
 
   return (
@@ -195,7 +198,7 @@ export function PaymentTopUpCard({ onTopUpSuccess, stablecoinsFromParent }: Paym
         <button
           type="button"
           onClick={handlePayWithStablecoin}
-          disabled={loading || !amount.trim() || !canPay}
+          disabled={loading || !amount.trim() || !canPay || !account}
           className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)] disabled:opacity-50 disabled:pointer-events-none"
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wallet className="w-4 h-4" />}

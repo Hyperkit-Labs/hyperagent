@@ -17,6 +17,7 @@ try:
 except ImportError:
     pass
 
+import asyncio
 import json
 import logging
 import os
@@ -245,13 +246,16 @@ def _get_caller_id(request: Request) -> str | None:
 
 def _assert_workflow_owner(w: dict[str, Any], request: Request) -> None:
     """Raise 403 if authenticated user does not own the workflow.
-    When workflow has an owner (not anonymous), require authenticated caller."""
+    Checks both user_id and wallet_user_id for backward compatibility
+    during the identity column migration period."""
     caller = _get_caller_id(request)
     owner = w.get("user_id") or ""
-    if owner and owner != "anonymous":
+    wallet_owner = w.get("wallet_user_id") or ""
+    effective_owner = owner or wallet_owner
+    if effective_owner and effective_owner != "anonymous":
         if not caller:
             raise HTTPException(status_code=403, detail="Access denied")
-        if caller != owner:
+        if caller != owner and caller != wallet_owner:
             raise HTTPException(status_code=403, detail="Access denied")
 
 
@@ -804,38 +808,70 @@ def stream_workflow_code_api(
     )
 
 
-def _stream_agent_discussion_sse(workflow_id: str):
-    """Yield SSE events showing autofix cycles, guardian checks, and agent discussions."""
-    w = get_workflow(workflow_id)
-    if not w:
-        return
-    stages = w.get("stages") or []
-    autofix_stages = [s for s in stages if s.get("stage") == "autofix"]
-    guardian_stages = [s for s in stages if s.get("stage") == "guardian"]
-    audit_stages = [s for s in stages if s.get("stage") == "audit"]
+async def _stream_agent_discussion_sse(workflow_id: str):
+    """Stream live pipeline events from run_steps and agent_logs. Cursor-based polling at 0.25s."""
+    run_id = workflow_id
+    seen_step_ids: set[str] = set()
+    last_log_id = 0
+    poll_interval = 0.25
+    max_duration = 600.0
+    started = time.monotonic()
 
-    for stage in stages:
-        name = stage.get("stage", "unknown")
-        status = stage.get("status", "pending")
-        cycles = stage.get("cycles")
-        event = {"stage": name, "status": status}
-        if cycles:
-            event["cycles"] = cycles
-        yield f"data: {json.dumps(event)}\n\n".encode()
+    while (time.monotonic() - started) < max_duration:
+        steps = db.get_steps(run_id)
+        logs = db.get_agent_logs(run_id, after_id=last_log_id if last_log_id else None)
 
-    if autofix_stages:
-        cycle_count = autofix_stages[0].get("cycles", 0)
-        yield f"data: {json.dumps({'type': 'agent_discussion', 'message': f'Autofix agent ran {cycle_count} correction cycle(s)'})}\n\n".encode()
+        def _log_event(log: dict) -> tuple[str, dict]:
+            ts = log.get("created_at") or ""
+            return (ts, {"_id": str(log.get("id", "")), "_type": "log", "event": {
+                "type": "log",
+                "stage": log.get("agent_name") or log.get("stage", "agent"),
+                "status": "info",
+                "message": (log.get("message") or log.get("stage") or "")[:1024] or None,
+                "done": False,
+            }})
 
-    if guardian_stages:
-        guardian_status = guardian_stages[0].get("status", "pending")
-        yield f"data: {json.dumps({'type': 'agent_discussion', 'message': f'Guardian invariant check: {guardian_status}'})}\n\n".encode()
+        def _step_event(step: dict) -> tuple[str, dict]:
+            ts = step.get("started_at") or step.get("completed_at") or step.get("created_at") or ""
+            ev: dict = {
+                "type": "step",
+                "stage": step.get("step_type", "agent"),
+                "status": step.get("status", "pending"),
+                "message": (step.get("output_summary") or step.get("error_message") or step.get("input_summary") or step.get("status") or "")[:1024] or None,
+                "done": False,
+            }
+            if step.get("step_type") == "human_review":
+                ev["type"] = "require_action"
+                ev["action"] = "approve_spec"
+            return (ts, {"_id": str(step.get("id", "")), "_type": "step", "event": ev})
 
-    findings = w.get("audit_findings") or []
-    if findings:
-        yield f"data: {json.dumps({'type': 'audit_summary', 'findings_count': len(findings), 'passed': w.get('audit_passed', False)})}\n\n".encode()
+        merged = []
+        for log in logs:
+            lid = log.get("id")
+            if lid is not None:
+                last_log_id = max(last_log_id, int(lid))
+            merged.append(_log_event(log))
+        for step in steps:
+            sid = str(step.get("id", ""))
+            if sid and sid not in seen_step_ids:
+                seen_step_ids.add(sid)
+                merged.append(_step_event(step))
 
-    yield f"data: {json.dumps({'done': True})}\n\n".encode()
+        merged.sort(key=lambda x: x[0])
+        for _ts, item in merged:
+            ev = item["event"]
+            yield f"data: {json.dumps(ev)}\n\n".encode()
+
+        completed = any(s.get("status") == "completed" for s in steps)
+        if completed and steps:
+            last = steps[-1]
+            if last.get("step_type") in ("ui_scaffold", "deploy", "design"):
+                yield f"data: {json.dumps({'stage': last.get('step_type'), 'status': 'completed', 'message': 'Pipeline step completed', 'done': True})}\n\n".encode()
+                return
+
+        await asyncio.sleep(poll_interval)
+
+    yield f"data: {json.dumps({'stage': 'timeout', 'status': 'stopped', 'message': 'Stream ended', 'done': True})}\n\n".encode()
 
 
 @app.get("/api/v1/streaming/workflows/{workflow_id}/discussion")
@@ -2118,6 +2154,45 @@ def get_networks_api(skale: bool = False) -> list[dict[str, Any]]:
     return get_networks_for_api(skale=skale)
 
 
+@app.get("/api/v1/networks/rpc-test")
+async def rpc_test_api(network_id: str = "", chain_id: int | None = None) -> dict[str, Any]:
+    """Test RPC connectivity by calling eth_blockNumber. Pass network_id (slug) or chain_id."""
+    cid = chain_id
+    if cid is None and network_id:
+        cid = get_chain_id_by_network_slug(network_id.strip())
+    if cid is None:
+        raise HTTPException(status_code=400, detail="Provide network_id or chain_id")
+    rpc_explorer = get_chain_rpc_explorer(cid)
+    if not rpc_explorer:
+        raise HTTPException(status_code=404, detail=f"No RPC URL for chain_id={cid}")
+    rpc_url, _ = rpc_explorer
+    if not rpc_url:
+        raise HTTPException(status_code=404, detail=f"No RPC URL for chain_id={cid}")
+    start = time.perf_counter()
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.post(
+                rpc_url,
+                json={"jsonrpc": "2.0", "method": "eth_blockNumber", "params": [], "id": 1},
+            )
+        latency_ms = int((time.perf_counter() - start) * 1000)
+        if r.status_code != 200:
+            return {"ok": False, "error": f"HTTP {r.status_code}", "latency_ms": latency_ms}
+        try:
+            j = r.json()
+            if j.get("error"):
+                return {"ok": False, "error": str(j["error"]), "latency_ms": latency_ms}
+            if "result" in j:
+                return {"ok": True, "block": j["result"], "latency_ms": latency_ms}
+        except Exception as e:
+            return {"ok": False, "error": str(e)[:200], "latency_ms": latency_ms}
+        return {"ok": False, "error": "Unexpected response", "latency_ms": latency_ms}
+    except httpx.TimeoutException:
+        return {"ok": False, "error": "Request timed out", "latency_ms": int((time.perf_counter() - start) * 1000)}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200], "latency_ms": int((time.perf_counter() - start) * 1000)}
+
+
 @app.get("/api/v1/tokens/stablecoins")
 def get_stablecoins_api() -> dict[str, dict[str, str]]:
     """Return USDC/USDT addresses per chain from x402/stablecoins.yaml. Keys are chain IDs as strings."""
@@ -2339,13 +2414,32 @@ def pricing_usage_api(
     }
 
 
+def _metrics_since_from_time_range(time_range: str) -> str | None:
+    """Return ISO datetime string for filtering, or None for all time."""
+    if not time_range or time_range == "all":
+        return None
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime.now(timezone.utc)
+    if time_range == "7d":
+        since = now - timedelta(days=7)
+    elif time_range == "30d":
+        since = now - timedelta(days=30)
+    elif time_range == "90d":
+        since = now - timedelta(days=90)
+    else:
+        return None
+    return since.isoformat()
+
+
 @app.get("/api/v1/metrics")
-def get_metrics_api() -> dict[str, Any]:
-    """Return basic metrics for Studio dashboard. Counts from runs table when Supabase is configured."""
+def get_metrics_api(time_range: str = "all") -> dict[str, Any]:
+    """Return basic metrics for Studio dashboard. Counts from runs table when Supabase is configured. time_range: 7d, 30d, 90d, all."""
     total = count_workflows()
     active = 0
     completed = 0
     failed = 0
+    since = _metrics_since_from_time_range(time_range or "all")
     if db.is_configured():
         try:
             client = db._client()
@@ -2355,12 +2449,10 @@ def get_metrics_api() -> dict[str, Any]:
                     ("success", "completed"),
                     ("failed", "failed"),
                 ]:
-                    r = (
-                        client.table("runs")
-                        .select("id", count="exact")
-                        .eq("status", status_val)
-                        .execute()
-                    )
+                    q = client.table("runs").select("id", count="exact").eq("status", status_val)
+                    if since:
+                        q = q.gte("created_at", since)
+                    r = q.execute()
                     cnt = int(getattr(r, "count", 0) or 0)
                     if counter_name == "active":
                         active = cnt
@@ -2373,6 +2465,8 @@ def get_metrics_api() -> dict[str, Any]:
             completed = total
     else:
         completed = total
+    if since:
+        total = active + completed + failed
     return {
         "workflows": {
             "total": total,
@@ -2609,6 +2703,94 @@ def delete_llm_keys(
     delete_keys(wid)
     _trace_llm_keys(request, "DELETE", x_user_id, x_workspace_id, "success")
     return {"success": True}
+
+
+class LLMKeyValidateBody(BaseModel):
+    provider: str = Field(..., min_length=1, max_length=64)
+    api_key: str | None = Field(None, max_length=512)
+
+
+async def _validate_llm_key_provider(provider: str, api_key: str) -> tuple[bool, int | None, str | None]:
+    """Validate API key by calling provider models endpoint. Returns (valid, latency_ms, error)."""
+    provider = provider.strip().lower()
+    key = (api_key or "").strip()
+    if not key:
+        return False, None, "No API key provided"
+    start = time.perf_counter()
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            if provider == "openai":
+                r = await client.get(
+                    "https://api.openai.com/v1/models",
+                    headers={"Authorization": f"Bearer {key}"},
+                )
+            elif provider == "anthropic":
+                r = await client.get(
+                    "https://api.anthropic.com/v1/models",
+                    headers={
+                        "x-api-key": key,
+                        "anthropic-version": "2023-06-01",
+                        "Content-Type": "application/json",
+                    },
+                )
+            elif provider == "google":
+                r = await client.get(
+                    f"https://generativelanguage.googleapis.com/v1beta/models?key={key}",
+                )
+            elif provider == "together":
+                r = await client.get(
+                    "https://api.together.xyz/v1/models",
+                    headers={"Authorization": f"Bearer {key}"},
+                )
+            else:
+                return False, None, f"Unknown provider: {provider}"
+            latency_ms = int((time.perf_counter() - start) * 1000)
+            if r.status_code in (200, 201):
+                return True, latency_ms, None
+            err_body = r.text[:200] if r.text else ""
+            try:
+                j = r.json()
+                msg = (j.get("error") or {}).get("message") or (j.get("error") or {}).get("message") or str(j.get("message", ""))
+                if msg:
+                    err_body = msg[:200]
+            except Exception:
+                pass
+            return False, latency_ms, err_body or f"HTTP {r.status_code}"
+    except httpx.TimeoutException:
+        return False, int((time.perf_counter() - start) * 1000), "Request timed out"
+    except Exception as e:
+        return False, int((time.perf_counter() - start) * 1000), str(e)[:200]
+
+
+@app.post("/api/v1/workspaces/current/llm-keys/validate")
+async def validate_llm_key(
+    body: LLMKeyValidateBody,
+    x_workspace_id: str | None = Header(None, alias="X-Workspace-Id"),
+    x_user_id: str | None = Header(None, alias="X-User-Id"),
+) -> dict[str, Any]:
+    """Validate an LLM API key by calling the provider's models endpoint. Use api_key in body for form input, or omit to test stored key (requires auth)."""
+    api_key = (body.api_key or "").strip()
+    if not api_key:
+        _require_user_id_for_byok(x_user_id)
+        wid = x_workspace_id or DEFAULT_WORKSPACE
+        stored = {}
+        if x_user_id and llm_keys_supabase._is_configured():
+            stored = llm_keys_supabase.get_keys_for_user(x_user_id) or {}
+        else:
+            stored = get_keys_for_pipeline(wid) or {}
+        api_key = (stored or {}).get(body.provider.strip().lower(), "")
+        if not api_key:
+            raise HTTPException(
+                status_code=400,
+                detail="No API key in request and no stored key for this provider. Enter a key to validate.",
+            )
+    valid, latency_ms, err = await _validate_llm_key_provider(body.provider, api_key)
+    out: dict[str, Any] = {"valid": valid}
+    if latency_ms is not None:
+        out["latency_ms"] = latency_ms
+    if err and not valid:
+        out["error"] = err
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -2978,17 +3160,8 @@ def contract_call_api(body: ContractCallBody) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Legacy /run and health
+# Legacy /run removed (was 410 Gone). Use POST /api/v1/workflows/generate.
 # ---------------------------------------------------------------------------
-
-
-@app.post("/run")
-def create_run_legacy(req: RunRequest) -> dict[str, Any]:
-    """Deprecated. Use POST /api/v1/workflows/generate. Returns 410 Gone."""
-    raise HTTPException(
-        status_code=410,
-        detail="POST /run is deprecated. Use POST /api/v1/workflows/generate for workflow creation.",
-    )
 
 
 def _approve_spec_impl(run_id: str, request: Request | None = None) -> dict[str, Any]:

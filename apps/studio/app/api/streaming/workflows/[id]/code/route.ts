@@ -7,41 +7,53 @@ import { NextRequest } from 'next/server';
 import { formatDataStreamPart } from 'ai';
 import { getApiBase } from '@/lib/api';
 
+function createRequestId(): string {
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `req-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: workflowId } = await params;
+  const requestId = request.headers.get('x-request-id') ?? createRequestId();
 
   if (!workflowId) {
-    return new Response('Workflow ID required', { status: 400 });
+    return new Response(
+      JSON.stringify({ error: 'Workflow ID required', requestId }),
+      { status: 400, headers: { 'Content-Type': 'application/json', 'X-Request-Id': requestId } }
+    );
   }
 
   const backendBase = getApiBase();
   const streamUrl = `${backendBase}/streaming/workflows/${workflowId}/code`;
 
   try {
-    // Forward the request to backend streaming endpoint
-    // Include credentials for authenticated requests
     const response = await fetch(streamUrl, {
       credentials: 'include',
       headers: {
-        // Forward authorization headers if present
         ...(request.headers.get('authorization') && {
           authorization: request.headers.get('authorization')!,
         }),
-        // Forward cookie for session/auth
         ...(request.headers.get('cookie') && {
           cookie: request.headers.get('cookie')!,
         }),
+        'x-request-id': requestId,
       },
     });
 
     if (!response.ok) {
-      return new Response(
-        `Backend streaming error: ${response.statusText}`,
-        { status: response.status }
-      );
+      const backendRequestId = response.headers.get('x-request-id') ?? requestId;
+      const body = JSON.stringify({
+        error: `Backend streaming error: ${response.statusText}`,
+        requestId: backendRequestId,
+      });
+      return new Response(body, {
+        status: response.status,
+        headers: { 'Content-Type': 'application/json', 'X-Request-Id': backendRequestId },
+      });
     }
 
     // Create a readable stream that transforms SSE format for Vercel AI SDK
@@ -111,10 +123,14 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('Streaming proxy error:', error);
-    return new Response(
-      `Streaming error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      { status: 500 }
-    );
+    console.error('[streaming]', requestId, error);
+    const body = JSON.stringify({
+      error: error instanceof Error ? error.message : 'Unknown error',
+      requestId,
+    });
+    return new Response(body, {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', 'X-Request-Id': requestId },
+    });
   }
 }

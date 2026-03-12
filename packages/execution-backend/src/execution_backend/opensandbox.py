@@ -34,6 +34,20 @@ class OpenSandboxBackend:
         files: dict[str, str] | None = None,
     ) -> CompileResult:
         """Run compile inside OpenSandbox."""
+        return await self.run_compile_streaming(
+            contract_code, framework, files, run_id=None, on_log=None
+        )
+
+    async def run_compile_streaming(
+        self,
+        contract_code: str,
+        framework: str = "hardhat",
+        files: dict[str, str] | None = None,
+        run_id: str | None = None,
+        on_log: None | ((str, str) -> None) = None,
+    ) -> CompileResult:
+        """Run compile inside OpenSandbox. When on_log is provided, streams stdout/stderr line-by-line.
+        Uses run_streaming if SDK supports it; otherwise emits after run() completes."""
         if not self._configured():
             logger.warning("[opensandbox] not configured, compile would run in sandbox")
             return CompileResult(success=False, errors=["OpenSandbox not configured"])
@@ -45,6 +59,7 @@ class OpenSandboxBackend:
                 workdir = "/sandbox"
                 src = f"{workdir}/contracts" if framework == "hardhat" else f"{workdir}/src"
                 await sandbox.files.write(f"{src}/Contract.sol", contract_code)
+                cmd: str
                 if framework == "hardhat":
                     await sandbox.files.write(
                         f"{workdir}/package.json",
@@ -54,15 +69,51 @@ class OpenSandboxBackend:
                             "devDependencies": {"hardhat": "^2.19.0"},
                         }),
                     )
-                    result = await sandbox.commands.run("cd /sandbox && npm install && npm run compile", timeout=120)
+                    cmd = "cd /sandbox && npm install && npm run compile"
                 else:
                     await sandbox.files.write(
                         f"{workdir}/foundry.toml",
                         '[profile.default]\nsolc = "0.8.24"\n',
                     )
-                    result = await sandbox.commands.run("cd /sandbox && forge build --json", timeout=120)
-                stdout = result.stdout if hasattr(result, "stdout") else str(result)
-                stderr = result.stderr if hasattr(result, "stdout") else ""
+                    cmd = "cd /sandbox && forge build --json"
+
+                run_streaming = getattr(sandbox.commands, "run_streaming", None)
+                stdout = ""
+                stderr = ""
+
+                if on_log and run_streaming and callable(run_streaming):
+                    try:
+                        out_buf: list[str] = []
+                        async for chunk in run_streaming(cmd, timeout=300):
+                            if chunk:
+                                msg = chunk.decode("utf-8") if isinstance(chunk, bytes) else str(chunk)
+                                out_buf.append(msg)
+                                for line in msg.splitlines():
+                                    if line.strip():
+                                        on_log("compile", line.strip())
+                        stdout = "".join(out_buf)
+                    except Exception:
+                        result = await sandbox.commands.run(cmd, timeout=300)
+                        stdout = result.stdout if hasattr(result, "stdout") else str(result)
+                        stderr = result.stderr if hasattr(result, "stdout") else ""
+                        for line in (stdout or "").splitlines():
+                            if line.strip():
+                                on_log("compile", line)
+                        for line in (stderr or "").splitlines():
+                            if line.strip():
+                                on_log("compile", line)
+                else:
+                    result = await sandbox.commands.run(cmd, timeout=300)
+                    stdout = result.stdout if hasattr(result, "stdout") else str(result)
+                    stderr = result.stderr if hasattr(result, "stdout") else ""
+                    if on_log:
+                        for line in (stdout or "").splitlines():
+                            if line.strip():
+                                on_log("compile", line)
+                        for line in (stderr or "").splitlines():
+                            if line.strip():
+                                on_log("compile", line)
+
                 if "Compiler run successful" in stdout or "bytecode" in stdout.lower():
                     try:
                         data = json.loads(stdout) if stdout.strip().startswith("{") else {}
@@ -87,6 +138,7 @@ class OpenSandboxBackend:
         contract_code: str,
         contract_name: str,
         tools: list[str] | None = None,
+        on_log: None | ((str, str) -> None) = None,
     ) -> AuditResult:
         """Run audit (Slither, Mythril) inside OpenSandbox."""
         if not self._configured():
@@ -113,6 +165,10 @@ class OpenSandboxBackend:
                         if tool == "slither":
                             result = await sandbox.commands.run(f"slither {src} --json -", timeout=120)
                             out = result.stdout if hasattr(result, "stdout") else str(result)
+                            if on_log and out:
+                                for line in out.strip().split("\n"):
+                                    if line.strip():
+                                        on_log("slither", line[:1024])
                             try:
                                 data = json.loads(out)
                                 for d in data.get("results", {}).get("detectors", []):
@@ -130,6 +186,10 @@ class OpenSandboxBackend:
                         elif tool == "mythril":
                             result = await sandbox.commands.run(f"mythril analyze {src}/{contract_name}.sol -o json 2>/dev/null || true", timeout=120)
                             out = result.stdout if hasattr(result, "stdout") else str(result)
+                            if on_log and out:
+                                for line in out.strip().split("\n"):
+                                    if line.strip():
+                                        on_log("mythril", line[:1024])
                             try:
                                 data = json.loads(out)
                                 for d in data.get("issues", []) if isinstance(data, dict) else []:
@@ -147,6 +207,10 @@ class OpenSandboxBackend:
                         elif tool == "echidna":
                             result = await sandbox.commands.run(f"echidna {src}/{contract_name}.sol --contract {contract_name} 2>/dev/null || true", timeout=60)
                             out = result.stdout if hasattr(result, "stdout") else str(result)
+                            if on_log and out:
+                                for line in out.strip().split("\n"):
+                                    if line.strip():
+                                        on_log("echidna", line[:1024])
                             if "FAIL" in out or "failed" in out.lower():
                                 findings.append({
                                     "severity": "medium",
@@ -185,6 +249,7 @@ class OpenSandboxBackend:
         contract_code: str,
         contract_name: str,
         engines: list[list[str]] | None = None,
+        on_log: None | ((str, str) -> None) = None,
     ) -> AuditResult:
         """Run 3+ parallel OpenSandboxes, each with a different audit engine.
         Default engines: [slither], [mythril], [echidna] (best-effort)."""
@@ -199,7 +264,7 @@ class OpenSandboxBackend:
 
         async def _run_one(tools: list[str]) -> AuditResult:
             try:
-                return await self.run_audit(contract_code, contract_name, tools=tools)
+                return await self.run_audit(contract_code, contract_name, tools=tools, on_log=on_log)
             except Exception as e:
                 logger.warning("[opensandbox] multi-engine %s failed: %s", tools, e)
                 return AuditResult(findings=[], tools_run=[], tools_failed=tools)

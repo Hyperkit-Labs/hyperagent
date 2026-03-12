@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import { ROUTES } from "@/constants/routes";
 import { useDeployments } from "@/hooks/useDeployments";
 import { Rocket } from "lucide-react";
@@ -26,6 +27,7 @@ export default function DeploymentsPage() {
     : null;
 
   return (
+    <RequireApiSession>
     <div className="h-full flex flex-col p-4 lg:p-6">
       <ApiErrorBanner error={error} onRetry={refetch} />
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-4">
@@ -128,5 +130,6 @@ export default function DeploymentsPage() {
         </section>
       </div>
     </div>
+    </RequireApiSession>
   );
 }

@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import { useAppDetailData } from "@/hooks/useAppDetailData";
 import { useNetworks } from "@/hooks/useNetworks";
 import { prepareDeploymentTransaction, completeDeployment, createQuickDemo, createDebugSandbox } from "@/lib/api";
@@ -105,6 +106,7 @@ export default function AppDetailPage() {
   const chatHref = `${ROUTES.CHAT}?appId=${encodeURIComponent(id)}`;
 
   return (
+    <RequireApiSession>
     <div className="p-6 lg:p-8">
       <div className="max-w-[1200px] mx-auto space-y-6 animate-enter">
         <div className="flex items-center justify-between gap-4">
@@ -373,5 +375,6 @@ export default function AppDetailPage() {
         )}
       </div>
     </div>
+    </RequireApiSession>
   );
 }

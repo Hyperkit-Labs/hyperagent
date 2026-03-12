@@ -17,7 +17,7 @@ import { createProxyMiddleware, responseInterceptor } from "http-proxy-middlewar
 import { requestIdMiddleware, RequestWithId } from "./requestId.js";
 import { authMiddleware, RequestWithUser } from "./auth.js";
 import { rateLimitMiddleware } from "./rateLimit.js";
-import { authBootstrapHandler } from "./authBootstrap.js";
+import { authBootstrapHandler, getSupabaseAdmin } from "./authBootstrap.js";
 
 const ORCHESTRATOR_URL = process.env.ORCHESTRATOR_URL || "http://localhost:8000";
 const NODE_ENV = process.env.NODE_ENV || "development";
@@ -147,7 +147,16 @@ app.use("/api", createProxyMiddleware(proxyOptions()));
 app.use("/docs", createProxyMiddleware(proxyOptions()));
 app.use("/openapi.json", createProxyMiddleware(proxyOptions()));
 
-app.get("/health", (_req, res) => res.json({ status: "ok", gateway: true }));
+app.get("/health", async (_req, res) => {
+  const supabase = getSupabaseAdmin();
+  const { error } = supabase ? await supabase.from("wallet_users").select("id").limit(1) : { error: { message: "Supabase not configured" } };
+  res.json({
+    status: "ok",
+    gateway: true,
+    db_connected: !error,
+    db_error: error ? (error as { message?: string }).message : null,
+  });
+});
 
 const port = Number(process.env.PORT) || 4000;
 app.listen(port, "0.0.0.0", () => {

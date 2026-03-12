@@ -457,6 +457,31 @@ def get_steps(run_id: str) -> list[dict[str, Any]]:
         return []
 
 
+def get_agent_logs(
+    run_id: str, limit: int = 500, after_id: int | None = None
+) -> list[dict[str, Any]]:
+    """Return agent_logs for a run, ordered by created_at. Used by SSE stream for real-time logs.
+    When after_id is set, only returns rows with id > after_id (cursor-based fetch)."""
+    client = _client()
+    if not client:
+        return []
+    try:
+        q = (
+            client.table("agent_logs")
+            .select("id, agent_name, stage, log_level, message, created_at")
+            .eq("run_id", run_id)
+            .order("created_at")
+            .limit(limit)
+        )
+        if after_id is not None:
+            q = q.gt("id", after_id)
+        r = q.execute()
+        return list(r.data) if r.data else []
+    except Exception as e:
+        logger.warning("[db] get_agent_logs failed: %s", e)
+        return []
+
+
 def _to_ts(val: Any) -> str:
     if val is None:
         return ""

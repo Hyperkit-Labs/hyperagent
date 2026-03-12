@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
+import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -18,13 +19,13 @@ import {
   X,
 } from "lucide-react";
 import { useAgents } from "@/hooks/useAgents";
+import { useMetrics } from "@/hooks/useMetrics";
 import type { AgentStatus } from "@/lib/api";
 import { ROUTES } from "@/constants/routes";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { ShimmerGrid } from "@/components/ai-elements";
 import { EmptyState, GlowingBorder, RadialProgress, NetworkTopologyMap } from "@/components/ui";
 import { PageTitle } from "@/components/layout/PageTitle";
-import { LineChart, Line, ResponsiveContainer, YAxis } from "recharts";
 
 type AgentCategory = "all" | "generators" | "auditors" | "deployers";
 
@@ -59,6 +60,7 @@ export default function AgentsPage() {
   const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set());
   const router = useRouter();
   const { agents, loading, error, refetch } = useAgents();
+  const { metrics } = useMetrics({ timeRange: "7d" });
 
   const toggleSelectAgent = useCallback((name: string) => {
     setSelectedAgents((prev) => {
@@ -112,6 +114,7 @@ export default function AgentsPage() {
   );
 
   return (
+    <RequireApiSession>
     <div className="p-6 lg:p-8 flex flex-1 overflow-hidden">
       <div className="flex-1 min-w-0 flex gap-0">
         <div className="flex-1 min-w-0 max-w-5xl mx-auto flex flex-col">
@@ -254,13 +257,23 @@ export default function AgentsPage() {
             {filtered.map((agent, i) => {
               const { Icon, bgClass } = agentIcon(agent.name);
               const cat = agentCategory(agent.name);
-              const isOk = (agent.status || "").toLowerCase() === "ok" || (agent.status || "").toLowerCase() === "healthy";
+              const statusKey = (agent.status || "").toLowerCase();
+              const isOk = statusKey === "ok" || statusKey === "healthy";
               const enabled = isEnabled(agent.name ?? "");
               const name = agent.name ?? "Agent";
               const toggleId = `agent-toggle-${String(agent.name ?? "").replace(/\s/g, "-")}-${i}`;
               const isSelected = selectedName === (agent.name ?? null);
               const isChecked = selectedAgents.has(name);
-              const progress = isOk ? 98 : 75;
+              const stepIndex = typeof agent.step_index === "number" ? agent.step_index : 0;
+              const progressMap: Record<string, number> = {
+                idle: 100,
+                ok: 100,
+                healthy: 100,
+                running: stepIndex > 0 ? Math.min(90, stepIndex * 15) : 45,
+                busy: 45,
+                failed: 0,
+              };
+              const progress = progressMap[statusKey] ?? (isOk ? 100 : 45);
 
               return (
                 <div
@@ -290,7 +303,7 @@ export default function AgentsPage() {
                         <h3 className={`text-sm font-medium ${enabled ? "text-[var(--color-text-primary)]" : "text-[var(--color-text-muted)]"}`}>
                           {name}
                         </h3>
-                        <RadialProgress progress={progress} size={16} strokeWidth={2} color={isOk ? "var(--color-semantic-success)" : "var(--color-semantic-warning)"} />
+                        <RadialProgress progress={progress} size={16} strokeWidth={2} color={statusKey === "failed" ? "var(--color-semantic-error)" : statusKey === "running" || statusKey === "busy" ? "var(--color-semantic-info)" : isOk ? "var(--color-semantic-success)" : "var(--color-semantic-warning)"} />
                       </div>
                       <div className="text-[10px] text-[var(--color-text-tertiary)] flex items-center gap-1.5 mt-0.5">
                         <span className={`px-1.5 py-px rounded border ${cat === "generators" ? "bg-purple-500/10 text-purple-400 border-purple-500/20" : cat === "auditors" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" : cat === "deployers" ? "bg-orange-500/10 text-orange-400 border-orange-500/20" : "bg-[var(--color-primary-alpha-10)] text-[var(--color-semantic-violet)] border-[var(--color-primary-alpha-20)]"}`}>
@@ -311,7 +324,7 @@ export default function AgentsPage() {
                       <div className="text-xs text-[var(--color-text-secondary)]">-</div>
                     </div>
                     <div className="col-span-12 sm:col-span-2 flex justify-end items-center">
-                      <span className={`text-[10px] mr-2 ${enabled ? "text-[var(--color-text-muted)]" : "text-[var(--color-text-muted)]"}`}>
+                      <span className={`text-[10px] mr-2 ${enabled ? "text-[var(--color-text-muted)]" : "text-[var(--color-text-muted)]"}`} title="Session toggle">
                         {enabled ? "Enabled" : "Disabled"}
                       </span>
                       <input
@@ -321,7 +334,8 @@ export default function AgentsPage() {
                         onChange={() => toggleEnabled(name)}
                         onClick={(e) => e.stopPropagation()}
                         className="toggle-checkbox"
-                        aria-label={enabled ? "Disable agent" : "Enable agent"}
+                        aria-label={enabled ? "Disable agent (session-only)" : "Enable agent (session-only)"}
+                        title="Toggle enabled for this session"
                       />
                       <label htmlFor={toggleId} className="toggle-label" onClick={(e) => e.stopPropagation()} />
                     </div>
@@ -410,20 +424,19 @@ export default function AgentsPage() {
 
               <div>
                 <div className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] font-semibold mb-3">Execution History (Last 7 Days)</div>
-                <div className="h-24 bg-[var(--color-bg-panel)] rounded-lg border border-[var(--color-border-subtle)] p-2">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={[
-                      { time: 'Mon', count: 12 },
-                      { time: 'Tue', count: 19 },
-                      { time: 'Wed', count: 15 },
-                      { time: 'Thu', count: 25 },
-                      { time: 'Fri', count: 22 },
-                      { time: 'Sat', count: 30 },
-                      { time: 'Sun', count: 28 },
-                    ]}>
-                      <Line type="monotone" dataKey="count" stroke="var(--color-semantic-violet)" strokeWidth={2} dot={{ r: 2, fill: "var(--color-semantic-violet)" }} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                <div className="h-24 bg-[var(--color-bg-panel)] rounded-lg border border-[var(--color-border-subtle)] p-3 flex items-center justify-center gap-6">
+                  <div className="text-center">
+                    <div className="text-lg font-semibold text-[var(--color-semantic-success)]">{metrics?.workflows?.completed ?? 0}</div>
+                    <div className="text-[10px] text-[var(--color-text-muted)]">Completed</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-lg font-semibold text-[var(--color-semantic-info)]">{metrics?.workflows?.active ?? 0}</div>
+                    <div className="text-[10px] text-[var(--color-text-muted)]">Active</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-lg font-semibold text-[var(--color-semantic-error)]">{metrics?.workflows?.failed ?? 0}</div>
+                    <div className="text-[10px] text-[var(--color-text-muted)]">Failed</div>
+                  </div>
                 </div>
               </div>
 
@@ -465,5 +478,6 @@ export default function AgentsPage() {
         )}
       </div>
     </div>
+    </RequireApiSession>
   );
 }

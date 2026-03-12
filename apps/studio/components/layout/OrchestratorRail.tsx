@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ROUTES } from "@/constants/routes";
 
 interface OrchestratorRailProps {
   /** Whether the rail is collapsed */
@@ -29,7 +31,9 @@ export function OrchestratorRail({
   environment = "Firecracker VM",
   children,
 }: OrchestratorRailProps) {
+  const router = useRouter();
   const [isCollapsed, setIsCollapsed] = useState(collapsed);
+  const [inputValue, setInputValue] = useState("");
 
   const handleToggle = () => {
     const next = !isCollapsed;
@@ -108,29 +112,45 @@ export function OrchestratorRail({
 
       <div className="border-t border-white/5 px-3 py-2 space-y-2 shrink-0">
         <div className="flex gap-1 text-[11px] flex-wrap">
-          {["Audit", "Debug", "Deploy", "Create"].map((mode) => (
+          {[
+            { mode: "Audit", href: ROUTES.SECURITY },
+            { mode: "Debug", href: `${ROUTES.HOME}?q=${encodeURIComponent("Debug the last workflow")}` },
+            { mode: "Deploy", href: ROUTES.DEPLOYMENTS },
+            { mode: "Create", href: ROUTES.HOME },
+          ].map(({ mode, href }) => (
             <button
               key={mode}
               type="button"
+              onClick={() => router.push(href)}
               className="px-2 py-1 rounded-full bg-white/5 text-slate-300 hover:bg-white/10 transition-colors"
             >
               {mode}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2 rounded-xl bg-slate-900/80 px-2 py-1.5 border border-white/5">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const q = inputValue.trim();
+            if (q) router.push(`${ROUTES.HOME}?q=${encodeURIComponent(q)}`);
+            setInputValue("");
+          }}
+          className="flex items-center gap-2 rounded-xl bg-slate-900/80 px-2 py-1.5 border border-white/5"
+        >
           <input
             type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
             className="flex-1 bg-transparent text-xs outline-none placeholder:text-slate-500"
             placeholder="Ask HyperAgent to build, audit, or deploy…"
           />
           <button
-            type="button"
+            type="submit"
             className="h-7 w-7 rounded-full bg-violet-500 text-xs flex items-center justify-center shadow-lg shadow-violet-500/40 hover:bg-violet-400 transition-colors"
           >
             ↵
           </button>
-        </div>
+        </form>
       </div>
     </aside>
   );

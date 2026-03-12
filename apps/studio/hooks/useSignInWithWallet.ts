@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useActiveAccount, useActiveWallet } from "thirdweb/react";
+import { useActiveAccount, useActiveWallet, useActiveWalletChain } from "thirdweb/react";
 import { signMessage } from "thirdweb/utils";
 import { bootstrapWithSiwe, bootstrapWithThirdwebInApp } from "@/lib/authBootstrap";
 import { setStoredSession } from "@/lib/session-store";
 
-/** Map backend-shaped errors to user-friendly messages. */
+const AUTH_TOKEN_MAX_RETRIES = 3;
+const AUTH_TOKEN_RETRY_BASE_MS = 500;
+
 function normalizeAuthError(raw: string): string {
   const lower = raw.toLowerCase();
   if (lower.includes("missing or invalid authorization") || lower.includes("authorization header")) {
@@ -27,6 +29,20 @@ function normalizeAuthError(raw: string): string {
   return raw;
 }
 
+async function getAuthTokenWithRetry(
+  getAuth: (() => string | null | Promise<string>) | undefined,
+  walletRef: unknown,
+): Promise<string> {
+  for (let attempt = 0; attempt < AUTH_TOKEN_MAX_RETRIES; attempt++) {
+    const token = getAuth ? await Promise.resolve(getAuth.call(walletRef)) : null;
+    if (token) return token;
+    if (attempt < AUTH_TOKEN_MAX_RETRIES - 1) {
+      await new Promise((r) => setTimeout(r, AUTH_TOKEN_RETRY_BASE_MS * 2 ** attempt));
+    }
+  }
+  throw new Error("Could not retrieve auth token from wallet after multiple attempts. Please reconnect and try again.");
+}
+
 /**
  * Sign in: bootstrap backend user for both SIWE (external wallet) and thirdweb OAuth/in-app.
  * Detects in-app wallet via getAuthToken; otherwise uses SIWE. Both upsert wallet_users and return session JWT.
@@ -34,6 +50,7 @@ function normalizeAuthError(raw: string): string {
 export function useSignInWithWallet() {
   const account = useActiveAccount();
   const wallet = useActiveWallet();
+  const activeChain = useActiveWalletChain();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,15 +70,12 @@ export function useSignInWithWallet() {
         const getAuth = (wallet as { getAuthToken?: () => string | null | Promise<string> }).getAuthToken;
         session = await bootstrapWithThirdwebInApp({
           walletAddress: account.address,
-          getAuthToken: async () => {
-            const token = getAuth ? await Promise.resolve(getAuth.call(wallet)) : null;
-            if (!token) throw new Error("No auth token from wallet");
-            return token;
-          },
+          getAuthToken: () => getAuthTokenWithRetry(getAuth, wallet),
         });
       } else {
         session = await bootstrapWithSiwe({
           address: account.address,
+          chainId: activeChain?.id,
           signMessage: async (msg) => {
             const sig = await signMessage({ message: msg, account });
             return sig;
@@ -78,7 +92,7 @@ export function useSignInWithWallet() {
     } finally {
       setIsLoading(false);
     }
-  }, [account, wallet]);
+  }, [account, wallet, activeChain]);
 
   return { signIn, isLoading, error };
 }

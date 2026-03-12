@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { PaymentHistoryTable } from "@/components/analytics/PaymentHistoryTable";
 import { SpendingTrends } from "@/components/analytics/SpendingTrends";
@@ -120,6 +121,7 @@ export default function PaymentsPage() {
   const budgetValue = loading ? "..." : `${control?.budget ?? "0"} ${control?.currency ?? "USD"}`;
 
   return (
+    <RequireApiSession>
     <div className="p-6 lg:p-8">
       <div className="max-w-[1200px] mx-auto space-y-6 animate-enter">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -201,5 +203,6 @@ export default function PaymentsPage() {
         </div>
       </div>
     </div>
+    </RequireApiSession>
   );
 }

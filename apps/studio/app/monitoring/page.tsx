@@ -2,6 +2,7 @@
 
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import { useLogs } from "@/hooks/useLogs";
 import { useHealth } from "@/hooks/useHealth";
 import { FileText, Heart, Activity, ShieldCheck, Search, Pause, Play } from "lucide-react";
@@ -185,8 +186,10 @@ function MonitoringContent() {
 
 export default function MonitoringPage() {
   return (
-    <Suspense fallback={<div className="p-6 flex items-center justify-center"><FileText className="w-6 h-6 animate-pulse text-[var(--color-text-muted)]" /></div>}>
-      <MonitoringContent />
-    </Suspense>
+    <RequireApiSession>
+      <Suspense fallback={<div className="p-6 flex items-center justify-center"><FileText className="w-6 h-6 animate-pulse text-[var(--color-text-muted)]" /></div>}>
+        <MonitoringContent />
+      </Suspense>
+    </RequireApiSession>
   );
 }

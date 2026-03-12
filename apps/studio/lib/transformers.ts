@@ -22,6 +22,8 @@ export interface Contract {
   network?: string;
   address?: string;
   verified?: boolean;
+  transactionHash?: string;
+  createdAt?: string;
   [key: string]: unknown;
 }
 
@@ -66,9 +68,11 @@ export function transformWorkflowToContract(w: Workflow): Contract | Contract[] 
       network: d.network ?? w.network,
       address: d.contract_address,
       verified: w.status === 'completed',
+      transactionHash: d.transaction_hash,
+      createdAt: d.created_at ?? w.updated_at ?? w.created_at,
     }));
   }
-  const meta = (w as { deployment_address?: string; deploymentAddress?: string }) as Workflow & { deployment_address?: string; deploymentAddress?: string };
+  const meta = (w as { deployment_address?: string; deploymentAddress?: string; transaction_hash?: string }) as Workflow & { deployment_address?: string; deploymentAddress?: string; transaction_hash?: string };
   const addr = meta.deployment_address ?? meta.deploymentAddress;
   if (!addr && w.status !== 'completed') return null;
   return {
@@ -77,5 +81,7 @@ export function transformWorkflowToContract(w: Workflow): Contract | Contract[] 
     network: w.network,
     address: addr,
     verified: w.status === 'completed',
+    transactionHash: meta.transaction_hash,
+    createdAt: w.updated_at ?? w.created_at,
   };
 }

@@ -7,6 +7,8 @@
  *   2. Server env (dev only): OPENAI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, ANTHROPIC_API_KEY.
  *      In production (NODE_ENV=production or REQUIRE_AUTH=true), server env is NOT used per BYOK policy.
  *   3. No key -> return a user-facing placeholder message with CTA to add keys in Settings.
+ *      This is intentional: we never fail with 500; we surface a clear CTA. Pipeline workflows
+ *      use the orchestrator and BYOK from workspace; chat is a separate surface with its own key resolution.
  */
 
 import { streamText, createDataStreamResponse, formatDataStreamPart, tool, jsonSchema } from 'ai';

@@ -91,8 +91,9 @@ def _after_security_policy_evaluator(state: AgentState) -> str:
 
 
 def _after_exploit_simulation(state: AgentState) -> str:
-    """Route after exploit simulation: pass -> ui_scaffold, fail -> autofix (if cycles remain) or END."""
-    if state.get("exploit_simulation_passed", True):
+    """Route after exploit simulation: pass -> ui_scaffold, fail -> autofix (if cycles remain) or END.
+    ZSPS: Missing state defaults to failure."""
+    if state.get("exploit_simulation_passed", False):
         return "ui_scaffold"
     cycle = state.get("autofix_cycle", 0)
     if cycle < MAX_AUTOFIX_CYCLES:

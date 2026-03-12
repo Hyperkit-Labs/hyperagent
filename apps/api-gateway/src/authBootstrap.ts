@@ -40,7 +40,7 @@ function isMissingTableError(msg: string | undefined, code?: string): boolean {
   );
 }
 
-function getSupabaseAdmin(): SupabaseClient | null {
+export function getSupabaseAdmin(): SupabaseClient | null {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return null;
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },

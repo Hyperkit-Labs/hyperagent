@@ -178,11 +178,17 @@ async def _run_audit_via_execution_backend(
         from execution_backend import get_execution_backend
 
         backend = get_execution_backend()
+        on_log = None
+        if is_configured() and run_id:
+            from db import insert_agent_log
+            def _on_log(tool: str, line: str) -> None:
+                insert_agent_log(run_id, tool, "audit", line[:4096], log_level="info")
+            on_log = _on_log
         if OPENSANDBOX_ENABLED and hasattr(backend, "run_multi_engine_audit"):
-            result = await backend.run_multi_engine_audit(code, contract_name)
+            result = await backend.run_multi_engine_audit(code, contract_name, on_log=on_log)
         else:
             result = await backend.run_audit(
-                code, contract_name, tools=list(AUDIT_TOOLS)
+                code, contract_name, tools=list(AUDIT_TOOLS), on_log=on_log
             )
         tool_label = ",".join(result.tools_run) or "audit"
         findings = []

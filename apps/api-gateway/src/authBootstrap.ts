@@ -230,6 +230,11 @@ export async function authBootstrapHandler(req: Request, res: Response): Promise
     return;
   }
 
+  if (!result.userId) {
+    res.status(500).json({ error: "Service Unavailable", message: "Critical: Failed to record wallet user in DB" });
+    return;
+  }
+
   const token = jwt.sign(
     { sub: result.userId, wallet_address: walletAddress.toLowerCase() },
     AUTH_JWT_SECRET,

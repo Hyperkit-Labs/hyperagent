@@ -40,6 +40,10 @@ const EXPLORER_BY_NETWORK: Record<string, string> = {
   'base-sepolia': 'https://sepolia.basescan.org',
   bsc: 'https://bscscan.com',
   'bsc-testnet': 'https://testnet.bscscan.com',
+  'skalebase-mainnet': 'https://skale-base-explorer.skalenodes.com',
+  'skalebase-sepolia': 'https://base-sepolia-testnet-explorer.skalenodes.com',
+  'skale base sepolia': 'https://base-sepolia-testnet-explorer.skalenodes.com',
+  'skale base': 'https://skale-base-explorer.skalenodes.com',
 };
 
 export function getExplorerUrl(network: string, type: 'tx' | 'address', value: string): string | null {

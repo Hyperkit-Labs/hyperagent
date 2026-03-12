@@ -5,6 +5,7 @@ import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import { ROUTES } from "@/constants/routes";
 import { useContracts } from "@/hooks/useContracts";
 import { contractRead, contractCall } from "@/lib/api";
+import { getExplorerUrl } from "@/lib/utils";
 import { FileCode, Terminal, Loader2, ChevronRight, Send, Copy, CheckCircle2, History, Fuel, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { ShimmerGrid } from "@/components/ai-elements";

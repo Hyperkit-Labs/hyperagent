@@ -3,16 +3,19 @@
 import { useParams } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { useActiveAccount } from "thirdweb/react";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import { useAppDetailData } from "@/hooks/useAppDetailData";
 import { useNetworks } from "@/hooks/useNetworks";
 import { prepareDeploymentTransaction, completeDeployment, createQuickDemo, createDebugSandbox } from "@/lib/api";
+import { deployUserContractEoa } from "@/lib/eoaDeploy";
+import { getChainByChainId } from "@/lib/smartWalletDeploy";
 import { ArrowLeft, FileCode, ExternalLink, Rocket, Loader2, LayoutGrid, GitBranch, Layers, Activity, MessageSquare, Terminal, Bug } from "lucide-react";
 import { Shimmer } from "@/components/ai-elements";
 import { ROUTES } from "@/constants/routes";
 import { FALLBACK_DEFAULT_CHAIN_ID, FALLBACK_DEFAULT_CHAIN_LABEL, getDefaultChainIdFromList } from "@/constants/defaults";
 import { getLogs } from "@/lib/api";
-import { hasAuditOrSimFailure } from "@/lib/types";
+import { hasAuditOrSimFailure, hasSecurityCheckFailure } from "@/lib/types";
 
 type ContractItem = { bytecode?: string; abi?: unknown; contract_name?: string; [key: string]: unknown };
 type DeploymentItem = { contract_address?: string; network?: string; [key: string]: unknown };
@@ -49,9 +52,11 @@ export default function AppDetailPage() {
       setDeployChainId(chainOptions[0].chainId);
     }
   }, [chainOptions, deployChainId]);
+  const account = useActiveAccount();
   const [prepareLoading, setPrepareLoading] = useState(false);
   const [prepareError, setPrepareError] = useState<string | null>(null);
   const [preparePayload, setPreparePayload] = useState<unknown>(null);
+  const [signing, setSigning] = useState(false);
   const [quickDemoLoading, setQuickDemoLoading] = useState(false);
   const [debugSandboxLoading, setDebugSandboxLoading] = useState(false);
   const [sandboxError, setSandboxError] = useState<string | null>(null);
@@ -239,6 +244,9 @@ export default function AppDetailPage() {
           )}
           <div className="mt-6 pt-6 border-t border-[var(--color-border-default)]">
             <h3 className="font-medium text-white text-sm mb-2">Prepare deployment</h3>
+            {hasSecurityCheckFailure(workflow) && (
+              <p className="text-amber-400 text-sm mb-3">Deployment blocked: sensitive data detected in workspace.</p>
+            )}
             <p className="text-[var(--color-text-tertiary)] text-xs mb-3">Get deploy payload for the selected chain (testnet).</p>
             <div className="flex flex-wrap items-center gap-3">
               <select
@@ -253,7 +261,7 @@ export default function AppDetailPage() {
               </select>
               <button
                 type="button"
-                disabled={prepareLoading}
+                disabled={prepareLoading || hasSecurityCheckFailure(workflow)}
                 onClick={async () => {
                   setPrepareError(null);
                   setPrepareLoading(true);
@@ -278,30 +286,63 @@ export default function AppDetailPage() {
             {prepareError && <p className="text-[var(--color-semantic-error)] text-sm mt-2">{prepareError}</p>}
             {preparePayload ? (
               <div className="mt-3 glass-panel rounded-lg p-4 space-y-3">
-                <p className="text-xs text-[var(--color-text-secondary)]">Deploy payload ready. Review and confirm.</p>
-                <pre className="text-[10px] text-[var(--color-text-muted)] font-mono bg-[var(--color-bg-base)] rounded p-2 max-h-32 overflow-auto">
-                  {JSON.stringify(preparePayload, null, 2).slice(0, 500)}
-                </pre>
+                <p className="text-xs text-[var(--color-text-secondary)]">Deploy payload ready. Sign in your wallet to deploy.</p>
+                {!account && (
+                  <p className="text-xs text-amber-400">Connect your wallet to sign the deployment transaction.</p>
+                )}
                 <button
                   type="button"
+                  disabled={!account || signing}
                   onClick={async () => {
+                    if (!account) {
+                      setPrepareError("Connect your wallet first");
+                      return;
+                    }
+                    const p = preparePayload as Record<string, unknown>;
+                    if (p.error) {
+                      setPrepareError(String(p.error));
+                      return;
+                    }
+                    const bytecode = p.bytecode as string;
+                    const abi = (p.abi as unknown[]) ?? [];
+                    if (!bytecode) {
+                      setPrepareError("No bytecode in payload");
+                      return;
+                    }
+                    const chain = getChainByChainId(deployChainId);
+                    if (!chain) {
+                      setPrepareError(`Chain ${deployChainId} not supported`);
+                      return;
+                    }
+                    setSigning(true);
+                    setPrepareError(null);
                     try {
+                      const result = await deployUserContractEoa({
+                        account: { address: account.address, type: account.type },
+                        chain,
+                        abi,
+                        bytecode,
+                        constructorArgs: (p.constructorArgs as unknown[]) ?? [],
+                      });
                       await completeDeployment(workflow.workflow_id, {
                         chainId: deployChainId,
-                        transactionHash: (preparePayload as Record<string, unknown>).transaction_hash as string || "pending",
-                        contractAddress: (preparePayload as Record<string, unknown>).contract_address as string || "",
-                        walletAddress: "",
+                        transactionHash: result.transactionHash,
+                        contractAddress: result.contractAddress,
+                        walletAddress: account.address,
                       });
                       setPreparePayload(null);
                       refetchOverview();
                       setTab("deployments");
                     } catch (e) {
-                      setPrepareError(e instanceof Error ? e.message : "Complete deploy failed");
+                      setPrepareError(e instanceof Error ? e.message : "Deploy failed");
+                    } finally {
+                      setSigning(false);
                     }
                   }}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium disabled:opacity-50"
                 >
-                  Confirm deployment
+                  {signing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Rocket className="w-3.5 h-3.5" />}
+                  {signing ? "Signing in wallet…" : "Confirm & deploy"}
                 </button>
               </div>
             ) : null}

@@ -25,6 +25,7 @@ from nodes import (
     guardian_agent,
     human_review_agent,
     scrubd_validation_agent,
+    security_gate_agent,
     security_policy_evaluator_agent,
     simulation_agent,
     spec_agent,
@@ -124,6 +125,7 @@ def create_workflow():
     workflow.add_node("audit", audit_agent)
     workflow.add_node("autofix", autofix_agent)
     workflow.add_node("guardian", guardian_agent)
+    workflow.add_node("security_gate", security_gate_agent)
     workflow.add_node("deploy_gate", deploy_gate_agent)
     workflow.add_node("simulation", simulation_agent)
     workflow.add_node("security_policy_evaluator", security_policy_evaluator_agent)
@@ -152,7 +154,8 @@ def create_workflow():
     )
     workflow.add_edge("human_review", END)
     workflow.add_edge("design", "codegen")
-    workflow.add_edge("codegen", "test_generation")
+    workflow.add_edge("codegen", "security_gate")
+    workflow.add_edge("security_gate", "test_generation")
     workflow.add_edge("test_generation", "scrubd_validation")
     workflow.add_conditional_edges(
         "scrubd_validation",

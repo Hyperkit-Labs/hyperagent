@@ -26,6 +26,7 @@ STEP_ORDER = (
     "human_review",
     "design",
     "codegen",
+    "security_check",
     "test_generation",
     "scrubd",
     "audit",
@@ -420,6 +421,52 @@ async def codegen_agent(state: AgentState) -> AgentState:
     except Exception as e:
         await _step_complete(run_id, "codegen", error_message=str(e))
         raise
+
+
+async def security_gate_agent(state: AgentState) -> AgentState:
+    """ZSPS: Scan contract source for sensitive patterns. Blocks deploy if found."""
+    import re
+
+    run_id = state.get("run_id") or ""
+    _step_start(run_id, "security_check")
+    contracts = state.get("contracts") or {}
+    if not contracts:
+        await _step_complete(run_id, "security_check", output_summary="no contracts")
+        return state
+
+    patterns = [
+        (r"privateKey\s*=\s*0x[a-fA-F0-9]{64}", "Private key assignment"),
+        (r"private_key\s*=\s*0x[a-fA-F0-9]{64}", "Private key assignment"),
+        (r"mnemonic\s*=\s*[\"'][^\"']{20,}[\"']", "Hardcoded mnemonic"),
+        (r"api[_-]?key\s*=\s*[\"'][^\"']+[\"']", "Hardcoded API key"),
+        (r"\.env\s*\[", "Environment variable access"),
+    ]
+    findings = []
+    for name, source in contracts.items():
+        if not isinstance(source, str):
+            continue
+        for pattern, label in patterns:
+            if re.search(pattern, source):
+                findings.append(f"CRITICAL: {label} in {name}")
+
+    if findings:
+        await _step_complete(
+            run_id, "security_check", error_message="; ".join(findings[:5])
+        )
+        state["current_stage"] = "failed"
+        state["error"] = "Deployment blocked: sensitive data detected in workspace."
+        state["security_check_failed"] = True
+        from store import get_workflow, update_workflow
+
+        w = get_workflow(run_id)
+        stages = list(w.get("stages") or [])
+        stages.append({"stage": "security_check", "status": "failed"})
+        update_workflow(run_id, stages=stages, status="failed")
+        return state
+
+    await _step_complete(run_id, "security_check", output_summary="passed")
+    state["security_check_passed"] = True
+    return state
 
 
 async def test_generation_agent(state: AgentState) -> AgentState:

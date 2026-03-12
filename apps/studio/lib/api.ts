@@ -393,7 +393,10 @@ export interface PresetItem {
 }
 
 export async function getPresets(): Promise<PresetItem[]> {
-  return fetchJson<PresetItem[]>('/presets').catch(() => []);
+  return fetchJson<PresetItem[]>('/presets').catch((e) => {
+    reportApiError(e, { path: '/presets' });
+    return [];
+  });
 }
 
 export interface PlatformTrackRecord {
@@ -414,10 +417,8 @@ const TRACK_RECORD_DEFAULTS: PlatformTrackRecord = {
 };
 
 export async function getPlatformTrackRecord(signal?: AbortSignal): Promise<PlatformTrackRecord> {
-  return fetchJson<PlatformTrackRecord>('/platform/track-record', { signal }).catch((err) => {
-    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-      console.warn('[TrackRecord] API failed, using defaults:', err instanceof Error ? err.message : err);
-    }
+  return fetchJson<PlatformTrackRecord>('/platform/track-record', { signal }).catch((e) => {
+    reportApiError(e, { path: '/platform/track-record' });
     return TRACK_RECORD_DEFAULTS;
   });
 }
@@ -431,7 +432,10 @@ export interface BlueprintItem {
 }
 
 export async function getBlueprints(): Promise<BlueprintItem[]> {
-  return fetchJson<BlueprintItem[]>('/blueprints').catch(() => []);
+  return fetchJson<BlueprintItem[]>('/blueprints').catch((e) => {
+    reportApiError(e, { path: '/blueprints' });
+    return [];
+  });
 }
 
 export interface RunDetail {
@@ -542,7 +546,9 @@ export interface RuntimeConfig {
 }
 
 export async function getConfig(): Promise<RuntimeConfig> {
-  return fetchJson<RuntimeConfig>('/config').catch(() => ({
+  return fetchJson<RuntimeConfig>('/config').catch((e) => {
+    reportApiError(e, { path: '/config' });
+    return {
     x402_enabled: false,
     monitoring_enabled: false,
     merchant_wallet_address: null,
@@ -550,7 +556,8 @@ export async function getConfig(): Promise<RuntimeConfig> {
     integrations: { tenderly_configured: false, pinata_configured: false, qdrant_configured: false },
     default_network_id: FALLBACK_DEFAULT_NETWORK_ID,
     default_chain_id: FALLBACK_DEFAULT_CHAIN_ID,
-  }));
+  };
+  });
 }
 
 /**
@@ -559,13 +566,27 @@ export async function getConfig(): Promise<RuntimeConfig> {
  */
 /** GET /tokens/stablecoins. Returns { chainId: { USDC: addr, USDT: addr } }. */
 export async function getStablecoins(): Promise<Record<string, { USDC?: string; USDT?: string }>> {
-  return fetchJson<Record<string, { USDC?: string; USDT?: string }>>('/tokens/stablecoins').catch(() => ({}));
+  return fetchJson<Record<string, { USDC?: string; USDT?: string }>>('/tokens/stablecoins').catch((e) => {
+    reportApiError(e, { path: '/tokens/stablecoins' });
+    return {};
+  });
 }
 
 /**
  * GET /networks. Returns list from chain registry (backend normalizes to NetworkConfig[]).
  * Raw API may return { networks: [...] } or array; this function always returns NetworkConfig[].
  */
+/** Test RPC connectivity for a network. Returns { ok, block?, error?, latency_ms }. */
+export async function testNetworkRpc(
+  networkId: string,
+  signal?: AbortSignal
+): Promise<{ ok: boolean; block?: string; error?: string; latency_ms?: number }> {
+  return fetchJson<{ ok: boolean; block?: string; error?: string; latency_ms?: number }>(
+    `/networks/rpc-test?network_id=${encodeURIComponent(networkId)}`,
+    signal ? { signal } : undefined
+  );
+}
+
 export async function getNetworks(
   opts?: { skale?: boolean },
   signal?: AbortSignal
@@ -618,8 +639,12 @@ export async function createDebugSandbox(workflowId: string): Promise<DebugSandb
   });
 }
 
-export async function getMetrics(signal?: AbortSignal): Promise<Metrics> {
-  return fetchJson('/metrics', signal ? { signal } : undefined);
+export async function getMetrics(
+  params?: { time_range?: string },
+  signal?: AbortSignal
+): Promise<Metrics> {
+  const qs = params?.time_range ? `?time_range=${encodeURIComponent(params.time_range)}` : '';
+  return fetchJson(`/metrics${qs}`, signal ? { signal } : undefined);
 }
 
 /** Security finding from GET /api/v1/security/findings. Scoped by wallet_user_id via X-User-Id from session. */
@@ -646,28 +671,58 @@ export async function getSecurityFindings(params?: {
   if (params?.run_id) qs.set('run_id', params.run_id);
   if (params?.limit != null) qs.set('limit', String(params.limit));
   const path = `/security/findings${qs.toString() ? `?${qs}` : ''}`;
-  return fetchJson<{ findings: SecurityFinding[] }>(path, params?.signal ? { signal: params.signal } : undefined).catch(
-    () => ({ findings: [] })
-  );
+  return fetchJson<{ findings: SecurityFinding[] }>(path, params?.signal ? { signal: params.signal } : undefined).catch((e) => {
+    reportApiError(e, { path });
+    return { findings: [] };
+  });
 }
 
 export async function getDetailedHealth(): Promise<{ status: string; services?: Record<string, { status: string }> }> {
   return fetchJson('/health/detailed');
 }
 
+export interface DomainRecord {
+  id: string;
+  domain: string;
+  status: 'pending' | 'verified' | 'failed';
+}
+
+export async function listDomains(): Promise<DomainRecord[]> {
+  return fetchJson<DomainRecord[]>('/infra/domains').catch((e) => {
+    reportApiError(e, { path: '/infra/domains' });
+    return [];
+  });
+}
+
+export async function addDomain(domain: string): Promise<DomainRecord> {
+  return fetchJson<DomainRecord>('/infra/domains', {
+    method: 'POST',
+    body: JSON.stringify({ domain }),
+  });
+}
+
 export async function getPaymentHistory(params?: { limit?: number; offset?: number }): Promise<PaymentHistoryResponse> {
   const limit = params?.limit ?? 50;
   const offset = params?.offset ?? 0;
   const qs = new URLSearchParams({ limit: String(limit), offset: String(offset) });
-  return fetchJson<PaymentHistoryResponse>(`/payments/history?${qs}`).catch(() => ({ items: [], total: 0 }));
+  return fetchJson<PaymentHistoryResponse>(`/payments/history?${qs}`).catch((e) => {
+    reportApiError(e, { path: '/payments/history' });
+    return { items: [], total: 0 };
+  });
 }
 
 export async function getPaymentSummary(): Promise<PaymentSummary> {
-  return fetchJson<PaymentSummary>('/payments/summary').catch(() => ({}));
+  return fetchJson<PaymentSummary>('/payments/summary').catch((e) => {
+    reportApiError(e, { path: '/payments/summary' });
+    return {};
+  });
 }
 
 export async function getSpendingControlWithBudget(): Promise<SpendingControlWithBudget> {
-  return fetchJson<SpendingControlWithBudget>('/payments/spending-control').catch(() => ({}));
+  return fetchJson<SpendingControlWithBudget>('/payments/spending-control').catch((e) => {
+    reportApiError(e, { path: '/payments/spending-control' });
+    return {};
+  });
 }
 
 export interface SpendingControlPatchBody {
@@ -692,7 +747,10 @@ export interface CreditsBalance {
 }
 
 export async function getCreditsBalance(): Promise<CreditsBalance> {
-  return fetchJson<CreditsBalance>('/credits/balance').catch(() => ({ balance: 0, currency: 'USD' }));
+  return fetchJson<CreditsBalance>('/credits/balance').catch((e) => {
+    reportApiError(e, { path: '/credits/balance' });
+    return { balance: 0, currency: 'USD' };
+  });
 }
 
 export interface CreditsTopUpBody {
@@ -731,24 +789,31 @@ export async function getLogs(filters?: LogsFilters): Promise<LogsResponse> {
   if (filters?.page_size != null) params.set('page_size', String(filters.page_size));
   const query = params.toString();
   const path = query ? `/logs?${query}` : '/logs';
-  return fetchJson<LogsResponse>(path).catch(() => ({
-    logs: [],
-    total: 0,
-    page: 1,
-    page_size: 50,
-  }));
+  return fetchJson<LogsResponse>(path).catch((e) => {
+    reportApiError(e, { path });
+    return { logs: [], total: 0, page: 1, page_size: 50 };
+  });
 }
 
 export async function getLogServices(): Promise<string[]> {
-  return fetchJson<string[]>('/logs/services').catch(() => []);
+  return fetchJson<string[]>('/logs/services').catch((e) => {
+    reportApiError(e, { path: '/logs/services' });
+    return [];
+  });
 }
 
 export async function getLogHosts(): Promise<string[]> {
-  return fetchJson<string[]>('/logs/hosts').catch(() => []);
+  return fetchJson<string[]>('/logs/hosts').catch((e) => {
+    reportApiError(e, { path: '/logs/hosts' });
+    return [];
+  });
 }
 
 export async function getAgents(): Promise<AgentsResponse> {
-  return fetchJson<AgentsResponse>('/agents').catch(() => ({ agents: [] }));
+  return fetchJson<AgentsResponse>('/agents').catch((e) => {
+    reportApiError(e, { path: '/agents' });
+    return { agents: [] };
+  });
 }
 
 /** Template from registry (GET /api/v1/templates). Matches orchestrator get_templates_for_api(). */
@@ -766,13 +831,19 @@ export interface TemplateItem {
 }
 
 export async function getTemplates(): Promise<TemplateItem[]> {
-  return fetchJson<TemplateItem[]>('/templates').catch(() => []);
+  return fetchJson<TemplateItem[]>('/templates').catch((e) => {
+    reportApiError(e, { path: '/templates' });
+    return [];
+  });
 }
 
 export async function searchTemplates(query: string): Promise<TemplateItem[]> {
   if (!query || !String(query).trim()) return getTemplates();
   const qs = new URLSearchParams({ q: String(query).trim() });
-  return fetchJson<TemplateItem[]>(`/templates/search?${qs}`).catch(() => []);
+  return fetchJson<TemplateItem[]>(`/templates/search?${qs}`).catch((e) => {
+    reportApiError(e, { path: '/templates/search' });
+    return [];
+  });
 }
 
 export interface PrepareDeployParams {
@@ -805,7 +876,10 @@ export async function getWorkflowContracts(workflowId: string): Promise<{ byteco
 }
 
 export async function getWorkflowDeployments(workflowId: string): Promise<{ deployments?: { contract_address?: string; network?: string; [key: string]: unknown }[] }> {
-  return fetchJson<{ deployments?: { contract_address?: string; network?: string; [key: string]: unknown }[] }>(`/workflows/${workflowId}/deployments`).catch(() => ({ deployments: [] }));
+  return fetchJson<{ deployments?: { contract_address?: string; network?: string; [key: string]: unknown }[] }>(`/workflows/${workflowId}/deployments`).catch((e) => {
+    reportApiError(e, { path: `/workflows/${workflowId}/deployments` });
+    return { deployments: [] };
+  });
 }
 
 export interface ClarificationEntry {
@@ -900,7 +974,8 @@ export function isByokStorageOrMigrationError(message: string): boolean {
 export const BYOK_RATE_LIMIT_MESSAGE = 'LLM keys save rate limit reached. Wait a minute and try again.';
 
 /** BYOK: which LLM providers are configured for the current workspace (no key values). Persisted in DB when NEXT_PUBLIC_API_URL points at the gateway (gateway sets X-User-Id from JWT). Keys are encrypted at rest (Fernet or KMS envelope). */
-const workspaceHeaders = (workspaceId?: string): Record<string, string> =>
+/** Headers for workspace isolation. Pass to API calls that support X-Workspace-Id. */
+export const workspaceHeaders = (workspaceId?: string): Record<string, string> =>
   workspaceId ? { 'X-Workspace-Id': workspaceId } : {};
 
 export async function getConfiguredLLMProviders(workspaceId?: string): Promise<{ configured_providers: string[] }> {
@@ -938,6 +1013,23 @@ export async function deleteLLMKeys(workspaceId?: string): Promise<{ success: bo
     headers: workspaceHeaders(workspaceId),
     timeoutMs: BYOK_REQUEST_TIMEOUT_MS,
   });
+}
+
+/** BYOK: validate an LLM API key by calling the provider's models endpoint. Pass api_key for form input, or omit to test stored key. */
+export async function validateLLMKey(
+  provider: string,
+  apiKey?: string,
+  workspaceId?: string
+): Promise<{ valid: boolean; latency_ms?: number; error?: string }> {
+  return fetchJson<{ valid: boolean; latency_ms?: number; error?: string }>(
+    '/workspaces/current/llm-keys/validate',
+    {
+      method: 'POST',
+      headers: workspaceHeaders(workspaceId),
+      body: JSON.stringify({ provider, api_key: apiKey || undefined }),
+      timeoutMs: BYOK_REQUEST_TIMEOUT_MS,
+    }
+  );
 }
 
 /** Contract read (view/pure). Backend: POST /contracts/read. Requires chain_id or network and abi. */

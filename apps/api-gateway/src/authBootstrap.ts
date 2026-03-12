@@ -79,51 +79,33 @@ async function bootstrapUser(
 ): Promise<{ userId: string } | { error: string; status: number }> {
   const walletAddressNorm = walletAddress.toLowerCase();
 
-  const { data: existing, error: selectError } = await supabase
+  const { data, error } = await supabase
     .from("wallet_users")
+    .upsert(
+      {
+        wallet_address: walletAddressNorm,
+        auth_method: authProvider,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "wallet_address" }
+    )
     .select("id")
-    .eq("wallet_address", walletAddressNorm)
-    .maybeSingle();
+    .single();
 
-  if (selectError) {
-    debugLog("authBootstrap:selectError", "wallet_users select failed", { msg: selectError.message });
-    if (isMissingTableError(selectError.message, (selectError as { code?: string }).code)) {
+  if (error) {
+    debugLog("authBootstrap:upsertError", "wallet_users upsert failed", { msg: error.message });
+    if (isMissingTableError(error.message, (error as { code?: string }).code)) {
       return { error: "Database schema missing. Run Supabase migrations.", status: 503 };
     }
     return { error: "Internal Server Error", status: 500 };
   }
 
-  let userId: string;
-
-  if (existing?.id) {
-    userId = existing.id;
-    await supabase
-      .from("wallet_users")
-      .update({ updated_at: new Date().toISOString(), auth_method: authProvider })
-      .eq("id", userId);
-    // Idempotent provisioning for returning users: ensure credits/spending/profile exist
-    await ensureWalletUserProvisioned(supabase, userId);
-  } else {
-    const { data: inserted, error: insertError } = await supabase
-      .from("wallet_users")
-      .insert({ wallet_address: walletAddressNorm, auth_method: authProvider })
-      .select("id")
-      .single();
-
-    if (insertError || !inserted?.id) {
-      debugLog("authBootstrap:insertError", "wallet_users insert failed", { msg: insertError?.message });
-      if (insertError && isMissingTableError(insertError.message, (insertError as { code?: string }).code)) {
-        return { error: "Database schema missing. Run Supabase migrations.", status: 503 };
-      }
-      return { error: "Internal Server Error", status: 500 };
-    }
-    userId = inserted.id;
-
-    // Production SaaS/BaaS onboarding: credits, spending_controls, wallet_user_profiles
-    await ensureWalletUserProvisioned(supabase, userId);
+  if (!data?.id) {
+    return { error: "Internal Server Error", status: 500 };
   }
 
-  return { userId };
+  await ensureWalletUserProvisioned(supabase, data.id);
+  return { userId: data.id };
 }
 
 /** Idempotent provisioning: credits, spending_controls, wallet_user_profiles. Non-fatal on RPC/table errors. */

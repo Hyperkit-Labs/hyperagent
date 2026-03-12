@@ -23,7 +23,8 @@ const ORCHESTRATOR_URL = process.env.ORCHESTRATOR_URL || "http://localhost:8000"
 const NODE_ENV = process.env.NODE_ENV || "development";
 const REDIS_URL = process.env.REDIS_URL;
 
-/** Upstream timeout (ms). If orchestrator does not respond, gateway returns 502 instead of hanging. */
+/** Upstream timeout (ms). If orchestrator does not respond, gateway returns 502 instead of hanging.
+ * Default 25s kills SSE during long builds. Set PROXY_TIMEOUT_MS=660000 for real-time terminal (10+ min). */
 const PROXY_TIMEOUT_MS = Number(process.env.PROXY_TIMEOUT_MS) || 25_000;
 
 if (NODE_ENV === "production" && !REDIS_URL) {

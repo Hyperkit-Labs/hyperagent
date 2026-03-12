@@ -20,3 +20,9 @@ docker compose --project-directory . -f infra/docker/docker-compose.yml up --bui
 - Agent runtime: http://localhost:4001
 - Supabase Postgres: localhost:54322 (migrations from `platform/supabase/migrations`)
 - Redis: localhost:6379
+
+## Contabo VPS / Nginx
+
+For production behind Nginx (e.g. Contabo), use `nginx-contabo-full.conf` or include `nginx-sse.conf` in your server block so the agent discussion SSE stream does not disconnect during long runs (10+ min). Default 60s proxy timeout causes chat to drop; use 660s for `/api/v1/streaming/`.
+
+**Critical:** Also set `PROXY_TIMEOUT_MS=660000` for the api-gateway. The gateway defaults to 25s, which kills SSE before Nginx. Add to Shared Env in Coolify or `.env` on the VPS.

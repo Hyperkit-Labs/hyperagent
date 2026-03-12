@@ -23,6 +23,7 @@ from workflow_state import AgentState
 
 STEP_ORDER = (
     "spec",
+    "human_review",
     "design",
     "codegen",
     "test_generation",
@@ -233,6 +234,23 @@ async def spec_agent(state: AgentState) -> AgentState:
             raise
 
 
+async def human_review_agent(state: AgentState) -> AgentState:
+    """Pause node: writes require_action for spec approval. SSE stream yields type=require_action, action=approve_spec."""
+    import db
+
+    run_id = state.get("run_id") or state.get("project_id", "")
+    if db.is_configured() and run_id:
+        db.insert_step(run_id, _step_index("human_review"), "human_review", status="pending")
+        db.insert_agent_log(
+            run_id,
+            "human_review",
+            "human_review",
+            "Action required: approve spec to continue",
+            log_level="info",
+        )
+    return state
+
+
 async def design_agent(state: AgentState) -> AgentState:
     spec = state.get("spec") or {}
     user_id = state.get("user_id", "")
@@ -252,7 +270,7 @@ async def design_agent(state: AgentState) -> AgentState:
             target_chains = spec.get("chains", [])
             from agents.live_spec_validation import run_live_spec_validation
 
-            live_ok, live_msg = await run_live_spec_validation(spec)
+            live_ok, live_msg = await run_live_spec_validation(spec, run_id=run_id)
             if not live_ok:
                 state["live_spec_validation_warning"] = live_msg
             security_ctx = await build_security_context(

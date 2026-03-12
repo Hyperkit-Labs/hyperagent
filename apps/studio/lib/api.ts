@@ -457,8 +457,15 @@ export interface RunStep {
   [key: string]: unknown;
 }
 
-export async function getRunSteps(runId: string): Promise<{ run_id: string; steps: RunStep[] }> {
-  return fetchJson<{ run_id: string; steps: RunStep[] }>(`/runs/${runId}/steps`);
+export interface RunStepsResponse {
+  run_id: string;
+  steps: RunStep[];
+  /** False when any step has stub trace_blob_id (IPFS not configured). */
+  trace_verifiable?: boolean;
+}
+
+export async function getRunSteps(runId: string): Promise<RunStepsResponse> {
+  return fetchJson<RunStepsResponse>(`/runs/${runId}/steps`);
 }
 
 /** Approve spec and resume pipeline from design. Call when workflow is at spec_review with spec present. */

@@ -80,10 +80,11 @@ async function callBootstrap(body: {
  */
 export async function bootstrapWithSiwe(params: {
   address: string;
+  chainId?: number;
   signMessage: (message: string) => Promise<string>;
 }): Promise<BootstrapSession> {
   const domain = typeof window !== "undefined" ? window.location.host : "localhost";
-  const chainId = 1;
+  const chainId = params.chainId ?? 1;
   const messageBody = buildSiweMessage({ address: params.address, domain, chainId });
   const signature = await params.signMessage(messageBody);
   return callBootstrap({

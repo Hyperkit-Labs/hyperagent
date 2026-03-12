@@ -2115,16 +2115,27 @@ def get_run_api(run_id: str, request: Request = None) -> dict[str, Any]:
     }
 
 
+def _has_stub_trace(steps: list[dict]) -> bool:
+    """True when any step has stub blob_id (IPFS not configured)."""
+    for s in steps:
+        bid = s.get("trace_blob_id") or ""
+        if isinstance(bid, str) and bid.startswith("stub:"):
+            return True
+    return False
+
+
 @app.get("/api/v1/runs/{run_id}/steps")
 def get_run_steps_api(run_id: str, request: Request = None) -> dict[str, Any]:
-    """Return step-level audit for a run (Phase 1). Empty when Supabase not configured."""
+    """Return step-level audit for a run (Phase 1). Empty when Supabase not configured.
+    trace_verifiable: false when any step has stub blob_id (IPFS not configured)."""
     w = get_workflow(run_id)
     if not w:
         raise HTTPException(status_code=404, detail="Run not found")
     if request:
         _assert_workflow_owner(w, request)
     steps = db.get_steps(run_id)
-    return {"run_id": run_id, "steps": steps}
+    trace_verifiable = not _has_stub_trace(steps)
+    return {"run_id": run_id, "steps": steps, "trace_verifiable": trace_verifiable}
 
 
 @app.get("/api/v1/security/findings")

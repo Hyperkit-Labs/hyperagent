@@ -243,6 +243,17 @@ spec:
       deployRule: never_block
       role: "Optional compatibility backend; not a hard dependency."
 
+  # Per-contract-type exploit simulation policy. Types with requires_exploit_sim=true
+  # must have EXPLOIT_SIM_ENABLED when deploy is allowed. Types with false skip
+  # exploit sim and get "coverage partial" in summary.
+  exploitSimByContractType:
+    dex: true
+    lending: true
+    vault: true
+    erc20: false
+    erc721: false
+    nft: false
+
   policies:
     - id: default
       name: Default EVM

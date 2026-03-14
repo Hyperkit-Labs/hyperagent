@@ -11,8 +11,11 @@ import os
 from typing import Any, Protocol
 
 import httpx
+from circuit_breaker import CircuitOpenError, get_breaker
 from registries import get_timeout
 from trace_context import get_request_id
+
+logger = logging.getLogger(__name__)
 
 
 def _trace_headers() -> dict[str, str]:
@@ -70,30 +73,37 @@ class SimulationHttpProvider:
         value: str = "0",
         design_rationale: str = "",
     ) -> dict[str, Any]:
-        headers = _trace_headers()
-        payload: dict[str, Any] = {
-            "network": network,
-            "from": from_address,
-            "to": to_address or "",
-            "data": data,
-            "value": value,
-        }
-        if design_rationale:
-            payload["design_rationale"] = design_rationale
-        async with httpx.AsyncClient(timeout=get_timeout("simulation")) as client:
-            r = await client.post(
-                f"{self.base_url}/simulate",
-                headers=headers,
-                json=payload,
-            )
-            if r.status_code == 503:
-                return {
-                    "success": False,
-                    "error": "Tenderly not configured",
-                    "gasUsed": 0,
-                }
-            r.raise_for_status()
-            return r.json()
+        async def _do() -> dict[str, Any]:
+            headers = _trace_headers()
+            payload: dict[str, Any] = {
+                "network": network,
+                "from": from_address,
+                "to": to_address or "",
+                "data": data,
+                "value": value,
+            }
+            if design_rationale:
+                payload["design_rationale"] = design_rationale
+            async with httpx.AsyncClient(timeout=get_timeout("simulation")) as client:
+                r = await client.post(
+                    f"{self.base_url}/simulate",
+                    headers=headers,
+                    json=payload,
+                )
+                if r.status_code == 503:
+                    return {
+                        "success": False,
+                        "error": "Tenderly not configured",
+                        "gasUsed": 0,
+                    }
+                r.raise_for_status()
+                return r.json()
+
+        try:
+            return await get_breaker("simulation").call(_do)
+        except CircuitOpenError:
+            logger.warning("[simulation] circuit open, failing fast")
+            return {"success": False, "error": "Simulation service unavailable", "gasUsed": 0}
 
     async def simulate_bundle(
         self,
@@ -103,22 +113,30 @@ class SimulationHttpProvider:
         Each item: network_id, from, to?, input, value?, gas?, state_objects?
         See https://docs.tenderly.co/simulations/bundled-simulations
         """
-        headers = _trace_headers()
-        payload: dict[str, Any] = {"simulations": simulations}
-        async with httpx.AsyncClient(timeout=get_timeout("simulation")) as client:
-            r = await client.post(
-                f"{self.base_url}/simulate-bundle",
-                headers=headers,
-                json=payload,
-            )
-            if r.status_code == 503:
-                return {
-                    "success": False,
-                    "error": "Tenderly not configured",
-                    "gasUsed": 0,
-                }
-            r.raise_for_status()
-            return r.json()
+
+        async def _do() -> dict[str, Any]:
+            headers = _trace_headers()
+            payload: dict[str, Any] = {"simulations": simulations}
+            async with httpx.AsyncClient(timeout=get_timeout("simulation")) as client:
+                r = await client.post(
+                    f"{self.base_url}/simulate-bundle",
+                    headers=headers,
+                    json=payload,
+                )
+                if r.status_code == 503:
+                    return {
+                        "success": False,
+                        "error": "Tenderly not configured",
+                        "gasUsed": 0,
+                    }
+                r.raise_for_status()
+                return r.json()
+
+        try:
+            return await get_breaker("simulation").call(_do)
+        except CircuitOpenError:
+            logger.warning("[simulation] circuit open, failing fast")
+            return {"success": False, "error": "Simulation service unavailable", "gasUsed": 0}
 
 
 # ---------------------------------------------------------------------------
@@ -155,28 +173,30 @@ class DeployHttpProvider:
         abi: list,
         constructor_args: list | None = None,
     ) -> dict[str, Any]:
-        logger = logging.getLogger(__name__)
-        headers = _trace_headers()
-        async with httpx.AsyncClient(timeout=get_timeout("deploy_client")) as client:
-            r = await client.post(
-                f"{self.base_url}/deploy",
-                headers=headers,
-                json={
-                    "chainId": chain_id,
-                    "bytecode": bytecode,
-                    "abi": abi,
-                    "constructorArgs": constructor_args or [],
-                },
-            )
-            if r.status_code >= 400:
-                try:
-                    body = r.json()
-                    err = body.get("error", body)
-                except Exception:
-                    err = r.text[:500] if r.text else r.reason_phrase
-                logger.warning("[deploy] %s %s: %s", r.status_code, self.base_url, err)
-            r.raise_for_status()
-            return r.json()
+        async def _do() -> dict[str, Any]:
+            headers = _trace_headers()
+            async with httpx.AsyncClient(timeout=get_timeout("deploy_client")) as client:
+                r = await client.post(
+                    f"{self.base_url}/deploy",
+                    headers=headers,
+                    json={
+                        "chainId": chain_id,
+                        "bytecode": bytecode,
+                        "abi": abi,
+                        "constructorArgs": constructor_args or [],
+                    },
+                )
+                if r.status_code >= 400:
+                    try:
+                        body = r.json()
+                        err = body.get("error", body)
+                    except Exception:
+                        err = r.text[:500] if r.text else r.reason_phrase
+                    logger.warning("[deploy] %s %s: %s", r.status_code, self.base_url, err)
+                r.raise_for_status()
+                return r.json()
+
+        return await get_breaker("deploy").call(_do)
 
 
 # ---------------------------------------------------------------------------

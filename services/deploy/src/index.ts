@@ -5,18 +5,8 @@
 
 import cors from "cors";
 import express from "express";
+import { requestIdMiddleware } from "@hyperagent/backend-middleware";
 import { createDefaultBackend } from "./backends.js";
-
-const REQUEST_ID_HEADER = "x-request-id";
-
-function requestIdMiddleware(req: express.Request, _res: express.Response, next: express.NextFunction): void {
-  const id = (req.headers[REQUEST_ID_HEADER] as string)?.trim() || "";
-  (req as express.Request & { requestId?: string }).requestId = id;
-  if (id) {
-    console.log(`[Deploy] requestId=${id} path=${req.path}`);
-  }
-  next();
-}
 
 const app = express();
 app.use(requestIdMiddleware);

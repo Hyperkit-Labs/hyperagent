@@ -250,54 +250,66 @@ async def run_security_audits(
                 audit_succeeded_count += 1
             continue
         try:
-            headers = get_trace_headers()
-            async with httpx.AsyncClient(timeout=get_timeout("audit")) as client:
-                r = await client.post(
-                    f"{AUDIT_SERVICE_URL.rstrip('/')}/audit",
-                    params={"tool": ",".join(AUDIT_TOOLS)},
-                    json={"contractCode": code, "contractName": contract_name},
-                    headers=headers,
-                )
-                if r.status_code != 200:
-                    logger.warning(
-                        "[audit] %s returned %s: %s",
-                        contract_name,
-                        r.status_code,
-                        r.text[:200],
+            from circuit_breaker import CircuitOpenError, get_breaker
+
+            async def _do_audit() -> dict:
+                headers = get_trace_headers()
+                async with httpx.AsyncClient(timeout=get_timeout("audit")) as client:
+                    r = await client.post(
+                        f"{AUDIT_SERVICE_URL.rstrip('/')}/audit",
+                        params={"tool": ",".join(AUDIT_TOOLS)},
+                        json={"contractCode": code, "contractName": contract_name},
+                        headers=headers,
                     )
-                    continue
-                audit_succeeded_count += 1
-                data = r.json()
-                raw_findings = (
-                    data.get("findings", [])
-                    if isinstance(data, dict)
-                    else data if isinstance(data, list) else []
-                )
-                tool_label = (
-                    ",".join(data.get("tools_run", AUDIT_TOOLS))
-                    if isinstance(data, dict)
-                    else "audit"
-                )
-                for f in raw_findings:
-                    finding = {
-                        "tool": tool_label,
-                        "severity": (f.get("severity") or "info").lower(),
-                        "title": f.get("title", ""),
-                        "description": f.get("description", ""),
-                        "location": f.get("location"),
-                        "category": f.get("category"),
-                    }
-                    findings.append(finding)
-                    if is_configured() and run_id:
-                        insert_security_finding(
-                            run_id=run_id,
-                            tool=finding["tool"],
-                            severity=finding["severity"],
-                            title=finding["title"],
-                            description=finding.get("description"),
-                            location=finding.get("location"),
-                            category=finding.get("category"),
-                        )
+                    if r.status_code != 200:
+                        raise RuntimeError(f"audit returned {r.status_code}: {r.text[:200]}")
+                    return r.json()
+
+            data = await get_breaker("audit").call(_do_audit)
+            audit_succeeded_count += 1
+            raw_findings = (
+                data.get("findings", [])
+                if isinstance(data, dict)
+                else data if isinstance(data, list) else []
+            )
+            tool_label = (
+                ",".join(data.get("tools_run", AUDIT_TOOLS))
+                if isinstance(data, dict)
+                else "audit"
+            )
+            for f in raw_findings:
+                finding = {
+                    "tool": tool_label,
+                    "severity": (f.get("severity") or "info").lower(),
+                    "title": f.get("title", ""),
+                    "description": f.get("description", ""),
+                    "location": f.get("location"),
+                    "category": f.get("category"),
+                }
+                findings.append(finding)
+                if is_configured() and run_id:
+                    insert_security_finding(
+                        run_id=run_id,
+                        tool=finding["tool"],
+                        severity=finding["severity"],
+                        title=finding["title"],
+                        description=finding.get("description"),
+                        location=finding.get("location"),
+                        category=finding.get("category"),
+                    )
+        except CircuitOpenError:
+            logger.warning("[audit] circuit open, failing fast")
+            findings.append(
+                {
+                    "tool": "audit",
+                    "severity": "high",
+                    "title": "Audit service unavailable",
+                    "description": "Circuit breaker open. Audit service is down or timing out.",
+                    "location": None,
+                    "category": "service",
+                }
+            )
+            break
         except Exception as e:
             logger.warning("[audit] %s failed: %s", contract_name, e)
             continue

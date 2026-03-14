@@ -19,20 +19,23 @@ TOOLS_API_KEY = os.environ.get("TOOLS_API_KEY", "")
 
 app = FastAPI(title="HyperAgent Audit Service", version="0.1.0")
 
-# Contract name: single token only (alphanumeric + underscore) to prevent path traversal
-_SAFE_CONTRACT_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_]+$")
-
-
 def _safe_contract_name(contract_name: str) -> str:
-    """Return a safe contract name for file paths. Reject path traversal and invalid names."""
-    if not contract_name or not isinstance(contract_name, str):
-        raise HTTPException(status_code=400, detail="Invalid contract name")
-    base = Path(contract_name).name
-    if ".." in contract_name or "/" in contract_name or "\\" in contract_name:
-        raise HTTPException(status_code=400, detail="Contract name must not contain path components")
-    if not _SAFE_CONTRACT_NAME_PATTERN.match(base):
-        raise HTTPException(status_code=400, detail="Contract name must be alphanumeric with optional underscores")
-    return base
+    """Return a safe contract name. Uses shared contract-validation package when available."""
+    try:
+        from contract_validation import safe_contract_name as _validate
+        try:
+            return _validate(contract_name)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    except ImportError:
+        if not contract_name or not isinstance(contract_name, str):
+            raise HTTPException(status_code=400, detail="Invalid contract name")
+        base = Path(contract_name).name
+        if ".." in contract_name or "/" in contract_name or "\\" in contract_name:
+            raise HTTPException(status_code=400, detail="Contract name must not contain path components")
+        if not re.match(r"^[a-zA-Z0-9_]+$", base):
+            raise HTTPException(status_code=400, detail="Contract name must be alphanumeric with optional underscores")
+        return base
 
 
 class AuditRequest(BaseModel):

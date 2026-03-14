@@ -231,6 +231,16 @@ def get_tool_deploy_rule(tool: str) -> str:
     return "never_block"
 
 
+def get_requires_exploit_sim(contract_type: str) -> bool:
+    """Whether exploit sim is required for this contract type. Source: security.yaml exploitSimByContractType.
+    dex/lending/vault=true; erc20/erc721/nft=false. Unknown types default True (fail closed)."""
+    _ensure_loaded()
+    mapping = (_SECURITY or {}).get("spec", {}).get("exploitSimByContractType") or {}
+    if contract_type in mapping:
+        return bool(mapping[contract_type])
+    return True
+
+
 def get_deterministic_tools() -> list[str]:
     """Tools that produce deterministic, reproducible evidence (Slither, Mythril, Echidna, Tenderly)."""
     return ["slither", "mythril", "echidna", "tenderly"]

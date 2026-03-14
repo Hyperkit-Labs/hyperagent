@@ -31,36 +31,44 @@ def _strip_markdown_fences(source: str) -> str:
     s = _MD_FENCE_END_RE.sub("", s)
     return s.strip()
 
-# Safe filename: basename only, [a-zA-Z0-9_.-]+\\.sol (path traversal prevention)
-_SAFE_SOL_PATTERN = re.compile(r"^[a-zA-Z0-9_.-]+\.sol$")
-# Safe contract name: Solidity identifier [a-zA-Z0-9_]+ (path traversal prevention)
-_SAFE_CONTRACT_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_]+$")
-
-
 def _safe_contract_name(name: str | None) -> str:
-    """Validate and return a safe contract name for path construction. Reject path traversal."""
-    if name is None or not isinstance(name, str):
-        raise HTTPException(status_code=400, detail="Invalid contract name")
-    s = name.strip()
-    if not s:
-        raise HTTPException(status_code=400, detail="Contract name must not be empty")
-    if ".." in s or "/" in s or ("\\" in s) or s.startswith("."):
-        raise HTTPException(status_code=400, detail="Contract name must not contain path components")
-    if not _SAFE_CONTRACT_NAME_PATTERN.match(s):
-        raise HTTPException(status_code=400, detail="Contract name must match [a-zA-Z0-9_]+")
-    return s
+    """Validate contract name. Uses shared contract-validation package when available."""
+    try:
+        from contract_validation import safe_contract_name as _validate
+        try:
+            return _validate(name)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    except ImportError:
+        if name is None or not isinstance(name, str):
+            raise HTTPException(status_code=400, detail="Invalid contract name")
+        s = name.strip()
+        if not s:
+            raise HTTPException(status_code=400, detail="Contract name must not be empty")
+        if ".." in s or "/" in s or ("\\" in s) or s.startswith("."):
+            raise HTTPException(status_code=400, detail="Contract name must not contain path components")
+        if not re.match(r"^[a-zA-Z0-9_]+$", Path(s).name):
+            raise HTTPException(status_code=400, detail="Contract name must match [a-zA-Z0-9_]+")
+        return Path(s).name
 
 
 def _safe_sol_filename(name: str) -> str:
-    """Return a safe .sol filename for use in temp dirs. Reject path traversal and invalid names."""
-    if not name or not isinstance(name, str):
-        raise HTTPException(status_code=400, detail="Invalid filename")
-    base = Path(name).name
-    if ".." in name or os.sep in name or (os.altsep and os.altsep in name):
-        raise HTTPException(status_code=400, detail="Filename must not contain path components")
-    if not _SAFE_SOL_PATTERN.match(base):
-        raise HTTPException(status_code=400, detail="Filename must match [a-zA-Z0-9_.-]+.sol")
-    return base
+    """Return a safe .sol filename. Uses shared contract-validation when available."""
+    try:
+        from contract_validation import safe_sol_filename as _validate
+        try:
+            return _validate(name)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    except ImportError:
+        if not name or not isinstance(name, str):
+            raise HTTPException(status_code=400, detail="Invalid filename")
+        base = Path(name).name
+        if ".." in name or os.sep in name or (os.altsep and os.altsep in name):
+            raise HTTPException(status_code=400, detail="Filename must not contain path components")
+        if not re.match(r"^[a-zA-Z0-9_.-]+\.sol$", base):
+            raise HTTPException(status_code=400, detail="Filename must match [a-zA-Z0-9_.-]+.sol")
+        return base
 
 
 class CompileRequest(BaseModel):

@@ -1,0 +1,12 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "contract-validation"
+version = "0.1.0"
+description = "Shared Solidity contract name validation (path traversal prevention)"
+requires-python = ">=3.11"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/contract_validation"]

@@ -5,6 +5,7 @@
 
 import cors from "cors";
 import express from "express";
+import { requestIdMiddleware } from "@hyperagent/backend-middleware";
 import { createDefaultStorage } from "./backends.js";
 
 const MAX_BODY_BYTES = 5 * 1024 * 1024;
@@ -34,17 +35,6 @@ function rateLimit(req: express.Request): boolean {
 }
 
 const storage = createDefaultStorage();
-
-const REQUEST_ID_HEADER = "x-request-id";
-
-function requestIdMiddleware(req: express.Request, _res: express.Response, next: express.NextFunction): void {
-  const id = (req.headers[REQUEST_ID_HEADER] as string)?.trim() || "";
-  (req as express.Request & { requestId?: string }).requestId = id;
-  if (id) {
-    console.log(`[Storage] requestId=${id} path=${req.path}`);
-  }
-  next();
-}
 
 const app = express();
 app.use(requestIdMiddleware);
@@ -88,7 +78,10 @@ app.post("/ipfs/unpin", async (req, res) => {
 });
 
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok" });
+  res.json({
+    status: "ok",
+    pinata_configured: Boolean(process.env.PINATA_JWT),
+  });
 });
 
 const port = Number(process.env.PORT) || 4005;

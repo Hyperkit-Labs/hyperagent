@@ -222,7 +222,8 @@ _LATENCY_BUFFER_SIZE = 1000
 @app.middleware("http")
 async def log_request_id(request: Request, call_next):
     """Set and log x-request-id for trace correlation; downstream services receive it from gateway.
-    Records request latency for p95 SLO measurement (excludes /health and streaming)."""
+    Records request latency for p95 SLO measurement (excludes /health and streaming).
+    Emits OpenTelemetry span per request when OPENTELEMETRY_ENABLED is set."""
     rid = (
         request.headers.get("x-request-id") or request.headers.get("X-Request-Id") or ""
     ).strip() or None
@@ -230,7 +231,16 @@ async def log_request_id(request: Request, call_next):
     if rid:
         logger.info("[orchestrator] request_id=%s path=%s", rid, request.url.path)
     start = time.perf_counter()
-    response = await call_next(request)
+    from otel_spans import span
+
+    with span(
+        "orchestrator.request",
+        step_type="http",
+        path=request.url.path,
+        method=request.method,
+        request_id=rid,
+    ):
+        response = await call_next(request)
     elapsed = time.perf_counter() - start
     path = request.url.path or ""
     if "/health" not in path and "/streaming/" not in path:
@@ -2273,25 +2283,62 @@ VECTORDB_URL = os.environ.get("VECTORDB_URL", "http://localhost:8010").rstrip("/
 INTEGRATIONS_TIMEOUT = float(os.environ.get("INTEGRATIONS_TIMEOUT", "15.0"))
 
 
+SIMULATION_SERVICE_URL = os.environ.get(
+    "SIMULATION_SERVICE_URL", "http://localhost:8002"
+).rstrip("/")
+STORAGE_SERVICE_URL = os.environ.get(
+    "STORAGE_SERVICE_URL", "http://localhost:4005"
+).rstrip("/")
+
+
 async def _fetch_integrations() -> dict[str, bool]:
-    """Fetch integration status from agent-runtime and vectordb health endpoints.
-    In production (Contabo/Coolify), agent-runtime and vectordb may cold-start (30-60s); use INTEGRATIONS_TIMEOUT env (default 15s).
+    """Fetch integration status from simulation, storage, agent-runtime, vectordb health endpoints.
+    In production (Contabo/Coolify), services may cold-start (30-60s); use INTEGRATIONS_TIMEOUT env (default 15s).
     """
     tenderly = False
     pinata = False
     qdrant = False
     async with httpx.AsyncClient(timeout=INTEGRATIONS_TIMEOUT) as client:
         try:
-            r = await client.get(f"{AGENT_RUNTIME_URL}/health")
+            r = await client.get(f"{SIMULATION_SERVICE_URL}/health")
             if r.status_code == 200:
                 data = r.json()
                 tenderly = data.get("tenderly_configured", False)
-                pinata = data.get("pinata_configured", False)
-                logger.debug(
-                    "[integrations] agent-runtime ok tenderly=%s pinata=%s",
-                    tenderly,
-                    pinata,
+                logger.debug("[integrations] simulation ok tenderly=%s", tenderly)
+            else:
+                logger.warning(
+                    "[integrations] simulation health %s: %s",
+                    r.status_code,
+                    r.text[:200],
                 )
+        except Exception as e:
+            logger.warning(
+                "[integrations] simulation unreachable url=%s: %s",
+                SIMULATION_SERVICE_URL,
+                e,
+            )
+        try:
+            r = await client.get(f"{STORAGE_SERVICE_URL}/health")
+            if r.status_code == 200:
+                data = r.json()
+                pinata = data.get("pinata_configured", False)
+                logger.debug("[integrations] storage ok pinata=%s", pinata)
+            else:
+                logger.warning(
+                    "[integrations] storage health %s: %s",
+                    r.status_code,
+                    r.text[:200],
+                )
+        except Exception as e:
+            logger.warning(
+                "[integrations] storage unreachable url=%s: %s",
+                STORAGE_SERVICE_URL,
+                e,
+            )
+        try:
+            r = await client.get(f"{AGENT_RUNTIME_URL}/health")
+            if r.status_code == 200:
+                logger.debug("[integrations] agent-runtime ok")
             else:
                 logger.warning(
                     "[integrations] agent-runtime health %s: %s",
@@ -2334,11 +2381,13 @@ async def get_integrations_debug_api() -> dict[str, Any]:
     networks = get_networks_for_api()
     return {
         "agent_runtime_url": AGENT_RUNTIME_URL,
+        "simulation_url": SIMULATION_SERVICE_URL,
+        "storage_url": STORAGE_SERVICE_URL,
         "vectordb_url": VECTORDB_URL,
         "integrations_timeout": INTEGRATIONS_TIMEOUT,
         "integrations": integrations,
         "networks_count": len(networks),
-        "hint": "Tenderly/Pinata need TENDERLY_API_KEY and PINATA_JWT on agent-runtime. Qdrant needs QDRANT_URL on vectordb pointing to a real Qdrant instance.",
+        "hint": "Tenderly: TENDERLY_API_KEY on simulation service. Pinata: PINATA_JWT on storage service. Qdrant: QDRANT_URL on vectordb.",
     }
 
 

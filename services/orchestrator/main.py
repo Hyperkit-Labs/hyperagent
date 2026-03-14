@@ -158,10 +158,21 @@ def _is_production() -> bool:
     )
 
 
+def _ipfs_configured() -> bool:
+    """True when IPFS/Pinata or storage service is configured for trace provenance."""
+    if os.environ.get("PINATA_API_KEY") or os.environ.get("PINATA_JWT"):
+        return True
+    storage = os.environ.get("STORAGE_SERVICE_URL", "").strip()
+    if storage and "localhost" not in storage:
+        return True
+    return bool(os.environ.get("IPFS_ENABLED"))
+
+
 @app.on_event("startup")
 def _validate_critical_services() -> None:
     """Log missing critical service URLs. Full lifecycle requires compile, audit, agent-runtime.
-    In production, REDIS_URL is required for checkpoint persistence (warn, don't crash)."""
+    In production, REDIS_URL is required for checkpoint persistence (warn, don't crash).
+    ZSPS: In production, IPFS is required for verifiable traces; refuse start when unconfigured."""
     if _is_production():
         redis_url = os.environ.get("REDIS_URL", "").strip()
         if not redis_url:
@@ -169,6 +180,15 @@ def _validate_critical_services() -> None:
                 "[orchestrator] REDIS_URL is not set in production. "
                 "Checkpoint persistence will use in-memory fallback (data lost on restart). "
                 "Set REDIS_URL to a Redis instance (e.g. Redis Cloud) in Coolify Shared Env."
+            )
+        if not _ipfs_configured():
+            logger.error(
+                "[orchestrator] IPFS not configured in production. "
+                "Verifiable trace provenance is mandatory. Set PINATA_JWT, PINATA_API_KEY, "
+                "or STORAGE_SERVICE_URL to a real storage service."
+            )
+            raise RuntimeError(
+                "IPFS/Storage required in production. Set PINATA_JWT, PINATA_API_KEY, or STORAGE_SERVICE_URL."
             )
     required = [
         ("COMPILE_SERVICE_URL", COMPILE_SERVICE_URL),
@@ -233,30 +253,11 @@ def _p95_latency_ms() -> float | None:
 
 
 # ---------------------------------------------------------------------------
-# Auth helpers
+# Auth helpers (from api.common for modularization)
 # ---------------------------------------------------------------------------
 
-
-def _get_caller_id(request: Request) -> str | None:
-    """Extract authenticated user id from gateway-injected header."""
-    return (
-        request.headers.get("X-User-Id") or request.headers.get("x-user-id") or ""
-    ).strip() or None
-
-
-def _assert_workflow_owner(w: dict[str, Any], request: Request) -> None:
-    """Raise 403 if authenticated user does not own the workflow.
-    Checks both user_id and wallet_user_id for backward compatibility
-    during the identity column migration period."""
-    caller = _get_caller_id(request)
-    owner = w.get("user_id") or ""
-    wallet_owner = w.get("wallet_user_id") or ""
-    effective_owner = owner or wallet_owner
-    if effective_owner and effective_owner != "anonymous":
-        if not caller:
-            raise HTTPException(status_code=403, detail="Access denied")
-        if caller != owner and caller != wallet_owner:
-            raise HTTPException(status_code=403, detail="Access denied")
+from api.common import assert_workflow_owner as _assert_workflow_owner
+from api.common import get_caller_id as _get_caller_id
 
 
 import re as _re

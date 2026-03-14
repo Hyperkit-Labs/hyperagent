@@ -44,6 +44,29 @@ def _is_uuid(s: str) -> bool:
         return False
 
 
+def _truncate_and_warn(
+    value: str | None,
+    max_len: int,
+    context: str,
+    field: str,
+    context_id: str,
+) -> str | None:
+    """Truncate value to max_len; log warning when truncated. Returns truncated or original value."""
+    if value is None:
+        return None
+    if len(value) <= max_len:
+        return value
+    logger.warning(
+        "[db] truncation %s.%s id=%s len=%d max=%d",
+        context,
+        field,
+        context_id,
+        len(value),
+        max_len,
+    )
+    return value[:max_len]
+
+
 def is_uuid(s: str) -> bool:
     """Public helper for UUID validation."""
     return _is_uuid(s)
@@ -311,7 +334,7 @@ def insert_project_artifact(
             "type": artifact_type,
             "name": name,
             "content": (
-                (content[:65535] if content and len(content) > 65535 else content)
+                _truncate_and_warn(content, 65535, "project_artifact", "content", project_id)
                 if content
                 else None
             ),
@@ -345,7 +368,7 @@ def insert_agent_log(
                 "run_id": run_id,
                 "agent_name": agent_name,
                 "stage": stage,
-                "message": message[:4096] if len(message) > 4096 else message,
+                "message": _truncate_and_warn(message, 4096, "agent_log", "message", run_id),
                 "log_level": log_level,
                 "metadata": metadata or {},
             }
@@ -379,10 +402,8 @@ def insert_step(
             "started_at": started_at or datetime.now(UTC).isoformat(),
         }
         if input_summary is not None:
-            row["input_summary"] = (
-                input_summary[:4096]
-                if len(input_summary or "") > 4096
-                else input_summary
+            row["input_summary"] = _truncate_and_warn(
+                input_summary, 4096, "run_step", "input_summary", run_id
             )
         r = (
             client.table("run_steps")
@@ -415,12 +436,12 @@ def update_step(
 
         payload = {"status": status}
         if output_summary is not None:
-            payload["output_summary"] = (
-                output_summary[:4096] if len(output_summary) > 4096 else output_summary
+            payload["output_summary"] = _truncate_and_warn(
+                output_summary, 4096, "run_step", "output_summary", run_id
             )
         if error_message is not None:
-            payload["error_message"] = (
-                error_message[:2048] if len(error_message) > 2048 else error_message
+            payload["error_message"] = _truncate_and_warn(
+                error_message, 2048, "run_step", "error_message", run_id
             )
         payload["completed_at"] = completed_at or datetime.now(UTC).isoformat()
         if trace_blob_id is not None:

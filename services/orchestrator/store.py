@@ -1,14 +1,23 @@
 """
 Workflow store: Supabase (runs.workflow_state) as source of truth when configured; in-memory fallback for dev.
+In production with Supabase, in-memory cache is write-through only; never authoritative.
 """
 
 from __future__ import annotations
 
+import logging
+import os
 import threading
+from collections import OrderedDict
 from datetime import UTC, datetime
 from typing import Any
 
 import db as _db
+
+logger = logging.getLogger(__name__)
+
+_MAX_CACHED_WORKFLOWS = int(os.environ.get("WORKFLOW_CACHE_MAX", "500"))
+_USE_CACHE_AS_FALLBACK_ONLY = os.environ.get("WORKFLOW_CACHE_FALLBACK_ONLY", "false").lower() in ("1", "true", "yes")
 
 
 def _ensure_contracts_dict(raw: Any) -> dict[str, Any]:
@@ -32,7 +41,52 @@ def _ensure_contracts_dict(raw: Any) -> dict[str, Any]:
     return {}
 
 
-_workflows: dict[str, dict[str, Any]] = {}
+class _LRUWorkflowCache:
+    """Bounded LRU cache for workflows. Evicts oldest when full. Used only when Supabase disabled or as write-through."""
+
+    def __init__(self, max_size: int = _MAX_CACHED_WORKFLOWS):
+        self._data: OrderedDict[str, dict[str, Any]] = OrderedDict()
+        self._max_size = max_size
+        self._lock = threading.Lock()
+
+    def get(self, key: str) -> dict[str, Any] | None:
+        with self._lock:
+            if key not in self._data:
+                return None
+            self._data.move_to_end(key)
+            return dict(self._data[key])
+
+    def __setitem__(self, key: str, value: dict[str, Any]) -> None:
+        with self._lock:
+            if key in self._data:
+                self._data.move_to_end(key)
+            else:
+                while len(self._data) >= self._max_size and self._data:
+                    evicted = next(iter(self._data))
+                    del self._data[evicted]
+                    logger.debug("[store] evicted workflow_id=%s (cache full)", evicted)
+            self._data[key] = value
+
+    def __getitem__(self, key: str) -> dict[str, Any]:
+        v = self.get(key)
+        if v is None:
+            raise KeyError(key)
+        return v
+
+    def __contains__(self, key: str) -> bool:
+        with self._lock:
+            return key in self._data
+
+    def values(self) -> list[dict[str, Any]]:
+        with self._lock:
+            return [dict(v) for v in self._data.values()]
+
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._data)
+
+
+_workflows = _LRUWorkflowCache()
 _lock = threading.Lock()
 
 MAX_INTENT_LENGTH = 10_000
@@ -88,10 +142,12 @@ def create_workflow(
 ) -> dict[str, Any]:
     """Create a new workflow record; persist to Supabase when configured, always keep in-memory copy."""
     record = _new_record(workflow_id, intent, network, user_id, project_id, template_id)
-    with _lock:
-        _workflows[workflow_id] = record
     if _db.is_configured():
         _db.upsert_workflow_state(workflow_id, record)
+        if not _USE_CACHE_AS_FALLBACK_ONLY:
+            _workflows[workflow_id] = record
+    else:
+        _workflows[workflow_id] = record
     return record
 
 
@@ -159,10 +215,12 @@ def update_workflow(
     if metadata_merge is not None:
         rec["metadata"] = {**(rec.get("metadata") or {}), **metadata_merge}
     rec["updated_at"] = now
-    with _lock:
-        _workflows[workflow_id] = rec
     if _db.is_configured():
         _db.upsert_workflow_state(workflow_id, rec)
+        if not _USE_CACHE_AS_FALLBACK_ONLY:
+            _workflows[workflow_id] = rec
+    else:
+        _workflows[workflow_id] = rec
     return rec
 
 
@@ -197,22 +255,19 @@ def get_workflow(workflow_id: str) -> dict[str, Any] | None:
             rec = dict(rec)
             rec["contracts"] = _ensure_contracts_dict(rec.get("contracts"))
             return rec
-    with _lock:
-        rec = _workflows.get(workflow_id)
-        if rec:
-            rec = dict(rec)
-            rec["contracts"] = _ensure_contracts_dict(rec.get("contracts"))
-            return rec
-        return None
+    rec = _workflows.get(workflow_id)
+    if rec:
+        rec["contracts"] = _ensure_contracts_dict(rec.get("contracts"))
+        return rec
+    return None
 
 
 def list_workflows(limit: int = 50, status: str | None = None) -> list[dict[str, Any]]:
     """List workflows, newest first; from Supabase when configured."""
     if _db.is_configured():
         return _db.list_workflow_states(limit=limit, status=status)
-    with _lock:
-        items = list(_workflows.values())
-    items.sort(key=lambda r: r.get("created_at") or "", reverse=True)
+    items = _workflows.values()
+    items = sorted(items, key=lambda r: r.get("created_at") or "", reverse=True)
     if status:
         items = [r for r in items if (r.get("status") or "").lower() == status.lower()]
     return items[:limit]
@@ -222,8 +277,7 @@ def count_workflows() -> int:
     """Total workflow count for metrics."""
     if _db.is_configured():
         return _db.count_runs()
-    with _lock:
-        return len(_workflows)
+    return len(_workflows)
 
 
 def append_deployment(
@@ -241,7 +295,8 @@ def append_deployment(
     rec["updated_at"] = now
     if _db.is_configured():
         _db.upsert_workflow_state(workflow_id, rec)
-    else:
-        with _lock:
+        if not _USE_CACHE_AS_FALLBACK_ONLY:
             _workflows[workflow_id] = rec
+    else:
+        _workflows[workflow_id] = rec
     return rec

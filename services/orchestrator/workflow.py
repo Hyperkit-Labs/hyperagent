@@ -74,8 +74,9 @@ def _after_audit(state: AgentState) -> str:
 
 
 def _after_simulation(state: AgentState) -> str:
-    """Route after simulation: pass -> security_policy_evaluator, fail -> autofix or END."""
-    if state.get("simulation_passed", True):
+    """Route after simulation: pass -> security_policy_evaluator, fail -> autofix or END.
+    ZSPS: Missing state defaults to failure."""
+    if state.get("simulation_passed", False):
         return "security_policy_evaluator"
     cycle = state.get("autofix_cycle", 0)
     if cycle < MAX_AUTOFIX_CYCLES:

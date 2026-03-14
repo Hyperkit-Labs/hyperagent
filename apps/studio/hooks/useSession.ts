@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useContext, useState, useEffect } from "react";
 import { getStoredSession, SESSION_CHANGE_EVENT } from "@/lib/session-store";
+import { SessionContext } from "@/components/providers/SessionProvider";
 
 export interface UseSessionReturn {
   hasSession: boolean;
@@ -9,11 +10,15 @@ export interface UseSessionReturn {
 }
 
 /**
- * Single source of truth for API session (JWT in session store).
- * isReady is false until after mount so server and first client render match (no hydration mismatch).
- * Subscribes to session change events so sign-in/sign-out updates all consumers.
+ * Single source of truth for API session. Uses SessionProvider context when available.
+ * Falls back to direct session-store read when outside SessionProvider (e.g. login page).
  */
 export function useSession(): UseSessionReturn {
+  const ctx = useContext(SessionContext);
+  if (ctx) {
+    return { hasSession: ctx.isAuthenticated, isReady: true };
+  }
+
   const [hasSession, setHasSession] = useState(false);
   const [isReady, setIsReady] = useState(false);
 

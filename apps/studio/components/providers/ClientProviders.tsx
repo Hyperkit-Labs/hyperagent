@@ -6,6 +6,7 @@ import { LayoutProvider } from '@/components/providers/LayoutProvider';
 import { NetworksProvider } from '@/components/providers/NetworksProvider';
 import { SelectedNetworkProvider } from '@/components/providers/SelectedNetworkProvider';
 import { PipelineStateProvider } from '@/components/providers/PipelineStateProvider';
+import { SessionProvider } from '@/components/providers/SessionProvider';
 import { ThirdwebProviderWrapper } from '@/components/providers/ThirdwebProviderWrapper';
 import { WalletAuthProvider } from '@/components/providers/WalletAuthContext';
 import { LayoutSwitcher } from '@/components/layout/LayoutSwitcher';
@@ -15,6 +16,7 @@ import { Analytics } from '@vercel/analytics/next';
 /**
  * Single client boundary for all providers. Ensures ThirdwebProvider wraps
  * the entire app so useActiveAccount and other thirdweb hooks work everywhere.
+ * SessionProvider is the single source of truth for isAuthenticated.
  * WalletAuthProvider exposes sign-in via context so components in portals (e.g. Dialog)
  * can sign in without calling thirdweb hooks directly.
  */
@@ -22,6 +24,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
   return (
     <ThirdwebProviderWrapper>
       <WalletAuthProvider>
+      <SessionProvider>
       <ConfigProvider>
         <ApiAuthProvider>
           <NetworksProvider>
@@ -37,6 +40,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
           <Analytics />
         </ApiAuthProvider>
       </ConfigProvider>
+      </SessionProvider>
       </WalletAuthProvider>
     </ThirdwebProviderWrapper>
   );

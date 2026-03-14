@@ -150,12 +150,18 @@ app.use("/openapi.json", createProxyMiddleware(proxyOptions()));
 app.get("/health", async (_req, res) => {
   const supabase = getSupabaseAdmin();
   const { error } = supabase ? await supabase.from("wallet_users").select("id").limit(1) : { error: { message: "Supabase not configured" } };
-  res.json({
-    status: "ok",
+  const dbConnected = !error;
+  const payload = {
+    status: dbConnected ? "ok" : "degraded",
     gateway: true,
-    db_connected: !error,
+    db_connected: dbConnected,
     db_error: error ? (error as { message?: string }).message : null,
-  });
+  };
+  if (!dbConnected) {
+    res.status(503).json(payload);
+    return;
+  }
+  res.json(payload);
 });
 
 const port = Number(process.env.PORT) || 4000;

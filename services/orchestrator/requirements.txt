@@ -16,3 +16,7 @@ datasets>=2.14.0
 -e ../../packages/execution-backend
 # Vercel Sandbox SDK for Quick Demo (https://vercel.com/docs/vercel-sandbox)
 vercel>=0.4.0
+# OpenTelemetry (optional): set OPENTELEMETRY_ENABLED=1 and OTEL_EXPORTER_OTLP_ENDPOINT for traces
+opentelemetry-api>=1.20.0
+opentelemetry-sdk>=1.20.0
+opentelemetry-exporter-otlp-proto-http>=1.20.0

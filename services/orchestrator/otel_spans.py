@@ -1,6 +1,7 @@
 """
 Optional OpenTelemetry spans for pipeline steps. No-op when OPENTELEMETRY_ENABLED
 is unset or opentelemetry packages are not installed.
+When OTEL_EXPORTER_OTLP_ENDPOINT is set, exports traces to OTLP (e.g. Jaeger, Prometheus).
 """
 
 from __future__ import annotations
@@ -16,8 +17,33 @@ _OTEL_ENABLED = (
     os.environ.get("OPENTELEMETRY_ENABLED", "").strip().lower()
     in ("1", "true", "yes")
 )
+_OTEL_INITIALIZED = False
 
-_tracer = None
+
+def _init_otel_export():  # type: ignore[no-untyped-def]
+    """Configure OTLP exporter when OTEL_EXPORTER_OTLP_ENDPOINT is set."""
+    global _OTEL_INITIALIZED
+    if _OTEL_INITIALIZED or not _OTEL_ENABLED:
+        return
+    endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "").strip()
+    if not endpoint:
+        return
+    try:
+        from opentelemetry import trace
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+        provider = TracerProvider()
+        exporter = OTLPSpanExporter(endpoint=f"{endpoint.rstrip('/')}/v1/traces")
+        provider.add_span_processor(BatchSpanProcessor(exporter))
+        trace.set_tracer_provider(provider)
+        _OTEL_INITIALIZED = True
+        logger.info("[otel] OTLP export configured endpoint=%s", endpoint)
+    except ImportError:
+        logger.debug("opentelemetry exporter not installed, OTLP disabled")
+    except Exception as e:
+        logger.warning("[otel] OTLP setup failed: %s", e)
 
 
 def _get_tracer():  # type: ignore[no-untyped-def]
@@ -27,6 +53,7 @@ def _get_tracer():  # type: ignore[no-untyped-def]
     if not _OTEL_ENABLED:
         return None
     try:
+        _init_otel_export()
         from opentelemetry import trace
 
         _tracer = trace.get_tracer("hyperagent.orchestrator", "0.1.0")
@@ -34,6 +61,9 @@ def _get_tracer():  # type: ignore[no-untyped-def]
     except ImportError:
         logger.debug("opentelemetry not installed, spans disabled")
         return None
+
+
+_tracer = None
 
 
 @contextmanager

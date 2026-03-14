@@ -58,3 +58,53 @@ def test_health(client):
     if r.status_code == 200:
         j = r.json()
         assert "status" in j or "ok" in str(j).lower()
+
+
+# ---------------------------------------------------------------------------
+# Gateway -> orchestrator auth chain: X-User-Id propagation, JWT flow
+# ---------------------------------------------------------------------------
+
+
+def test_workflows_generate_accepts_x_user_id(client):
+    """When X-User-Id is present (as set by gateway from JWT sub), generate accepts it."""
+    r = client.post(
+        "/api/v1/workflows/generate",
+        json={
+            "nlp_input": "Create a simple ERC20 token",
+            "api_keys": {"openai": "sk-test-placeholder"},
+        },
+        headers={"X-User-Id": "test-user-uuid-auth-chain"},
+    )
+    assert r.status_code == 200
+    j = r.json()
+    assert "workflow_id" in j
+    assert "status" in j
+    assert j["status"] == "running"
+
+
+def test_workflows_list_scoped_by_x_user_id(client):
+    """List workflows returns only those owned by X-User-Id when present."""
+    r = client.get("/api/v1/workflows", headers={"X-User-Id": "test-user-uuid-auth-chain"})
+    assert r.status_code == 200
+    j = r.json()
+    assert "workflows" in j
+    for w in j["workflows"]:
+        uid = w.get("user_id") or w.get("wallet_user_id") or "anonymous"
+        assert uid in ("test-user-uuid-auth-chain", "anonymous")
+
+
+def test_workflow_get_requires_owner(client):
+    """Getting a workflow owned by another user returns 403 when X-User-Id is different."""
+    r = client.post(
+        "/api/v1/workflows/generate",
+        json={
+            "nlp_input": "Create ERC20",
+            "api_keys": {"openai": "sk-test"},
+        },
+        headers={"X-User-Id": "owner-user-123"},
+    )
+    assert r.status_code == 200
+    wf_id = r.json()["workflow_id"]
+
+    r2 = client.get(f"/api/v1/workflows/{wf_id}", headers={"X-User-Id": "other-user-456"})
+    assert r2.status_code == 403

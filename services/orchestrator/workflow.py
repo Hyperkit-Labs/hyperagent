@@ -24,6 +24,7 @@ from nodes import (
     exploit_simulation_agent,
     guardian_agent,
     human_review_agent,
+    monitor_agent,
     scrubd_validation_agent,
     security_gate_agent,
     security_policy_evaluator_agent,
@@ -75,7 +76,7 @@ def _after_audit(state: AgentState) -> str:
 
 def _after_simulation(state: AgentState) -> str:
     """Route after simulation: pass -> security_policy_evaluator, fail -> autofix or END."""
-    if state.get("simulation_passed", True):
+    if state.get("simulation_passed", False):
         return "security_policy_evaluator"
     cycle = state.get("autofix_cycle", 0)
     if cycle < MAX_AUTOFIX_CYCLES:
@@ -132,6 +133,7 @@ def create_workflow():
     workflow.add_node("security_policy_evaluator", security_policy_evaluator_agent)
     workflow.add_node("exploit_simulation", exploit_simulation_agent)
     workflow.add_node("deploy", deploy_agent)
+    workflow.add_node("monitor", monitor_agent)
     workflow.add_node("ui_scaffold", ui_scaffold_agent)
 
     workflow.set_entry_point("start")
@@ -187,7 +189,8 @@ def create_workflow():
         },
     )
     workflow.add_edge("deploy_gate", "deploy")
-    workflow.add_edge("deploy", "simulation")
+    workflow.add_edge("deploy", "monitor")
+    workflow.add_edge("monitor", "simulation")
     workflow.add_conditional_edges(
         "simulation",
         _after_simulation,
@@ -309,6 +312,9 @@ def run_pipeline(
         initial.update(initial_state_override)
     import logging
 
+    from observability import inc_pipeline_runs_completed, inc_pipeline_runs_failed, inc_pipeline_runs_total
+
+    inc_pipeline_runs_total()
     logging.getLogger(__name__).info(
         "[pipeline] run_pipeline start run_id=%s api_keys_providers=%s agent_session_jwt=%s",
         run_id,
@@ -323,8 +329,10 @@ def run_pipeline(
             final = asyncio.run(graph.ainvoke(None, config=config))
         else:
             final = asyncio.run(graph.ainvoke(initial, config=config))
+        inc_pipeline_runs_completed()
         return final
     except Exception as e:
+        inc_pipeline_runs_failed()
         err_msg = str(e)
         failed_state = initial.copy()
         failed_state["error"] = err_msg

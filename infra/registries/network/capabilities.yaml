@@ -3,7 +3,7 @@
 # thirdweb owns chain resolution and RPC-facing objects; HyperAgent owns capability policy.
 # Use rpcUrl/explorerUrl only for chains where thirdweb metadata is missing or needs override.
 
-apiVersion: hyperagent.io/v1
+apiVersion: hyperkitlabs.com/v1
 kind: ChainCapabilities
 metadata:
   name: hyperagent-chain-capabilities

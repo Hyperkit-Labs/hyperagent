@@ -1,7 +1,9 @@
 """
 Redis job queue for pipeline. Enqueue workflow runs; worker consumes and executes.
 Keys: queue:hyperagent:pipeline, queue:hyperagent:dead. Set REDIS_URL and QUEUE_ENABLED=1 to enable.
-Supports retry count and dead-letter on repeated failure.
+
+Redis separation: Use REDIS_QUEUE_URL for queue when set (separate from LangGraph checkpoint/cache).
+When not set, falls back to REDIS_URL. LangGraph checkpointer uses REDIS_URL only.
 """
 
 from __future__ import annotations
@@ -19,7 +21,7 @@ QUEUE_MAX_RETRIES = int(os.environ.get("QUEUE_MAX_RETRIES", "3"))
 
 
 def _get_redis():
-    url = (os.environ.get("REDIS_URL") or "").strip()
+    url = (os.environ.get("REDIS_QUEUE_URL") or os.environ.get("REDIS_URL") or "").strip()
     if not url:
         return None
     try:

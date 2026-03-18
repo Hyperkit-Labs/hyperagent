@@ -14,6 +14,7 @@ config({ path: resolve(__dirname, "../../../.env") });
 import cors from "cors";
 import express from "express";
 import { createProxyMiddleware, responseInterceptor } from "http-proxy-middleware";
+import rateLimit from "express-rate-limit";
 import { requestIdMiddleware, RequestWithId } from "./requestId.js";
 import { authMiddleware, RequestWithUser } from "./auth.js";
 import { rateLimitMiddleware } from "./rateLimit.js";
@@ -133,7 +134,13 @@ function proxyOptions(): Record<string, unknown> {
 }
 
 // Single auth entrypoint: SIWE and thirdweb OAuth/in-app. Both upsert wallet_users and issue session JWT.
-app.post("/api/v1/auth/bootstrap", jsonParser, authBootstrapHandler);
+const authBootstrapRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // limit each IP to 20 auth bootstrap requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.post("/api/v1/auth/bootstrap", authBootstrapRateLimiter, jsonParser, authBootstrapHandler);
 
 // Primary: versioned API (proxied; raw body stream forwarded to orchestrator)
 app.use("/api/v1", createProxyMiddleware(proxyOptions()));

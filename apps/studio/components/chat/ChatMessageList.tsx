@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Conversation, ConversationContent, ConversationScrollButton, Message, Tool, Shimmer } from '@/components/ai-elements';
+import { Conversation, ConversationContent, ConversationScrollButton, Message, Tool, Shimmer, Plan, Artifact, Terminal, StackTrace } from '@/components/ai-elements';
 import { GlowingBorder } from '@/components/ui';
 import { XTermTerminal } from '@/components/chat/XTermTerminal';
 import { Check, Loader2 } from 'lucide-react';
@@ -50,6 +50,10 @@ export interface ChatMessage {
   role: ChatMessageRole;
   content: string;
   toolInvocations?: ToolInvocation[];
+  planSteps?: { id: string; label: string; status: 'pending' | 'processing' | 'completed' | 'failed'; error?: string }[];
+  artifact?: { title: string; content: string; description?: string };
+  errorStack?: string;
+  terminalLines?: { message: string; timestamp?: string; level?: string }[];
 }
 
 export interface AgentDiscussionEvent {
@@ -115,15 +119,33 @@ export function ChatMessageList({
             className={`flex flex-col gap-1 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
           >
             <Message from={msg.role} content={typeof msg.content === 'string' ? msg.content : ''}>
+              {msg.role === 'assistant' && msg.planSteps && msg.planSteps.length > 0 && (
+                <Plan steps={msg.planSteps} title="Pipeline" className="mt-2" />
+              )}
               {msg.role === 'assistant' &&
                 msg.toolInvocations?.map((inv, i) => (
-                  <Tool
-                    key={inv.toolCallId ?? i}
-                    toolName={inv.toolName ?? 'create_workflow'}
-                    status={inv.state === 'result' ? 'result' : inv.state === 'partial' ? 'running' : 'result'}
-                    result={inv.result}
-                  />
+                  <div key={inv.toolCallId ?? i} className="mt-2 space-y-1">
+                    <Tool
+                      toolName={inv.toolName ?? 'create_workflow'}
+                      status={inv.state === 'result' ? 'result' : inv.state === 'partial' ? 'running' : 'result'}
+                      result={inv.result}
+                    />
+                    {(inv as { errorStack?: string }).errorStack && (
+                      <StackTrace raw={(inv as { errorStack?: string }).errorStack!} title="Tool error" />
+                    )}
+                  </div>
                 ))}
+              {msg.role === 'assistant' && msg.artifact && (
+                <Artifact title={msg.artifact.title} description={msg.artifact.description} className="mt-2">
+                  <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto">{msg.artifact.content}</pre>
+                </Artifact>
+              )}
+              {msg.role === 'assistant' && msg.errorStack && (
+                <StackTrace raw={msg.errorStack} title="Error" className="mt-2" />
+              )}
+              {msg.role === 'assistant' && msg.terminalLines && msg.terminalLines.length > 0 && (
+                <Terminal lines={msg.terminalLines} className="mt-2" />
+              )}
             </Message>
           </div>
         ))}
@@ -139,6 +161,18 @@ export function ChatMessageList({
               </span>
             </div>
             <GlowingBorder active={true} className="rounded-xl border border-indigo-500/20 bg-indigo-500/10 backdrop-blur-sm px-4 py-3 max-w-[90%] w-full">
+              {discussionEvents.some((e) => e.stage) && (
+                <Plan
+                  title="Pipeline"
+                  steps={Array.from(new Map(discussionEvents.filter((e) => e.stage).map((e) => [e.stage, e])).entries()).map(([stage, e]) => ({
+                    id: stage ?? '',
+                    label: (stage ?? 'step').replace(/_/g, ' '),
+                    status: e.status === 'completed' ? 'completed' : e.status === 'failed' ? 'failed' : e.status === 'running' ? 'processing' : 'pending',
+                    error: (e as { error?: string }).error,
+                  }))}
+                  className="mb-3"
+                />
+              )}
               <div className="rounded-lg bg-black/40 border border-white/5 font-mono text-[11px] leading-relaxed overflow-hidden">
                 <div className="px-2 py-1.5 border-b border-white/5 text-[var(--color-text-muted)]">
                   HyperAgent is thinking

@@ -3,7 +3,7 @@
 # agentRegistry format: eip155:{chainId}:{identityRegistry}
 # See: https://eips.ethereum.org/EIPS/eip-8004, https://docs.pinata.cloud/tools/erc-8004/quickstart
 
-apiVersion: hyperagent.io/v1
+apiVersion: hyperkitlabs.com/v1
 kind: ERC8004Registry
 metadata:
   name: hyperagent-erc8004
@@ -11,6 +11,7 @@ metadata:
 spec:
   chains:
     # SKALE Base Sepolia (testnet)
+    # Official ERC-8004: https://base-sepolia-testnet-explorer.skalenodes.com/address/0x8004A818BFB912233c491871b3d84c89A494BD9e
     - chainId: 324705682
       slug: skalebase-sepolia
       identityRegistry: "0x8004A818BFB912233c491871b3d84c89A494BD9e"
@@ -18,7 +19,8 @@ spec:
       validationRegistry: null
       agentRegistry: "eip155:324705682:0x8004A818BFB912233c491871b3d84c89A494BD9e"
       notes:
-        - "Canonical testnet Identity Registry address"
+        - "Official ERC-8004 Identity Registry (Stub Token / ERC-1155)"
+        - "Explorer: https://base-sepolia-testnet-explorer.skalenodes.com/address/0x8004A818BFB912233c491871b3d84c89A494BD9e"
         - "SKALE Base Sepolia: zero-gas, BITE privacy"
 
     # SKALE Base (mainnet)

@@ -1,6 +1,6 @@
 # It handles the settings for the x402 service configuration for x402 payments (true or false) when this is true, the x402 service will be enabled and the x402 payments will be enabled
 # when this is false, the x402 service will be disabled and the x402 payments will be disabled
-apiVersion: hyperagent.io/v1
+apiVersion: hyperkitlabs.com/v1
 kind: X402SettingsRegistry
 metadata:
   name: x402-settings

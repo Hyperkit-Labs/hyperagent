@@ -15,6 +15,8 @@ import {
 describe("session-store", () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
+    clearSessionOnlyLLMKey();
     document.cookie.split(";").forEach((c) => {
       document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
     });

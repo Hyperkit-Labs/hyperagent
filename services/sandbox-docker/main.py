@@ -9,13 +9,16 @@ requests via Bearer token (OPENSANDBOX_API_KEY).
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import logging
 import os
 import shutil
+import socket
 import subprocess
 import time
 import uuid
 from pathlib import Path
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import FastAPI, Depends, HTTPException, Request
@@ -44,6 +47,9 @@ def _verify_api_key(credentials: HTTPAuthorizationCredentials | None = Depends(s
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
 
+ALLOWED_PORTS = {80, 3000, 4000, 8080, 8545}
+
+
 class SandboxCreateBody(BaseModel):
     tarball_url: str = Field(..., description="URL of gzipped tarball to run")
     timeout_minutes: int = Field(default=30, ge=1, le=120)
@@ -54,6 +60,34 @@ class SandboxCreateResponse(BaseModel):
     sandbox_id: str
     url: str
     status: str
+
+
+def _is_public_ip(ip_str: str) -> bool:
+    try:
+        addr = ipaddress.ip_address(ip_str)
+        if addr.is_loopback or addr.is_link_local or addr.is_private:
+            return False
+        if addr.is_reserved or (hasattr(addr, "is_private") and addr.is_private):
+            return False
+        return True
+    except ValueError:
+        return False
+
+
+def _validate_tarball_url(url: str) -> None:
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise HTTPException(status_code=400, detail="tarball_url must use http or https")
+    hostname = (parsed.hostname or parsed.netloc or "").split(":")[0].strip()
+    if not hostname:
+        raise HTTPException(status_code=400, detail="tarball_url must have a hostname")
+    try:
+        for info in socket.getaddrinfo(hostname, None):
+            addr = info[4][0]
+            if not _is_public_ip(addr):
+                raise HTTPException(status_code=400, detail="tarball_url must point to a public host")
+    except socket.gaierror:
+        raise HTTPException(status_code=400, detail="tarball_url hostname could not be resolved")
 
 
 def _run_sync(cmd: list[str], cwd: str | None = None, timeout: int = 120) -> tuple[int, str, str]:
@@ -73,6 +107,7 @@ def _run_sync(cmd: list[str], cwd: str | None = None, timeout: int = 120) -> tup
 
 
 async def _create_sandbox_container(tarball_url: str, timeout_minutes: int, port: int) -> tuple[str, int]:
+    _validate_tarball_url(tarball_url)
     sandbox_id = f"sandbox-{uuid.uuid4().hex[:12]}"
     extract_dir = WORK_DIR / sandbox_id
     extract_dir.mkdir(parents=True, exist_ok=True)
@@ -186,10 +221,15 @@ async def sandbox_create(
     _: None = Depends(_verify_api_key),
 ) -> SandboxCreateResponse:
     """Create an ephemeral sandbox from a tarball URL. Returns preview URL."""
+    port = body.port
+    if not isinstance(port, int) or port < 1 or port > 65535:
+        raise HTTPException(status_code=400, detail="port must be an integer between 1 and 65535")
+    if port not in ALLOWED_PORTS:
+        raise HTTPException(status_code=400, detail=f"port must be one of {sorted(ALLOWED_PORTS)}")
     sandbox_id, host_port = await _create_sandbox_container(
         body.tarball_url,
         body.timeout_minutes,
-        body.port,
+        port,
     )
     meta = _sandboxes.get(sandbox_id, {})
     url = meta.get("url", f"http://localhost:{host_port}")

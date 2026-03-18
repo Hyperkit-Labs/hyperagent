@@ -41,6 +41,7 @@ export const BYOK_UPDATED_EVENT = "hyperagent_byok_updated";
 export const SESSION_LLM_PASS_THROUGH_UPDATED_EVENT = "hyperagent_session_llm_pass_through_updated";
 
 const SESSION_LLM_PASS_THROUGH_STORAGE_KEY = "hyperagent_llm_pass_through";
+const ENCRYPTION_PASSPHRASE = "hyperagent-session-llm-v1";
 
 export type SessionLLMProvider = "openai" | "google" | "anthropic";
 
@@ -49,17 +50,92 @@ export interface SessionOnlyLLMKey {
   apiKey: string;
 }
 
+let _decryptedCache: SessionOnlyLLMKey | null = null;
+
+async function deriveKey(salt: Uint8Array): Promise<CryptoKey> {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(ENCRYPTION_PASSPHRASE),
+    "PBKDF2",
+    false,
+    ["deriveBits", "deriveKey"]
+  );
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+async function encrypt(plaintext: string): Promise<{ ciphertext: string; iv: string; salt: string }> {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveKey(salt);
+  const enc = new TextEncoder();
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    enc.encode(plaintext)
+  );
+  return {
+    ciphertext: btoa(String.fromCharCode(...new Uint8Array(ciphertext))),
+    iv: btoa(String.fromCharCode(...iv)),
+    salt: btoa(String.fromCharCode(...salt)),
+  };
+}
+
+async function decrypt(ciphertext: string, iv: string, salt: string): Promise<string> {
+  const key = await deriveKey(
+    new Uint8Array(atob(salt).split("").map((c) => c.charCodeAt(0)))
+  );
+  const dec = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: new Uint8Array(atob(iv).split("").map((c) => c.charCodeAt(0))) },
+    key,
+    new Uint8Array(atob(ciphertext).split("").map((c) => c.charCodeAt(0)))
+  );
+  return new TextDecoder().decode(dec);
+}
+
+function notifySessionLLMUpdated(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new Event(SESSION_LLM_PASS_THROUGH_UPDATED_EVENT));
+  } catch {
+    // ignore
+  }
+}
+
 export function getSessionOnlyLLMKey(): SessionOnlyLLMKey | null {
   if (typeof window === "undefined") return null;
+  if (_decryptedCache) return _decryptedCache;
   try {
     const raw = sessionStorage.getItem(SESSION_LLM_PASS_THROUGH_STORAGE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw) as unknown;
-    if (data && typeof data === "object" && "provider" in data && "apiKey" in data) {
+    if (data && typeof data === "object" && "provider" in data) {
       const provider = (data as { provider: string }).provider;
-      const apiKey = (data as { apiKey: string }).apiKey;
-      if (["openai", "google", "anthropic"].includes(provider) && typeof apiKey === "string" && apiKey.trim()) {
-        return { provider: provider as SessionLLMProvider, apiKey: apiKey.trim() };
+      if (!["openai", "google", "anthropic"].includes(provider)) return null;
+      const stored = data as { provider: string; apiKey?: string; iv?: string; salt?: string };
+      if (typeof stored.apiKey === "string" && stored.iv && stored.salt) {
+        decrypt(stored.apiKey, stored.iv, stored.salt)
+          .then((apiKey) => {
+            if (apiKey.trim()) {
+              _decryptedCache = { provider: provider as SessionLLMProvider, apiKey: apiKey.trim() };
+              notifySessionLLMUpdated();
+            }
+          })
+          .catch(() => {
+            sessionStorage.removeItem(SESSION_LLM_PASS_THROUGH_STORAGE_KEY);
+            _decryptedCache = null;
+          });
+        return null;
+      }
+      if (typeof stored.apiKey === "string" && stored.apiKey.trim()) {
+        sessionStorage.removeItem(SESSION_LLM_PASS_THROUGH_STORAGE_KEY);
+        return { provider: provider as SessionLLMProvider, apiKey: stored.apiKey.trim() };
       }
     }
   } catch {
@@ -70,19 +146,23 @@ export function getSessionOnlyLLMKey(): SessionOnlyLLMKey | null {
 
 export function setSessionOnlyLLMKey(payload: SessionOnlyLLMKey): void {
   if (typeof window === "undefined") return;
-  try {
-    sessionStorage.setItem(
-      SESSION_LLM_PASS_THROUGH_STORAGE_KEY,
-      JSON.stringify({ provider: payload.provider, apiKey: payload.apiKey })
-    );
-    window.dispatchEvent(new Event(SESSION_LLM_PASS_THROUGH_UPDATED_EVENT));
-  } catch {
-    // ignore
-  }
+  _decryptedCache = payload;
+  encrypt(payload.apiKey)
+    .then(({ ciphertext, iv, salt }) => {
+      sessionStorage.setItem(
+        SESSION_LLM_PASS_THROUGH_STORAGE_KEY,
+        JSON.stringify({ provider: payload.provider, apiKey: ciphertext, iv, salt })
+      );
+      notifySessionLLMUpdated();
+    })
+    .catch(() => {
+      sessionStorage.removeItem(SESSION_LLM_PASS_THROUGH_STORAGE_KEY);
+    });
 }
 
 export function clearSessionOnlyLLMKey(): void {
   if (typeof window === "undefined") return;
+  _decryptedCache = null;
   try {
     sessionStorage.removeItem(SESSION_LLM_PASS_THROUGH_STORAGE_KEY);
     window.dispatchEvent(new Event(SESSION_LLM_PASS_THROUGH_UPDATED_EVENT));

@@ -14,6 +14,13 @@ export interface IpfsPinataToolkitOptions {
   gatewayBase?: string;
 }
 
+function isValidCid(cid: string): boolean {
+  if (!cid || typeof cid !== "string") return false;
+  const trimmed = cid.trim();
+  if (trimmed.length < 10 || trimmed.length > 200) return false;
+  return /^[A-Za-z0-9_-]+$/.test(trimmed);
+}
+
 function buildGatewayUrl(cid: string, opts: IpfsPinataToolkitOptions): string {
   if (opts.gatewayBase) {
     const base = opts.gatewayBase.replace(/\/$/, "");
@@ -63,7 +70,9 @@ export class IpfsPinataToolkit {
   }
 
   async unpin(cid: string): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/pinning/unpin/${cid}`, {
+    if (!isValidCid(cid)) throw new Error("Invalid CID");
+    const safeCid = encodeURIComponent(cid);
+    const response = await fetch(`${this.baseUrl}/pinning/unpin/${safeCid}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${this.jwt}` },
     });

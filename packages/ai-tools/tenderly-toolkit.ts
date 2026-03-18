@@ -91,23 +91,33 @@ export class TenderlyToolkit {
   }
 
   /**
-   * Bundled Simulations: run multiple transactions consecutively in one block.
-   * Use for deploy + initialize() or deploy + first-interaction validation.
-   * See https://docs.tenderly.co/simulations/bundled-simulations
+   * Bundled Simulations: run multiple transactions consecutively on the same block.
+   * Per Tenderly API: simulations array, optional block_number, state_objects (overrides).
+   * See https://docs.tenderly.co/simulations/bundled-simulations and tenderly-api.json
    */
   async simulateBundle(req: SimulateBundleRequest): Promise<SimulateBundleResult> {
-    const simulations = req.simulations.map((tx: SimulateBundleTx) => ({
-      network_id: tx.network_id,
-      from: tx.from,
-      to: tx.to ?? undefined,
-      input: tx.input,
-      value: tx.value ?? "0",
-      gas: tx.gas ?? 8000000,
-      save: tx.save ?? true,
-      save_if_fails: tx.save_if_fails ?? true,
-      simulation_type: tx.simulation_type ?? "full",
-      state_objects: tx.state_objects,
-    }));
+    const simulations = req.simulations.map((tx: SimulateBundleTx) => {
+      const val = tx.value ?? "0";
+      const valueStr = typeof val === "string" ? val : String(val);
+      return {
+        network_id: tx.network_id,
+        from: tx.from,
+        to: tx.to ?? undefined,
+        input: tx.input,
+        value: valueStr || "0",
+        gas: tx.gas ?? 8000000,
+        save: tx.save ?? true,
+        save_if_fails: tx.save_if_fails ?? true,
+        simulation_type: tx.simulation_type ?? "full",
+        state_objects: tx.state_objects,
+      };
+    });
+
+    const payload: Record<string, unknown> = { simulations };
+    if (req.block_number != null) payload.block_number = req.block_number;
+    if (req.state_objects && Object.keys(req.state_objects).length > 0) payload.state_objects = req.state_objects;
+    if (req.simulation_type) payload.simulation_type = req.simulation_type;
+    if (req.save !== undefined) payload.save = req.save;
 
     const response = await fetch(this.getSimulateBundleUrl(), {
       method: "POST",
@@ -115,23 +125,24 @@ export class TenderlyToolkit {
         "Content-Type": "application/json",
         "X-Access-Key": this.apiKey,
       },
-      body: JSON.stringify({ simulations }),
+      body: JSON.stringify(payload),
     });
 
     const result = (await response.json()) as {
       simulation_results?: Array<{
         transaction?: { status?: boolean; gas_used?: number };
-        error?: string;
+        error?: { message?: string };
       }>;
       simulation?: { id?: string };
-      error?: string;
+      error?: string | { message?: string };
     };
 
     if (!response.ok) {
-      return {
-        success: false,
-        error: result.error ?? "Tenderly simulate-bundle API error",
-      };
+      const errMsg =
+        typeof result.error === "string"
+          ? result.error
+          : (result.error as { message?: string })?.message ?? "Tenderly simulate-bundle API error";
+      return { success: false, error: errMsg };
     }
 
     const results = result.simulation_results ?? [];
@@ -151,7 +162,7 @@ export class TenderlyToolkit {
       simulations: results.map((r) => ({
         success: r.transaction?.status ?? false,
         gas_used: r.transaction?.gas_used,
-        error: r.error,
+        error: typeof r.error === "object" && r.error?.message ? r.error.message : (r.error as string | undefined),
       })),
       simulationUrl: simulationUrl ?? null,
     };

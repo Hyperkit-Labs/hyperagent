@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
-import { Server, Globe, Shield, Container, Settings } from "lucide-react";
+import useSWR from "swr";
+import { RequireApiSession } from "@/components/auth/RequireApiSession";
+import { Server, Globe, Shield, Container, Settings, Loader2, Plus } from "lucide-react";
 import { EmptyState } from "@/components/ui";
 import { PageTitle } from "@/components/layout/PageTitle";
+import { listDomains, addDomain, type DomainRecord } from "@/lib/api";
+import { toast } from "sonner";
 
 type InfraTab = "domains" | "certificates" | "deployments";
 
@@ -16,8 +19,34 @@ const TABS: { id: InfraTab; label: string; icon: React.ComponentType<{ className
 
 export default function DomainsPage() {
   const [tab, setTab] = useState<InfraTab>("domains");
+  const [domainInput, setDomainInput] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [addModalOpen, setAddModalOpen] = useState(false);
+
+  const { data: domains = [], isLoading, mutate } = useSWR<DomainRecord[]>(
+    tab === "domains" ? "domains" : null,
+    () => listDomains()
+  );
+
+  const handleAddDomain = async () => {
+    const domain = domainInput.trim().toLowerCase();
+    if (!domain) return;
+    setAdding(true);
+    try {
+      await addDomain(domain);
+      setDomainInput("");
+      setAddModalOpen(false);
+      mutate();
+      toast.success("Domain added");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add domain");
+    } finally {
+      setAdding(false);
+    }
+  };
 
   return (
+    <RequireApiSession>
     <div className="p-6 lg:p-8 max-w-[1200px] mx-auto space-y-6 animate-enter">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -28,9 +57,8 @@ export default function DomainsPage() {
         </div>
         <button
           type="button"
-          onClick={() => toast.info("Domain configuration coming soon. Deploy a dApp first to configure a custom URL.")}
           className="btn-primary-gradient text-xs px-4 py-2 rounded-lg flex items-center gap-2"
-          title="Domain configuration coming soon"
+          title="Configure infrastructure"
         >
           <Settings className="w-3.5 h-3.5" />
           Configure
@@ -62,21 +90,86 @@ export default function DomainsPage() {
 
       {tab === "domains" && (
         <div className="glass-panel rounded-xl p-6">
-          <EmptyState
-            icon={<Globe className="w-8 h-8 text-[var(--color-text-muted)]" />}
-            title="No custom domains"
-            description="Custom domains allow users to access your deployed dApps at a branded URL. Deploy a dApp first, then configure a domain."
-            action={
-              <button
-                type="button"
-                onClick={() => toast.info("Domain configuration coming soon. Deploy a dApp first to configure a custom URL.")}
-                className="btn-primary-gradient text-xs px-4 py-1.5 rounded-lg"
-                title="Domain configuration coming soon"
-              >
-                Add domain
-              </button>
-            }
-          />
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-[var(--color-text-primary)]">Custom domains</h3>
+            <button
+              type="button"
+              onClick={() => setAddModalOpen(true)}
+              className="btn-primary-gradient text-xs px-4 py-1.5 rounded-lg flex items-center gap-2"
+              title="Add custom domain"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add domain
+            </button>
+          </div>
+          {addModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setAddModalOpen(false)}>
+              <div className="glass-panel rounded-xl p-6 max-w-md w-full border border-[var(--color-border-subtle)] shadow-xl" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-sm font-medium text-[var(--color-text-primary)] mb-3">Add custom domain</h3>
+                <input
+                  type="text"
+                  value={domainInput}
+                  onChange={(e) => setDomainInput(e.target.value)}
+                  placeholder="example.com"
+                  className="w-full px-4 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                />
+                <div className="flex gap-2 mt-4">
+                  <button
+                    type="button"
+                    onClick={handleAddDomain}
+                    disabled={adding || !domainInput.trim()}
+                    className="btn-primary-gradient text-xs px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {adding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                    Add
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAddModalOpen(false)}
+                    className="px-4 py-2 rounded-lg border border-[var(--color-border-subtle)] text-[var(--color-text-secondary)] text-xs"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {isLoading && domains.length === 0 ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-[var(--color-text-muted)]" />
+            </div>
+          ) : domains.length === 0 ? (
+            <EmptyState
+              icon={<Globe className="w-8 h-8 text-[var(--color-text-muted)]" />}
+              title="No custom domains"
+              description="Custom domains allow users to access your deployed dApps at a branded URL. Deploy a dApp first, then configure a domain."
+              action={
+                <button
+                  type="button"
+                  onClick={() => setAddModalOpen(true)}
+                  className="btn-primary-gradient text-xs px-4 py-1.5 rounded-lg"
+                  title="Add custom domain"
+                >
+                  Add domain
+                </button>
+              }
+            />
+          ) : (
+            <div className="space-y-2">
+              {domains.map((d) => (
+                <div key={d.id} className="flex items-center justify-between py-3 px-4 rounded-lg bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)]">
+                  <span className="text-sm font-medium text-[var(--color-text-primary)]">{d.domain}</span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                    d.status === "verified" ? "bg-emerald-500/10 text-emerald-400" :
+                    d.status === "failed" ? "bg-red-500/10 text-red-400" :
+                    "bg-amber-500/10 text-amber-400"
+                  }`}>
+                    {d.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -100,8 +193,8 @@ export default function DomainsPage() {
               {[
                 { name: "Vercel", status: "available", desc: "Frontend hosting for Next.js dApps" },
                 { name: "IPFS / Pinata", status: "available", desc: "Decentralized hosting for static dApps" },
-                { name: "Docker", status: "coming soon", desc: "Container deployments for backend services" },
-                { name: "Custom Server", status: "coming soon", desc: "Deploy to your own infrastructure" },
+                { name: "Docker", status: "requires setup", desc: "Container deployments for backend services" },
+                { name: "Custom Server", status: "requires setup", desc: "Deploy to your own infrastructure" },
               ].map((target) => (
                 <div key={target.name} className="glass-panel glass-panel-hover rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
@@ -109,7 +202,9 @@ export default function DomainsPage() {
                     <span className={`text-[10px] px-2 py-0.5 rounded-full ${
                       target.status === "available"
                         ? "bg-emerald-500/10 text-emerald-400"
-                        : "bg-[var(--color-bg-panel)] text-[var(--color-text-muted)]"
+                        : target.status === "requires setup"
+                          ? "bg-amber-500/10 text-amber-400"
+                          : "bg-[var(--color-bg-panel)] text-[var(--color-text-muted)]"
                     }`}>
                       {target.status}
                     </span>
@@ -122,5 +217,6 @@ export default function DomainsPage() {
         </div>
       )}
     </div>
+    </RequireApiSession>
   );
 }

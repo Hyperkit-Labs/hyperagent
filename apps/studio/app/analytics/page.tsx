@@ -2,20 +2,15 @@
 
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import Link from "next/link";
 import { useMetrics } from "@/hooks/useMetrics";
 import { Activity, TrendingUp, Globe, Shield, CheckCircle, XCircle, Loader2, Zap, BarChart3, Download } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { EmptyState, NumberTicker } from "@/components/ui";
+import { TimeRangeFilter, type TimeRangeKey } from "@/components/analytics/TimeRangeFilter";
 import { ROUTES } from "@/constants/routes";
-
-const TIME_RANGES = [
-  { key: "7d", label: "7 days" },
-  { key: "30d", label: "30 days" },
-  { key: "90d", label: "90 days" },
-  { key: "all", label: "All time" },
-] as const;
 
 interface WorkflowMetrics {
   total?: number;
@@ -70,8 +65,8 @@ function AnalyticsContent() {
   const searchParams = useSearchParams();
   const view = searchParams.get("view") ?? "project";
   const viewConfig = VIEW_LABELS[view] ?? VIEW_LABELS.project;
-  const [timeRange, setTimeRange] = useState<"7d" | "30d" | "90d" | "all">("30d");
-  const { metrics, loading, error, refetch } = useMetrics();
+  const [timeRange, setTimeRange] = useState<TimeRangeKey>("30d");
+  const { metrics, loading, error, refetch } = useMetrics({ timeRange });
   const m = metrics && typeof metrics === "object" ? (metrics as unknown as Record<string, unknown>) : {};
   const wf = (m.workflows || {}) as WorkflowMetrics;
   const total = wf.total || 0;
@@ -91,22 +86,7 @@ function AnalyticsContent() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex gap-1">
-              {TIME_RANGES.map((tr) => (
-                <button
-                  key={tr.key}
-                  type="button"
-                  onClick={() => setTimeRange(tr.key)}
-                  className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
-                    timeRange === tr.key
-                      ? "bg-[var(--color-primary-alpha-20)] text-[var(--color-primary-light)]"
-                      : "text-[var(--color-text-muted)] hover:bg-[var(--color-bg-panel)] hover:text-[var(--color-text-primary)]"
-                  }`}
-                >
-                  {tr.label}
-                </button>
-              ))}
-            </div>
+            <TimeRangeFilter value={timeRange} onChange={setTimeRange} />
             <button
               type="button"
               onClick={() => {
@@ -276,8 +256,10 @@ function AnalyticsContent() {
 
 export default function AnalyticsPage() {
   return (
-    <Suspense fallback={<div className="p-6 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-[var(--color-text-muted)]" /></div>}>
-      <AnalyticsContent />
-    </Suspense>
+    <RequireApiSession>
+      <Suspense fallback={<div className="p-6 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-[var(--color-text-muted)]" /></div>}>
+        <AnalyticsContent />
+      </Suspense>
+    </RequireApiSession>
   );
 }

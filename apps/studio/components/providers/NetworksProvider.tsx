@@ -3,12 +3,20 @@
 import {
   createContext,
   useContext,
-  useState,
-  useEffect,
   useCallback,
-  useRef,
+  useMemo,
 } from "react";
-import { getNetworks, getErrorMessage, isAbortError, type NetworkConfig } from "@/lib/api";
+import useSWR from "swr";
+import { getNetworks, getErrorMessage, type NetworkConfig } from "@/lib/api";
+
+const NETWORKS_SWR_KEY = "networks";
+/** Cache networks for 24h. Network list rarely changes; reduces API load by ~90%. */
+const NETWORKS_STALE_TIME_MS = 24 * 60 * 60 * 1000;
+
+async function fetcherNetworks(): Promise<NetworkConfig[]> {
+  const data = await getNetworks();
+  return data;
+}
 
 interface NetworksContextValue {
   networks: NetworkConfig[];
@@ -26,62 +34,40 @@ export function useNetworksContext(): NetworksContextValue | null {
 }
 
 export function NetworksProvider({ children }: { children: React.ReactNode }) {
-  const [networks, setNetworks] = useState<NetworkConfig[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const fetchController = useRef<AbortController | null>(null);
-
-  const fetchNetworks = useCallback(async (signal?: AbortSignal) => {
-    try {
-      setError(null);
-      const data = await getNetworks(undefined, signal);
-      setNetworks(data);
-    } catch (err: unknown) {
-      if (!isAbortError(err)) {
-        setError(getErrorMessage(err, "Failed to fetch networks"));
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const { data, error, isLoading, mutate } = useSWR(NETWORKS_SWR_KEY, fetcherNetworks, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: true,
+    revalidateOnMount: false,
+    dedupingInterval: NETWORKS_STALE_TIME_MS,
+    errorRetryCount: 1,
+    keepPreviousData: true,
+  });
 
   const refetch = useCallback(async () => {
-    if (fetchController.current) {
-      fetchController.current.abort();
-    }
-    fetchController.current = new AbortController();
-    setLoading(true);
-    await fetchNetworks(fetchController.current.signal);
-  }, [fetchNetworks]);
+    await mutate();
+  }, [mutate]);
 
   const getNetworkByChainId = useCallback(
-    (chainId: number) => networks.find((n) => n.chain_id === chainId),
-    [networks]
+    (chainId: number) => (data ?? []).find((n) => n.chain_id === chainId),
+    [data]
   );
 
   const getNetworkById = useCallback(
-    (id: string) => networks.find((n) => n.id === id),
-    [networks]
+    (id: string) => (data ?? []).find((n) => n.id === id),
+    [data]
   );
 
-  useEffect(() => {
-    fetchController.current = new AbortController();
-    fetchNetworks(fetchController.current.signal);
-    return () => {
-      if (fetchController.current) {
-        fetchController.current.abort();
-      }
-    };
-  }, [fetchNetworks]);
-
-  const value: NetworksContextValue = {
-    networks,
-    loading,
-    error,
-    refetch,
-    getNetworkByChainId,
-    getNetworkById,
-  };
+  const value: NetworksContextValue = useMemo(
+    () => ({
+      networks: data ?? [],
+      loading: isLoading,
+      error: error ? getErrorMessage(error, "Failed to fetch networks") : null,
+      refetch,
+      getNetworkByChainId,
+      getNetworkById,
+    }),
+    [data, isLoading, error, refetch, getNetworkByChainId, getNetworkById]
+  );
 
   return (
     <NetworksContext.Provider value={value}>{children}</NetworksContext.Provider>

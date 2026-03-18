@@ -8,24 +8,15 @@ import express from "express";
 import { specAgent, designAgent, codegenAgent, testAgent, autofixAgent, estimateAgent, pashovAuditAgent, type AgentContext, type DesignProposal, type AutofixInput } from "./agents.js";
 import { resolveAgentSession } from "./agentSession.js";
 import { generateFromWizard } from "./ozWizard.js";
-import { simulate, getDeployPlan, pin, unpin } from "./simulateDeploy.js";
 
-const REQUEST_ID_HEADER = "x-request-id";
-
-function requestIdMiddleware(req: express.Request, _res: express.Response, next: express.NextFunction): void {
-  const id = (req.headers[REQUEST_ID_HEADER] as string)?.trim() || "";
-  (req as express.Request & { requestId?: string }).requestId = id;
-  if (id && process.env.NODE_ENV !== "production") {
-    console.log(`[agent-runtime] requestId=${id} path=${req.path}`);
-  }
-  next();
-}
+import { requestIdMiddleware, otelRequestSpanMiddleware } from "@hyperagent/backend-middleware";
 
 const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || "http://localhost:3000").split(",").map((o) => o.trim());
 const INTERNAL_AUTH_TOKEN = process.env.INTERNAL_SERVICE_TOKEN || "";
 
 const app = express();
 app.use(requestIdMiddleware);
+app.use(otelRequestSpanMiddleware);
 app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
 app.use(express.json({ limit: "2mb" }));
 
@@ -179,117 +170,7 @@ app.post("/agents/pashov-audit", async (req, res) => {
   }
 });
 
-async function handleSimulate(req: express.Request, res: express.Response): Promise<void> {
-  try {
-    const { network, from, to, data, value } = req.body as { network?: string; from?: string; to?: string; data?: string; value?: string };
-    if (!network || !from || !data) {
-      res.status(400).json({ success: false, error: "network, from, and data are required" });
-      return;
-    }
-    const result = await simulate({ network, from, to, data, value: value ?? "0" });
-    res.json(result);
-  } catch (e: unknown) {
-    console.error("[simulate]", e);
-    res.status(500).json({ success: false, error: e instanceof Error ? e.message : "Simulation failed" });
-  }
-}
-
-app.post("/agents/simulate", handleSimulate);
-app.post("/simulate", handleSimulate);
-
-async function handleDeploy(req: express.Request, res: express.Response): Promise<void> {
-  try {
-    const { chainId, bytecode, abi, constructorArgs = [], contractName } = req.body;
-    if (!chainId || !bytecode || !abi || !Array.isArray(abi)) {
-      res.status(400).json({ error: "chainId, bytecode, and abi are required" });
-      return;
-    }
-    if (typeof bytecode !== "string" || (bytecode !== "" && (!bytecode.startsWith("0x") || !/^0x[0-9a-fA-F]+$/.test(bytecode)))) {
-      res.status(400).json({ error: "bytecode must be hex string" });
-      return;
-    }
-    const args = Array.isArray(constructorArgs) ? constructorArgs : [];
-    const plan = await getDeployPlan({ chainId, bytecode, abi, constructorArgs: args, contractName });
-    res.json(plan);
-  } catch (e: unknown) {
-    console.error("[deploy]", e);
-    res.status(500).json({ error: e instanceof Error ? e.message : "Deploy failed" });
-  }
-}
-
-app.post("/agents/deploy", handleDeploy);
-app.post("/deploy", handleDeploy);
-
-async function handlePin(req: express.Request, res: express.Response): Promise<void> {
-  try {
-    const { content, name } = req.body as { content?: string; name?: string };
-    if (!content || !name) {
-      res.status(400).json({ error: "content and name are required" });
-      return;
-    }
-    const result = await pin({ content, name });
-    res.json(result);
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "Pin failed";
-    if (msg.includes("PINATA_JWT")) {
-      res.status(503).json({ error: msg });
-      return;
-    }
-    console.error("[pin]", e);
-    res.status(500).json({ error: msg });
-  }
-}
-
-app.post("/agents/pin", handlePin);
-app.post("/pin", handlePin);
-
-app.post("/ipfs/pin", async (req, res) => {
-  try {
-    const { content, name } = req.body as { content?: string; name?: string };
-    if (!content || !name) {
-      res.status(400).json({ error: "content and name are required" });
-      return;
-    }
-    const result = await pin({ content, name });
-    res.json({ success: true, cid: result.cid, gatewayUrl: result.gatewayUrl });
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "Pin failed";
-    if (msg.includes("PINATA_JWT")) {
-      res.status(503).json({ error: msg });
-      return;
-    }
-    console.error("[ipfs/pin]", e);
-    res.status(500).json({ error: msg });
-  }
-});
-
-app.post("/ipfs/unpin", async (req, res) => {
-  try {
-    const { cid } = req.body as { cid?: string };
-    if (!cid) {
-      res.status(400).json({ error: "cid required" });
-      return;
-    }
-    await unpin(cid);
-    res.json({ success: true, cid });
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "Unpin failed";
-    if (msg.includes("PINATA_JWT")) {
-      res.status(503).json({ error: msg });
-      return;
-    }
-    console.error("[ipfs/unpin]", e);
-    res.status(500).json({ error: msg });
-  }
-});
-
-app.get("/health", (_req, res) =>
-  res.json({
-    status: "ok",
-    tenderly_configured: Boolean(process.env.TENDERLY_API_KEY),
-    pinata_configured: Boolean(process.env.PINATA_JWT),
-  })
-);
+app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
 const port = Number(process.env.PORT) || 4001;
 app.listen(port, "0.0.0.0", () => console.log(`[Agent Runtime] listening on ${port}`));

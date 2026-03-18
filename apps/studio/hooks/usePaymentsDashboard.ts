@@ -90,5 +90,11 @@ export function usePaymentsDashboard(
     void fetchAll();
   }, [fetchAll]);
 
+  useEffect(() => {
+    if (!enabled) return;
+    const interval = setInterval(() => void fetchAll(), 60_000);
+    return () => clearInterval(interval);
+  }, [enabled, fetchAll]);
+
   return { data, loading, error, refetch: fetchAll };
 }

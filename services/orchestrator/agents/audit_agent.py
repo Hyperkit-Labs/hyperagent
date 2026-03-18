@@ -1,5 +1,5 @@
 """Audit agent: call audit service (Slither + Mythril); persist to security_findings.
-Includes weighted-evidence consensus resolution for conflicting tool results.
+Tiered gate model: Slither/Mythril block on High/Critical; Pashov blocks only when corroborated.
 When OPENSANDBOX_ENABLED, routes through ExecutionBackend for gVisor/Firecracker isolation."""
 
 import logging
@@ -7,13 +7,16 @@ import os
 from collections import defaultdict
 
 import httpx
+from circuit_breaker import CircuitOpenError, get_breaker
 from db import insert_security_finding, is_configured
-from registries import get_timeout
+from registries import get_deterministic_tools, get_timeout, get_tool_deploy_rule
 from trace_context import get_trace_headers
+
+_AUDIT_BREAKER_NAME = "audit_service"
 
 logger = logging.getLogger(__name__)
 AUDIT_SERVICE_URL = os.environ.get("AUDIT_SERVICE_URL", "http://localhost:8001")
-AUDIT_TOOLS = ["slither", "mythril"]
+AUDIT_TOOLS = ["slither", "mythril", "echidna"]
 OPENSANDBOX_ENABLED = os.environ.get(
     "OPENSANDBOX_ENABLED", "false"
 ).strip().lower() in ("1", "true", "yes")
@@ -69,6 +72,103 @@ def _resolve_consensus(findings: list[dict]) -> list[dict]:
     return resolved
 
 
+def _is_pashov_corroborated(
+    pashov_finding: dict,
+    deterministic_findings: list[dict],
+) -> bool:
+    """True if Pashov finding is corroborated by Slither/Mythril/Echidna/Tenderly.
+    Corroboration: same or overlapping location/title/category from a deterministic tool."""
+    det_tools = set(get_deterministic_tools())
+    p_title = (pashov_finding.get("title") or "").lower()
+    p_desc = (pashov_finding.get("description") or "").lower()
+    p_loc = (pashov_finding.get("location") or "").lower()
+
+    for f in deterministic_findings:
+        tool = (f.get("tool") or "").lower()
+        if not any(dt in tool for dt in det_tools):
+            continue
+        d_title = (f.get("title") or "").lower()
+        d_desc = (f.get("description") or "").lower()
+        d_loc = (f.get("location") or "").lower()
+        d_cat = (f.get("category") or "").lower()
+
+        if p_title and d_title and (p_title in d_title or d_title in p_title):
+            return True
+        if p_desc and d_desc and (p_desc[:80] in d_desc or d_desc[:80] in p_desc):
+            return True
+        if p_loc and d_loc and (p_loc in d_loc or d_loc in p_loc):
+            return True
+        keywords = ["reentrancy", "access", "overflow", "unchecked", "transfer", "call"]
+        if any(k in p_title or k in p_desc for k in keywords) and any(
+            k in d_title or k in d_desc or k in d_cat for k in keywords
+        ):
+            return True
+    return False
+
+
+def _tool_to_gate_key(tool: str) -> str:
+    """Map finding tool string to tiered gate key."""
+    t = (tool or "").lower()
+    if "pashov" in t:
+        return "pashov"
+    if "slither" in t:
+        return "slither"
+    if "mythril" in t:
+        return "mythril"
+    if "echidna" in t:
+        return "echidna"
+    if "scrubd" in t:
+        return "scrubd"
+    return "unknown"
+
+
+def _finding_blocks_deploy(
+    finding: dict,
+    all_findings: list[dict],
+    echidna_harness_available: bool = False,
+) -> bool:
+    """Apply tiered gate: return True if this finding blocks deploy."""
+    tool = (finding.get("tool") or "").lower()
+    severity = (finding.get("severity") or "info").lower()
+    gate_key = _tool_to_gate_key(tool)
+    deploy_rule = get_tool_deploy_rule(gate_key)
+
+    if "slither" in tool or "mythril" in tool:
+        if deploy_rule == "block_on_high_critical" and severity in ("high", "critical"):
+            return True
+
+    if "echidna" in tool:
+        if deploy_rule == "block_when_harness_fails":
+            if echidna_harness_available and severity in ("medium", "high", "critical"):
+                return True
+            if not echidna_harness_available:
+                return False
+
+    if "pashov" in tool:
+        if deploy_rule == "block_only_when_corroborated":
+            if _is_pashov_corroborated(finding, [f for f in all_findings if f != finding]):
+                return severity in ("high", "critical")
+            return False
+
+    if "scrubd" in tool or finding.get("scrubd_matched"):
+        if deploy_rule == "block_on_matched_patterns":
+            return severity in ("medium", "high", "critical")
+
+    return False
+
+
+def compute_audit_deploy_blocked(
+    findings: list[dict],
+    echidna_harness_available: bool = False,
+) -> tuple[bool, list[dict]]:
+    """Apply tiered gate model. Returns (deploy_blocked, blocking_findings)."""
+    blocking: list[dict] = []
+    for f in findings:
+        if _finding_blocks_deploy(f, findings, echidna_harness_available):
+            blocking.append(f)
+    return len(blocking) > 0, blocking
+
+
 async def _run_audit_via_execution_backend(
     contract_name: str,
     code: str,
@@ -81,11 +181,17 @@ async def _run_audit_via_execution_backend(
         from execution_backend import get_execution_backend
 
         backend = get_execution_backend()
+        on_log = None
+        if is_configured() and run_id:
+            from db import insert_agent_log
+            def _on_log(tool: str, line: str) -> None:
+                insert_agent_log(run_id, tool, "audit", line[:4096], log_level="info")
+            on_log = _on_log
         if OPENSANDBOX_ENABLED and hasattr(backend, "run_multi_engine_audit"):
-            result = await backend.run_multi_engine_audit(code, contract_name)
+            result = await backend.run_multi_engine_audit(code, contract_name, on_log=on_log)
         else:
             result = await backend.run_audit(
-                code, contract_name, tools=list(AUDIT_TOOLS)
+                code, contract_name, tools=list(AUDIT_TOOLS), on_log=on_log
             )
         tool_label = ",".join(result.tools_run) or "audit"
         findings = []
@@ -146,7 +252,10 @@ async def run_security_audits(
                 findings.extend(exec_findings)
                 audit_succeeded_count += 1
             continue
+        breaker = get_breaker(_AUDIT_BREAKER_NAME)
         try:
+            if not breaker.can_execute():
+                raise CircuitOpenError(f"Circuit {_AUDIT_BREAKER_NAME} is open")
             headers = get_trace_headers()
             async with httpx.AsyncClient(timeout=get_timeout("audit")) as client:
                 r = await client.post(
@@ -156,6 +265,7 @@ async def run_security_audits(
                     headers=headers,
                 )
                 if r.status_code != 200:
+                    breaker.record_failure()
                     logger.warning(
                         "[audit] %s returned %s: %s",
                         contract_name,
@@ -163,6 +273,7 @@ async def run_security_audits(
                         r.text[:200],
                     )
                     continue
+                breaker.record_success()
                 audit_succeeded_count += 1
                 data = r.json()
                 raw_findings = (
@@ -195,7 +306,11 @@ async def run_security_audits(
                             location=finding.get("location"),
                             category=finding.get("category"),
                         )
+        except CircuitOpenError as e:
+            logger.warning("[audit] %s circuit open, skipping: %s", contract_name, e)
+            continue
         except Exception as e:
+            breaker.record_failure()
             logger.warning("[audit] %s failed: %s", contract_name, e)
             continue
 

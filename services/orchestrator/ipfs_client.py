@@ -1,4 +1,5 @@
 """IPFS/Pinata artifact pinning. Pins specs, audit reports, code, and ABIs after pipeline stages.
+Uses StorageProvider (providers.py) for HTTP calls; single path with retries and circuit breaker.
 Set STORAGE_SERVICE_URL (default http://localhost:4005) to enable. No-op when unconfigured."""
 
 from __future__ import annotations
@@ -8,14 +9,11 @@ import logging
 import os
 from typing import Any
 
-import httpx
-
 logger = logging.getLogger(__name__)
 
 STORAGE_SERVICE_URL = os.environ.get(
     "STORAGE_SERVICE_URL", "http://localhost:4005"
 ).rstrip("/")
-IPFS_TIMEOUT = float(os.environ.get("IPFS_TIMEOUT_SEC", "15"))
 
 
 def is_configured() -> bool:
@@ -24,35 +22,20 @@ def is_configured() -> bool:
     ) or bool(os.environ.get("IPFS_ENABLED"))
 
 
-async def _do_pin_json(
-    content: str, name: str, metadata: dict[str, str] | None
-) -> str | None:
-    async with httpx.AsyncClient(timeout=IPFS_TIMEOUT) as client:
-        r = await client.post(
-            f"{STORAGE_SERVICE_URL}/ipfs/pin",
-            json={
-                "content": content,
-                "name": name,
-                "metadata": metadata or {},
-            },
-        )
-        r.raise_for_status()
-        result = r.json()
-        return result.get("cid") or result.get("IpfsHash") or result.get("ipfs_hash")
-
-
 async def pin_json(
     data: dict | list | str, name: str, metadata: dict[str, str] | None = None
 ) -> str | None:
-    """Pin JSON data to IPFS via the storage service. Returns CID or None on failure."""
+    """Pin JSON data to IPFS via StorageProvider. Returns CID or None on failure."""
     if not is_configured():
         return None
     content = data if isinstance(data, str) else json.dumps(data, default=str)
     try:
-        from circuit_breaker import CircuitOpenError, get_breaker
+        from circuit_breaker import CircuitOpenError
+        from providers import get_storage_provider
 
-        breaker = get_breaker("ipfs")
-        cid = await breaker.call(_do_pin_json, content, name, metadata)
+        provider = get_storage_provider()
+        result = await provider.pin(content, name)
+        cid = result.get("cid")
         if cid:
             logger.info("[ipfs] pinned %s → %s", name, cid)
         return cid
@@ -109,7 +92,13 @@ async def record_storage(
             )
         client = db._client()
         if client:
-            gateway_url = f"https://gateway.pinata.cloud/ipfs/{cid}"
+            gateway_base = os.environ.get("PINATA_GATEWAY_BASE", "").strip()
+            gateway_domain = os.environ.get("PINATA_GATEWAY_DOMAIN", "gateway.pinata.cloud").strip()
+            gateway_url = (
+                f"{gateway_base.rstrip('/')}/{cid}"
+                if gateway_base
+                else f"https://{gateway_domain}/ipfs/{cid}"
+            )
             row = {
                 "run_id": run_id,
                 "artifact_type": stage,

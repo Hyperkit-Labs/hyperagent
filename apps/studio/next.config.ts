@@ -75,11 +75,19 @@ const nextConfig: NextConfig = {
       'wss:',
       'https://*.thirdweb.com',
       'https://*.supabase.co',
+      // Chain RPCs: wallet connect and smart-account resolution
+      'https://base-sepolia-testnet.skalenodes.com',
+      'https://skale-base.skalenodes.com',
+      'https://sepolia.base.org',
+      // thirdweb bundler (AA)
+      'https://*.bundler.thirdweb.com',
     ].filter(Boolean).join(' ');
+    const scriptSrc = "'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com";
     const csp = [
       "default-src 'self'",
       `connect-src ${connectSrc}`,
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      `script-src ${scriptSrc}`,
+      `script-src-elem 'self' 'unsafe-inline' https://va.vercel-scripts.com`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https: blob:",
       "font-src 'self' data:",

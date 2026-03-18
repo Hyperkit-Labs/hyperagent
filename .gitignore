@@ -496,6 +496,11 @@ external/*
 artifacts/
 platform/
 
+# GitHub (local/generated)
+.github/issues/
+.github/pr-bodies/
+.github/scripts/
+
 # Docker environment files (contain secrets)
 infra/docker/.env
 infra/docker/.env.local

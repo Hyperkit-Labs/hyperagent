@@ -4,11 +4,16 @@ Workflow store: Supabase (runs.workflow_state) as source of truth when configure
 
 from __future__ import annotations
 
+import logging
+import os
 import threading
+import time
 from datetime import UTC, datetime
 from typing import Any
 
 import db as _db
+
+logger = logging.getLogger(__name__)
 
 
 def _ensure_contracts_dict(raw: Any) -> dict[str, Any]:
@@ -34,8 +39,31 @@ def _ensure_contracts_dict(raw: Any) -> dict[str, Any]:
 
 _workflows: dict[str, dict[str, Any]] = {}
 _lock = threading.Lock()
+_MAX_IN_MEMORY_WORKFLOWS = int(os.environ.get("IN_MEMORY_WORKFLOW_LIMIT", "500"))
+_MAX_AGE_SECONDS = float(os.environ.get("IN_MEMORY_WORKFLOW_TTL_SEC", "3600"))
 
 MAX_INTENT_LENGTH = 10_000
+
+
+def _evict_if_needed() -> None:
+    """Evict oldest workflows when over limit or TTL. Only when Supabase not configured."""
+    if _db.is_configured():
+        return
+    with _lock:
+        n = len(_workflows)
+        if n < _MAX_IN_MEMORY_WORKFLOWS:
+            return
+        now = time.monotonic()
+        items = [
+            (wid, rec.get("updated_at") or rec.get("created_at") or "")
+            for wid, rec in _workflows.items()
+        ]
+        items.sort(key=lambda x: x[1])
+        to_remove = max(0, n - _MAX_IN_MEMORY_WORKFLOWS)
+        for i in range(min(to_remove, len(items))):
+            wid = items[i][0]
+            del _workflows[wid]
+            logger.info("[store] evicted workflow_id=%s (in-memory limit)", wid)
 
 
 def _new_record(
@@ -69,6 +97,7 @@ def _new_record(
         "spec": None,
         "spec_approved": False,
         "user_id": user_id,
+        "wallet_user_id": user_id,
         "project_id": project_id,
         "simulation_passed": False,
         "simulation_results": [],
@@ -85,12 +114,21 @@ def create_workflow(
     project_id: str = "",
     template_id: str | None = None,
 ) -> dict[str, Any]:
-    """Create a new workflow record; persist to Supabase when configured, always keep in-memory copy."""
+    """Create a new workflow record; persist to Supabase when configured, always keep in-memory copy.
+    Writes to run_state when migration applied; keeps upsert_workflow_state for backward compat (deprecated).
+    When Supabase not configured, evicts oldest workflows when over IN_MEMORY_WORKFLOW_LIMIT."""
     record = _new_record(workflow_id, intent, network, user_id, project_id, template_id)
     with _lock:
         _workflows[workflow_id] = record
+    _evict_if_needed()
     if _db.is_configured():
-        _db.upsert_workflow_state(workflow_id, record)
+        _db.upsert_run_state(
+            workflow_id,
+            phase="spec",
+            status="running",
+            current_step="spec",
+        )
+        _db.upsert_workflow_state(workflow_id, record)  # deprecated: full blob
     return record
 
 
@@ -113,18 +151,12 @@ def update_workflow(
     test_files: dict[str, Any] | None = None,
     metadata_merge: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
-    """Update an existing workflow record; persist to Supabase when configured."""
+    """Update workflow; run_state (delta) is primary write path. Blob written only when rich fields change."""
     now = datetime.now(UTC).isoformat()
-    rec = None
-    if _db.is_configured():
-        rec = _db.get_workflow_state(workflow_id)
-    if rec is None:
-        with _lock:
-            rec = _workflows.get(workflow_id)
-            if rec:
-                rec = dict(rec)
+    rec = get_workflow(workflow_id)
     if not rec:
         return None
+    rec = dict(rec)
     if status is not None:
         rec["status"] = _normalize_status(status)
     if current_stage is not None:
@@ -161,7 +193,31 @@ def update_workflow(
     with _lock:
         _workflows[workflow_id] = rec
     if _db.is_configured():
-        _db.upsert_workflow_state(workflow_id, rec)
+        phase = current_stage or rec.get("current_stage") or "spec"
+        _db.upsert_run_state(
+            workflow_id,
+            phase=phase,
+            status=rec.get("status", "running"),
+            current_step=current_stage or rec.get("current_stage"),
+            simulation_passed=rec.get("simulation_passed", False),
+        )
+        # Blob write only when rich pipeline fields change (contracts, spec, deployments, ui_schema, audit).
+        # Status-only updates go solely to run_state.
+        _rich_changed = any(x is not None for x in (contracts, spec, deployments, ui_schema, audit_findings, test_files))
+        if _rich_changed:
+            _db.upsert_workflow_state(workflow_id, rec)
+            proj_id = rec.get("project_id") or ""
+            if _db.is_uuid(proj_id):
+                _db.upsert_workflow_artifacts(
+                    run_id=workflow_id,
+                    project_id=proj_id,
+                    spec=rec.get("spec"),
+                    contracts=rec.get("contracts"),
+                    deployments=rec.get("deployments"),
+                    audit_findings=rec.get("audit_findings"),
+                    ui_schema=rec.get("ui_schema"),
+                    test_files=rec.get("test_files"),
+                )
     return rec
 
 
@@ -189,11 +245,24 @@ def _normalize_status(stage: str) -> str:
 
 
 def get_workflow(workflow_id: str) -> dict[str, Any] | None:
-    """Return workflow by id; from Supabase when configured."""
+    """Return workflow; run_state is authoritative for status/phase. Blob supplies rich fields."""
     if _db.is_configured():
-        rec = _db.get_workflow_state(workflow_id)
-        if rec:
-            rec = dict(rec)
+        # Prefer run_state for operational fields; enrich with blob for rich pipeline data.
+        run_st = _db.get_run_state(workflow_id)
+        blob = _db.get_workflow_state(workflow_id)
+        if run_st or blob:
+            rec: dict[str, Any] = dict(blob) if blob else {}
+            if run_st:
+                # run_state wins for these operational fields
+                if run_st.get("status"):
+                    rec["status"] = _normalize_status(run_st["status"])
+                if run_st.get("phase"):
+                    rec["current_stage"] = run_st["phase"]
+                if run_st.get("simulation_passed") is not None:
+                    rec["simulation_passed"] = run_st["simulation_passed"]
+                if run_st.get("current_step"):
+                    rec.setdefault("current_stage", run_st["current_step"])
+                rec.setdefault("workflow_id", workflow_id)
             rec["contracts"] = _ensure_contracts_dict(rec.get("contracts"))
             return rec
     with _lock:

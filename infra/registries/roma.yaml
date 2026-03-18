@@ -1,5 +1,5 @@
 # ROMA trigger and complexity (GitOps). Tuning ROMA usage without code change.
-apiVersion: hyperagent.io/v1
+apiVersion: hyperkitlabs.com/v1
 kind: RomaRegistry
 metadata:
   name: roma-spec

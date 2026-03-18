@@ -2,13 +2,19 @@
  * Simulation service backend: uses shared toolkit from @hyperagent/ai-tools.
  * Types from @hyperagent/core-types; implementation is TenderlyToolkit.
  */
-import type { SimulateRequest, SimulateTxResult } from "@hyperagent/core-types";
+import type {
+  SimulateRequest,
+  SimulateTxResult,
+  SimulateBundleRequest,
+  SimulateBundleResult,
+} from "@hyperagent/core-types";
 import { TenderlyToolkit } from "@hyperagent/ai-tools";
 
-export type { SimulateRequest, SimulateTxResult };
+export type { SimulateRequest, SimulateTxResult, SimulateBundleRequest, SimulateBundleResult };
 
 export interface ISimulationBackend {
   simulate(tx: SimulateRequest): Promise<SimulateTxResult>;
+  simulateBundle?(req: SimulateBundleRequest): Promise<SimulateBundleResult>;
 }
 
 export function createDefaultBackend(): ISimulationBackend | null {

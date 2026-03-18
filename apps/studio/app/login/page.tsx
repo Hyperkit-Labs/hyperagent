@@ -11,6 +11,7 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 
 import { PipelineDemo, NumberTicker } from "@/components/ui";
+import { useServerStatus } from "@/hooks/useServerStatus";
 
 const CHAIN_LOGOS = [
   { src: "/arbitrum-white.png", alt: "Arbitrum" },
@@ -30,6 +31,7 @@ function LoginContent() {
   const account = useActiveAccount();
   const { hasSession, isReady } = useSession();
   const { trackRecord } = useTrackRecord();
+  const serverStatus = useServerStatus();
 
   useEffect(() => {
     if (!isReady || !hasSession || !account) return;
@@ -40,6 +42,22 @@ function LoginContent() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[var(--color-bg-base)] bg-web3">
+      {/* Server status badge — top-right */}
+      <div className="fixed top-4 right-4 z-10 flex items-center gap-2 rounded-full border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)]/80 px-3 py-1.5 text-xs font-medium backdrop-blur-sm">
+        <span
+          className={`h-2 w-2 shrink-0 rounded-full ${
+            serverStatus === "up"
+              ? "bg-emerald-500"
+              : serverStatus === "down"
+                ? "bg-red-500"
+                : "animate-pulse bg-amber-500"
+          }`}
+          aria-hidden
+        />
+        <span className="text-[var(--color-text-secondary)]">
+          Server: {serverStatus === "up" ? "Up" : serverStatus === "down" ? "Down" : "Checking…"}
+        </span>
+      </div>
       <div className="absolute inset-0 grid-pattern bg-grid" aria-hidden />
       <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[50vw] h-[60vh] max-w-[600px] pointer-events-none hidden lg:block" aria-hidden>
         <div

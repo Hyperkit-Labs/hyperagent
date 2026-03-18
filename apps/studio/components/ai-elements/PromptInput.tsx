@@ -72,8 +72,8 @@ export function PromptInputAttachments({ children }: { children: React.ReactNode
   return <div className="px-3 pt-2 flex flex-wrap gap-2 border-b border-[var(--color-border-subtle)]">{children}</div>;
 }
 
-export function PromptInputFooter({ children }: { children: React.ReactNode }) {
-  return <div className="flex items-center justify-between px-2 pb-2 pt-1">{children}</div>;
+export function PromptInputFooter({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <div className={className ?? "flex items-center justify-between px-2 pb-2 pt-1"}>{children}</div>;
 }
 
 export interface PromptInputProps {

@@ -1,0 +1,216 @@
+# HyperAgent Chain Capabilities (GitOps)
+# Product policy only. Chain metadata (RPC, explorer, native currency) comes from thirdweb.
+# thirdweb owns chain resolution and RPC-facing objects; HyperAgent owns capability policy.
+# Use rpcUrl/explorerUrl only for chains where thirdweb metadata is missing or needs override.
+
+apiVersion: hyperkitlabs.com/v1
+kind: ChainCapabilities
+metadata:
+  name: hyperagent-chain-capabilities
+  version: 1.0.0
+spec:
+  chains:
+    ethereum-mainnet:
+      chainId: 1
+      enabled: true
+      tier: canonical
+      category: L1
+      capabilities:
+        tenderly: true
+        x402: true
+        verification: full
+        accountAbstraction:
+          erc4337: true
+          eip7702: true
+      defaults:
+        framework: hardhat
+        gasStrategy: standard
+        securityProfile: strict
+
+    base-mainnet:
+      chainId: 8453
+      enabled: true
+      tier: primary
+      category: L2
+      capabilities:
+        tenderly: true
+        x402: true
+        verification: full
+        accountAbstraction:
+          erc4337: true
+          eip7702: true
+      defaults:
+        framework: hardhat
+        gasStrategy: standard
+        securityProfile: strict
+
+    skalebase-mainnet:
+      chainId: 1187947933
+      enabled: true
+      tier: preferred
+      category: L2
+      rpcUrl: https://skale-base.skalenodes.com/v1/base
+      explorerUrl: https://skale-base-explorer.skalenodes.com/
+      nativeCurrency:
+        symbol: CREDIT
+        decimals: 18
+      capabilities:
+        tenderly: false
+        x402: true
+        erc8004: true
+        verification: full
+        accountAbstraction:
+          erc4337: true
+          eip7702: false
+      defaults:
+        framework: foundry
+        gasStrategy: low
+        securityProfile: strict
+
+    skalebase-sepolia:
+      chainId: 324705682
+      enabled: true
+      tier: primary
+      category: testnet
+      rpcUrl: https://base-sepolia-testnet.skalenodes.com/v1/jubilant-horrible-ancha
+      explorerUrl: https://base-sepolia-testnet-explorer.skalenodes.com/
+      nativeCurrency:
+        symbol: CREDIT
+        decimals: 18
+      capabilities:
+        tenderly: false
+        x402: true
+        erc8004: true
+        verification: full
+        accountAbstraction:
+          erc4337: true
+          eip7702: false
+      aa:
+        provider: thirdweb
+        factoryMode: custom
+        entrypointVersion: "0.6"
+      defaults:
+        framework: foundry
+        gasStrategy: cheap
+        securityProfile: relaxed
+
+    mantle-mainnet:
+      chainId: 5000
+      enabled: true
+      tier: preferred
+      category: L2
+      capabilities:
+        tenderly: true
+        x402: true
+        verification: full
+        accountAbstraction:
+          erc4337: true
+          eip7702: false
+      defaults:
+        framework: hardhat
+        gasStrategy: low
+        securityProfile: strict
+
+    avalanche-c:
+      chainId: 43114
+      enabled: true
+      tier: supported
+      category: L1
+      capabilities:
+        tenderly: true
+        x402: true
+        erc8004: true
+        verification: full
+        accountAbstraction:
+          erc4337: true
+          eip7702: false
+      defaults:
+        framework: hardhat
+        gasStrategy: standard
+        securityProfile: strict
+
+    avalanche-fuji:
+      chainId: 43113
+      enabled: true
+      tier: primary
+      category: testnet
+      capabilities:
+        tenderly: true
+        x402: true
+        erc8004: true
+        verification: full
+        accountAbstraction:
+          erc4337: true
+          eip7702: false
+      defaults:
+        framework: hardhat
+        gasStrategy: cheap
+        securityProfile: relaxed
+
+    arbitrum-one:
+      chainId: 42161
+      enabled: true
+      tier: supported
+      category: L2
+      capabilities:
+        tenderly: true
+        x402: true
+        verification: full
+        accountAbstraction:
+          erc4337: true
+          eip7702: false
+      defaults:
+        framework: foundry
+        gasStrategy: low
+        securityProfile: strict
+
+    bsc-mainnet:
+      chainId: 56
+      enabled: true
+      tier: supported
+      category: L1
+      capabilities:
+        tenderly: true
+        x402: true
+        verification: full
+        accountAbstraction:
+          erc4337: true
+          eip7702: false
+      defaults:
+        framework: hardhat
+        gasStrategy: standard
+        securityProfile: medium
+
+    opbnb-mainnet:
+      chainId: 204
+      enabled: true
+      tier: experimental
+      category: L2
+      capabilities:
+        tenderly: false
+        x402: true
+        verification: full
+        accountAbstraction:
+          erc4337: true
+          eip7702: false
+      defaults:
+        framework: hardhat
+        gasStrategy: low
+        securityProfile: medium
+
+    filecoin-mainnet:
+      chainId: 314
+      enabled: true
+      tier: specialized
+      category: L1-storage
+      capabilities:
+        tenderly: false
+        x402: true
+        verification: limited
+        accountAbstraction:
+          erc4337: false
+          eip7702: false
+      defaults:
+        framework: hardhat
+        gasStrategy: standard
+        securityProfile: strict

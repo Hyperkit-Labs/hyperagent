@@ -1,5 +1,5 @@
 # Orchestrator timeouts and backends (GitOps). Single source for which DA/memory backend to use.
-apiVersion: hyperagent.io/v1
+apiVersion: hyperkitlabs.com/v1
 kind: OrchestratorRegistry
 metadata:
   name: orchestrator-settings

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import { Loader2, Plus, Layers } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import { PageTitle } from "@/components/layout/PageTitle";
@@ -10,6 +11,7 @@ export default function AppsListPage() {
   const { workflows, loading, error } = useWorkflows({ filters: { limit: 50 } });
 
   return (
+    <RequireApiSession>
     <div className="p-6 lg:p-8">
       <div className="max-w-[1200px] mx-auto space-y-6 animate-enter">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
@@ -84,5 +86,6 @@ export default function AppsListPage() {
         )}
       </div>
     </div>
+    </RequireApiSession>
   );
 }

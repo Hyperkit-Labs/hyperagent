@@ -15,15 +15,17 @@ import cors from "cors";
 import express from "express";
 import { createProxyMiddleware, responseInterceptor } from "http-proxy-middleware";
 import { requestIdMiddleware, RequestWithId } from "./requestId.js";
+import { otelRequestSpanMiddleware, getTraceparentHeader } from "@hyperagent/backend-middleware";
 import { authMiddleware, RequestWithUser } from "./auth.js";
 import { rateLimitMiddleware } from "./rateLimit.js";
-import { siweAuthHandler } from "./siweAuth.js";
+import { authBootstrapHandler, getSupabaseAdmin } from "./authBootstrap.js";
 
 const ORCHESTRATOR_URL = process.env.ORCHESTRATOR_URL || "http://localhost:8000";
 const NODE_ENV = process.env.NODE_ENV || "development";
 const REDIS_URL = process.env.REDIS_URL;
 
-/** Upstream timeout (ms). If orchestrator does not respond, gateway returns 502 instead of hanging. */
+/** Upstream timeout (ms). If orchestrator does not respond, gateway returns 502 instead of hanging.
+ * Default 25s kills SSE during long builds. Set PROXY_TIMEOUT_MS=660000 for real-time terminal (10+ min). */
 const PROXY_TIMEOUT_MS = Number(process.env.PROXY_TIMEOUT_MS) || 25_000;
 
 if (NODE_ENV === "production" && !REDIS_URL) {
@@ -60,6 +62,11 @@ function isAllowedOrigin(origin: string | undefined): boolean {
 }
 
 const app = express();
+
+// Trust first proxy hop (Coolify/Traefik) so req.ip and X-Forwarded-For resolve to real client IP.
+// Without this, all requests appear as the proxy's internal Docker IP.
+app.set("trust proxy", 1);
+
 app.use(
   cors({
     origin: (origin, cb) => {
@@ -71,10 +78,11 @@ app.use(
 );
 
 // Body parsing is NOT applied globally. Proxy routes need the raw request stream intact.
-// Only non-proxied routes (SIWE, health) use express.json() via per-route middleware.
+// Only non-proxied routes (auth bootstrap, health) use express.json() via per-route middleware.
 const jsonParser = express.json({ limit: "2mb" });
 
 app.use(requestIdMiddleware);
+app.use(otelRequestSpanMiddleware);
 app.use(authMiddleware);
 app.use((req, res, next) => {
   (rateLimitMiddleware as (req: express.Request, res: express.Response, next: express.NextFunction) => Promise<void>)(req, res, next).catch(next);
@@ -92,6 +100,8 @@ function proxyOptions(): Record<string, unknown> {
         proxyReq.destroy();
       });
       if (r.requestId) proxyReq.setHeader("x-request-id", r.requestId);
+      const traceparent = getTraceparentHeader() || (r.headers.traceparent as string);
+      if (traceparent) proxyReq.setHeader("traceparent", traceparent);
       if (r.headers.authorization) proxyReq.setHeader("authorization", r.headers.authorization);
       if (r.headers["x-agent-session"]) proxyReq.setHeader("x-agent-session", r.headers["x-agent-session"] as string);
       proxyReq.removeHeader("x-user-id");
@@ -126,8 +136,8 @@ function proxyOptions(): Record<string, unknown> {
   };
 }
 
-// SIWE: wallet sign-in (public, no auth). Needs parsed body, so jsonParser is applied here only.
-app.post("/api/v1/auth/siwe", jsonParser, siweAuthHandler);
+// Single auth entrypoint: SIWE and thirdweb OAuth/in-app. Both upsert wallet_users and issue session JWT.
+app.post("/api/v1/auth/bootstrap", jsonParser, authBootstrapHandler);
 
 // Primary: versioned API (proxied; raw body stream forwarded to orchestrator)
 app.use("/api/v1", createProxyMiddleware(proxyOptions()));
@@ -141,7 +151,51 @@ app.use("/api", createProxyMiddleware(proxyOptions()));
 app.use("/docs", createProxyMiddleware(proxyOptions()));
 app.use("/openapi.json", createProxyMiddleware(proxyOptions()));
 
-app.get("/health", (_req, res) => res.json({ status: "ok", gateway: true }));
+/** Dependency-aware health: return 503 when orchestrator is down. */
+app.get("/health", async (_req, res) => {
+  const supabase = getSupabaseAdmin();
+  const dbCheck = supabase ? await supabase.from("wallet_users").select("id").limit(1) : { error: { message: "Supabase not configured" } };
+  const dbError = dbCheck.error ? (dbCheck.error as { message?: string }).message : null;
+  const dbOk = !dbCheck.error;
+
+  let orchestratorOk = false;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    const r = await fetch(`${ORCHESTRATOR_URL.replace(/\/$/, "")}/health`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    orchestratorOk = r.ok;
+  } catch {
+    orchestratorOk = false;
+  }
+
+  const dbRequired = !!supabase;
+  const criticalOk = orchestratorOk && (!dbRequired || dbOk);
+  if (!criticalOk) {
+    const msg = !orchestratorOk
+      ? "Orchestrator unreachable. Check ORCHESTRATOR_URL and backend status."
+      : "Database unreachable. Check Supabase connection.";
+    res.status(503).json({
+      status: "degraded",
+      gateway: true,
+      orchestrator_ok: orchestratorOk,
+      db_connected: dbOk,
+      db_error: dbError,
+      message: msg,
+    });
+    return;
+  }
+
+  res.json({
+    status: "ok",
+    gateway: true,
+    orchestrator_ok: true,
+    db_connected: dbOk,
+    db_error: dbError,
+  });
+});
 
 const port = Number(process.env.PORT) || 4000;
 app.listen(port, "0.0.0.0", () => {

@@ -1,21 +1,37 @@
 /**
- * IpfsPinataToolkit: wraps Pinata API for pin/unpin. Use from storage service or agent-runtime.
- * Keys and API URL are passed in; no raw vendor SDK in callers.
+ * IpfsPinataToolkit: Pinata IPFS pin/unpin.
+ * Use your dedicated gateway domain (e.g. example-gateway.mypinata.cloud) instead of shared gateway.pinata.cloud.
+ * See docs.pinata.cloud/gateways for dedicated gateway setup.
  */
 import type { PinResult } from "@hyperagent/core-types";
 
 export interface IpfsPinataToolkitOptions {
   jwt: string;
   baseUrl?: string;
+  /** Dedicated gateway domain (e.g. example-gateway.mypinata.cloud). No protocol or path. */
+  gatewayDomain?: string;
+  /** Legacy: full base URL (e.g. https://example-gateway.mypinata.cloud/ipfs). Overrides gatewayDomain when set. */
   gatewayBase?: string;
+}
+
+function buildGatewayUrl(cid: string, opts: IpfsPinataToolkitOptions): string {
+  if (opts.gatewayBase) {
+    const base = opts.gatewayBase.replace(/\/$/, "");
+    return `${base}/${cid}`;
+  }
+  const domain = opts.gatewayDomain || "gateway.pinata.cloud";
+  return `https://${domain}/ipfs/${cid}`;
 }
 
 export class IpfsPinataToolkit {
   constructor(
     private readonly jwt: string,
-    private readonly baseUrl = "https://api.pinata.cloud",
-    private readonly gatewayBase = "https://gateway.pinata.cloud/ipfs"
+    private readonly options: Partial<IpfsPinataToolkitOptions> = {}
   ) {}
+
+  private get baseUrl(): string {
+    return this.options.baseUrl || "https://api.pinata.cloud";
+  }
 
   async pin(content: string, name: string): Promise<PinResult> {
     const response = await fetch(`${this.baseUrl}/pinning/pinJSONToIPFS`, {
@@ -34,9 +50,15 @@ export class IpfsPinataToolkit {
       throw new Error(`Pinata API error: ${error}`);
     }
     const data = (await response.json()) as { IpfsHash: string };
+    const cid = data.IpfsHash;
+    const opts: IpfsPinataToolkitOptions = {
+      jwt: this.jwt,
+      gatewayDomain: this.options.gatewayDomain,
+      gatewayBase: this.options.gatewayBase,
+    };
     return {
-      cid: data.IpfsHash,
-      gatewayUrl: `${this.gatewayBase}/${data.IpfsHash}`,
+      cid,
+      gatewayUrl: buildGatewayUrl(cid, opts),
     };
   }
 

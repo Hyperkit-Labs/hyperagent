@@ -74,8 +74,10 @@ class ExecutionBackend(Protocol):
         contract_code: str,
         contract_name: str,
         tools: list[str] | None = None,
+        on_log: None | ((str, str) -> None) = None,
     ) -> AuditResult:
-        """Run security audit (Slither, Mythril, etc.). Returns findings."""
+        """Run security audit (Slither, Mythril, etc.). Returns findings.
+        on_log(tool, line) called for each stdout/stderr line when streaming is supported."""
         ...
 
     async def run_exploit_sim(

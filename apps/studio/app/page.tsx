@@ -2,9 +2,9 @@
 
 import { useEffect, useState, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useActiveAccount } from "thirdweb/react";
+import { useActiveAccountFromContext } from "@/components/providers/ActiveAccountContext";
 import { useAppChat, hasActiveByokKey } from "@/hooks/useAppChat";
-import { useWorkflowPolling } from "@/hooks/useWorkflowPolling";
+import { useWorkflowProgress } from "@/hooks/useWorkflowProgress";
 import { createWorkflow, DEFAULT_NETWORK, getErrorMessage, handleApiError, requireLLMKeys, LLM_KEYS_REQUIRED_MESSAGE, isByokStorageOrMigrationError, BYOK_SAVE_AGAIN_HINT, isCreditsError } from "@/lib/api";
 import { getSessionOnlyLLMKey, SESSION_LLM_PASS_THROUGH_UPDATED_EVENT } from "@/lib/session-store";
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
@@ -23,7 +23,7 @@ import type { ChatMessage, ToolInvocation } from "@/components/chat/ChatMessageL
 import { needsSpecApproval, needsDeployApproval, hasAuditOrSimFailure } from "@/lib/types";
 import type { Workflow } from "@/lib/types";
 import { useNetworks } from "@/hooks/useNetworks";
-import { useConfig } from "@/components/providers/ConfigProvider";
+import { useSelectedNetwork } from "@/components/providers/SelectedNetworkProvider";
 import { useWorkflows } from "@/hooks/useWorkflows";
 import {
   LayoutGrid,
@@ -46,6 +46,7 @@ import Link from "next/link";
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
 import { LLMKeysCard } from "@/components/settings/LLMKeysCard";
 import { ConnectWalletNav } from "@/components/wallet/ConnectWalletNav";
+import { RequireApiSession } from "@/components/auth/RequireApiSession";
 
 type ShellView = "code" | "data" | "agents";
 
@@ -157,7 +158,7 @@ function SpecReviewPanel({ workflow, onApproved, onError }: { workflow: Workflow
 function ChatPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const account = useActiveAccount();
+  const account = useActiveAccountFromContext();
   const [shellView, setShellView] = useState<ShellView>("code");
   const [workflowsSidebarOpen, setWorkflowsSidebarOpen] = useState(true);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(
@@ -189,18 +190,9 @@ function ChatPageContent() {
   }, []);
 
   const { networks } = useNetworks();
-  const { defaultNetworkId: configDefaultNetwork } = useConfig();
+  const { selectedNetworkId: buildNetwork, setSelectedNetworkId: setBuildNetwork } = useSelectedNetwork();
   const testnets = (networks ?? []).filter((n) => n.is_mainnet === false);
-  const defaultNetwork = configDefaultNetwork ?? testnets[0]?.id ?? DEFAULT_NETWORK;
-  const [buildNetwork, setBuildNetwork] = useState<string>(defaultNetwork);
-  const configNetworkAppliedRef = useRef(false);
-
-  useEffect(() => {
-    if (configDefaultNetwork && !configNetworkAppliedRef.current) {
-      configNetworkAppliedRef.current = true;
-      setBuildNetwork(configDefaultNetwork);
-    }
-  }, [configDefaultNetwork]);
+  const defaultNetwork = testnets[0]?.id ?? DEFAULT_NETWORK;
 
   const {
     messages: sdkMessages,
@@ -233,7 +225,8 @@ function ChatPageContent() {
     contractData,
     contractCode,
     fetchWorkflow,
-  } = useWorkflowPolling(selectedWorkflowId);
+    discussionEvents,
+  } = useWorkflowProgress(selectedWorkflowId);
 
   const loadingContracts = selectedWorkflowId && workflowLoading && contracts.length === 0;
 
@@ -548,6 +541,17 @@ function ChatPageContent() {
                 messages={allMessages}
                 isLoading={isLoading}
                 streamingContent={streamingContent}
+                discussionEvents={discussionEvents}
+                workflowIdForApproval={selectedWorkflowId}
+                onApproveSpec={
+                  selectedWorkflowId && fetchWorkflow
+                    ? async () => {
+                        const { approveSpec } = await import("@/lib/api");
+                        await approveSpec(selectedWorkflowId);
+                        await fetchWorkflow();
+                      }
+                    : undefined
+                }
               />
             </div>
             {selectedWorkflowId && workflow && (
@@ -956,14 +960,16 @@ function ChatPageContent() {
 
 export default function HomePage() {
   return (
-    <Suspense
-      fallback={
-        <div className="bg-[var(--color-bg-base)] text-[var(--color-text-primary)] h-screen w-full flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-[var(--color-text-muted)] animate-spin" />
-        </div>
-      }
-    >
-      <ChatPageContent />
-    </Suspense>
+    <RequireApiSession>
+      <Suspense
+        fallback={
+          <div className="bg-[var(--color-bg-base)] text-[var(--color-text-primary)] h-screen w-full flex items-center justify-center">
+            <Loader2 className="w-8 h-8 text-[var(--color-text-muted)] animate-spin" />
+          </div>
+        }
+      >
+        <ChatPageContent />
+      </Suspense>
+    </RequireApiSession>
   );
 }

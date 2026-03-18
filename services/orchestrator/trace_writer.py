@@ -66,25 +66,37 @@ async def write_trace(
     payload = build_trace_payload(
         run_id, step_type, step_index, status, output_summary, error_message, extra
     )
+    import json
+    payload_str = json.dumps(payload, default=str)
+    blob_id = _stub_trace_id(run_id, step_type, step_index)
+    da_cert, ref_block = None, None
+
     try:
         from ipfs_client import is_configured, pin_json
-
         if is_configured():
             name = f"trace/{run_id}/{step_type}/{step_index}.json"
-            cid = await pin_json(
-                payload, name, {"run_id": run_id, "step_type": step_type}
-            )
+            cid = await pin_json(payload, name, {"run_id": run_id, "step_type": step_type})
             if cid:
-                return cid, None, None
+                blob_id = cid
     except Exception as e:
         logger.warning("[trace_writer] IPFS pin failed: %s", e)
-    stub_id = _stub_trace_id(run_id, step_type, step_index)
+
+    try:
+        from da_client import is_configured as da_ok, submit_blob
+        if da_ok():
+            da_cert, ref_block = await submit_blob(blob_id, payload_str)
+    except RuntimeError:
+        raise
+    except Exception as da_err:
+        logger.debug("[trace_writer] EigenDA submit skipped: %s", da_err)
+
     if IS_PRODUCTION:
-        logger.warning(
-            "[trace_writer] production stub: trace unverifiable run_id=%s step=%s index=%s blob_id=%s",
-            run_id, step_type, step_index, stub_id,
-        )
-    return stub_id, None, None
+        from da_client import is_configured as da_ok
+        if da_ok() and not (da_cert or ref_block):
+            raise RuntimeError("EigenDA enabled but trace produced no DA cert or reference block") from None
+        if blob_id.startswith("stub:"):
+            raise RuntimeError("IPFS/Storage Provider unavailable. Verifiable trace is mandatory in production.") from None
+    return blob_id, da_cert, ref_block
 
 
 def write_trace_sync(
@@ -128,6 +140,8 @@ def write_trace_sync(
                     extra,
                 )
             )
+    except RuntimeError:
+        raise
     except Exception as e:
         logger.warning("[trace_writer] write_trace_sync failed: %s", e)
         return _stub_trace_id(run_id, step_type, step_index), None, None

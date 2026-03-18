@@ -5,16 +5,31 @@
 
 const STORAGE_KEY = "hyperagent_session";
 const SESSION_COOKIE_NAME = "hyperagent_has_session";
-const SESSION_COOKIE_MAX_AGE_SEC = 86400; // 1 day
+/** Unix timestamp (seconds) when session expires. Middleware uses this for expiry-aware checks. */
+export const SESSION_EXPIRES_COOKIE_NAME = "hyperagent_session_expires";
 
-function setSessionCookie() {
+const SESSION_TOKEN_COOKIE_NAME = "hyperagent_session_token";
+
+function setSessionCookie(maxAgeSec: number, accessToken?: string) {
   if (typeof document === "undefined") return;
-  document.cookie = `${SESSION_COOKIE_NAME}=1; path=/; max-age=${SESSION_COOKIE_MAX_AGE_SEC}; SameSite=Lax`;
+  const expiresAt = Math.floor(Date.now() / 1000) + maxAgeSec;
+  const secure = typeof location !== "undefined" && location?.protocol === "https:";
+  const secureAttr = secure ? "; Secure" : "";
+  document.cookie = `${SESSION_COOKIE_NAME}=1; path=/; max-age=${maxAgeSec}; SameSite=Lax${secureAttr}`;
+  document.cookie = `${SESSION_EXPIRES_COOKIE_NAME}=${expiresAt}; path=/; max-age=${maxAgeSec}; SameSite=Lax${secureAttr}`;
+  // Carry the raw JWT so middleware can inspect exp without needing localStorage.
+  if (accessToken) {
+    document.cookie = `${SESSION_TOKEN_COOKIE_NAME}=${accessToken}; path=/; max-age=${maxAgeSec}; SameSite=Lax${secureAttr}`;
+  }
 }
 
 function clearSessionCookie() {
   if (typeof document === "undefined") return;
-  document.cookie = `${SESSION_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`;
+  const secure = typeof location !== "undefined" && location?.protocol === "https:";
+  const secureAttr = secure ? "; Secure" : "";
+  document.cookie = `${SESSION_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax${secureAttr}`;
+  document.cookie = `${SESSION_EXPIRES_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax${secureAttr}`;
+  document.cookie = `${SESSION_TOKEN_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax${secureAttr}`;
 }
 
 export const SESSION_CHANGE_EVENT = "hyperagent_session_change";
@@ -85,6 +100,30 @@ export function notifyByokUpdated(): void {
   }
 }
 
+const SESSION_BROADCAST_CHANNEL = "hyperagent_session_sync";
+let _broadcastChannel: BroadcastChannel | null = null;
+
+function getBroadcastChannel(): BroadcastChannel | null {
+  if (typeof BroadcastChannel === "undefined") return null;
+  if (!_broadcastChannel) {
+    try {
+      _broadcastChannel = new BroadcastChannel(SESSION_BROADCAST_CHANNEL);
+      _broadcastChannel.onmessage = (event) => {
+        if (event.data?.type === "session_cleared") {
+          localStorage.removeItem(STORAGE_KEY);
+          clearSessionCookie();
+          window.dispatchEvent(new Event(SESSION_CHANGE_EVENT));
+        } else if (event.data?.type === "session_updated") {
+          window.dispatchEvent(new Event(SESSION_CHANGE_EVENT));
+        }
+      };
+    } catch {
+      return null;
+    }
+  }
+  return _broadcastChannel;
+}
+
 function notifySessionChange() {
   if (typeof window === "undefined") return;
   try {
@@ -127,11 +166,24 @@ export function setStoredSession(access_token: string, expires_in: number): void
   const expires_at = Math.floor(Date.now() / 1000) + expires_in;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ access_token, expires_at }));
-    setSessionCookie();
+    // Pass the token so middleware can verify exp from cookie without localStorage.
+    setSessionCookie(expires_in, access_token);
     notifySessionChange();
+    getBroadcastChannel()?.postMessage({ type: "session_updated" });
   } catch {
     // ignore quota / private mode
   }
+}
+
+/**
+ * Seconds until the stored session expires. Returns 0 if no session or already expired.
+ * Used by ApiAuthProvider to schedule proactive redirect before expiry.
+ */
+export function getSessionTimeToExpiry(): number {
+  const session = getStoredSession();
+  if (!session) return 0;
+  const remaining = session.expires_at - Math.floor(Date.now() / 1000);
+  return remaining > 0 ? remaining : 0;
 }
 
 export function clearStoredSession(): void {
@@ -140,6 +192,7 @@ export function clearStoredSession(): void {
     localStorage.removeItem(STORAGE_KEY);
     clearSessionCookie();
     notifySessionChange();
+    getBroadcastChannel()?.postMessage({ type: "session_cleared" });
   } catch {
     // ignore
   }

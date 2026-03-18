@@ -19,6 +19,41 @@ export interface SimulateTxResult {
   error?: string;
 }
 
+/** Single tx for Tenderly Bundled Simulations. See https://docs.tenderly.co/simulations/bundled-simulations */
+export interface SimulateBundleTx {
+  network_id: string;
+  from: string;
+  to?: string;
+  input: string;
+  value?: string;
+  gas?: number;
+  save?: boolean;
+  save_if_fails?: boolean;
+  simulation_type?: "full" | "quick" | "abi";
+  state_objects?: Record<string, { stateDiff?: Record<string, string>; storage?: Record<string, string> }>;
+}
+
+/** Bundle-level options per Tenderly API. See https://docs.tenderly.co/simulations/bundled-simulations */
+export interface SimulateBundleRequest {
+  simulations: SimulateBundleTx[];
+  /** Block number for all simulations. Omit for latest. */
+  block_number?: number | null;
+  /** Initial state overrides before first simulation. Key = contract address. Tenderly: nonce, code, balance, storage. */
+  state_objects?: Record<string, { nonce?: number; code?: string; balance?: string; storage?: Record<string, string> }>;
+  /** Default simulation type for all txs. Individual txs can override. */
+  simulation_type?: "full" | "quick" | "abi";
+  /** Save all simulations to dashboard. */
+  save?: boolean;
+}
+
+export interface SimulateBundleResult {
+  success: boolean;
+  gasUsed?: number;
+  simulations?: Array<{ success: boolean; gas_used?: number; error?: string }>;
+  simulationUrl?: string | null;
+  error?: string;
+}
+
 export interface DeployPlanRequest {
   chainId: number;
   bytecode: string;

@@ -3,6 +3,7 @@
 import { Suspense, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useActiveAccount } from "thirdweb/react";
+import { ActiveAccountProvider } from "@/components/providers/ActiveAccountContext";
 import { AmbientBackground } from "@/components/layout/AmbientBackground";
 import { AppBar } from "@/components/layout/AppBar";
 import { ContextSidebar } from "@/components/layout/ContextSidebar";
@@ -41,12 +42,18 @@ export function LayoutSwitcher({ children }: { children: React.ReactNode }) {
     return null;
   }
 
+  const wrappedChildren = (
+    <ActiveAccountProvider account={account}>
+      {children}
+    </ActiveAccountProvider>
+  );
+
   if (pathname === PUBLIC_ROUTE) {
-    return <>{children}</>;
+    return <>{wrappedChildren}</>;
   }
 
   if (isFullPage) {
-    return <>{children}</>;
+    return <>{wrappedChildren}</>;
   }
 
   return (
@@ -58,7 +65,7 @@ export function LayoutSwitcher({ children }: { children: React.ReactNode }) {
           <SlimNav />
           <div className="flex-1 flex flex-col min-w-0 min-h-0 relative">
             <main className="flex-1 overflow-y-auto bg-[var(--color-bg-base)] relative scroll-smooth min-h-0 min-w-0">
-              {children}
+              {wrappedChildren}
             </main>
             <StatusDock />
             <FloatingLogsPill />

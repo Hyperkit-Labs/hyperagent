@@ -6,12 +6,29 @@ import { usePathname } from "next/navigation";
 import { useConnectModal, useActiveAccount, useDisconnect, useActiveWallet } from "thirdweb/react";
 import { toast } from "sonner";
 import { getThirdwebClient } from "@/lib/thirdwebClient";
-import { CONNECT_WALLETS } from "@/lib/connectWallets";
+import { getConnectConfig } from "@/lib/connectWallets";
 import { useSignInWithWallet } from "@/hooks/useSignInWithWallet";
 import { clearStoredSession, clearSessionOnlyLLMKey } from "@/lib/session-store";
 import { deleteLLMKeys } from "@/lib/api";
 import { useSession } from "@/hooks/useSession";
 import { ROUTES } from "@/constants/routes";
+
+/** Auto-bootstrap OAuth/in-app wallet users so they don't need to click "Sign in with wallet". */
+function useAutoBootstrapInApp() {
+  const account = useActiveAccount();
+  const wallet = useActiveWallet();
+  const { hasSession, isReady } = useSession();
+  const { signIn } = useSignInWithWallet();
+  const attemptedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isReady || hasSession || !account || !wallet || attemptedRef.current) return;
+    const isInApp = typeof (wallet as { getAuthToken?: () => Promise<string> }).getAuthToken === "function";
+    if (!isInApp) return;
+    attemptedRef.current = true;
+    void signIn();
+  }, [isReady, hasSession, account, wallet, signIn]);
+}
 
 const walletPillClass =
   "group flex items-center gap-3 pl-1.5 pr-4 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 hover:border-purple-500/30 transition-all duration-300";
@@ -22,6 +39,7 @@ const walletPillClass =
  * When not connected, shows button that opens Thirdweb connect modal.
  */
 export function ConnectWalletNav() {
+  useAutoBootstrapInApp();
   const pathname = usePathname();
   const client = getThirdwebClient();
   const account = useActiveAccount();
@@ -48,7 +66,7 @@ export function ConnectWalletNav() {
 
   const handleConnect = () => {
     if (client) {
-      connect({ client, wallets: CONNECT_WALLETS });
+      connect(getConnectConfig(client));
     } else {
       toast.error(
         "Wallet connection is not configured. Set NEXT_PUBLIC_THIRDWEB_CLIENT_ID in .env and restart the app."

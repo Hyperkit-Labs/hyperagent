@@ -2,17 +2,71 @@
 Toolkit interfaces (capability abstraction) for simulation, deploy, and storage.
 Implementations are thin HTTP clients calling existing services; actual Tenderly/Pinata
 logic stays inside the respective services. Propagate x-request-id for trace correlation.
+Circuit breakers and retries applied to all external HTTP calls.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
-from typing import Any, Protocol
+from typing import Any, Awaitable, Callable, Protocol, TypeVar
 
 import httpx
+from circuit_breaker import CircuitOpenError, get_breaker
 from registries import get_timeout
 from trace_context import get_request_id
+
+logger = logging.getLogger(__name__)
+
+RETRY_MAX_ATTEMPTS = int(os.environ.get("ORCHESTRATOR_HTTP_RETRY_ATTEMPTS", "3"))
+RETRY_BASE_DELAY_SEC = float(os.environ.get("ORCHESTRATOR_HTTP_RETRY_BASE_SEC", "1.0"))
+
+T = TypeVar("T")
+
+
+async def _retry_http(
+    fn: Callable[[], Awaitable[T]],
+    service_name: str,
+) -> T:
+    """Retry on 5xx, connection errors, timeout. Exponential backoff."""
+    last_err: BaseException | None = None
+    for attempt in range(RETRY_MAX_ATTEMPTS):
+        try:
+            return await fn()
+        except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError) as e:
+            last_err = e
+            if attempt < RETRY_MAX_ATTEMPTS - 1:
+                delay = RETRY_BASE_DELAY_SEC * (2**attempt)
+                logger.warning(
+                    "[%s] attempt %d/%d failed: %s; retrying in %.1fs",
+                    service_name,
+                    attempt + 1,
+                    RETRY_MAX_ATTEMPTS,
+                    type(e).__name__,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+            else:
+                raise
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code >= 500 and attempt < RETRY_MAX_ATTEMPTS - 1:
+                last_err = e
+                delay = RETRY_BASE_DELAY_SEC * (2**attempt)
+                logger.warning(
+                    "[%s] attempt %d/%d got %d; retrying in %.1fs",
+                    service_name,
+                    attempt + 1,
+                    RETRY_MAX_ATTEMPTS,
+                    e.response.status_code,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+            else:
+                raise
+    if last_err:
+        raise last_err
+    raise RuntimeError("retry exhausted")
 
 
 def _trace_headers() -> dict[str, str]:
@@ -33,7 +87,7 @@ def _trace_headers() -> dict[str, str]:
 
 
 class SimulationProvider(Protocol):
-    """Protocol: simulate(network, from_addr, data, to_addr?, value?, design_rationale?) -> SimulateTxResult."""
+    """Protocol: simulate(...) and simulate_bundle(...) -> SimulateTxResult / SimulateBundleResult."""
 
     async def simulate(
         self,
@@ -44,7 +98,11 @@ class SimulationProvider(Protocol):
         value: str = "0",
         design_rationale: str = "",
     ) -> dict[str, Any]:
-        """Run simulation; returns SimulateTxResult-shaped dict."""
+        """Run single simulation; returns SimulateTxResult-shaped dict."""
+        ...
+
+    async def simulate_bundle(self, simulations: list[dict[str, Any]]) -> dict[str, Any]:
+        """Run bundled simulations; returns SimulateBundleResult-shaped dict."""
         ...
 
 
@@ -66,6 +124,10 @@ class SimulationHttpProvider:
         value: str = "0",
         design_rationale: str = "",
     ) -> dict[str, Any]:
+        breaker = get_breaker("simulation")
+        if not breaker.can_execute():
+            logger.warning("[simulation] circuit open, skipping simulate")
+            return {"success": False, "error": "Simulation service circuit open", "gasUsed": 0}
         headers = _trace_headers()
         payload: dict[str, Any] = {
             "network": network,
@@ -76,20 +138,70 @@ class SimulationHttpProvider:
         }
         if design_rationale:
             payload["design_rationale"] = design_rationale
-        async with httpx.AsyncClient(timeout=get_timeout("simulation")) as client:
-            r = await client.post(
-                f"{self.base_url}/simulate",
-                headers=headers,
-                json=payload,
-            )
-            if r.status_code == 503:
-                return {
-                    "success": False,
-                    "error": "Tenderly not configured",
-                    "gasUsed": 0,
-                }
-            r.raise_for_status()
-            return r.json()
+
+        async def _do_simulate() -> dict[str, Any]:
+            async def _req() -> dict[str, Any]:
+                async with httpx.AsyncClient(timeout=get_timeout("simulation")) as client:
+                    r = await client.post(
+                        f"{self.base_url}/simulate",
+                        headers=headers,
+                        json=payload,
+                    )
+                if r.status_code == 503:
+                    return {
+                        "success": False,
+                        "error": "Tenderly not configured",
+                        "gasUsed": 0,
+                    }
+                r.raise_for_status()
+                return r.json()
+
+            return await _retry_http(_req, "simulation")
+
+        try:
+            result = await breaker.call(_do_simulate)
+            return result
+        except CircuitOpenError:
+            return {"success": False, "error": "Simulation service circuit open", "gasUsed": 0}
+
+    async def simulate_bundle(
+        self,
+        simulations: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Tenderly Bundled Simulations: run multiple txs consecutively in one block.
+        Each item: network_id, from, to?, input, value?, gas?, state_objects?
+        See https://docs.tenderly.co/simulations/bundled-simulations
+        """
+        breaker = get_breaker("simulation")
+        if not breaker.can_execute():
+            logger.warning("[simulation] circuit open, skipping simulate_bundle")
+            return {"success": False, "error": "Simulation service circuit open", "gasUsed": 0}
+        headers = _trace_headers()
+        payload: dict[str, Any] = {"simulations": simulations}
+
+        async def _do_bundle() -> dict[str, Any]:
+            async def _req() -> dict[str, Any]:
+                async with httpx.AsyncClient(timeout=get_timeout("simulation")) as client:
+                    r = await client.post(
+                        f"{self.base_url}/simulate-bundle",
+                        headers=headers,
+                        json=payload,
+                    )
+                if r.status_code == 503:
+                    return {
+                        "success": False,
+                        "error": "Tenderly not configured",
+                        "gasUsed": 0,
+                    }
+                r.raise_for_status()
+                return r.json()
+
+            return await _retry_http(_req, "simulation")
+
+        try:
+            return await breaker.call(_do_bundle)
+        except CircuitOpenError:
+            return {"success": False, "error": "Simulation service circuit open", "gasUsed": 0}
 
 
 # ---------------------------------------------------------------------------
@@ -126,28 +238,38 @@ class DeployHttpProvider:
         abi: list,
         constructor_args: list | None = None,
     ) -> dict[str, Any]:
-        logger = logging.getLogger(__name__)
+        breaker = get_breaker("deploy")
+        if not breaker.can_execute():
+            logger.warning("[deploy] circuit open, skipping get_deploy_plan")
+            raise CircuitOpenError("Deploy service circuit open")
         headers = _trace_headers()
-        async with httpx.AsyncClient(timeout=get_timeout("deploy_client")) as client:
-            r = await client.post(
-                f"{self.base_url}/deploy",
-                headers=headers,
-                json={
-                    "chainId": chain_id,
-                    "bytecode": bytecode,
-                    "abi": abi,
-                    "constructorArgs": constructor_args or [],
-                },
-            )
-            if r.status_code >= 400:
-                try:
-                    body = r.json()
-                    err = body.get("error", body)
-                except Exception:
-                    err = r.text[:500] if r.text else r.reason_phrase
-                logger.warning("[deploy] %s %s: %s", r.status_code, self.base_url, err)
-            r.raise_for_status()
-            return r.json()
+
+        async def _do_deploy() -> dict[str, Any]:
+            async def _req() -> dict[str, Any]:
+                async with httpx.AsyncClient(timeout=get_timeout("deploy_client")) as client:
+                    r = await client.post(
+                        f"{self.base_url}/deploy",
+                        headers=headers,
+                        json={
+                            "chainId": chain_id,
+                            "bytecode": bytecode,
+                            "abi": abi,
+                            "constructorArgs": constructor_args or [],
+                        },
+                    )
+                if r.status_code >= 400:
+                    try:
+                        body = r.json()
+                        err = body.get("error", body)
+                    except Exception:
+                        err = r.text[:500] if r.text else r.reason_phrase
+                    logger.warning("[deploy] %s %s: %s", r.status_code, self.base_url, err)
+                r.raise_for_status()
+                return r.json()
+
+            return await _retry_http(_req, "deploy")
+
+        return await breaker.call(_do_deploy)
 
 
 # ---------------------------------------------------------------------------
@@ -176,28 +298,50 @@ class StorageHttpProvider:
         ).rstrip("/")
 
     async def pin(self, content: str, name: str) -> dict[str, Any]:
+        breaker = get_breaker("storage")
+        if not breaker.can_execute():
+            logger.warning("[storage] circuit open, skipping pin")
+            raise CircuitOpenError("Storage service circuit open")
         headers = _trace_headers()
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            r = await client.post(
-                f"{self.base_url}/ipfs/pin",
-                headers=headers,
-                json={"content": content, "name": name},
-            )
-            r.raise_for_status()
-            data = r.json()
-            if not data.get("success"):
-                raise RuntimeError(data.get("error", "Pin failed"))
-            return {"cid": data["cid"], "gatewayUrl": data["gatewayUrl"]}
+
+        async def _do_pin() -> dict[str, Any]:
+            async def _req() -> dict[str, Any]:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    r = await client.post(
+                        f"{self.base_url}/ipfs/pin",
+                        headers=headers,
+                        json={"content": content, "name": name},
+                    )
+                r.raise_for_status()
+                data = r.json()
+                if not data.get("success"):
+                    raise RuntimeError(data.get("error", "Pin failed"))
+                return {"cid": data["cid"], "gatewayUrl": data["gatewayUrl"]}
+
+            return await _retry_http(_req, "storage")
+
+        return await breaker.call(_do_pin)
 
     async def unpin(self, cid: str) -> None:
+        breaker = get_breaker("storage")
+        if not breaker.can_execute():
+            logger.warning("[storage] circuit open, skipping unpin")
+            raise CircuitOpenError("Storage service circuit open")
         headers = _trace_headers()
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            r = await client.post(
-                f"{self.base_url}/ipfs/unpin",
-                headers=headers,
-                json={"cid": cid},
-            )
-            r.raise_for_status()
+
+        async def _do_unpin() -> None:
+            async def _req() -> None:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    r = await client.post(
+                        f"{self.base_url}/ipfs/unpin",
+                        headers=headers,
+                        json={"cid": cid},
+                    )
+                r.raise_for_status()
+
+            await _retry_http(_req, "storage")
+
+        await breaker.call(_do_unpin)
 
 
 # ---------------------------------------------------------------------------

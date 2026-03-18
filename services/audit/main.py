@@ -11,26 +11,48 @@ import tempfile
 from pathlib import Path
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
+
+try:
+    from contract_validation import safe_contract_name as _safe_contract_name_pkg
+    from contract_validation import ValidationError
+except ImportError:
+    _safe_contract_name_pkg = None
+    ValidationError = Exception  # type: ignore[misc, assignment]
 
 TOOLS_BASE_URL = (os.environ.get("TOOLS_BASE_URL") or "").rstrip("/")
 TOOLS_API_KEY = os.environ.get("TOOLS_API_KEY", "")
 
 app = FastAPI(title="HyperAgent Audit Service", version="0.1.0")
 
-# Contract name: single token only (alphanumeric + underscore) to prevent path traversal
-_SAFE_CONTRACT_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_]+$")
+
+@app.middleware("http")
+async def otel_request_span(request: Request, call_next):
+    """Create OTel request span when OPENTELEMETRY_ENABLED."""
+    rid = (request.headers.get("x-request-id") or request.headers.get("X-Request-Id") or "").strip() or None
+    try:
+        from otel_spans import request_span
+        with request_span(method=request.method or "GET", path=request.url.path or "/", request_id=rid):
+            return await call_next(request)
+    except ImportError:
+        return await call_next(request)
 
 
 def _safe_contract_name(contract_name: str) -> str:
-    """Return a safe contract name for file paths. Reject path traversal and invalid names."""
+    """Return a safe contract name for file paths. Uses contract_validation package when available."""
+    if _safe_contract_name_pkg:
+        try:
+            return _safe_contract_name_pkg(contract_name)
+        except ValidationError as e:
+            raise HTTPException(status_code=getattr(e, "status_code", 400), detail=e.detail) from e
+    # Fallback when package not installed
     if not contract_name or not isinstance(contract_name, str):
         raise HTTPException(status_code=400, detail="Invalid contract name")
     base = Path(contract_name).name
     if ".." in contract_name or "/" in contract_name or "\\" in contract_name:
         raise HTTPException(status_code=400, detail="Contract name must not contain path components")
-    if not _SAFE_CONTRACT_NAME_PATTERN.match(base):
+    if not re.match(r"^[a-zA-Z0-9_]+$", base):
         raise HTTPException(status_code=400, detail="Contract name must be alphanumeric with optional underscores")
     return base
 
@@ -189,11 +211,80 @@ def _run_mythx(workdir: Path, contract_name: str, code: str) -> list[dict]:
         return [{"severity": "info", "title": "MythX", "description": f"MythX error: {e}", "location": None}]
 
 
+def _detect_contract_type(code: str) -> str | None:
+    """Detect ERC20 vs ERC721 from code. Returns 'erc20', 'erc721', or None if unsupported."""
+    lower = code.lower()
+    has_total_supply = "totalsupply" in lower or "total_supply" in lower
+    has_balance_of = "balanceof" in lower or "balance_of" in lower
+    has_owner_of = "ownerof" in lower or "owner_of" in lower
+    has_token_uri = "tokenuri" in lower or "token_uri" in lower
+    if has_total_supply and has_balance_of:
+        return "erc20"
+    if (has_balance_of and has_owner_of) or (has_balance_of and has_token_uri):
+        return "erc721"
+    if has_balance_of:
+        return "erc20"
+    return None
+
+
+def _select_harness_path(contract_type: str | None) -> Path | None:
+    """Return harness path for contract type. Fail-closed: None when unsupported."""
+    if contract_type == "erc20":
+        p = os.environ.get("ECHIDNA_HARNESS_PATH", "services/audit/echidna_harness/ERC20Harness.sol").strip()
+        return Path(p) if p else None
+    if contract_type == "erc721":
+        p = os.environ.get("ECHIDNA_HARNESS_ERC721_PATH", "services/audit/echidna_harness/ERC721Harness.sol").strip()
+        return Path(p) if p else None
+    return None
+
+
 def _run_echidna(workdir: Path, contract_name: str, code: str) -> list[dict]:
-    """Echidna fuzzing requires a test harness (invariant or property). Not run in this service.
-    To use: run echidna locally with a harness contract that imports the target; or configure
-    ECHIDNA_HARNESS_PATH and ECHIDNA_TIMEOUT in a dedicated job. See https://github.com/crytic/echidna."""
-    return [{"severity": "info", "title": "Echidna", "description": "Echidna fuzzing requires a test harness; run separately or set ECHIDNA_HARNESS_PATH.", "location": None}]
+    """Run Echidna fuzzing. Harness selection by contract type. Fail-closed when unsupported."""
+    contract_type = _detect_contract_type(code)
+    harness_file = _select_harness_path(contract_type)
+    if harness_file is None:
+        if contract_type is None:
+            return [{"severity": "high", "title": "Echidna", "description": "Contract type not supported for Echidna. Supported: ERC20, ERC721. Add totalSupply+balanceOf (ERC20) or balanceOf+ownerOf (ERC721).", "location": None, "category": "echidna"}]
+        return [{"severity": "info", "title": "Echidna", "description": "Set ECHIDNA_HARNESS_PATH or ECHIDNA_HARNESS_ERC721_PATH.", "location": None}]
+    if not harness_file.exists():
+        return [{"severity": "high", "title": "Echidna", "description": f"Harness not found: {harness_file}. Unsupported contract type or missing harness.", "location": None, "category": "echidna"}]
+    timeout = int(os.environ.get("ECHIDNA_TIMEOUT", "60") or "60")
+    src = workdir / "src"
+    src.mkdir(parents=True, exist_ok=True)
+    if "pragma solidity" not in code.strip().lower():
+        code = "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n" + code
+    (src / f"{contract_name}.sol").write_text(code)
+    (workdir / "foundry.toml").write_text('[profile.default]\nsolc = "0.8.24"\n')
+    harness_code = harness_file.read_text()
+    if contract_name not in harness_code:
+        harness_code = harness_code.replace("Contract", contract_name)
+    (src / "Harness.sol").write_text(harness_code)
+    try:
+        result = subprocess.run(
+            ["echidna", str(src / "Harness.sol"), "--contract", "Harness", "--format", "json", "--timeout", str(timeout)],
+            cwd=workdir,
+            capture_output=True,
+            text=True,
+            timeout=timeout + 30,
+        )
+    except FileNotFoundError:
+        return [{"severity": "info", "title": "Echidna", "description": "Echidna binary not installed. Install: https://github.com/crytic/echidna", "location": None}]
+    out: list[dict] = []
+    if result.stdout:
+        try:
+            data = json.loads(result.stdout)
+            for issue in data.get("success", []) or []:
+                if isinstance(issue, dict) and issue.get("status") == "failed":
+                    out.append({
+                        "severity": "high",
+                        "title": issue.get("name", "Invariant failed"),
+                        "description": str(issue.get("error", "") or "Fuzzer found failing input"),
+                        "location": issue.get("filename"),
+                        "category": "echidna",
+                    })
+        except json.JSONDecodeError:
+            pass
+    return out if out else [{"severity": "info", "title": "Echidna", "description": "No issues found" if result.returncode == 0 else "Echidna run completed", "location": None}]
 
 
 def _normalize_severity(s: str) -> str:

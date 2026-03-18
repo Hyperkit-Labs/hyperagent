@@ -2,7 +2,8 @@
 
 import { useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
-import { Code2, Shield, Rocket, Wrench, ArrowUp, Plus } from "lucide-react";
+import { Code2, Shield, Rocket, Wrench, Plus } from "lucide-react";
+import { PromptInput, PromptInputButton, PromptInputFooter } from "@/components/ai-elements";
 
 export interface ActionPill {
   id: string;
@@ -112,49 +113,38 @@ export function ChatCommandBar({
           </motion.button>
         ))}
       </div>
-      <form onSubmit={handleSubmit} className="relative group">
-        <textarea
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          disabled={disabled}
-          rows={3}
-          className="w-full bg-white/5 border border-white/10 rounded-xl p-4 pr-24 pb-12 text-[13px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:ring-1 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none resize-none min-h-[80px] max-h-[160px]"
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              if (!disabled && value.trim()) handleSubmit(e as unknown as React.FormEvent);
-            }
-          }}
-        />
-        <div className="absolute right-3 bottom-3 flex items-center gap-2">
-          {onCreateWorkflow && canCreateWorkflow && (
-            <button
-              type="button"
-              onClick={onCreateWorkflow}
-              disabled={creatingWorkflow}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[11px] font-medium text-[var(--color-text-secondary)] hover:bg-white/10 disabled:opacity-50 transition-colors"
-            >
-              {creatingWorkflow ? (
-                <span className="animate-pulse">...</span>
-              ) : (
-                <>
-                  <Plus className="w-3.5 h-3.5" />
-                  Run pipeline
-                </>
+      <PromptInput
+        value={value}
+        onChange={(v) => onChange(v)}
+        onSubmit={handleSubmit}
+        disabled={disabled}
+        placeholder={placeholder}
+        className="!p-0 !border-0 !bg-transparent"
+        footer={
+          <PromptInputFooter className="flex items-center justify-between px-2 pb-2 pt-1">
+            <div className="flex items-center gap-2">
+              {onCreateWorkflow && canCreateWorkflow && (
+                <button
+                  type="button"
+                  onClick={onCreateWorkflow}
+                  disabled={creatingWorkflow}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[11px] font-medium text-[var(--color-text-secondary)] hover:bg-white/10 disabled:opacity-50 transition-colors"
+                >
+                  {creatingWorkflow ? (
+                    <span className="animate-pulse">...</span>
+                  ) : (
+                    <>
+                      <Plus className="w-3.5 h-3.5" />
+                      Run pipeline
+                    </>
+                  )}
+                </button>
               )}
-            </button>
-          )}
-          <button
-            type="submit"
-            disabled={disabled || !value.trim()}
-            className="p-2 rounded-lg bg-[var(--color-primary)] hover:bg-[var(--color-primary-mid)] text-white disabled:opacity-50 disabled:pointer-events-none transition-colors"
-            aria-label="Send"
-          >
-            <ArrowUp className="w-4 h-4" />
-          </button>
-        </div>
-      </form>
+            </div>
+            <PromptInputButton disabled={disabled || !value.trim()} />
+          </PromptInputFooter>
+        }
+      />
     </div>
   );
 }

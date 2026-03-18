@@ -52,4 +52,4 @@ infra/registries/
 
 ## Schema
 
-All registries use `apiVersion: hyperagent.io/v1` and a `kind` per registry type. Add a `metadata.name` and `spec` with the relevant entries. Extend `spec` as needed; keep structure stable for backward compatibility.
+All registries use `apiVersion: hyperkitlabs.com/v1` and a `kind` per registry type. Add a `metadata.name` and `spec` with the relevant entries. Extend `spec` as needed; keep structure stable for backward compatibility.

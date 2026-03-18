@@ -3,62 +3,26 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import { useNetworks } from "@/hooks/useNetworks";
+import { useSelectedNetwork } from "@/components/providers/SelectedNetworkProvider";
 import type { NetworkConfig } from "@/lib/api";
 
-const STORAGE_KEY = "hyperkit_selected_network_id";
 const PRIMARY_TIERS = ["canonical", "primary", "preferred"];
 
 function isPrimary(net: NetworkConfig) {
   return net.tier && PRIMARY_TIERS.includes(net.tier);
 }
 
-function getStoredNetworkId(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage.getItem(STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function setStoredNetworkId(id: string | null) {
-  try {
-    if (id == null) window.localStorage.removeItem(STORAGE_KEY);
-    else window.localStorage.setItem(STORAGE_KEY, id);
-  } catch {
-    /* ignore */
-  }
-}
-
 export function NetworkSelector() {
   const { networks, loading, error } = useNetworks();
+  const { selectedNetworkId, setSelectedNetworkId } = useSelectedNetwork();
   const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState<NetworkConfig | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   const testnets = networks.filter((n) => n.is_mainnet === false);
-
-  const initialisedRef = useRef(false);
-  useEffect(() => {
-    if (networks.length === 0) return;
-    const storedId = getStoredNetworkId();
-    if (storedId) {
-      const found = networks.find((n) => n.id === storedId || n.network_id === storedId);
-      if (found) {
-        setSelected(found);
-        initialisedRef.current = true;
-      }
-    }
-    if (!initialisedRef.current && testnets.length > 0) {
-      const first = testnets.find(isPrimary) ?? testnets[0];
-      setSelected(first);
-      initialisedRef.current = true;
-    }
-  }, [networks, testnets]);
+  const selected = networks.find((n) => n.id === selectedNetworkId || n.network_id === selectedNetworkId) ?? null;
 
   const handleSelect = (net: NetworkConfig) => {
-    setSelected(net);
-    setStoredNetworkId(net.id ?? net.network_id ?? null);
+    setSelectedNetworkId(net.id ?? net.network_id ?? "");
     setOpen(false);
   };
   const popular = testnets.filter(isPrimary);
@@ -159,6 +123,8 @@ export function NetworkSelector() {
               </div>
             </>
           )}
+          <div className="border-t border-[var(--color-border-subtle)] mt-2 pt-2 px-3">
+          </div>
         </div>
       )}
     </div>

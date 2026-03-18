@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Settings as SettingsIcon, Folder, Key, Plug, ExternalLink, DollarSign, CreditCard } from "lucide-react";
+import { RequireApiSession } from "@/components/auth/RequireApiSession";
+import { Settings as SettingsIcon, Folder, Key, Plug, ExternalLink, DollarSign, CreditCard, Loader2 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import { LLMKeysCard } from "@/components/settings/LLMKeysCard";
 import { WorkspaceTab } from "@/components/settings/WorkspaceTab";
@@ -10,6 +11,9 @@ import { X402SpendingTab } from "@/components/settings/X402SpendingTab";
 import { PlanPricingTab } from "@/components/settings/PlanPricingTab";
 import { IntegrationsTab } from "@/components/settings/IntegrationsTab";
 import { isFeatureEnabled } from "@/config/environment";
+import { deleteLLMKeys } from "@/lib/api";
+import { clearStoredSession, notifyByokUpdated } from "@/lib/session-store";
+import { toast } from "sonner";
 import { useConfig } from "@/components/providers/ConfigProvider";
 import { useNetworks } from "@/hooks/useNetworks";
 import { usePlanData } from "@/hooks/usePlanData";
@@ -20,6 +24,9 @@ type SettingsTab = "workspace" | "byok" | "x402" | "integrations" | "plan";
 
 export default function SettingsPage() {
   const [tab, setTab] = useState<SettingsTab>("byok");
+  const [revokeLoading, setRevokeLoading] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const x402Enabled = isFeatureEnabled("x402");
   const { config, loading: configLoading } = useConfig();
   const { networks, loading: networksLoading, error: networksError, refetch: refetchNetworks } = useNetworks();
@@ -61,6 +68,7 @@ export default function SettingsPage() {
     }`;
 
   return (
+    <RequireApiSession>
     <div className="p-6 lg:p-8">
       <div className="max-w-6xl mx-auto animate-enter">
         <div className="flex items-center gap-2 mb-8">
@@ -158,7 +166,25 @@ export default function SettingsPage() {
                   <h4 className="text-sm font-medium text-[var(--color-text-primary)]">Revoke All Keys</h4>
                   <p className="text-xs text-[var(--color-text-muted)] mt-1">Remove all LLM API keys from this workspace.</p>
                 </div>
-                <button className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-medium rounded-lg border border-red-500/20 transition-colors shrink-0">
+                <button
+                  type="button"
+                  disabled={revokeLoading}
+                  onClick={async () => {
+                    if (!window.confirm("Are you sure you want to revoke all LLM keys? This cannot be undone.")) return;
+                    setRevokeLoading(true);
+                    try {
+                      await deleteLLMKeys();
+                      notifyByokUpdated();
+                      toast.success("All LLM keys have been revoked.");
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : "Failed to revoke keys.");
+                    } finally {
+                      setRevokeLoading(false);
+                    }
+                  }}
+                  className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-medium rounded-lg border border-red-500/20 transition-colors shrink-0 disabled:opacity-50 inline-flex items-center gap-2"
+                >
+                  {revokeLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   Revoke Keys
                 </button>
               </div>
@@ -168,9 +194,53 @@ export default function SettingsPage() {
                   <h4 className="text-sm font-medium text-[var(--color-text-primary)]">Delete Workspace</h4>
                   <p className="text-xs text-[var(--color-text-muted)] mt-1">Permanently delete this workspace and all associated data.</p>
                 </div>
-                <button className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-lg transition-colors shrink-0">
-                  Delete Workspace
-                </button>
+                {!deleteConfirm ? (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteConfirm(true)}
+                    className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-lg transition-colors shrink-0"
+                  >
+                    Delete Workspace
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-red-400">Type &quot;delete&quot; in the prompt to confirm.</span>
+                    <button
+                      type="button"
+                      disabled={deleteLoading}
+                      onClick={async () => {
+                        const answer = window.prompt('Type "delete" to permanently delete this workspace:');
+                        if (answer?.toLowerCase() !== "delete") {
+                          setDeleteConfirm(false);
+                          return;
+                        }
+                        setDeleteLoading(true);
+                        try {
+                          await deleteLLMKeys();
+                          clearStoredSession();
+                          toast.success("Workspace data cleared. You have been signed out.");
+                          window.location.href = "/login";
+                        } catch (err) {
+                          toast.error(err instanceof Error ? err.message : "Failed to delete workspace.");
+                        } finally {
+                          setDeleteLoading(false);
+                          setDeleteConfirm(false);
+                        }
+                      }}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg transition-colors shrink-0 disabled:opacity-50 inline-flex items-center gap-2"
+                    >
+                      {deleteLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      Confirm Delete
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteConfirm(false)}
+                      className="px-3 py-2 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -178,5 +248,6 @@ export default function SettingsPage() {
         </div>
       </div>
     </div>
+    </RequireApiSession>
   );
 }

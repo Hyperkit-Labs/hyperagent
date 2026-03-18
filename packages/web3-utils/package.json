@@ -16,10 +16,12 @@
     }
   },
   "dependencies": {
-    "@hyperagent/core-types": "workspace:*"
+    "@hyperagent/core-types": "workspace:*",
+    "thirdweb": "^5.119.1",
+    "yaml": "^2.3.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/node": "^25.5.0",
     "typescript": "^5.0.0"
   }
 }

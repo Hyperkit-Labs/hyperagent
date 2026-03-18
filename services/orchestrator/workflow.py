@@ -23,7 +23,11 @@ from nodes import (
     estimate_agent,
     exploit_simulation_agent,
     guardian_agent,
+    human_review_agent,
+    monitor_agent,
     scrubd_validation_agent,
+    security_gate_agent,
+    security_policy_evaluator_agent,
     simulation_agent,
     spec_agent,
     test_generation_agent,
@@ -71,18 +75,26 @@ def _after_audit(state: AgentState) -> str:
 
 
 def _after_simulation(state: AgentState) -> str:
-    """Route after simulation: pass -> exploit_simulation, fail -> autofix (if cycles remain) or END."""
-    if state.get("simulation_passed", True):
-        return "exploit_simulation"
+    """Route after simulation: pass -> security_policy_evaluator, fail -> autofix or END."""
+    if state.get("simulation_passed", False):
+        return "security_policy_evaluator"
     cycle = state.get("autofix_cycle", 0)
     if cycle < MAX_AUTOFIX_CYCLES:
         return "autofix"
     return "failed"
 
 
+def _after_security_policy_evaluator(state: AgentState) -> str:
+    """Route after security policy evaluator: approved -> exploit_simulation, else failed."""
+    if state.get("security_approved_for_deploy", False):
+        return "exploit_simulation"
+    return "failed"
+
+
 def _after_exploit_simulation(state: AgentState) -> str:
-    """Route after exploit simulation: pass -> ui_scaffold, fail -> autofix (if cycles remain) or END."""
-    if state.get("exploit_simulation_passed", True):
+    """Route after exploit simulation: pass -> ui_scaffold, fail -> autofix (if cycles remain) or END.
+    ZSPS: Missing state defaults to failure."""
+    if state.get("exploit_simulation_passed", False):
         return "ui_scaffold"
     cycle = state.get("autofix_cycle", 0)
     if cycle < MAX_AUTOFIX_CYCLES:
@@ -107,6 +119,7 @@ def create_workflow():
     workflow.add_node("start", lambda s: s)
     workflow.add_node("estimate", estimate_agent)
     workflow.add_node("spec", spec_agent)
+    workflow.add_node("human_review", human_review_agent)
     workflow.add_node("design", design_agent)
     workflow.add_node("codegen", codegen_agent)
     workflow.add_node("test_generation", test_generation_agent)
@@ -114,10 +127,13 @@ def create_workflow():
     workflow.add_node("audit", audit_agent)
     workflow.add_node("autofix", autofix_agent)
     workflow.add_node("guardian", guardian_agent)
+    workflow.add_node("security_gate", security_gate_agent)
     workflow.add_node("deploy_gate", deploy_gate_agent)
     workflow.add_node("simulation", simulation_agent)
+    workflow.add_node("security_policy_evaluator", security_policy_evaluator_agent)
     workflow.add_node("exploit_simulation", exploit_simulation_agent)
     workflow.add_node("deploy", deploy_agent)
+    workflow.add_node("monitor", monitor_agent)
     workflow.add_node("ui_scaffold", ui_scaffold_agent)
 
     workflow.set_entry_point("start")
@@ -135,12 +151,14 @@ def create_workflow():
         "spec",
         _should_approve_spec,
         {
-            "human_review": END,
+            "human_review": "human_review",
             "design": "design",
         },
     )
+    workflow.add_edge("human_review", END)
     workflow.add_edge("design", "codegen")
-    workflow.add_edge("codegen", "test_generation")
+    workflow.add_edge("codegen", "security_gate")
+    workflow.add_edge("security_gate", "test_generation")
     workflow.add_edge("test_generation", "scrubd_validation")
     workflow.add_conditional_edges(
         "scrubd_validation",
@@ -171,13 +189,22 @@ def create_workflow():
         },
     )
     workflow.add_edge("deploy_gate", "deploy")
-    workflow.add_edge("deploy", "simulation")
+    workflow.add_edge("deploy", "monitor")
+    workflow.add_edge("monitor", "simulation")
     workflow.add_conditional_edges(
         "simulation",
         _after_simulation,
         {
-            "exploit_simulation": "exploit_simulation",
+            "security_policy_evaluator": "security_policy_evaluator",
             "autofix": "autofix",
+            "failed": END,
+        },
+    )
+    workflow.add_conditional_edges(
+        "security_policy_evaluator",
+        _after_security_policy_evaluator,
+        {
+            "exploit_simulation": "exploit_simulation",
             "failed": END,
         },
     )
@@ -285,6 +312,9 @@ def run_pipeline(
         initial.update(initial_state_override)
     import logging
 
+    from observability import inc_pipeline_runs_completed, inc_pipeline_runs_failed, inc_pipeline_runs_total
+
+    inc_pipeline_runs_total()
     logging.getLogger(__name__).info(
         "[pipeline] run_pipeline start run_id=%s api_keys_providers=%s agent_session_jwt=%s",
         run_id,
@@ -299,8 +329,10 @@ def run_pipeline(
             final = asyncio.run(graph.ainvoke(None, config=config))
         else:
             final = asyncio.run(graph.ainvoke(initial, config=config))
+        inc_pipeline_runs_completed()
         return final
     except Exception as e:
+        inc_pipeline_runs_failed()
         err_msg = str(e)
         failed_state = initial.copy()
         failed_state["error"] = err_msg

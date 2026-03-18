@@ -33,13 +33,14 @@ const RATE_LIMIT_WORKFLOW_GENERATE_MAX_USER = Math.round((Number(process.env.RAT
 const RATE_LIMIT_DEPLOY_PREPARE_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_DEPLOY_PREPARE_MAX_IP) || 30) * RATE_LIMIT_MULTIPLIER);
 const RATE_LIMIT_DEPLOY_PREPARE_MAX_USER = Math.round((Number(process.env.RATE_LIMIT_DEPLOY_PREPARE_MAX_USER) || 50) * RATE_LIMIT_MULTIPLIER);
 
-/** SIWE sign-in: strict per-IP limit to prevent brute force. No auth yet so IP-only. */
-const SIWE_PATH = "/api/v1/auth/siwe";
-const RATE_LIMIT_SIWE_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_SIWE_MAX_IP) || 5) * RATE_LIMIT_MULTIPLIER);
-const RATE_LIMIT_SIWE_WINDOW_SEC = Number(process.env.RATE_LIMIT_SIWE_WINDOW_SEC) || 60;
+/** Auth bootstrap: strict per-IP limit to prevent brute force. No auth yet so IP-only. */
+const BOOTSTRAP_PATH = "/api/v1/auth/bootstrap";
+const RATE_LIMIT_BOOTSTRAP_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_BOOTSTRAP_MAX_IP) || Number(process.env.RATE_LIMIT_SIWE_MAX_IP) || 5) * RATE_LIMIT_MULTIPLIER);
+const RATE_LIMIT_BOOTSTRAP_WINDOW_SEC = Number(process.env.RATE_LIMIT_SIWE_WINDOW_SEC) || Number(process.env.RATE_LIMIT_BOOTSTRAP_WINDOW_SEC) || 60;
 
-/** Lightweight reads (GET /config, /networks, /tokens/stablecoins). Higher limit; these are read-only and frequently polled. */
-const RATE_LIMIT_LIGHT_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_LIGHT_MAX_IP) || 1000) * RATE_LIMIT_MULTIPLIER);
+/** Lightweight reads (GET /config, /networks, /tokens/stablecoins). Tiered: strict IP for unauthenticated, user-based for authenticated. */
+const RATE_LIMIT_LIGHT_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_LIGHT_MAX_IP) || 100) * RATE_LIMIT_MULTIPLIER);
+const RATE_LIMIT_LIGHT_MAX_USER = Math.round((Number(process.env.RATE_LIMIT_LIGHT_MAX_USER) || 500) * RATE_LIMIT_MULTIPLIER);
 
 /** After Redis failure, skip reconnects for this many ms to avoid log spam. */
 const REDIS_BACKOFF_MS = 60_000;
@@ -137,14 +138,14 @@ export async function rateLimitMiddleware(
     next();
     return;
   }
-  const isSiwe = req.method === "POST" && req.path === SIWE_PATH;
-  if (isSiwe) {
-    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
-    const siweKey = `rl:ip:${ip}:siwe`;
-    const siweOk = await checkLimit(siweKey, RATE_LIMIT_SIWE_MAX_IP, RATE_LIMIT_SIWE_WINDOW_SEC);
-    if (!siweOk) {
-      logSecurityEvent("rate_limit_siwe", 429, req.path, req.requestId, undefined);
-      res.setHeader("Retry-After", String(RATE_LIMIT_SIWE_WINDOW_SEC));
+  const isBootstrap = req.method === "POST" && req.path === BOOTSTRAP_PATH;
+  if (isBootstrap) {
+    const ip = req.ip || (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+    const bootstrapKey = `rl:ip:${ip}:bootstrap`;
+    const bootstrapOk = await checkLimit(bootstrapKey, RATE_LIMIT_BOOTSTRAP_MAX_IP, RATE_LIMIT_BOOTSTRAP_WINDOW_SEC);
+    if (!bootstrapOk) {
+      logSecurityEvent("rate_limit_bootstrap", 429, req.path, req.requestId, undefined);
+      res.setHeader("Retry-After", String(RATE_LIMIT_BOOTSTRAP_WINDOW_SEC));
       res.status(429).json({
         error: "Too Many Requests",
         message: "Too many sign-in attempts. Try again later.",
@@ -159,17 +160,36 @@ export async function rateLimitMiddleware(
     req.method === "GET" &&
     (req.path === "/api/v1/config" || req.path === "/api/v1/config/integrations-debug" || req.path === "/api/v1/networks" || req.path === "/api/v1/tokens/stablecoins");
   if (isLightweightRead) {
-    const lightKey = `rl:ip:${(req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown"}:light`;
-    const lightOk = await checkLimit(lightKey, RATE_LIMIT_LIGHT_MAX_IP, RATE_LIMIT_WINDOW_SEC);
-    if (!lightOk) {
-      logSecurityEvent("rate_limit_light", 429, req.path, req.requestId, req.userId);
-      res.setHeader("Retry-After", String(RATE_LIMIT_WINDOW_SEC));
-      res.status(429).json({
-        error: "Too Many Requests",
-        message: "Config/networks rate limit exceeded. Try again later.",
-        requestId: req.requestId,
-      });
-      return;
+    const ip = req.ip || (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+    const userId = req.userId || "";
+
+    // Tiered: authenticated users get user-based limit; unauthenticated get strict IP limit
+    if (userId) {
+      const userKey = `rl:user:${userId}:light`;
+      const userOk = await checkLimit(userKey, RATE_LIMIT_LIGHT_MAX_USER, RATE_LIMIT_WINDOW_SEC);
+      if (!userOk) {
+        logSecurityEvent("rate_limit_light", 429, req.path, req.requestId, userId);
+        res.setHeader("Retry-After", String(RATE_LIMIT_WINDOW_SEC));
+        res.status(429).json({
+          error: "Too Many Requests",
+          message: "Config/networks rate limit exceeded. Try again later.",
+          requestId: req.requestId,
+        });
+        return;
+      }
+    } else {
+      const lightKey = `rl:ip:${ip}:light`;
+      const lightOk = await checkLimit(lightKey, RATE_LIMIT_LIGHT_MAX_IP, RATE_LIMIT_WINDOW_SEC);
+      if (!lightOk) {
+        logSecurityEvent("rate_limit_light", 429, req.path, req.requestId, undefined);
+        res.setHeader("Retry-After", String(RATE_LIMIT_WINDOW_SEC));
+        res.status(429).json({
+          error: "Too Many Requests",
+          message: "Config/networks rate limit exceeded. Try again later.",
+          requestId: req.requestId,
+        });
+        return;
+      }
     }
     next();
     return;
@@ -178,20 +198,18 @@ export async function rateLimitMiddleware(
     const r = await getRedis();
     if (!r) {
       if (RATE_LIMIT_BYPASS_ON_FAIL) {
-        console.warn("[rate-limit] Redis unreachable, bypassing rate limit (RATE_LIMIT_BYPASS_ON_FAIL=true)");
-        next();
-        return;
+        console.warn("[rate-limit] Redis unreachable. RATE_LIMIT_BYPASS_ON_FAIL ignored in production (fail-closed).");
       }
       logSecurityEvent("rate_limit_unavailable", 503, req.path, req.requestId, req.userId);
       res.status(503).json({
         error: "Service Unavailable",
-        message: "Rate limiting unavailable. Redis connection failed. Ensure REDIS_URL is set and reachable (use rediss:// for TLS). Set RATE_LIMIT_BYPASS_ON_FAIL=true to bypass when Redis is unavailable.",
+        message: "Rate limiting unavailable. Redis connection failed. Ensure REDIS_URL is set and reachable (use rediss:// for TLS).",
         requestId: req.requestId,
       });
       return;
     }
   }
-  const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+  const ip = req.ip || (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
   const userId = req.userId || "";
   const isLlmKeysPost = req.method === "POST" && req.path === LLM_KEYS_PATH;
   const isWorkflowGenerate = req.method === "POST" && req.path === "/api/v1/workflows/generate";

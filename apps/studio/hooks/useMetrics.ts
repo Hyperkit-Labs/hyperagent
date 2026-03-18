@@ -57,6 +57,8 @@ interface MetricsApiResponse {
 export interface UseMetricsOptions {
   autoRefresh?: boolean;
   refreshInterval?: number;
+  /** Time range: 7d, 30d, 90d, all. Passed to backend for run counts. */
+  timeRange?: '7d' | '30d' | '90d' | 'all';
 }
 
 export interface UseMetricsReturn {
@@ -105,6 +107,7 @@ export function useMetrics(options: UseMetricsOptions = {}): UseMetricsReturn {
   const {
     autoRefresh = true,
     refreshInterval = POLLING.METRICS_MS,
+    timeRange = 'all',
   } = options;
 
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
@@ -119,7 +122,7 @@ export function useMetrics(options: UseMetricsOptions = {}): UseMetricsReturn {
     try {
       setError(null);
       
-      const raw = await getMetrics(signal) as MetricsApiResponse;
+      const raw = await getMetrics({ time_range: timeRange }, signal) as MetricsApiResponse;
       
       if (isMounted.current) {
         // Transform API response to expected format
@@ -170,7 +173,7 @@ export function useMetrics(options: UseMetricsOptions = {}): UseMetricsReturn {
         setLoading(false);
       }
     }
-  }, []);
+  }, [timeRange]);
 
   // Manual refetch
   const refetch = useCallback(async () => {

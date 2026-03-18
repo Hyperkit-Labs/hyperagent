@@ -12,9 +12,25 @@
 #   - Disable Git submodules and LFS in Advanced > Git (Coolify #4746)
 #   - Set env vars in Shared Env
 #
-# External: Supabase (DB), Redis Cloud. Qdrant runs locally in this stack.
+# External: Supabase (DB). Redis runs locally (colocated) for rate limit + LangGraph checkpointer.
+# Set REDIS_URL=redis://redis:6379 for local Redis. Use managed Redis (rediss://) when scaling to multi-node.
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: hyperagent-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - hyperagent
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Internal only; no ports exposed to host. Use redis://redis:6379 from other services.
+
   api-gateway:
     build:
       context: .
@@ -30,8 +46,10 @@ services:
       - PORT=4000
       - ORCHESTRATOR_URL=http://orchestrator:8000
       - AGENT_RUNTIME_URL=http://agent-runtime:4001
-      - STORAGE_SERVICE_URL=http://agent-runtime:4001
+      - STORAGE_SERVICE_URL=http://storage:4005
     depends_on:
+      redis:
+        condition: service_healthy
       orchestrator:
         condition: service_healthy
     networks:
@@ -57,31 +75,40 @@ services:
       - AGENT_RUNTIME_URL=http://agent-runtime:4001
       - COMPILE_SERVICE_URL=http://compile:8004
       - AUDIT_SERVICE_URL=http://audit:8001
-      - SIMULATION_SERVICE_URL=http://agent-runtime:4001
-      - DEPLOY_SERVICE_URL=http://agent-runtime:4001
-      - STORAGE_SERVICE_URL=http://agent-runtime:4001
+      - SIMULATION_SERVICE_URL=http://simulation:8002
+      - DEPLOY_SERVICE_URL=http://deploy:8003
+      - STORAGE_SERVICE_URL=http://storage:4005
       - VECTORDB_URL=http://vectordb:8080
       - ROMA_URL=http://roma-service:8080
+      - TOOLS_BASE_URL=http://hyperagent-tools:9000
     volumes:
       - ./infra/registries:/app/services/orchestrator/registries:ro
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
       interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     depends_on:
+      redis:
+        condition: service_healthy
       agent-runtime:
         condition: service_healthy
+      simulation:
+        condition: service_healthy
+      deploy:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
       compile:
-        condition: service_started
+        condition: service_healthy
       audit:
-        condition: service_started
+        condition: service_healthy
       roma-service:
-        condition: service_started
+        condition: service_healthy
       vectordb:
-        condition: service_started
+        condition: service_healthy
     networks:
       - hyperagent
 
@@ -98,9 +125,9 @@ services:
       - AUDIT_SERVICE_URL=http://audit:8001
       - COMPILE_SERVICE_URL=http://compile:8004
       - CHAIN_REGISTRY_PATH=/app/registries/network/chains.yaml
-      - SIMULATION_SERVICE_URL=http://localhost:4001
-      - DEPLOY_SERVICE_URL=http://localhost:4001
-      - STORAGE_SERVICE_URL=http://localhost:4001
+      - SIMULATION_SERVICE_URL=http://simulation:8002
+      - DEPLOY_SERVICE_URL=http://deploy:8003
+      - STORAGE_SERVICE_URL=http://storage:4005
     volumes:
       - ./infra/registries:/app/registries:ro
     networks:
@@ -112,6 +139,66 @@ services:
       retries: 3
       start_period: 15s
 
+  simulation:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.simulation
+    container_name: hyperagent-simulation
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PORT=8002
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8002/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - hyperagent
+
+  deploy:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.deploy
+    container_name: hyperagent-deploy
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PORT=8003
+      - CHAIN_REGISTRY_PATH=/app/registries/network/chains.yaml
+    volumes:
+      - ./infra/registries:/app/registries:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8003/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - hyperagent
+
+  storage:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.storage
+    container_name: hyperagent-storage
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PORT=4005
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:4005/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - hyperagent
+
   compile:
     build:
       context: services/compile
@@ -121,6 +208,12 @@ services:
     env_file:
       - .env
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8004"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8004/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - hyperagent
 
@@ -133,6 +226,12 @@ services:
     env_file:
       - .env
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - hyperagent
 
@@ -145,6 +244,12 @@ services:
     env_file:
       - .env
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "9000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - hyperagent
 
@@ -159,6 +264,12 @@ services:
     environment:
       - AGENT_RUNTIME_URL=http://agent-runtime:4001
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     depends_on:
       agent-runtime:
         condition: service_healthy
@@ -187,6 +298,12 @@ services:
     depends_on:
       - qdrant
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - hyperagent
 
@@ -197,7 +314,9 @@ services:
     container_name: hyperagent-sandbox
     restart: unless-stopped
     ports:
-      - "8005:8000"
+      # F-029: Bind to 127.0.0.1 only. Host access for admin/debug; internal calls use http://sandbox-api:8000.
+      # Service validates OPENSANDBOX_API_KEY (Bearer) for all non-health requests.
+      - "127.0.0.1:8005:8000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - sandbox-data:/var/lib/sandbox-docker
@@ -205,6 +324,12 @@ services:
       - .env
     environment:
       - SANDBOX_WORK_DIR=/var/lib/sandbox-docker
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - hyperagent
 
@@ -215,3 +340,4 @@ networks:
 volumes:
   sandbox-data: {}
   qdrant_data: {}
+  redis_data: {}

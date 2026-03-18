@@ -8,7 +8,8 @@
 'use client';
 
 import { useCompletion } from 'ai/react';
-import { useMemo, useEffect, useRef } from 'react';
+import { useMemo, useEffect, useRef, useCallback } from 'react';
+import { getStoredSession } from '@/lib/session-store';
 
 export interface UseWorkflowStreamingOptions {
   workflowId: string | null;
@@ -39,11 +40,19 @@ export function useWorkflowStreaming(
   // Build streaming API URL (use Next.js API route as proxy)
   const apiUrl = useMemo(() => {
     if (!workflowId) return null;
-    // Use Next.js API route which proxies to backend
     return `/api/streaming/workflows/${workflowId}/code`;
   }, [workflowId]);
 
-  // Use Vercel AI SDK's useCompletion hook
+  const streamingFetch = useCallback(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const session = getStoredSession();
+    const headers = new Headers(init?.headers);
+    if (session?.access_token?.trim()) {
+      headers.set('Authorization', `Bearer ${session.access_token.trim()}`);
+    }
+    return fetch(input, { ...init, headers });
+  }, []);
+
+  // Use Vercel AI SDK's useCompletion hook with auth
   const {
     completion,
     isLoading,
@@ -52,6 +61,7 @@ export function useWorkflowStreaming(
     stop,
   } = useCompletion({
     api: apiUrl || undefined,
+    fetch: streamingFetch,
     streamProtocol: 'data',
     body: abortSignal ? { signal: abortSignal } : undefined,
     onFinish: (completion) => {

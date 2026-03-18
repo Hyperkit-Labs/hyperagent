@@ -7,7 +7,13 @@ import type { Workflow } from '@/lib/types';
 
 type ContractItem = { bytecode?: string; abi?: unknown; source_code?: string; [key: string]: unknown };
 
-export function useWorkflowPolling(workflowId: string | null) {
+export interface UseWorkflowPollingOptions {
+  /** Override poll interval (ms). When SSE is primary, use larger value to reduce polling. */
+  pollIntervalMs?: number;
+}
+
+export function useWorkflowPolling(workflowId: string | null, options?: UseWorkflowPollingOptions) {
+  const pollIntervalMs = options?.pollIntervalMs ?? POLLING.WORKFLOW_POLL_MS;
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [contracts, setContracts] = useState<ContractItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -110,9 +116,9 @@ export function useWorkflowPolling(workflowId: string | null) {
 
   useEffect(() => {
     if (!workflowId || !autoRefresh) return;
-    const t = setInterval(() => fetchWorkflowRef.current(), POLLING.WORKFLOW_POLL_MS);
+    const t = setInterval(() => fetchWorkflowRef.current(), pollIntervalMs);
     return () => clearInterval(t);
-  }, [workflowId, autoRefresh]);
+  }, [workflowId, autoRefresh, pollIntervalMs]);
 
   return {
     workflow,

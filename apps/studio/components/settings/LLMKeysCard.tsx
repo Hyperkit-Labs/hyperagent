@@ -6,14 +6,15 @@ import {
   getConfiguredLLMProviders,
   setLLMKeys,
   deleteLLMKeys,
+  validateLLMKey,
   handleApiError,
   isAuthError,
   isByokStorageOrMigrationError,
   BYOK_SAVE_AGAIN_HINT,
 } from "@/lib/api";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
-import { useSignInWithWallet } from "@/hooks/useSignInWithWallet";
-import { useActiveAccount } from "thirdweb/react";
+import { useWalletAuth } from "@/components/providers/WalletAuthContext";
+import { useActiveAccountFromContext } from "@/components/providers/ActiveAccountContext";
 import { getSupabaseBrowserClient } from "@/lib/supabase-client";
 import { useSession } from "@/hooks/useSession";
 import {
@@ -73,7 +74,7 @@ export function LLMKeysCard() {
   });
   const [keyValidated, setKeyValidated] = useState<string | null>(null);
   const [sessionOnlyKey, setSessionOnlyKey] = useState<{ provider: string; apiKey: string } | null>(null);
-  const account = useActiveAccount();
+  const account = useActiveAccountFromContext();
 
   useEffect(() => {
     setSessionOnlyKey(getSessionOnlyLLMKey());
@@ -84,7 +85,7 @@ export function LLMKeysCard() {
     return () => window.removeEventListener(SESSION_LLM_PASS_THROUGH_UPDATED_EVENT, onUpdate);
   }, []);
   const supabase = getSupabaseBrowserClient();
-  const { signIn, isLoading: isSigningIn, error: signInError } = useSignInWithWallet();
+  const { signIn, isLoading: isSigningIn, error: signInError } = useWalletAuth();
   const { hasSession } = useSession();
 
   const isUnauthorized = Boolean(error && isAuthError(error));
@@ -143,6 +144,39 @@ export function LLMKeysCard() {
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [hasSession, refetchKeys]);
+
+  useEffect(() => {
+    if (!hasSession || configured.length === 0) return;
+    let cancelled = false;
+    const validateStoredKeys = async () => {
+      for (const provider of configured) {
+        if (cancelled) return;
+        setTestStatus((prev) => ({ ...prev, [provider]: { loading: true } }));
+        try {
+          const res = await validateLLMKey(provider, undefined);
+          if (!cancelled) {
+            setTestStatus((prev) => ({
+              ...prev,
+              [provider]: {
+                loading: false,
+                latency: res.latency_ms,
+                error: res.valid ? undefined : (res.error || "Invalid or expired key"),
+              },
+            }));
+          }
+        } catch (e) {
+          if (!cancelled) {
+            setTestStatus((prev) => ({
+              ...prev,
+              [provider]: { loading: false, error: handleApiError(e) },
+            }));
+          }
+        }
+      }
+    };
+    validateStoredKeys();
+    return () => { cancelled = true; };
+  }, [hasSession, configured]);
 
   const handleSaveKeys = () => {
     const toSend = Object.fromEntries(
@@ -222,17 +256,31 @@ export function LLMKeysCard() {
     return trimmed.length >= 20 && /^[a-zA-Z0-9_-]+$/.test(trimmed);
   };
 
-  const [testStatus, setTestStatus] = useState<Record<string, { loading: boolean, latency?: number, error?: string }>>({});
+  const [testStatus, setTestStatus] = useState<Record<string, { loading: boolean; latency?: number; error?: string }>>({});
 
   const handleTestConnection = async (provider: string) => {
+    const keyToTest = keys[provider]?.trim();
+    const hasStored = configured.includes(provider) && !keyToTest;
+    if (!keyToTest && !hasStored) {
+      setTestStatus(prev => ({ ...prev, [provider]: { loading: false, error: "Enter a key or save one first" } }));
+      return;
+    }
     setTestStatus(prev => ({ ...prev, [provider]: { loading: true } }));
-    // Mock testing connection
     try {
-      await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 500));
-      setTestStatus(prev => ({ ...prev, [provider]: { loading: false, latency: Math.floor(Math.random() * 100) + 150 } }));
-      setTimeout(() => setTestStatus(prev => ({ ...prev, [provider]: { loading: false } })), 3000);
-    } catch {
-      setTestStatus(prev => ({ ...prev, [provider]: { loading: false, error: "Failed to connect" } }));
+      const res = await validateLLMKey(provider, keyToTest || undefined);
+      setTestStatus(prev => ({
+        ...prev,
+        [provider]: {
+          loading: false,
+          latency: res.latency_ms,
+          error: res.valid ? undefined : (res.error || "Invalid key"),
+        },
+      }));
+    } catch (e) {
+      setTestStatus(prev => ({
+        ...prev,
+        [provider]: { loading: false, error: handleApiError(e) },
+      }));
     }
   };
 

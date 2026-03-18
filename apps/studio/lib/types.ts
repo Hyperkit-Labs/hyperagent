@@ -72,6 +72,17 @@ export function hasAuditOrSimFailure(w: { stages?: Array<{ name?: string; stage?
   );
 }
 
+/** True when security_check stage failed (sensitive data detected). */
+export function hasSecurityCheckFailure(w: { stages?: Array<{ name?: string; stage?: string; status?: string }>; current_stage?: string }): boolean {
+  if (w.current_stage === 'failed') return true;
+  const stages = w.stages ?? [];
+  return stages.some(
+    (s) =>
+      (s.name === 'security_check' || s.stage === 'security_check') &&
+      (s.status === 'failed' || s.status === 'error')
+  );
+}
+
 export interface Network {
   id: string;
   name?: string;

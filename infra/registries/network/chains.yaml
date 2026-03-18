@@ -3,7 +3,7 @@
 # Fields under `chainlist:` are synced from Chainlist / ethereum-lists.
 # Fields under `hyperagent:` are local extensions and MUST NOT be overwritten by sync.
 
-apiVersion: hyperagent.io/v1
+apiVersion: hyperkitlabs.com/v1
 kind: ChainRegistry
 metadata:
   name: hyperagent-chains

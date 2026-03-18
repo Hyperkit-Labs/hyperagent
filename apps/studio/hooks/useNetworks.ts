@@ -60,7 +60,7 @@ export function useNetworks(options: UseNetworksOptions = {}): UseNetworksReturn
 
       const [data, metrics] = await Promise.all([
         getNetworks(undefined, signal),
-        includeStats ? getMetrics(signal).catch(() => null) : Promise.resolve(null),
+        includeStats ? getMetrics(undefined, signal).catch(() => null) : Promise.resolve(null),
       ]);
 
       if (isMounted.current) {

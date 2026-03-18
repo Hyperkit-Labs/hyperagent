@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import { History, Search, Filter, Loader2, ChevronRight, ExternalLink, Bug } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import { PageTitle } from "@/components/layout/PageTitle";
@@ -79,6 +80,7 @@ export default function HistoryPage() {
     : logs;
 
   return (
+    <RequireApiSession>
     <div className="p-6 lg:p-8 max-w-[1200px] mx-auto space-y-6 animate-enter">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -243,5 +245,6 @@ export default function HistoryPage() {
         )
       )}
     </div>
+    </RequireApiSession>
   );
 }

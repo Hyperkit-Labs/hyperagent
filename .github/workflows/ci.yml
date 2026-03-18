@@ -247,8 +247,35 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       
-      - name: Run tests
+      - name: Run unit tests
         run: pnpm --filter hyperagent-studio run test
+        continue-on-error: true
+
+  e2e-tests:
+    name: '[TEST] E2E (Playwright)'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.20.0
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Install Playwright browsers
+        run: pnpm --filter hyperagent-studio exec playwright install --with-deps chromium
+      
+      - name: Run E2E tests
+        run: pnpm --filter hyperagent-studio run test:e2e
         continue-on-error: true
 
   # ============================================================================
@@ -390,10 +417,13 @@ jobs:
       
       - name: Create minimal .env for CI
         run: |
+          # CI-only: minimal env for Docker smoke test. Orchestrator is not in production mode
+          # (no NODE_ENV/RENDER/ENVIRONMENT), so strict production checks do not run.
+          # For real integration tests, use GitHub secrets (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY).
           cat > .env << 'EOF'
           REDIS_URL=redis://localhost:6379/0
-          SUPABASE_URL=https://placeholder.supabase.co
-          SUPABASE_SERVICE_KEY=placeholder
+          SUPABASE_URL=https://ci-test.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY=ci-test-key-do-not-use-in-production
           EOF
       
       - name: Start services with Docker Compose

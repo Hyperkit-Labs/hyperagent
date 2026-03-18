@@ -4,11 +4,10 @@ import { useEffect, useState } from "react";
 import { getPlatformTrackRecord } from "@/lib/api";
 
 const DEFAULTS = {
-  audits_completed: 500,
-  vulnerabilities_found: 1200,
-  security_researchers: 50,
-  tvl_secured: 2,
-  tvl_suffix: "B+",
+  audits_completed: 0,
+  vulnerabilities_found: 0,
+  security_researchers: 0,
+  contracts_deployed: 0,
 };
 
 export function useTrackRecord() {
@@ -25,8 +24,8 @@ export function useTrackRecord() {
   const trackRecord = [
     { label: "Audits", value: record.audits_completed, prefix: "", suffix: "", desc: "Audits Completed" },
     { label: "Vulnerabilities", value: record.vulnerabilities_found, prefix: "", suffix: "", desc: "Vulnerabilities Found" },
-    { label: "Team", value: record.security_researchers, prefix: "", suffix: "+", desc: "Security Researchers" },
-    { label: "TVL", value: record.tvl_secured, prefix: "$", suffix: record.tvl_suffix, desc: "TVL Secured" },
+    { label: "Team", value: record.security_researchers, prefix: "", suffix: record.security_researchers > 0 ? "+" : "", desc: "Security Researchers" },
+    { label: "Deployments", value: record.contracts_deployed, prefix: "", suffix: "", desc: "Contracts Deployed" },
   ];
 
   return { trackRecord };

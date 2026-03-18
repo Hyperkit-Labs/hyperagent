@@ -13,24 +13,52 @@ export interface RequestWithUser extends Request {
 
 const AUTH_JWT_SECRET = process.env.AUTH_JWT_SECRET;
 const NODE_ENV = process.env.NODE_ENV || "development";
+const IS_PRODUCTION = NODE_ENV === "production";
 const REQUIRE_AUTH = process.env.REQUIRE_AUTH !== "false" || NODE_ENV === "production";
 
-function isPublicPath(path: string): boolean {
-  const p = (path || "").split("?")[0];
-  return (
-    p === "/health" ||
-    p === "/" ||
-    p === "" ||
-    p === "/api/v1/auth/siwe" ||
-    p === "/api/v1/config" ||
-    p === "/api/v1/config/integrations-debug" ||
-    p === "/api/v1/networks" ||
-    p === "/api/v1/tokens/stablecoins" ||
-    p === "/api/v1/platform/track-record"
-  );
+/** Normalize path: trim query, collapse slashes, trim trailing slash. */
+function normalizePath(input: string): string {
+  const noQuery = (input || "").split("?")[0];
+  const collapsed = noQuery.replace(/\/+/g, "/");
+  const trimmed = collapsed !== "/" ? collapsed.replace(/\/$/, "") : collapsed;
+  return trimmed || "/";
 }
 
-/** Trace: log auth path for protected routes so 401s can be diagnosed (missing header vs invalid token). */
+const PUBLIC_PATHS = new Set([
+  "/",
+  "/health",
+  "/auth/bootstrap",
+  "/api/v1/auth/bootstrap",
+  "/api/v1/config",
+  "/api/v1/networks",
+  "/api/v1/tokens/stablecoins",
+  "/api/v1/platform/track-record",
+]);
+
+/** Dev-only paths: excluded from PUBLIC_PATHS in production to avoid leaking debug info. */
+const DEV_ONLY_PUBLIC_PATHS = new Set(["/api/v1/config/integrations-debug"]);
+
+function isPublicPathFromReq(req: Request): boolean {
+  const candidates = [
+    normalizePath(req.originalUrl || ""),
+    normalizePath(req.path || ""),
+    normalizePath((req.baseUrl || "") + (req.path || "")),
+    normalizePath(req.url || ""),
+  ];
+
+  return candidates.some((p) => {
+    if (
+      p.startsWith("/auth/bootstrap/") ||
+      p.startsWith("/api/v1/auth/bootstrap/")
+    )
+      return true;
+    if (PUBLIC_PATHS.has(p)) return true;
+    if (DEV_ONLY_PUBLIC_PATHS.has(p) && !IS_PRODUCTION) return true;
+    return false;
+  });
+}
+
+/** Trace: log auth for non-pass outcomes, or all outcomes in dev. */
 function traceAuth(
   path: string,
   requestId: string | undefined,
@@ -38,6 +66,7 @@ function traceAuth(
   authScheme: "Bearer" | "none" | "other",
   outcome: "pass" | "401_missing_header" | "401_invalid_token" | "503_no_secret"
 ): void {
+  if (IS_PRODUCTION && outcome === "pass") return;
   const payload: Record<string, unknown> = {
     trace: "auth",
     path,
@@ -54,10 +83,21 @@ export function authMiddleware(
   res: Response,
   next: NextFunction
 ): void {
-  const path = (req.path || "").split("?")[0];
   const requestId = (req as Request & { requestId?: string }).requestId;
+  const path = normalizePath(req.originalUrl || req.path || "");
 
-  if (isPublicPath(path)) {
+  if (!IS_PRODUCTION) {
+    console.warn("[auth] path check", {
+      requestId,
+      originalUrl: req.originalUrl,
+      baseUrl: req.baseUrl,
+      path: req.path,
+      url: req.url,
+      isPublic: isPublicPathFromReq(req),
+    });
+  }
+
+  if (isPublicPathFromReq(req)) {
     next();
     return;
   }

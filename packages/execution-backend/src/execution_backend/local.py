@@ -71,8 +71,9 @@ class LocalBackend:
         contract_code: str,
         contract_name: str,
         tools: list[str] | None = None,
+        on_log: None | ((str, str) -> None) = None,
     ) -> AuditResult:
-        """Run audit via HTTP."""
+        """Run audit via HTTP. on_log ignored (no streaming from HTTP audit service)."""
         url = f"{self.audit_url}/audit"
         if self.tools_url:
             url = f"{self.tools_url}/audit"
@@ -108,8 +109,16 @@ class LocalBackend:
         spec: dict[str, Any],
         design: dict[str, Any],
     ) -> ExploitSimResult:
-        """Exploit sim: placeholder; returns passed with empty findings."""
-        return ExploitSimResult(passed=True, findings=[])
+        """Exploit sim: LocalBackend has no implementation. Fail closed."""
+        return ExploitSimResult(
+            passed=False,
+            findings=[{
+                "severity": "high",
+                "title": "Exploit simulation not implemented",
+                "description": "LocalBackend does not run exploit tests. Set OPENSANDBOX_ENABLED=true and configure OpenSandbox for real exploit simulation.",
+                "tool": "execution-backend",
+            }],
+        )
 
     async def run_gas_benchmark(
         self,

@@ -2,7 +2,7 @@
 
 import { ReactNode, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "@/hooks/useSession";
+import { useSessionContext } from "@/components/providers/SessionProvider";
 import { ROUTES } from "@/constants/routes";
 import { Loader2 } from "lucide-react";
 
@@ -13,18 +13,22 @@ interface RequireApiSessionProps {
 }
 
 /**
- * If no session, redirect to /login. Middleware handles most cases; this is a fallback.
+ * If no session or bootstrap failed, redirect to /login. Middleware handles most cases; this is a fallback.
+ * Uses SessionProvider for single source of truth.
  */
 export function RequireApiSession({ children }: RequireApiSessionProps) {
-  const { hasSession, isReady } = useSession();
+  const { hasSession, bootstrapStatus, isReady } = useSessionContext();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isReady || hasSession) return;
-    router.replace(ROUTES.LOGIN);
-  }, [isReady, hasSession, router]);
+    if (!isReady) return;
+    if (!hasSession || bootstrapStatus === "failed") {
+      const next = typeof window !== "undefined" ? encodeURIComponent(window.location.pathname + window.location.search) : "";
+      router.replace(next ? `${ROUTES.LOGIN}?next=${next}` : ROUTES.LOGIN);
+    }
+  }, [isReady, hasSession, bootstrapStatus, router]);
 
-  if (!isReady || !hasSession) {
+  if (!isReady || !hasSession || bootstrapStatus === "failed" || bootstrapStatus === "pending") {
     return (
       <div className="p-6 lg:p-8 flex items-center justify-center min-h-[60vh]">
         <Loader2 className="w-8 h-8 text-[var(--color-text-muted)] animate-spin" />

@@ -3,12 +3,20 @@
 import { useEffect, useRef } from 'react';
 import { useActiveAccount } from 'thirdweb/react';
 import { useSignInWithWallet } from '@/hooks/useSignInWithWallet';
-import { getStoredSession } from '@/lib/session-store';
+import { clearStoredSession, getStoredSession } from '@/lib/session-store';
+import { ROUTES } from '@/constants/routes';
+
+function redirectToLogin(): void {
+  if (typeof window === 'undefined') return;
+  const path = window.location.pathname + window.location.search;
+  const next = path && path !== ROUTES.LOGIN ? encodeURIComponent(path) : '';
+  window.location.href = next ? `${ROUTES.LOGIN}?next=${next}` : ROUTES.LOGIN;
+}
 
 /**
- * ZSPS: Proactive session bootstrap.
- * When AutoConnect restores wallet but no valid session exists, triggers bootstrap
- * so wallet_users is updated and a fresh JWT is issued.
+ * Proactive session bootstrap.
+ * When AutoConnect restores wallet but no valid session exists, triggers sign-in.
+ * On failure: clears session and redirects to /login to close ghost-state window.
  */
 export function useAutoBootstrap(): void {
   const account = useActiveAccount();
@@ -23,6 +31,16 @@ export function useAutoBootstrap(): void {
 
     bootstrappingRef.current = true;
     signIn()
+      .then((ok) => {
+        if (!ok) {
+          clearStoredSession();
+          redirectToLogin();
+        }
+      })
+      .catch(() => {
+        clearStoredSession();
+        redirectToLogin();
+      })
       .finally(() => {
         bootstrappingRef.current = false;
       });

@@ -32,11 +32,23 @@ function _isValidJwt(token: string): boolean {
   }
 }
 
+/** E2E bypass: when PLAYWRIGHT_E2E=1 cookie is set in dev, skip auth for happy-path tests. */
+const E2E_BYPASS_COOKIE = "PLAYWRIGHT_E2E";
+
 /** All routes except /login require a valid, non-expired session. */
 export function middleware(request: NextRequest): NextResponse {
   const pathname = request.nextUrl.pathname;
   if (pathname === ROUTES.LOGIN) {
     return NextResponse.next();
+  }
+
+  if (
+    process.env.NODE_ENV !== "production" &&
+    request.cookies.get(E2E_BYPASS_COOKIE)?.value === "1"
+  ) {
+    const res = NextResponse.next();
+    res.headers.set("x-e2e-bypass", "1");
+    return res;
   }
 
   const hasSession = request.cookies.get(SESSION_COOKIE_NAME)?.value === "1";
@@ -64,6 +76,11 @@ export function middleware(request: NextRequest): NextResponse {
   return NextResponse.next();
 }
 
+/**
+ * Matcher: runs for all paths except static assets.
+ * / is included (root path matches: negative lookahead fails for empty remainder).
+ * Excluded: _next/static, _next/image, favicon.ico, hyperkit-header-white.svg, image extensions.
+ */
 export const config = {
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|hyperkit-header-white.svg|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",

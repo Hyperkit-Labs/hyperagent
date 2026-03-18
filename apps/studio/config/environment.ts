@@ -71,7 +71,7 @@ class ConfigManager {
       if (isProduction || isStaging) {
         throw new Error(
           'NEXT_PUBLIC_BACKEND_HOST is required in production/staging. ' +
-          'Set it to your API domain (e.g. api.hyperkit.dev) or use NEXT_PUBLIC_API_URL instead.'
+          'Set it to your API domain (e.g. api.hyperkitlabs.com) or use NEXT_PUBLIC_API_URL instead.'
         );
       }
       return 'localhost';

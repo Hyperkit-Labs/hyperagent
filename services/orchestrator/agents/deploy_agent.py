@@ -5,11 +5,15 @@ import os
 import re
 
 import httpx
+from circuit_breaker import CircuitOpenError, get_breaker
 from db import insert_deployment, is_configured
 from providers import get_deploy_provider
 from registries import get_default_chain_id, get_timeout
 from store import _ensure_contracts_dict
 from trace_context import get_trace_headers
+
+_COMPILE_BREAKER_NAME = "compile_service"
+_DEPLOY_BREAKER_NAME = "deploy_service"
 
 logger = logging.getLogger(__name__)
 
@@ -47,27 +51,40 @@ async def _compile_contract(
         payload["entryContract"] = contract_name
     else:
         payload["contractCode"] = clean_source
-    async with httpx.AsyncClient(timeout=get_timeout("deploy")) as client:
-        r = await client.post(
-            f"{COMPILE_SERVICE_URL}/compile", json=payload, headers=headers
+    breaker = get_breaker(_COMPILE_BREAKER_NAME)
+    if not breaker.can_execute():
+        logger.warning("[deploy] compile circuit open for %s", contract_name)
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=get_timeout("deploy")) as client:
+            r = await client.post(
+                f"{COMPILE_SERVICE_URL}/compile", json=payload, headers=headers
+            )
+        breaker.record_success()
+    except CircuitOpenError:
+        return None
+    except Exception as e:
+        breaker.record_failure()
+        logger.warning("[deploy] compile request failed for %s: %s", contract_name, e)
+        return None
+    if r.status_code != 200:
+        breaker.record_failure()
+        logger.warning(
+            "[deploy] compile HTTP %s for %s", r.status_code, contract_name
         )
-        if r.status_code != 200:
-            logger.warning(
-                "[deploy] compile HTTP %s for %s", r.status_code, contract_name
-            )
-            return None
-        data = r.json()
-        if not data.get("success") or not data.get("bytecode"):
-            errors = data.get("errors") or []
-            msgs = [
-                e.get("message", "")[:200] if isinstance(e, dict) else str(e)[:200]
-                for e in errors[:3]
-            ]
-            logger.warning(
-                "[deploy] compile failed for %s: %s", contract_name, "; ".join(msgs)
-            )
-            return None
-        return {"bytecode": data["bytecode"], "abi": data.get("abi") or []}
+        return None
+    data = r.json()
+    if not data.get("success") or not data.get("bytecode"):
+        errors = data.get("errors") or []
+        msgs = [
+            e.get("message", "")[:200] if isinstance(e, dict) else str(e)[:200]
+            for e in errors[:3]
+        ]
+        logger.warning(
+            "[deploy] compile failed for %s: %s", contract_name, "; ".join(msgs)
+        )
+        return None
+    return {"bytecode": data["bytecode"], "abi": data.get("abi") or []}
 
 
 def _chain_ids_from_spec(chains: list) -> list[int]:
@@ -151,12 +168,20 @@ async def deploy_contracts(
         if order == 0 and str(spec.get("token_type", "")).upper() == "ERC20":
             constructor_args = _extract_erc20_constructor_args(spec, oz_wizard_options)
 
+        deploy_breaker = get_breaker(_DEPLOY_BREAKER_NAME)
         for chain_id in chain_ids:
+            if not deploy_breaker.can_execute():
+                logger.warning("[deploy] circuit open, skipping chain=%s contract=%s", chain_id, contract_name)
+                continue
             try:
                 plan = await get_deploy_provider().get_deploy_plan(
                     chain_id, bytecode, abi, constructor_args
                 )
+                deploy_breaker.record_success()
+            except CircuitOpenError:
+                continue
             except Exception as exc:
+                deploy_breaker.record_failure()
                 logger.warning(
                     "[deploy] deploy plan failed chain=%s contract=%s: %s",
                     chain_id,

@@ -8,8 +8,13 @@ import os
 
 from langchain_core.messages import AIMessage
 
-logger = logging.getLogger(__name__)
-
+from node_common import (
+    estimate_complexity as _estimate_complexity,
+    resolve_user_prompt as _resolve_user_prompt,
+    step_complete as _step_complete,
+    step_index as _step_index,
+    step_start as _step_start,
+)
 from registries import (
     get_default_pipeline_id,
     get_high_severity_swc,
@@ -21,90 +26,9 @@ from step_trace import step_span
 from store import _ensure_contracts_dict
 from workflow_state import AgentState
 
-STEP_ORDER = (
-    "spec",
-    "human_review",
-    "design",
-    "codegen",
-    "security_check",
-    "test_generation",
-    "scrubd",
-    "audit",
-    "debate",
-    "simulation",
-    "security_policy_evaluator",
-    "exploit_sim",
-    "deploy",
-    "ui_scaffold",
-)
+logger = logging.getLogger(__name__)
 
-
-def _step_index(step_type: str) -> int:
-    try:
-        return STEP_ORDER.index(step_type)
-    except ValueError:
-        return 0
-
-
-def _step_start(run_id: str, step_type: str) -> None:
-    import db
-
-    step_index = _step_index(step_type)
-    logger.info(
-        "[pipeline] run_id=%s step_id=%s step_type=%s status=running",
-        run_id,
-        step_index,
-        step_type,
-    )
-    if db.is_configured() and run_id:
-        db.insert_step(run_id, step_index, step_type, status="running")
-        db.insert_agent_log(run_id, step_type, step_type, "started", log_level="info")
-
-
-async def _step_complete(
-    run_id: str,
-    step_type: str,
-    output_summary: str | None = None,
-    error_message: str | None = None,
-    extra: dict | None = None,
-) -> None:
-    import db
-    from trace_writer import write_trace
-
-    status = "failed" if error_message else "completed"
-    step_index = _step_index(step_type)
-    logger.info(
-        "[pipeline] run_id=%s step_id=%s step_type=%s status=%s",
-        run_id,
-        step_index,
-        step_type,
-        status,
-    )
-    blob_id, da_cert, ref_block = None, None, None
-    if db.is_configured() and run_id:
-        blob_id, da_cert, ref_block = await write_trace(
-            run_id, step_type, step_index, status, output_summary, error_message, extra
-        )
-        db.update_step(
-            run_id,
-            step_type,
-            status,
-            output_summary=output_summary,
-            error_message=error_message,
-            trace_blob_id=blob_id,
-            trace_da_cert=da_cert,
-            trace_reference_block=ref_block,
-        )
-        msg = (error_message or output_summary or status)[:4096]
-        db.insert_agent_log(
-            run_id,
-            step_type,
-            step_type,
-            msg,
-            log_level="error" if error_message else "info",
-        )
-
-
+import context_client
 import ipfs_client
 import rag_client
 from agents.audit_agent import compute_audit_deploy_blocked, run_security_audits
@@ -118,33 +42,10 @@ from agents.pashov_audit_agent import run_pashov_audit
 from agents.scrubd_agent import run_scrubd_validation
 from agents.simulation_agent import run_tenderly_simulations, run_tenderly_simulations_bundle
 from agents.test_generation_agent import generate_tests
+from agents.monitor_agent import run_monitor
 from agents.ui_scaffold_agent import generate_ui_schema
 from roma_inprocess import invoke_roma_spec
 from security_context import build_security_context
-
-
-def _estimate_complexity(prompt: str) -> int:
-    indicators = get_roma_complexity_indicators()
-    lower = prompt.lower()
-    return min(sum(2 for w in indicators if w in lower), 10)
-
-
-def _resolve_user_prompt(state: AgentState) -> str:
-    """Resolve user_prompt from state or workflow store (for resume when checkpoint lacks it)."""
-    prompt = state.get("user_prompt", "")
-    if prompt:
-        return prompt
-    run_id = state.get("run_id")
-    if run_id:
-        try:
-            from store import get_workflow
-
-            w = get_workflow(run_id)
-            if w:
-                return w.get("intent", "") or ""
-        except Exception:
-            pass
-    return ""
 
 
 async def spec_agent(state: AgentState) -> AgentState:
@@ -163,20 +64,27 @@ async def spec_agent(state: AgentState) -> AgentState:
             )
             agent_session_jwt = state.get("agent_session_jwt") or None
             template_id_from_state = (state.get("template_id") or "").strip()
+            acontext_hits = context_client.search_context(
+                user_id, query=prompt[:200] if prompt else None, context_type="pattern", limit=3
+            )
             rag_context = await rag_client.query_specs(prompt, limit=3, user_id=user_id)
             rag_templates = await rag_client.query_templates(
                 prompt, limit=3, user_id=user_id
             )
-            if rag_context or rag_templates:
+            if acontext_hits:
+                state["acontext_hits"] = acontext_hits
+            if rag_context or rag_templates or acontext_hits:
                 state["rag_context"] = {
                     "specs": rag_context,
                     "templates": rag_templates,
+                    "acontext": acontext_hits,
                 }
             roma_context = {
                 "apiKeys": api_keys,
                 "userId": user_id,
                 "projectId": project_id,
                 "runId": run_id,
+                "ragContext": state.get("rag_context") or {},
             }
             spec = await invoke_roma_spec(
                 prompt, context=roma_context, agent_session_jwt=agent_session_jwt
@@ -208,6 +116,12 @@ async def spec_agent(state: AgentState) -> AgentState:
                     )
             except Exception as pin_err:
                 logger.warning("[pipeline] post-spec pin/index failed: %s", pin_err)
+            context_client.store_context(
+                user_id,
+                "pattern",
+                {"spec_summary": spec.get("token_type", "contract"), "run_id": run_id, "prompt_preview": prompt[:300] if prompt else ""},
+                metadata={"run_id": run_id, "project_id": project_id},
+            )
             state["messages"] = list(state.get("messages", [])) + [
                 AIMessage(
                     content=f"[{source}] Generated spec: {spec.get('token_type', 'contract')}"
@@ -336,6 +250,12 @@ async def design_agent(state: AgentState) -> AgentState:
                     )
             except Exception as pin_err:
                 logger.warning("[pipeline] post-design pin failed: %s", pin_err)
+            context_client.store_context(
+                user_id,
+                "pattern",
+                {"design_components": len(design.get("components", [])), "run_id": run_id, "framework": state["framework"]},
+                metadata={"run_id": run_id, "project_id": project_id},
+            )
             state["messages"] = list(state.get("messages", [])) + [
                 AIMessage(
                     content=f"Design: {len(design.get('components', []))} components"
@@ -687,7 +607,7 @@ async def simulation_agent(state: AgentState) -> AgentState:
                 design_rationale=state.get("design_rationale", "") or "",
             )
         state["simulation_results"] = results
-        state["simulation_passed"] = results.get("passed", True)
+        state["simulation_passed"] = results.get("passed", False)
         state["current_stage"] = (
             "simulation" if state["simulation_passed"] else "simulation_failed"
         )
@@ -920,6 +840,13 @@ async def deploy_agent(state: AgentState) -> AgentState:
                 {"stage": "deploy", "status": "completed"},
             ],
         )
+        user_id = state.get("user_id", "")
+        context_client.store_context(
+            user_id,
+            "pattern",
+            {"deployments_count": len(deployments), "run_id": run_id, "chains": [d.get("chain_id") for d in deployments if d.get("chain_id")]},
+            metadata={"run_id": run_id, "project_id": project_id},
+        )
         state["messages"] = list(state.get("messages", [])) + [
             AIMessage(content=f"Deployed to {len(deployments)} chains")
         ]
@@ -930,6 +857,31 @@ async def deploy_agent(state: AgentState) -> AgentState:
     except Exception as e:
         await _step_complete(run_id, "deploy", error_message=str(e))
         raise
+
+
+async def monitor_agent(state: AgentState) -> AgentState:
+    """Post-deploy health check. Runs after deploy, before simulation."""
+    run_id = state.get("run_id") or ""
+    deployments = state.get("deployments") or []
+    _step_start(run_id, "monitor")
+    async with step_span(run_id, "monitor", _step_index("monitor")):
+        try:
+            result = await run_monitor(deployments, run_id)
+            await _step_complete(
+                run_id,
+                "monitor",
+                output_summary=result.get("message", "ok"),
+                output_json={
+                    "verified": result.get("verified", []),
+                    "failed": result.get("failed") or [],
+                    "deployments_count": result.get("deployments_count", 0),
+                    "ok": result.get("ok", False),
+                },
+            )
+            return state
+        except Exception as e:
+            await _step_complete(run_id, "monitor", error_message=str(e))
+            return state
 
 
 async def ui_scaffold_agent(state: AgentState) -> AgentState:

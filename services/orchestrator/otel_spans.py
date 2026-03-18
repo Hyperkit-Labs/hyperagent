@@ -28,6 +28,18 @@ def _get_tracer():  # type: ignore[no-untyped-def]
         return None
     try:
         from opentelemetry import trace
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+        endpoint = (os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT") or "").strip()
+        if endpoint:
+            try:
+                from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+                provider = TracerProvider()
+                provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
+                trace.set_tracer_provider(provider)
+            except ImportError:
+                logger.debug("opentelemetry-exporter-otlp not installed, spans in-process only")
 
         _tracer = trace.get_tracer("hyperagent.orchestrator", "0.1.0")
         return _tracer
@@ -63,4 +75,23 @@ def span(
             yield
     except Exception as e:
         logger.debug("otel span error: %s", e)
+        yield
+
+
+@contextmanager
+def request_span(method: str, path: str, request_id: str | None = None) -> Generator[None, None, None]:
+    """Create an HTTP request span when OPENTELEMETRY_ENABLED. Use in middleware."""
+    t = _get_tracer()
+    if t is None:
+        yield
+        return
+    try:
+        with t.start_as_current_span("http.request") as s:
+            s.set_attribute("http.method", method)
+            s.set_attribute("http.url", path)
+            if request_id:
+                s.set_attribute("request_id", request_id)
+            yield
+    except Exception as e:
+        logger.debug("otel request span error: %s", e)
         yield

@@ -401,10 +401,11 @@ coverage.xml
 *.lcov
 .coveragerc
 
-# Test results
+# Test results (do not commit - CI/local only)
 test-results/
 test-results.xml
 playwright-report/
+**/playwright-report/
 
 # Dogfood QA output (reports, screenshots, videos). Opt-in to commit specific reports.
 dogfood-output/

@@ -226,10 +226,18 @@ async def sandbox_create(
     _: None = Depends(_verify_api_key),
 ) -> SandboxCreateResponse:
     """Create an ephemeral sandbox from a tarball URL. Returns preview URL."""
+    # Validate requested container port to avoid passing arbitrary values to docker.
+    try:
+        requested_port = int(body.port)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid port: must be an integer")
+    if not (1 <= requested_port <= 65535):
+        raise HTTPException(status_code=400, detail="Invalid port: must be between 1 and 65535")
+
     sandbox_id, host_port = await _create_sandbox_container(
         body.tarball_url,
         body.timeout_minutes,
-        body.port,
+        requested_port,
     )
     meta = _sandboxes.get(sandbox_id, {})
     url = meta.get("url", f"http://localhost:{host_port}")

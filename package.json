@@ -9,6 +9,8 @@
     "lint": "pnpm turbo lint",
     "typecheck": "pnpm turbo typecheck",
     "test": "pnpm turbo test",
+    "test:minimal": "node scripts/minimal-suite/run.mjs",
+    "test:minimal:all": "node scripts/minimal-suite/run.mjs --all",
     "format": "pnpm turbo format",
     "commit": "node .github/version/scripts/commit/cli/index.js commit",
     "commit:dry": "node .github/version/scripts/commit/cli/index.js commit --dry-run",
@@ -51,7 +53,7 @@
     "vercel": "^50.28.0"
   },
   "devDependencies": {
-    "turbo": "^2.0.0"
+    "turbo": "^2.8.17"
   },
   "pnpm": {
     "overrides": {

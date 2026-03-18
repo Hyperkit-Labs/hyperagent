@@ -1,7 +1,6 @@
 /**
- * Simulate, deploy, and pin endpoints (merged from simulation/deploy/storage services).
- * Uses @hyperagent/ai-tools and @hyperagent/web3-utils when built from monorepo.
- * Hybrid chain registry: capabilities first, chains.yaml fallback.
+ * Simulate, deploy, and pin via simulation and storage services (single implementation).
+ * Consolidates Tenderly/IPFS: all calls go through services, not direct toolkits.
  */
 
 import type {
@@ -14,25 +13,12 @@ import type {
   PinRequest,
   PinResult,
 } from "@hyperagent/core-types";
-import { TenderlyToolkit } from "@hyperagent/ai-tools";
-import { DeployToolkit, IpfsPinataToolkit, loadHybridChainRegistry } from "@hyperagent/web3-utils";
+import { DeployToolkit, loadHybridChainRegistry } from "@hyperagent/web3-utils";
 
-let tenderly: TenderlyToolkit | null = null;
+const SIMULATION_URL = (process.env.SIMULATION_SERVICE_URL || "http://localhost:8002").replace(/\/$/, "");
+const STORAGE_URL = (process.env.STORAGE_SERVICE_URL || "http://localhost:4005").replace(/\/$/, "");
+
 let deployToolkit: DeployToolkit | null = null;
-let ipfsToolkit: IpfsPinataToolkit | null = null;
-
-function getTenderly(): TenderlyToolkit | null {
-  if (tenderly) return tenderly;
-  const key = process.env.TENDERLY_API_KEY;
-  if (!key) return null;
-  tenderly = new TenderlyToolkit(
-    key,
-    process.env.TENDERLY_API_URL || "https://api.tenderly.co",
-    process.env.TENDERLY_ACCOUNT,
-    process.env.TENDERLY_PROJECT
-  );
-  return tenderly;
-}
 
 function getDeployToolkit(): DeployToolkit {
   if (deployToolkit) return deployToolkit;
@@ -46,53 +32,61 @@ function getDeployToolkit(): DeployToolkit {
 }
 
 export async function simulate(params: SimulateRequest): Promise<SimulateTxResult> {
-  const t = getTenderly();
-  if (!t) {
-    return { success: false, error: "TENDERLY_API_KEY not configured", gasUsed: 0 };
-  }
-  return t.simulate({
-    network: params.network,
-    from: params.from,
-    to: params.to,
-    data: params.data,
-    value: params.value ?? "0",
+  const res = await fetch(`${SIMULATION_URL}/simulate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      network: params.network,
+      from: params.from,
+      to: params.to,
+      data: params.data,
+      value: params.value ?? "0",
+    }),
   });
+  const data = (await res.json()) as SimulateTxResult & { error?: string };
+  if (!res.ok) {
+    return { success: false, error: data.error ?? "Simulation failed", gasUsed: 0 };
+  }
+  return data;
 }
 
 export async function simulateBundle(params: SimulateBundleRequest): Promise<SimulateBundleResult> {
-  const t = getTenderly();
-  if (!t) {
-    return { success: false, error: "TENDERLY_API_KEY not configured", gasUsed: 0 };
+  const res = await fetch(`${SIMULATION_URL}/simulate-bundle`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ simulations: params.simulations }),
+  });
+  const data = (await res.json()) as SimulateBundleResult & { error?: string };
+  if (!res.ok) {
+    return { success: false, error: data.error ?? "Bundle simulation failed", gasUsed: 0 };
   }
-  return t.simulateBundle(params);
+  return data;
 }
 
 export async function getDeployPlan(request: DeployPlanRequest): Promise<DeployPlanResult> {
   return getDeployToolkit().getDeployPlan(request);
 }
 
-function getIpfsToolkit(): IpfsPinataToolkit | null {
-  if (ipfsToolkit) return ipfsToolkit;
-  const jwt = process.env.PINATA_JWT;
-  if (!jwt) return null;
-  const gatewayBase = process.env.PINATA_GATEWAY_BASE?.trim();
-  const gatewayDomain = process.env.PINATA_GATEWAY_DOMAIN?.trim();
-  ipfsToolkit = new IpfsPinataToolkit(jwt, {
-    baseUrl: process.env.PINATA_API_URL || "https://api.pinata.cloud",
-    gatewayBase: gatewayBase || undefined,
-    gatewayDomain: gatewayDomain || "gateway.pinata.cloud",
-  });
-  return ipfsToolkit;
-}
-
 export async function pin(params: PinRequest): Promise<PinResult> {
-  const t = getIpfsToolkit();
-  if (!t) throw new Error("PINATA_JWT not configured");
-  return t.pin(params.content, params.name);
+  const res = await fetch(`${STORAGE_URL}/ipfs/pin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content: params.content, name: params.name }),
+  });
+  const data = (await res.json()) as { success?: boolean; cid?: string; gatewayUrl?: string; error?: string };
+  if (!res.ok || !data.success) {
+    throw new Error(data.error ?? "Pin failed");
+  }
+  return { cid: data.cid ?? "", gatewayUrl: data.gatewayUrl ?? "" };
 }
 
 export async function unpin(cid: string): Promise<void> {
-  const t = getIpfsToolkit();
-  if (!t) throw new Error("PINATA_JWT not configured");
-  return t.unpin(cid);
+  const res = await fetch(`${STORAGE_URL}/ipfs/unpin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cid }),
+  });
+  if (!res.ok) {
+    throw new Error("Unpin failed");
+  }
 }

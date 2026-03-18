@@ -190,7 +190,7 @@ jobs:
     needs: create-github-release
     environment:
       name: production
-      url: https://hyperagent.io
+      url: https://hyperkitlabs.com
     
     steps:
       - uses: actions/checkout@v4
@@ -267,7 +267,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*Status:* Ready for Production Deployment\n*Release:* <https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}|${{ github.ref_name }}>\n*ArgoCD:* <https://argocd.hyperagent.io/applications/hyperagent-production|Manual sync required>"
+                    "text": "*Status:* Ready for Production Deployment\n*Release:* <https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}|${{ github.ref_name }}>\n*ArgoCD:* <https://argocd.hyperkitlabs.com/applications/hyperagent-production|Manual sync required>"
                   }
                 },
                 {
@@ -294,7 +294,7 @@ jobs:
                         "type": "plain_text",
                         "text": "ArgoCD Dashboard"
                       },
-                      "url": "https://argocd.hyperagent.io/applications/hyperagent-production",
+                      "url": "https://argocd.hyperkitlabs.com/applications/hyperagent-production",
                       "style": "primary"
                     }
                   ]

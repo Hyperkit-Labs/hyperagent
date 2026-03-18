@@ -7,13 +7,16 @@ import os
 from collections import defaultdict
 
 import httpx
+from circuit_breaker import CircuitOpenError, get_breaker
 from db import insert_security_finding, is_configured
 from registries import get_deterministic_tools, get_timeout, get_tool_deploy_rule
 from trace_context import get_trace_headers
 
+_AUDIT_BREAKER_NAME = "audit_service"
+
 logger = logging.getLogger(__name__)
 AUDIT_SERVICE_URL = os.environ.get("AUDIT_SERVICE_URL", "http://localhost:8001")
-AUDIT_TOOLS = ["slither", "mythril"]
+AUDIT_TOOLS = ["slither", "mythril", "echidna"]
 OPENSANDBOX_ENABLED = os.environ.get(
     "OPENSANDBOX_ENABLED", "false"
 ).strip().lower() in ("1", "true", "yes")
@@ -249,7 +252,10 @@ async def run_security_audits(
                 findings.extend(exec_findings)
                 audit_succeeded_count += 1
             continue
+        breaker = get_breaker(_AUDIT_BREAKER_NAME)
         try:
+            if not breaker.can_execute():
+                raise CircuitOpenError(f"Circuit {_AUDIT_BREAKER_NAME} is open")
             headers = get_trace_headers()
             async with httpx.AsyncClient(timeout=get_timeout("audit")) as client:
                 r = await client.post(
@@ -259,6 +265,7 @@ async def run_security_audits(
                     headers=headers,
                 )
                 if r.status_code != 200:
+                    breaker.record_failure()
                     logger.warning(
                         "[audit] %s returned %s: %s",
                         contract_name,
@@ -266,6 +273,7 @@ async def run_security_audits(
                         r.text[:200],
                     )
                     continue
+                breaker.record_success()
                 audit_succeeded_count += 1
                 data = r.json()
                 raw_findings = (
@@ -298,7 +306,11 @@ async def run_security_audits(
                             location=finding.get("location"),
                             category=finding.get("category"),
                         )
+        except CircuitOpenError as e:
+            logger.warning("[audit] %s circuit open, skipping: %s", contract_name, e)
+            continue
         except Exception as e:
+            breaker.record_failure()
             logger.warning("[audit] %s failed: %s", contract_name, e)
             continue
 

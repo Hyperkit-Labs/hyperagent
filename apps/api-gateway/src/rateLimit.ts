@@ -198,14 +198,12 @@ export async function rateLimitMiddleware(
     const r = await getRedis();
     if (!r) {
       if (RATE_LIMIT_BYPASS_ON_FAIL) {
-        console.warn("[rate-limit] Redis unreachable, bypassing rate limit (RATE_LIMIT_BYPASS_ON_FAIL=true)");
-        next();
-        return;
+        console.warn("[rate-limit] Redis unreachable. RATE_LIMIT_BYPASS_ON_FAIL ignored in production (fail-closed).");
       }
       logSecurityEvent("rate_limit_unavailable", 503, req.path, req.requestId, req.userId);
       res.status(503).json({
         error: "Service Unavailable",
-        message: "Rate limiting unavailable. Redis connection failed. Ensure REDIS_URL is set and reachable (use rediss:// for TLS). Set RATE_LIMIT_BYPASS_ON_FAIL=true to bypass when Redis is unavailable.",
+        message: "Rate limiting unavailable. Redis connection failed. Ensure REDIS_URL is set and reachable (use rediss:// for TLS).",
         requestId: req.requestId,
       });
       return;

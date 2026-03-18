@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import { useActiveAccount, useActiveWallet, useActiveWalletChain } from "thirdweb/react";
 import { signMessage } from "thirdweb/utils";
 import { bootstrapWithSiwe, bootstrapWithThirdwebInApp } from "@/lib/authBootstrap";
-import { setStoredSession } from "@/lib/session-store";
+import { clearStoredSession, setStoredSession } from "@/lib/session-store";
 
 const AUTH_TOKEN_MAX_RETRIES = 3;
 const AUTH_TOKEN_RETRY_BASE_MS = 500;
@@ -85,6 +85,7 @@ export function useSignInWithWallet() {
       setStoredSession(session.access_token, session.expires_in);
       return true;
     } catch (err) {
+      clearStoredSession();
       const raw = err instanceof Error ? err.message : "Sign in failed.";
       const msg = normalizeAuthError(raw);
       setError(msg);

@@ -58,3 +58,20 @@ def test_health(client):
     if r.status_code == 200:
         j = r.json()
         assert "status" in j or "ok" in str(j).lower()
+
+
+def test_workflows_list_accepts_x_user_id(client):
+    """X-User-Id header is accepted; list returns 200."""
+    r = client.get("/api/v1/workflows", headers={"X-User-Id": "test-user-123"})
+    assert r.status_code == 200
+    j = r.json()
+    assert "workflows" in j
+    assert isinstance(j["workflows"], list)
+
+
+def test_workflows_list_without_auth(client):
+    """List without X-User-Id returns 200 (anonymous allowed)."""
+    r = client.get("/api/v1/workflows")
+    assert r.status_code == 200
+    j = r.json()
+    assert "workflows" in j

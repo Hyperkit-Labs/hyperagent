@@ -1,6 +1,6 @@
 # Pipeline & agent registry (GitOps). Named pipelines with stage list, default models per
 # stage, and gating rules. Change via PR; no code change required.
-apiVersion: hyperagent.io/v1
+apiVersion: hyperkitlabs.com/v1
 kind: PipelineRegistry
 metadata:
   name: evm-default-pipelines

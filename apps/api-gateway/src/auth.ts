@@ -13,6 +13,7 @@ export interface RequestWithUser extends Request {
 
 const AUTH_JWT_SECRET = process.env.AUTH_JWT_SECRET;
 const NODE_ENV = process.env.NODE_ENV || "development";
+const IS_PRODUCTION = NODE_ENV === "production";
 const REQUIRE_AUTH = process.env.REQUIRE_AUTH !== "false" || NODE_ENV === "production";
 
 /** Normalize path: trim query, collapse slashes, trim trailing slash. */
@@ -29,11 +30,13 @@ const PUBLIC_PATHS = new Set([
   "/auth/bootstrap",
   "/api/v1/auth/bootstrap",
   "/api/v1/config",
-  "/api/v1/config/integrations-debug",
   "/api/v1/networks",
   "/api/v1/tokens/stablecoins",
   "/api/v1/platform/track-record",
 ]);
+
+/** Dev-only paths: excluded from PUBLIC_PATHS in production to avoid leaking debug info. */
+const DEV_ONLY_PUBLIC_PATHS = new Set(["/api/v1/config/integrations-debug"]);
 
 function isPublicPathFromReq(req: Request): boolean {
   const candidates = [
@@ -44,15 +47,16 @@ function isPublicPathFromReq(req: Request): boolean {
   ];
 
   return candidates.some((p) => {
-    return (
-      PUBLIC_PATHS.has(p) ||
+    if (
       p.startsWith("/auth/bootstrap/") ||
       p.startsWith("/api/v1/auth/bootstrap/")
-    );
+    )
+      return true;
+    if (PUBLIC_PATHS.has(p)) return true;
+    if (DEV_ONLY_PUBLIC_PATHS.has(p) && !IS_PRODUCTION) return true;
+    return false;
   });
 }
-
-const IS_PRODUCTION = NODE_ENV === "production";
 
 /** Trace: log auth for non-pass outcomes, or all outcomes in dev. */
 function traceAuth(

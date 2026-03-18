@@ -1,6 +1,6 @@
 # x402 product/plan registry (GitOps). Resource IDs for metered APIs, unit pricing,
 # per-plan limits, and mapping from SKU to enabled pipelines/features.
-apiVersion: hyperagent.io/v1
+apiVersion: hyperkitlabs.com/v1
 kind: X402ProductRegistry
 metadata:
   name: x402-products

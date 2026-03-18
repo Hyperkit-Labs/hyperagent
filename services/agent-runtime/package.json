@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@hyperagent/ai-tools": "workspace:*",
+    "@hyperagent/backend-middleware": "workspace:*",
     "@hyperagent/core-types": "workspace:*",
     "@hyperagent/web3-utils": "workspace:*",
     "express": "^4.18.2",

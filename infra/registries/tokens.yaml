@@ -1,7 +1,7 @@
 # Token / template registry (GitOps). Canonical templates: ERC20/721 variants, governance
 # modules; source (openzeppelin-wizard | custom); wizard options for OZ-backed templates.
 # Community-contracts templates: riskProfile high, requiresHumanApproval true.
-apiVersion: hyperagent.io/v1
+apiVersion: hyperkitlabs.com/v1
 kind: TokenTemplateRegistry
 metadata:
   name: evm-token-templates

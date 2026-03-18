@@ -63,7 +63,7 @@ jobs:
     needs: build-and-push
     environment:
       name: staging
-      url: https://staging.hyperagent.io
+      url: https://staging.hyperkitlabs.com
     
     steps:
       - uses: actions/checkout@v4
@@ -118,10 +118,10 @@ jobs:
           sleep 30
           
           # Health check
-          curl -f https://staging-api.hyperagent.io/health || exit 1
+          curl -f https://staging-api.hyperkitlabs.com/health || exit 1
           
           # Verify frontend
-          curl -f https://staging.hyperagent.io || exit 1
+          curl -f https://staging.hyperkitlabs.com || exit 1
       
       - name: Notify on success
         if: success()
@@ -135,7 +135,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*Staging Deployment Successful*\n• Environment: https://staging.hyperagent.io\n• Commit: <https://github.com/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>\n• Author: ${{ github.actor }}\n• Branch: ${{ github.ref_name }}"
+                    "text": "*Staging Deployment Successful*\n• Environment: https://staging.hyperkitlabs.com\n• Commit: <https://github.com/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>\n• Author: ${{ github.actor }}\n• Branch: ${{ github.ref_name }}"
                   }
                 }
               ]

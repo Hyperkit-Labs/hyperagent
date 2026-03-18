@@ -1,6 +1,6 @@
 # LLM model registry (GitOps). Provider → models, context window, cost, recommended use
 # (spec, audit, quick edit), BYOK env mapping, and routing hints.
-apiVersion: hyperagent.io/v1
+apiVersion: hyperkitlabs.com/v1
 kind: ModelRegistry
 metadata:
   name: llm-models

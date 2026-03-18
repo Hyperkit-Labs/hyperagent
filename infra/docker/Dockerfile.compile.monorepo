@@ -1,0 +1,11 @@
+# Compile service with contract-validation package. Build from repo root.
+FROM python:3.11-slim
+WORKDIR /app
+COPY packages/contract-validation ./packages/contract-validation
+COPY services/compile/requirements.txt ./services/compile/
+RUN pip install --no-cache-dir -e ./packages/contract-validation -r ./services/compile/requirements.txt && \
+    python -c "import solcx; solcx.install_solc('0.8.24')"
+COPY services/compile .
+EXPOSE 8004
+ENV COMPILE_MODE=lite
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8004"]

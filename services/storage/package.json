@@ -9,6 +9,7 @@
     "dev": "tsx watch src/index.ts"
   },
   "dependencies": {
+    "@hyperagent/backend-middleware": "workspace:*",
     "@hyperagent/core-types": "workspace:*",
     "@hyperagent/web3-utils": "workspace:*",
     "cors": "^2.8.5",

@@ -1,7 +1,7 @@
 # USDC/USDT network and address registry (GitOps). Canonical contract addresses per chain
 # for x402 payments, gasless paymaster, and merchant settlement. Update via PR; verify
 # addresses from Circle (USDC) and Tether (USDT) before changing.
-apiVersion: hyperagent.io/v1
+apiVersion: hyperkitlabs.com/v1
 kind: StablecoinRegistry
 metadata:
   name: usdc-usdt-addresses

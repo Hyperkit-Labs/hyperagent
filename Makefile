@@ -8,9 +8,9 @@ COMPOSE_FILE := docker-compose.yml
 COMPOSE_FILE_LOCAL := docker-compose.local.yml
 ENV_FILE := .env
 
-.PHONY: help up down logs restart migrate install-web run-web install-api run-api build rebuild \
+.PHONY: help up down logs test-minimal test-minimal-all restart migrate install-web run-web install-api run-api build rebuild \
 	build-web build-prod check-env validate-prod format-api lint-api type-check-api quality-check-api \
-	dogfood-setup dogfood-help dogfood-daemon
+	dogfood-setup dogfood-help dogfood-daemon ai-bom
 
 # Dogfood: default scope and date (override: make dogfood-setup SCOPE=settings-byok DOGFOOD_DATE=2025-02-24)
 DOGFOOD_SCOPE ?= full
@@ -57,6 +57,13 @@ help:
 	@echo "  make dogfood-setup [SCOPE=full|settings-byok|...] - Create output dir and report template"
 	@echo "  make dogfood-help  - Show dogfood checklist and doc link"
 	@echo "  make dogfood-daemon - Start agent-browser daemon (Windows fix; run in separate terminal)"
+	@echo ""
+	@echo "Security:"
+	@echo "  make ai-bom [ARGS=...] - AI-BOM scan (excludes .next for speed; run from repo root)"
+	@echo ""
+	@echo "Minimal test suite:"
+	@echo "  make test-minimal      - Smoke + gateway auth (services must be running)"
+	@echo "  make test-minimal-all - Smoke + integration + E2E"
 
 # Build Docker images for local dev (run when code changes, before make up)
 build:
@@ -255,3 +262,15 @@ dogfood-help:
 # Run in one terminal and leave it open; run agent-browser open/wait/... in another terminal.
 dogfood-daemon:
 	@bash scripts/dogfood-daemon.sh
+
+# AI-BOM scan (excludes .next for speed). Requires: pip install ai-bom
+# Usage: make ai-bom   or make ai-bom ARGS="--format json -o bom.json"
+ai-bom:
+	@bash scripts/ai-bom-scan.sh $(ARGS)
+
+# Minimal test suite. Smoke tests require services (make up). Integration/E2E run pytest/playwright.
+test-minimal:
+	@node scripts/minimal-suite/run.mjs
+
+test-minimal-all:
+	@node scripts/minimal-suite/run.mjs --all

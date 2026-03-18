@@ -16,6 +16,7 @@ import express from "express";
 import { createProxyMiddleware, responseInterceptor } from "http-proxy-middleware";
 import rateLimit from "express-rate-limit";
 import { requestIdMiddleware, RequestWithId } from "./requestId.js";
+import { otelRequestSpanMiddleware, getTraceparentHeader } from "@hyperagent/backend-middleware";
 import { authMiddleware, RequestWithUser } from "./auth.js";
 import { rateLimitMiddleware } from "./rateLimit.js";
 import { authBootstrapHandler, getSupabaseAdmin } from "./authBootstrap.js";
@@ -82,6 +83,7 @@ app.use(
 const jsonParser = express.json({ limit: "2mb" });
 
 app.use(requestIdMiddleware);
+app.use(otelRequestSpanMiddleware);
 app.use(authMiddleware);
 app.use((req, res, next) => {
   (rateLimitMiddleware as (req: express.Request, res: express.Response, next: express.NextFunction) => Promise<void>)(req, res, next).catch(next);
@@ -99,6 +101,8 @@ function proxyOptions(): Record<string, unknown> {
         proxyReq.destroy();
       });
       if (r.requestId) proxyReq.setHeader("x-request-id", r.requestId);
+      const traceparent = getTraceparentHeader() || (r.headers.traceparent as string);
+      if (traceparent) proxyReq.setHeader("traceparent", traceparent);
       if (r.headers.authorization) proxyReq.setHeader("authorization", r.headers.authorization);
       if (r.headers["x-agent-session"]) proxyReq.setHeader("x-agent-session", r.headers["x-agent-session"] as string);
       proxyReq.removeHeader("x-user-id");
@@ -154,14 +158,49 @@ app.use("/api", createProxyMiddleware(proxyOptions()));
 app.use("/docs", createProxyMiddleware(proxyOptions()));
 app.use("/openapi.json", createProxyMiddleware(proxyOptions()));
 
+/** Dependency-aware health: return 503 when orchestrator is down. */
 app.get("/health", async (_req, res) => {
   const supabase = getSupabaseAdmin();
-  const { error } = supabase ? await supabase.from("wallet_users").select("id").limit(1) : { error: { message: "Supabase not configured" } };
+  const dbCheck = supabase ? await supabase.from("wallet_users").select("id").limit(1) : { error: { message: "Supabase not configured" } };
+  const dbError = dbCheck.error ? (dbCheck.error as { message?: string }).message : null;
+  const dbOk = !dbCheck.error;
+
+  let orchestratorOk = false;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    const r = await fetch(`${ORCHESTRATOR_URL.replace(/\/$/, "")}/health`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    orchestratorOk = r.ok;
+  } catch {
+    orchestratorOk = false;
+  }
+
+  const dbRequired = !!supabase;
+  const criticalOk = orchestratorOk && (!dbRequired || dbOk);
+  if (!criticalOk) {
+    const msg = !orchestratorOk
+      ? "Orchestrator unreachable. Check ORCHESTRATOR_URL and backend status."
+      : "Database unreachable. Check Supabase connection.";
+    res.status(503).json({
+      status: "degraded",
+      gateway: true,
+      orchestrator_ok: orchestratorOk,
+      db_connected: dbOk,
+      db_error: dbError,
+      message: msg,
+    });
+    return;
+  }
+
   res.json({
     status: "ok",
     gateway: true,
-    db_connected: !error,
-    db_error: error ? (error as { message?: string }).message : null,
+    orchestrator_ok: true,
+    db_connected: dbOk,
+    db_error: dbError,
   });
 });
 

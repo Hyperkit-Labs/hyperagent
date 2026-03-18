@@ -13,13 +13,34 @@ import tempfile
 from pathlib import Path
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
+
+try:
+    from contract_validation import safe_contract_name as _safe_contract_name_pkg, safe_sol_filename as _safe_sol_filename_pkg
+    from contract_validation import ValidationError
+except ImportError:
+    _safe_contract_name_pkg = None
+    _safe_sol_filename_pkg = None
+    ValidationError = Exception  # type: ignore[misc, assignment]
 
 TOOLS_BASE_URL = (os.environ.get("TOOLS_BASE_URL") or "").rstrip("/")
 TOOLS_API_KEY = os.environ.get("TOOLS_API_KEY", "")
 
 app = FastAPI(title="HyperAgent Compile Service", version="0.1.0")
+
+
+@app.middleware("http")
+async def otel_request_span(request: Request, call_next):
+    """Create OTel request span when OPENTELEMETRY_ENABLED."""
+    rid = (request.headers.get("x-request-id") or request.headers.get("X-Request-Id") or "").strip() or None
+    try:
+        from otel_spans import request_span
+        with request_span(method=request.method or "GET", path=request.url.path or "/", request_id=rid):
+            return await call_next(request)
+    except ImportError:
+        return await call_next(request)
+
 
 _MD_FENCE_RE = re.compile(r"^```(?:solidity|sol)?\s*\n?", re.MULTILINE)
 _MD_FENCE_END_RE = re.compile(r"\n?```\s*$", re.MULTILINE)
@@ -31,14 +52,15 @@ def _strip_markdown_fences(source: str) -> str:
     s = _MD_FENCE_END_RE.sub("", s)
     return s.strip()
 
-# Safe filename: basename only, [a-zA-Z0-9_.-]+\\.sol (path traversal prevention)
-_SAFE_SOL_PATTERN = re.compile(r"^[a-zA-Z0-9_.-]+\.sol$")
-# Safe contract name: Solidity identifier [a-zA-Z0-9_]+ (path traversal prevention)
-_SAFE_CONTRACT_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_]+$")
-
 
 def _safe_contract_name(name: str | None) -> str:
-    """Validate and return a safe contract name for path construction. Reject path traversal."""
+    """Validate and return a safe contract name. Uses contract_validation package when available."""
+    if _safe_contract_name_pkg:
+        try:
+            return _safe_contract_name_pkg(name)
+        except ValidationError as e:
+            raise HTTPException(status_code=e.status_code, detail=e.detail) from e
+    # Fallback when package not installed
     if name is None or not isinstance(name, str):
         raise HTTPException(status_code=400, detail="Invalid contract name")
     s = name.strip()
@@ -46,19 +68,25 @@ def _safe_contract_name(name: str | None) -> str:
         raise HTTPException(status_code=400, detail="Contract name must not be empty")
     if ".." in s or "/" in s or ("\\" in s) or s.startswith("."):
         raise HTTPException(status_code=400, detail="Contract name must not contain path components")
-    if not _SAFE_CONTRACT_NAME_PATTERN.match(s):
+    if not re.match(r"^[a-zA-Z0-9_]+$", Path(s).name):
         raise HTTPException(status_code=400, detail="Contract name must match [a-zA-Z0-9_]+")
-    return s
+    return Path(s).name
 
 
 def _safe_sol_filename(name: str) -> str:
-    """Return a safe .sol filename for use in temp dirs. Reject path traversal and invalid names."""
+    """Return a safe .sol filename. Uses contract_validation package when available."""
+    if _safe_sol_filename_pkg:
+        try:
+            return _safe_sol_filename_pkg(name)
+        except ValidationError as e:
+            raise HTTPException(status_code=e.status_code, detail=e.detail) from e
+    # Fallback when package not installed
     if not name or not isinstance(name, str):
         raise HTTPException(status_code=400, detail="Invalid filename")
     base = Path(name).name
     if ".." in name or os.sep in name or (os.altsep and os.altsep in name):
         raise HTTPException(status_code=400, detail="Filename must not contain path components")
-    if not _SAFE_SOL_PATTERN.match(base):
+    if not re.match(r"^[a-zA-Z0-9_.-]+\.sol$", base):
         raise HTTPException(status_code=400, detail="Filename must match [a-zA-Z0-9_.-]+.sol")
     return base
 

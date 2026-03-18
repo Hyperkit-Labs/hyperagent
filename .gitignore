@@ -404,6 +404,7 @@ coverage.xml
 # Test results
 test-results/
 test-results.xml
+playwright-report/
 
 # Dogfood QA output (reports, screenshots, videos). Opt-in to commit specific reports.
 dogfood-output/
@@ -495,6 +496,11 @@ e2e/
 external/*
 artifacts/
 platform/
+
+# GitHub (local/generated)
+.github/issues/
+.github/pr-bodies/
+.github/scripts/
 
 # Docker environment files (contain secrets)
 infra/docker/.env

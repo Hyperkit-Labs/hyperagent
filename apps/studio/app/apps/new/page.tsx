@@ -17,7 +17,7 @@ import {
   workspaceHeaders,
 } from "@/lib/api";
 import { useWorkspace } from "@/hooks/useWorkspace";
-import { useAgentDiscussion } from "@/hooks/useAgentDiscussion";
+import { useWorkflowSSE } from "@/hooks/useWorkflowSSE";
 import { XTermTerminal } from "@/components/chat/XTermTerminal";
 
 export default function NewAppPage() {
@@ -29,7 +29,7 @@ export default function NewAppPage() {
   const [workflowId, setWorkflowId] = useState<string | null>(null);
   const lastErrorRef = useRef<unknown>(null);
 
-  const { events: discussionEvents } = useAgentDiscussion(workflowId);
+  const { events: discussionEvents } = useWorkflowSSE(workflowId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

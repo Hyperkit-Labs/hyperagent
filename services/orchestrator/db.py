@@ -289,6 +289,188 @@ def insert_security_finding(
         return None
 
 
+def insert_agent_registration(
+    tx_hash: str,
+    chain_id: int,
+    agent_id: str,
+    contract_address: str,
+    source_route: str = "/api/v1/identity/register",
+) -> dict[str, Any] | None:
+    """Insert ERC-8004 registration proof. Returns row or None."""
+    client = _client()
+    if not client:
+        return None
+    try:
+        row = {
+            "tx_hash": tx_hash,
+            "chain_id": chain_id,
+            "agent_id": agent_id,
+            "contract_address": contract_address,
+            "source_route": source_route,
+        }
+        r = client.table("agent_registrations").insert(row).execute()
+        return r.data[0] if r.data else None
+    except Exception as e:
+        logger.warning("[db] insert_agent_registration failed: %s", e)
+        return None
+
+
+# Truncation limits (F-016). Content exceeding limits is cut; full content stored in IPFS when PINATA_* configured.
+# Large artifacts: use storage_backend=ipfs and cid for full retrieval; inline content may be truncated.
+ARTIFACT_CONTENT_LIMIT = 65535   # project_artifacts.content, run_step outputs
+AGENT_LOG_MESSAGE_LIMIT = 4096   # agent_log.message
+OUTPUT_SUMMARY_LIMIT = 4096      # run_step.output_summary
+ERROR_MESSAGE_LIMIT = 2048       # run_step.error_message, agent_log.message (when error)
+
+
+def _truncate_and_warn(
+    content: str | None,
+    limit: int,
+    field_name: str,
+    run_id: str | None = None,
+) -> tuple[str | None, bool]:
+    """Truncate content at limit, log warning, return (truncated_content, was_truncated).
+    Persist was_truncated in metadata so UI can show 'full report stored externally'."""
+    if not content or len(content) <= limit:
+        return (content, False)
+    truncated = content[:limit]
+    logger.warning(
+        "[db] %s truncated to %d chars (limit=%d) run_id=%s",
+        field_name,
+        limit,
+        limit,
+        run_id or "n/a",
+    )
+    return (truncated, True)
+
+
+def upsert_run_state(
+    run_id: str,
+    phase: str = "spec",
+    status: str = "running",
+    current_step: str | None = None,
+    checkpoint_id: str | None = None,
+    simulation_passed: bool = False,
+    exploit_simulation_passed: bool = False,
+) -> bool:
+    """Upsert run_state row. Small delta; replaces full-blob workflow_state writes."""
+    client = _client()
+    if not client or not _is_uuid(run_id):
+        return False
+    try:
+        from datetime import UTC, datetime
+
+        payload = {
+            "phase": phase,
+            "status": status,
+            "updated_at": datetime.now(UTC).isoformat(),
+        }
+        if current_step is not None:
+            payload["current_step"] = current_step
+        if checkpoint_id is not None:
+            payload["checkpoint_id"] = checkpoint_id
+        payload["simulation_passed"] = simulation_passed
+        payload["exploit_simulation_passed"] = exploit_simulation_passed
+        client.table("run_state").upsert(
+            {"run_id": run_id, **payload},
+            on_conflict="run_id",
+        ).execute()
+        return True
+    except Exception as e:
+        # run_state table may not exist until migration 20260316000002 is applied
+        logger.debug("[db] upsert_run_state failed (table may not exist): %s", e)
+        return False
+
+
+def get_run_state(run_id: str) -> dict[str, Any] | None:
+    """Return run_state row as dict, or None if not configured or missing."""
+    client = _client()
+    if not client or not _is_uuid(run_id):
+        return None
+    try:
+        r = client.table("run_state").select("*").eq("run_id", run_id).execute()
+        row = (r.data or [{}])[0] if r.data else {}
+        return row if isinstance(row, dict) and row.get("run_id") else None
+    except Exception as e:
+        # run_state table may not exist until migration 20260316000002 is applied
+        logger.debug("[db] get_run_state failed (table may not exist): %s", e)
+        return None
+
+
+def upsert_workflow_artifacts(
+    run_id: str,
+    project_id: str,
+    spec: dict | None = None,
+    contracts: dict | None = None,
+    deployments: list | None = None,
+    audit_findings: list | None = None,
+    ui_schema: dict | None = None,
+    test_files: dict | None = None,
+) -> None:
+    """Write rich pipeline fields to project_artifacts (split from workflow_state blob).
+    Each artifact type is stored separately; blob remains for backward compat."""
+    if not _is_uuid(project_id) or not _is_uuid(run_id):
+        return
+    import json
+    try:
+        if spec:
+            insert_project_artifact(
+                project_id=project_id,
+                run_id=run_id,
+                artifact_type="spec",
+                name=f"spec-{run_id[:8]}.json",
+                content=json.dumps(spec, default=str),
+                metadata={"source": "workflow_state_split"},
+            )
+        if contracts:
+            insert_project_artifact(
+                project_id=project_id,
+                run_id=run_id,
+                artifact_type="contracts",
+                name=f"contracts-{run_id[:8]}.json",
+                content=json.dumps(contracts, default=str),
+                metadata={"source": "workflow_state_split"},
+            )
+        if deployments:
+            insert_project_artifact(
+                project_id=project_id,
+                run_id=run_id,
+                artifact_type="deployment_record",
+                name=f"deployments-{run_id[:8]}.json",
+                content=json.dumps(deployments, default=str),
+                metadata={"source": "workflow_state_split"},
+            )
+        if audit_findings:
+            insert_project_artifact(
+                project_id=project_id,
+                run_id=run_id,
+                artifact_type="audit_report",
+                name=f"audit-{run_id[:8]}.json",
+                content=json.dumps(audit_findings, default=str),
+                metadata={"source": "workflow_state_split"},
+            )
+        if ui_schema:
+            insert_project_artifact(
+                project_id=project_id,
+                run_id=run_id,
+                artifact_type="ui_schema",
+                name=f"ui_schema-{run_id[:8]}.json",
+                content=json.dumps(ui_schema, default=str),
+                metadata={"source": "workflow_state_split"},
+            )
+        if test_files:
+            insert_project_artifact(
+                project_id=project_id,
+                run_id=run_id,
+                artifact_type="test_files",
+                name=f"tests-{run_id[:8]}.json",
+                content=json.dumps(test_files, default=str),
+                metadata={"source": "workflow_state_split"},
+            )
+    except Exception as e:
+        logger.warning("[db] upsert_workflow_artifacts failed: %s", e)
+
+
 def insert_project_artifact(
     project_id: str,
     run_id: str | None,
@@ -297,27 +479,42 @@ def insert_project_artifact(
     content: str | None = None,
     ipfs_cid: str | None = None,
     metadata: dict[str, Any] | None = None,
+    storage_backend: str | None = None,
+    cid: str | None = None,
+    kind: str | None = None,
 ) -> str | None:
     """Insert a project_artifacts row. Returns artifact id or None.
-    artifact_type: spec, design_doc, contract, audit_report, simulation_report, deployment_record.
+    artifact_type/kind: spec, design, contracts, audit_report, sim_report, exploit_report, ui_schema.
+    storage_backend: ipfs | inline. cid: IPFS CID when storage_backend=ipfs.
+    Uses _truncate_and_warn for content; persists was_truncated in metadata.
     """
     client = _client()
     if not client or not _is_uuid(project_id):
         return None
     try:
+        effective_content = content
+        meta = dict(metadata or {})
+        if content:
+            truncated, was_truncated = _truncate_and_warn(
+                content, ARTIFACT_CONTENT_LIMIT, "artifact content", run_id
+            )
+            effective_content = truncated
+            if was_truncated:
+                meta["was_truncated"] = True
+                meta["truncated_at"] = ARTIFACT_CONTENT_LIMIT
         row = {
             "project_id": project_id,
             "run_id": run_id if _is_uuid(run_id or "") else None,
-            "type": artifact_type,
+            "artifact_type": kind or artifact_type,
             "name": name,
-            "content": (
-                (content[:65535] if content and len(content) > 65535 else content)
-                if content
-                else None
-            ),
-            "ipfs_cid": ipfs_cid,
-            "metadata": metadata or {},
+            "content": effective_content,
+            "ipfs_cid": cid or ipfs_cid,
+            "metadata": meta,
         }
+        if storage_backend:
+            row["storage_backend"] = storage_backend
+        if cid:
+            row["cid"] = cid
         r = client.table("project_artifacts").insert(row).execute()
         return str(r.data[0]["id"]) if r.data else None
     except Exception as e:
@@ -340,14 +537,18 @@ def insert_agent_log(
     if log_level not in ("debug", "info", "warning", "error"):
         log_level = "info"
     try:
+        truncated_msg, was_truncated = _truncate_and_warn(
+            message, AGENT_LOG_MESSAGE_LIMIT, "agent_log message", run_id
+        )
+        effective_msg = truncated_msg or message
         client.table("agent_logs").insert(
             {
                 "run_id": run_id,
                 "agent_name": agent_name,
                 "stage": stage,
-                "message": message[:4096] if len(message) > 4096 else message,
+                "message": effective_msg,
                 "log_level": log_level,
-                "metadata": metadata or {},
+                "metadata": {**(metadata or {}), "was_truncated": was_truncated} if was_truncated else (metadata or {}),
             }
         ).execute()
         return True
@@ -379,11 +580,10 @@ def insert_step(
             "started_at": started_at or datetime.now(UTC).isoformat(),
         }
         if input_summary is not None:
-            row["input_summary"] = (
-                input_summary[:4096]
-                if len(input_summary or "") > 4096
-                else input_summary
+            truncated, was_truncated = _truncate_and_warn(
+                input_summary, 4096, "input_summary", run_id
             )
+            row["input_summary"] = truncated or input_summary
         r = (
             client.table("run_steps")
             .upsert(row, on_conflict="run_id,step_type")
@@ -405,8 +605,9 @@ def update_step(
     trace_blob_id: str | None = None,
     trace_da_cert: str | None = None,
     trace_reference_block: str | None = None,
+    output_json: dict[str, Any] | None = None,
 ) -> bool:
-    """Update a run step to completed or failed. Optional trace fields for run_steps trace storage."""
+    """Update a run step to completed or failed. Optional trace fields and output JSON (e.g. monitor verified/failed)."""
     client = _client()
     if not client:
         return False
@@ -414,14 +615,18 @@ def update_step(
         from datetime import UTC, datetime
 
         payload = {"status": status}
+        if output_json is not None:
+            payload["output"] = output_json
         if output_summary is not None:
-            payload["output_summary"] = (
-                output_summary[:4096] if len(output_summary) > 4096 else output_summary
+            truncated, was_truncated = _truncate_and_warn(
+                output_summary, OUTPUT_SUMMARY_LIMIT, "output_summary", run_id
             )
+            payload["output_summary"] = truncated
         if error_message is not None:
-            payload["error_message"] = (
-                error_message[:2048] if len(error_message) > 2048 else error_message
+            truncated, _ = _truncate_and_warn(
+                error_message, ERROR_MESSAGE_LIMIT, "error_message", run_id
             )
+            payload["error_message"] = truncated
         payload["completed_at"] = completed_at or datetime.now(UTC).isoformat()
         if trace_blob_id is not None:
             payload["trace_blob_id"] = trace_blob_id
@@ -510,9 +715,10 @@ def _run_steps_to_log_entries(rows: list[dict[str, Any]]) -> list[dict[str, Any]
         elif step:
             msg = f"[{step}] {row.get('status', '')}"
         level = "error" if row.get("status") == "failed" else "info"
+        truncated_msg, _ = _truncate_and_warn(msg, 2048, "run_step log message", row.get("run_id"))
         out.append(
             {
-                "message": msg[:2048] if msg else "-",
+                "message": truncated_msg or msg or "-",
                 "level": level,
                 "timestamp": ts,
                 "service": step or "orchestrator",
@@ -532,9 +738,10 @@ def _agent_logs_to_log_entries(rows: list[dict[str, Any]]) -> list[dict[str, Any
             msg = f"[{agent}] {msg}"
         elif agent:
             msg = f"[{agent}] {row.get('stage', '')}"
+        truncated_msg, _ = _truncate_and_warn(msg, 2048, "agent_log message", row.get("run_id"))
         out.append(
             {
-                "message": msg[:2048] if msg else "-",
+                "message": truncated_msg or msg or "-",
                 "level": level,
                 "timestamp": ts,
                 "service": agent or "agent",

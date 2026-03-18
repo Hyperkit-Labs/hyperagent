@@ -5,21 +5,27 @@
 
 import cors from "cors";
 import express from "express";
+import { requestIdMiddleware, otelRequestSpanMiddleware } from "@hyperagent/backend-middleware";
 import { createDefaultBackend } from "./backends.js";
 
-const REQUEST_ID_HEADER = "x-request-id";
+const INTERNAL_TOKEN = (process.env.INTERNAL_SERVICE_TOKEN || "").trim();
 
-function requestIdMiddleware(req: express.Request, _res: express.Response, next: express.NextFunction): void {
-  const id = (req.headers[REQUEST_ID_HEADER] as string)?.trim() || "";
-  (req as express.Request & { requestId?: string }).requestId = id;
-  if (id) {
-    console.log(`[Deploy] requestId=${id} path=${req.path}`);
-  }
-  next();
+function requireInternalAuth(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+): void {
+  if (req.path === "/health") return next();
+  if (!INTERNAL_TOKEN) return next();
+  const token = req.header("X-Internal-Token");
+  if (token === INTERNAL_TOKEN) return next();
+  res.status(401).json({ error: "Unauthorized: X-Internal-Token required when INTERNAL_SERVICE_TOKEN is set" });
 }
 
 const app = express();
 app.use(requestIdMiddleware);
+app.use(otelRequestSpanMiddleware);
+app.use(requireInternalAuth);
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 

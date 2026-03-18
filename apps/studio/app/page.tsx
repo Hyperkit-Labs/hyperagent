@@ -4,11 +4,10 @@ import { useEffect, useState, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useActiveAccountFromContext } from "@/components/providers/ActiveAccountContext";
 import { useAppChat, hasActiveByokKey } from "@/hooks/useAppChat";
-import { useWorkflowPolling } from "@/hooks/useWorkflowPolling";
+import { useWorkflowProgress } from "@/hooks/useWorkflowProgress";
 import { createWorkflow, DEFAULT_NETWORK, getErrorMessage, handleApiError, requireLLMKeys, LLM_KEYS_REQUIRED_MESSAGE, isByokStorageOrMigrationError, BYOK_SAVE_AGAIN_HINT, isCreditsError } from "@/lib/api";
 import { getSessionOnlyLLMKey, SESSION_LLM_PASS_THROUGH_UPDATED_EVENT } from "@/lib/session-store";
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
-import { useAgentDiscussion } from "@/hooks/useAgentDiscussion";
 import { StarterGrid } from "@/components/chat/StarterGrid";
 import { NumberTicker, ConfettiBurst, ShinyText } from "@/components/ui";
 import { PipelineStepper } from "@/components/chat/PipelineStepper";
@@ -226,12 +225,12 @@ function ChatPageContent() {
     contractData,
     contractCode,
     fetchWorkflow,
-  } = useWorkflowPolling(selectedWorkflowId);
+    discussionEvents,
+  } = useWorkflowProgress(selectedWorkflowId);
 
   const loadingContracts = selectedWorkflowId && workflowLoading && contracts.length === 0;
 
   const { workflows, loading: workflowsLoading } = useWorkflows({ filters: { limit: 10 } });
-  const { events: discussionEvents } = useAgentDiscussion(selectedWorkflowId);
 
   useEffect(() => {
     if (account !== undefined && !account) {

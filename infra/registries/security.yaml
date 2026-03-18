@@ -2,7 +2,7 @@
 # Deterministic tools and simulation are the hard gate; AI review is mandatory
 # context that can escalate risk but must not silently substitute for reproducible evidence.
 # NOT_APPLICABLE must never be treated as PASS; WAIVED must always carry human evidence.
-apiVersion: hyperagent.io/v1
+apiVersion: hyperkitlabs.com/v1
 kind: SecurityPolicyRegistry
 metadata:
   name: evm-security-policies

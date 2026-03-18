@@ -33,8 +33,17 @@ export interface SimulateBundleTx {
   state_objects?: Record<string, { stateDiff?: Record<string, string>; storage?: Record<string, string> }>;
 }
 
+/** Bundle-level options per Tenderly API. See https://docs.tenderly.co/simulations/bundled-simulations */
 export interface SimulateBundleRequest {
   simulations: SimulateBundleTx[];
+  /** Block number for all simulations. Omit for latest. */
+  block_number?: number | null;
+  /** Initial state overrides before first simulation. Key = contract address. Tenderly: nonce, code, balance, storage. */
+  state_objects?: Record<string, { nonce?: number; code?: string; balance?: string; storage?: Record<string, string> }>;
+  /** Default simulation type for all txs. Individual txs can override. */
+  simulation_type?: "full" | "quick" | "abi";
+  /** Save all simulations to dashboard. */
+  save?: boolean;
 }
 
 export interface SimulateBundleResult {

@@ -1,6 +1,6 @@
 # SDK capability registry (GitOps). Thirdweb, viem, Hardhat, Foundry: which chains they are
 # blessed for and what features (ERC4337, EIP7702, x402) they provide.
-apiVersion: hyperagent.io/v1
+apiVersion: hyperkitlabs.com/v1
 kind: SdkRegistry
 metadata:
   name: evm-sdks

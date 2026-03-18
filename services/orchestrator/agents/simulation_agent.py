@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import os
 
+from circuit_breaker import CircuitOpenError, get_breaker
 from db import insert_simulation, is_configured
 from providers import get_simulation_provider
+
+_SIM_BREAKER_NAME = "simulation_service"
 
 SIM_FROM_ADDRESS = "0x0000000000000000000000000000000000000001"
 
@@ -41,7 +44,10 @@ async def run_tenderly_simulations(
         network = str(chain_id)
         data = plan.get("bytecode", "")
 
+        breaker = get_breaker(_SIM_BREAKER_NAME)
         try:
+            if not breaker.can_execute():
+                raise CircuitOpenError(f"Circuit {_SIM_BREAKER_NAME} is open")
             result = await get_simulation_provider().simulate(
                 network=network,
                 from_address=SIM_FROM_ADDRESS,
@@ -49,7 +55,11 @@ async def run_tenderly_simulations(
                 value="0",
                 design_rationale=design_rationale,
             )
+            breaker.record_success()
+        except CircuitOpenError as e:
+            result = {"success": False, "error": str(e), "gasUsed": 0}
         except Exception as e:
+            breaker.record_failure()
             result = {"success": False, "error": str(e), "gasUsed": 0}
 
         error_message = str(result.get("error") or "")

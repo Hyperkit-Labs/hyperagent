@@ -53,7 +53,7 @@
     "vercel": "^50.28.0"
   },
   "devDependencies": {
-    "turbo": "^2.0.0"
+    "turbo": "^2.8.17"
   },
   "pnpm": {
     "overrides": {

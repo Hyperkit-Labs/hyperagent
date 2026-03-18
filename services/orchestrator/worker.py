@@ -30,8 +30,9 @@ def main():
         retries = job.get("_retries", 0)
         logger.info("[worker] processing job run_id=%s retries=%d", run_id, retries)
         try:
+            user_prompt = job.get("nlp_input") or job.get("user_prompt", "")
             run_pipeline(
-                user_prompt=job.get("user_prompt", ""),
+                user_prompt=user_prompt,
                 user_id=job.get("user_id", ""),
                 project_id=job.get("project_id", ""),
                 run_id=run_id,

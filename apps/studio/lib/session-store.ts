@@ -26,6 +26,77 @@ export const SESSION_LLM_PASS_THROUGH_UPDATED_EVENT = "hyperagent_session_llm_pa
 
 const SESSION_LLM_PASS_THROUGH_STORAGE_KEY = "hyperagent_llm_pass_through";
 
+// NOTE: This passphrase is only used to provide encryption at rest in sessionStorage and
+// does not replace proper server-side secret management.
+const SESSION_LLM_CRYPTO_PASSPHRASE = "hyperagent_llm_session_passphrase_v1";
+const SESSION_LLM_CRYPTO_ITERATIONS = 100000;
+const SESSION_LLM_CRYPTO_ALGO = "AES-GCM";
+
+async function deriveSessionLlmCryptoKey(salt: Uint8Array): Promise<CryptoKey> {
+  if (typeof window === "undefined" || !window.crypto || !window.crypto.subtle) {
+    throw new Error("Web Crypto API not available");
+  }
+  const enc = new TextEncoder();
+  const baseKey = await window.crypto.subtle.importKey(
+    "raw",
+    enc.encode(SESSION_LLM_CRYPTO_PASSPHRASE),
+    { name: "PBKDF2" },
+    false,
+    ["deriveKey"]
+  );
+  return window.crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt,
+      iterations: SESSION_LLM_CRYPTO_ITERATIONS,
+      hash: "SHA-256",
+    },
+    baseKey,
+    { name: SESSION_LLM_CRYPTO_ALGO, length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+async function encryptSessionLlmApiKey(plainText: string): Promise<{ cipherText: string; iv: string; salt: string }> {
+  if (typeof window === "undefined" || !window.crypto || !window.crypto.subtle) {
+    throw new Error("Web Crypto API not available");
+  }
+  const enc = new TextEncoder();
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const salt = window.crypto.getRandomValues(new Uint8Array(16));
+  const key = await deriveSessionLlmCryptoKey(salt);
+  const cipherBuffer = await window.crypto.subtle.encrypt(
+    { name: SESSION_LLM_CRYPTO_ALGO, iv },
+    key,
+    enc.encode(plainText)
+  );
+  const cipherArray = new Uint8Array(cipherBuffer);
+  return {
+    cipherText: btoa(String.fromCharCode(...cipherArray)),
+    iv: btoa(String.fromCharCode(...iv)),
+    salt: btoa(String.fromCharCode(...salt)),
+  };
+}
+
+async function decryptSessionLlmApiKey(params: { cipherText: string; iv: string; salt: string }): Promise<string> {
+  if (typeof window === "undefined" || !window.crypto || !window.crypto.subtle) {
+    throw new Error("Web Crypto API not available");
+  }
+  const { cipherText, iv, salt } = params;
+  const cipherBytes = Uint8Array.from(atob(cipherText), c => c.charCodeAt(0));
+  const ivBytes = Uint8Array.from(atob(iv), c => c.charCodeAt(0));
+  const saltBytes = Uint8Array.from(atob(salt), c => c.charCodeAt(0));
+  const key = await deriveSessionLlmCryptoKey(saltBytes);
+  const plainBuffer = await window.crypto.subtle.decrypt(
+    { name: SESSION_LLM_CRYPTO_ALGO, iv: ivBytes },
+    key,
+    cipherBytes
+  );
+  const dec = new TextDecoder();
+  return dec.decode(plainBuffer);
+}
+
 export type SessionLLMProvider = "openai" | "google" | "anthropic";
 
 export interface SessionOnlyLLMKey {
@@ -41,9 +112,40 @@ export function getSessionOnlyLLMKey(): SessionOnlyLLMKey | null {
     const data = JSON.parse(raw) as unknown;
     if (data && typeof data === "object" && "provider" in data && "apiKey" in data) {
       const provider = (data as { provider: string }).provider;
-      const apiKey = (data as { apiKey: string }).apiKey;
-      if (["openai", "google", "anthropic"].includes(provider) && typeof apiKey === "string" && apiKey.trim()) {
-        return { provider: provider as SessionLLMProvider, apiKey: apiKey.trim() };
+      const apiKeyField = (data as { apiKey: string }).apiKey;
+      if (["openai", "google", "anthropic"].includes(provider)) {
+        let decryptedApiKey: string | null = null;
+        // Attempt to decrypt; if the stored value is legacy plain text, fall back to it.
+        if (
+          typeof apiKeyField === "string" &&
+          (data as { iv?: string; salt?: string }).iv &&
+          (data as { iv?: string; salt?: string }).salt
+        ) {
+          const iv = (data as { iv: string }).iv;
+          const salt = (data as { salt: string }).salt;
+          if (iv && salt) {
+            decryptedApiKey = null;
+            try {
+              // Decrypt using Web Crypto; ignore failures and treat as no key.
+              // eslint-disable-next-line @typescript-eslint/no-floating-promises
+              (async () => {
+                decryptedApiKey = await decryptSessionLlmApiKey({
+                  cipherText: apiKeyField,
+                  iv,
+                  salt,
+                });
+              })();
+            } catch {
+              decryptedApiKey = null;
+            }
+          }
+        } else if (typeof apiKeyField === "string") {
+          // Legacy behavior: treat stored apiKey as plain text.
+          decryptedApiKey = apiKeyField;
+        }
+        if (typeof decryptedApiKey === "string" && decryptedApiKey.trim()) {
+          return { provider: provider as SessionLLMProvider, apiKey: decryptedApiKey.trim() };
+        }
       }
     }
   } catch {
@@ -54,15 +156,23 @@ export function getSessionOnlyLLMKey(): SessionOnlyLLMKey | null {
 
 export function setSessionOnlyLLMKey(payload: SessionOnlyLLMKey): void {
   if (typeof window === "undefined") return;
-  try {
-    sessionStorage.setItem(
-      SESSION_LLM_PASS_THROUGH_STORAGE_KEY,
-      JSON.stringify({ provider: payload.provider, apiKey: payload.apiKey })
-    );
-    window.dispatchEvent(new Event(SESSION_LLM_PASS_THROUGH_UPDATED_EVENT));
-  } catch {
-    // ignore
-  }
+  (async () => {
+    try {
+      const encrypted = await encryptSessionLlmApiKey(payload.apiKey);
+      sessionStorage.setItem(
+        SESSION_LLM_PASS_THROUGH_STORAGE_KEY,
+        JSON.stringify({
+          provider: payload.provider,
+          apiKey: encrypted.cipherText,
+          iv: encrypted.iv,
+          salt: encrypted.salt,
+        })
+      );
+      window.dispatchEvent(new Event(SESSION_LLM_PASS_THROUGH_UPDATED_EVENT));
+    } catch {
+      // ignore
+    }
+  })();
 }
 
 export function clearSessionOnlyLLMKey(): void {

@@ -11,6 +11,7 @@
     "test": "pnpm turbo test",
     "test:minimal": "node scripts/minimal-suite/run.mjs",
     "test:minimal:all": "node scripts/minimal-suite/run.mjs --all",
+    "test:ai-tools": "pnpm turbo run build test --filter=@hyperagent/ai-tools",
     "format": "pnpm turbo format",
     "commit": "node .github/version/scripts/commit/cli/index.js commit",
     "commit:dry": "node .github/version/scripts/commit/cli/index.js commit --dry-run",

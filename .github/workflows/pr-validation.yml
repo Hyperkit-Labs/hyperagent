@@ -142,6 +142,51 @@ jobs:
         run: pnpm --filter hyperagent-studio run test -- --watchAll=false
         continue-on-error: true
 
+  # Path-gated: same contract as ci.yml — catches type drift that breaks agent-runtime / simulation images.
+  ai-tools-tenderly-contract:
+    name: ai-tools (Tenderly contract — path-gated)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: paths
+        with:
+          filters: |
+            contract:
+              - 'packages/core-types/**'
+              - 'packages/ai-tools/**'
+              - 'services/agent-runtime/**'
+              - 'services/simulation/**'
+              - 'infra/docker/Dockerfile.agent-runtime.monorepo'
+              - 'turbo.json'
+              - 'pnpm-lock.yaml'
+
+      - name: Install pnpm
+        if: steps.paths.outputs.contract == 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.20.0
+
+      - name: Setup Node
+        if: steps.paths.outputs.contract == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        if: steps.paths.outputs.contract == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Turbo build + test @hyperagent/ai-tools
+        if: steps.paths.outputs.contract == 'true'
+        run: pnpm turbo run build test --filter=@hyperagent/ai-tools
+
+      - name: Skip (unchanged paths)
+        if: steps.paths.outputs.contract != 'true'
+        run: echo "Skip ai-tools contract — paths outside core-types / ai-tools / agent-runtime / simulation / agent-runtime Dockerfile / turbo.json / lockfile."
+
   test-contracts:
     name: Smart Contract Tests
     runs-on: ubuntu-latest

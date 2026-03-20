@@ -9,7 +9,10 @@
     "build": "tsc",
     "dev": "tsx watch src/index.ts"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/core": "^1.25.0"
+  },
   "devDependencies": {
     "@types/express": "^4.17.21",
     "express": "^4.18.2",
@@ -17,9 +20,5 @@
   },
   "peerDependencies": {
     "express": "^4.18.0"
-  },
-  "optionalDependencies": {
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/propagator-w3c-tracecontext": "^1.25.0"
   }
 }

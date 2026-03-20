@@ -168,6 +168,14 @@ def _root_health_critical_ok() -> tuple[bool, dict[str, Any]]:
     return critical_ok, payload
 
 
+@health_router.get("/health/live")
+def health_live():
+    """Liveness: HTTP 200 if the app process is serving. No I/O to Supabase, Redis, or downstream services.
+    Use this for Docker/Kubernetes liveness so transient dependency failures do not mark the container dead.
+    Readiness and dependency status remain on GET /health."""
+    return {"status": "ok"}
+
+
 @health_router.get("/health")
 def health():
     """Health and registry versions. Returns 503 when critical deps (Supabase, Redis when QUEUE_ENABLED) fail."""

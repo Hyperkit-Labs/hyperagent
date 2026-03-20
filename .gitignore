@@ -526,3 +526,6 @@ infra/k8s/overlays/*/secrets.yaml
 infra/k8s/overlays/*/secrets/*.yaml
 *.sealed-secret.yaml
 .env*.local
+
+./github/issues/*
+./github/pr-bodies/*

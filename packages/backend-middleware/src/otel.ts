@@ -38,7 +38,7 @@ export function otelRequestSpanMiddleware(req: Request, res: Response, next: Nex
   if (!OTEL_ENABLED) return next();
   try {
     const api = require("@opentelemetry/api");
-    const { W3CTraceContextPropagator } = require("@opentelemetry/propagator-w3c-tracecontext");
+    const { W3CTraceContextPropagator } = require("@opentelemetry/core");
     const propagator = new W3CTraceContextPropagator();
     const carrier: Record<string, string> = {};
     if (req.headers["traceparent"]) carrier.traceparent = req.headers["traceparent"] as string;

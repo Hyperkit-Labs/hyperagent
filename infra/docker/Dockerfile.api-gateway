@@ -1,8 +1,14 @@
+# Build from repo root so workspace:* deps (e.g. @hyperagent/backend-middleware) resolve.
+# Context: repo root (.)
+# npm cannot install workspace: protocol — use pnpm like other Node services in this stack.
 FROM node:20-alpine
+RUN corepack enable && corepack prepare pnpm@10.20.0 --activate
 WORKDIR /app
-COPY apps/api-gateway/package.json ./
-RUN npm install
-COPY apps/api-gateway .
-RUN npm run build
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages ./packages
+COPY apps/api-gateway ./apps/api-gateway
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter hyperagent-api-gateway... build
+WORKDIR /app/apps/api-gateway
 EXPOSE 4000
 CMD ["node", "build/index.js"]

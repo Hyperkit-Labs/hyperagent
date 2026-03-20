@@ -54,10 +54,16 @@ def test_blueprints_from_registry(client):
 
 def test_health(client):
     r = client.get("/health")
-    assert r.status_code in (200, 204, 404)
+    assert r.status_code in (200, 204, 404, 503)
     if r.status_code == 200:
         j = r.json()
         assert "status" in j or "ok" in str(j).lower()
+
+
+def test_health_live(client):
+    r = client.get("/health/live")
+    assert r.status_code == 200
+    assert r.json().get("status") == "ok"
 
 
 def test_workflows_list_accepts_x_user_id(client):

@@ -115,7 +115,9 @@ export class TenderlyToolkit {
 
     const payload: Record<string, unknown> = { simulations };
     if (req.block_number != null) payload.block_number = req.block_number;
-    if (req.state_objects && Object.keys(req.state_objects).length > 0) payload.state_objects = req.state_objects;
+    if (req.state_objects && Object.keys(req.state_objects).length > 0) {
+      payload.state_objects = req.state_objects;
+    }
     if (req.simulation_type) payload.simulation_type = req.simulation_type;
     if (req.save !== undefined) payload.save = req.save;
 

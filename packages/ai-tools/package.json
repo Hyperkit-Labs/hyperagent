@@ -6,7 +6,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "test": "vitest run"
   },
   "exports": {
     ".": {
@@ -19,6 +20,8 @@
     "@hyperagent/core-types": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.0.0"
+    "@types/node": "^20.19.32",
+    "typescript": "^5.0.0",
+    "vitest": "^3.2.4"
   }
 }

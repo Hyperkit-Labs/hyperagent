@@ -29,10 +29,16 @@ export interface SimulateBundleTx {
 
 export interface SimulateBundleRequest {
   simulations: SimulateBundleTx[];
-  block_number?: number | string;
+  block_number?: number | string | null;
   state_objects?: Record<
     string,
-    { stateDiff?: Record<string, string>; storage?: Record<string, string> }
+    {
+      nonce?: number;
+      code?: string;
+      balance?: string;
+      storage?: Record<string, string>;
+      stateDiff?: Record<string, string>;
+    }
   >;
   simulation_type?: "full" | "quick" | "abi";
   save?: boolean;

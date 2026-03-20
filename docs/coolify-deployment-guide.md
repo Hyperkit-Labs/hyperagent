@@ -22,7 +22,7 @@ Set **Base Directory** per app/service in the monorepo:
 | App/Service | Base Directory |
 |-------------|----------------|
 | Studio | `apps/studio` |
-| API Gateway | `apps/api-gateway` or repo root (see Dockerfile) |
+| API Gateway | **Repo root** (compose / `Dockerfile.api-gateway` uses pnpm + `workspace:*`; do not set base dir to `apps/api-gateway` for the gateway image) |
 | Orchestrator | `.` (repo root) |
 | Full stack (Compose) | `.` (repo root) |
 

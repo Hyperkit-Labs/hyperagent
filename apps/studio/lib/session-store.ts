@@ -49,6 +49,14 @@ const SESSION_LLM_CRYPTO_PASSPHRASE = "hyperagent_llm_session_passphrase_v1";
 const SESSION_LLM_CRYPTO_ITERATIONS = 100000;
 const SESSION_LLM_CRYPTO_ALGO = "AES-GCM";
 
+/**
+ * PBKDF2 salt for SubtleCrypto: copy into a fresh Uint8Array so typings match
+ * BufferSource / ArrayBuffer (avoids Uint8Array<ArrayBufferLike> vs DOM strict errors on TS 5.9+).
+ */
+function pbkdf2Salt(salt: Uint8Array): BufferSource {
+  return Uint8Array.from(salt);
+}
+
 async function deriveSessionLlmCryptoKey(salt: Uint8Array): Promise<CryptoKey> {
   if (typeof window === "undefined" || !window.crypto || !window.crypto.subtle) {
     throw new Error("Web Crypto API not available");
@@ -64,7 +72,7 @@ async function deriveSessionLlmCryptoKey(salt: Uint8Array): Promise<CryptoKey> {
   return window.crypto.subtle.deriveKey(
     {
       name: "PBKDF2",
-      salt,
+      salt: pbkdf2Salt(salt),
       iterations: SESSION_LLM_CRYPTO_ITERATIONS,
       hash: "SHA-256",
     },
@@ -133,7 +141,7 @@ async function deriveKey(salt: Uint8Array): Promise<CryptoKey> {
     ["deriveBits", "deriveKey"]
   );
   return crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
+    { name: "PBKDF2", salt: pbkdf2Salt(salt), iterations: 100000, hash: "SHA-256" },
     keyMaterial,
     { name: "AES-GCM", length: 256 },
     false,
@@ -187,33 +195,39 @@ export function getSessionOnlyLLMKey(): SessionOnlyLLMKey | null {
     if (!raw) return null;
     const data = JSON.parse(raw) as unknown;
     if (data && typeof data === "object" && "provider" in data) {
-      const provider = (data as { provider: string }).provider;
-      const apiKeyField = (data as { apiKey: string }).apiKey;
-      if (["openai", "google", "anthropic"].includes(provider)) {
+      const rec = data as Record<string, unknown>;
+      const provider = rec.provider;
+      const apiKeyField = rec.apiKey;
+      if (
+        typeof provider === "string" &&
+        ["openai", "google", "anthropic"].includes(provider)
+      ) {
         let decryptedApiKey: string | null = null;
         // Attempt to decrypt; if the stored value is legacy plain text, fall back to it.
+        const ivRaw = rec.iv;
+        const saltRaw = rec.salt;
         if (
           typeof apiKeyField === "string" &&
-          (data as { iv?: string; salt?: string }).iv &&
-          (data as { iv?: string; salt?: string }).salt
+          typeof ivRaw === "string" &&
+          typeof saltRaw === "string" &&
+          ivRaw &&
+          saltRaw
         ) {
-          const iv = (data as { iv: string }).iv;
-          const salt = (data as { salt: string }).salt;
-          if (iv && salt) {
+          const iv = ivRaw;
+          const salt = saltRaw;
+          decryptedApiKey = null;
+          try {
+            // Decrypt using Web Crypto; ignore failures and treat as no key.
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
+            (async () => {
+              decryptedApiKey = await decryptSessionLlmApiKey({
+                cipherText: apiKeyField,
+                iv,
+                salt,
+              });
+            })();
+          } catch {
             decryptedApiKey = null;
-            try {
-              // Decrypt using Web Crypto; ignore failures and treat as no key.
-              // eslint-disable-next-line @typescript-eslint/no-floating-promises
-              (async () => {
-                decryptedApiKey = await decryptSessionLlmApiKey({
-                  cipherText: apiKeyField,
-                  iv,
-                  salt,
-                });
-              })();
-            } catch {
-              decryptedApiKey = null;
-            }
           }
         } else if (typeof apiKeyField === "string") {
           // Legacy behavior: treat stored apiKey as plain text.

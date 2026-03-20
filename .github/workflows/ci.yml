@@ -337,6 +337,51 @@ jobs:
           DATABASE_URL: postgresql://test_user:test_password@localhost:5432/hyperagent_test
           ENVIRONMENT: test
 
+  # Path-gated: blocks agent-runtime / simulation Docker builds if @hyperagent/ai-tools breaks.
+  ai-tools-tenderly-contract:
+    name: '[TEST] ai-tools Tenderly contract (path-gated)'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: paths
+        with:
+          filters: |
+            contract:
+              - 'packages/core-types/**'
+              - 'packages/ai-tools/**'
+              - 'services/agent-runtime/**'
+              - 'services/simulation/**'
+              - 'infra/docker/Dockerfile.agent-runtime.monorepo'
+              - 'turbo.json'
+              - 'pnpm-lock.yaml'
+
+      - name: Install pnpm
+        if: steps.paths.outputs.contract == 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.20.0
+
+      - name: Set up Node.js
+        if: steps.paths.outputs.contract == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        if: steps.paths.outputs.contract == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Turbo build + test @hyperagent/ai-tools
+        if: steps.paths.outputs.contract == 'true'
+        run: pnpm turbo run build test --filter=@hyperagent/ai-tools
+
+      - name: Skip (unchanged paths)
+        if: steps.paths.outputs.contract != 'true'
+        run: echo "Skip ai-tools contract — no changes under core-types, ai-tools, agent-runtime, simulation, agent-runtime Dockerfile, turbo.json, or pnpm-lock.yaml."
+
   # ============================================================================
   # STAGE 5: BUILD DOCKER IMAGE
   # ============================================================================
@@ -344,7 +389,7 @@ jobs:
   build-docker:
     name: '[BUILD] Docker Image'
     runs-on: ubuntu-latest
-    needs: [lint-and-format, security-scan, unit-tests, frontend-lint-and-format, frontend-tests]
+    needs: [lint-and-format, security-scan, unit-tests, frontend-lint-and-format, frontend-tests, ai-tools-tenderly-contract]
     permissions:
       contents: read
       packages: write
@@ -455,7 +500,7 @@ jobs:
     name: '[*] Notifications'
     runs-on: ubuntu-latest
     if: always()
-    needs: [lint-and-format, unit-tests, integration-tests, build-docker, docker-compose-test]
+    needs: [lint-and-format, unit-tests, integration-tests, ai-tools-tenderly-contract, build-docker, docker-compose-test]
     
     steps:
       - name: Determine status
@@ -463,6 +508,7 @@ jobs:
         run: |
           if [ "${{ needs.unit-tests.result }}" == "success" ] && \
              [ "${{ needs.integration-tests.result }}" == "success" ] && \
+             [ "${{ needs.ai-tools-tenderly-contract.result }}" == "success" ] && \
              [ "${{ needs.build-docker.result }}" == "success" ] && \
              [ "${{ needs.docker-compose-test.result }}" == "success" ]; then
             echo "status=success" >> $GITHUB_OUTPUT
@@ -476,6 +522,7 @@ jobs:
           echo "Lint: ${{ needs.lint-and-format.result }}"
           echo "Unit Tests: ${{ needs.unit-tests.result }}"
           echo "Integration Tests: ${{ needs.integration-tests.result }}"
+          echo "ai-tools Tenderly contract: ${{ needs.ai-tools-tenderly-contract.result }}"
           echo "Docker Build: ${{ needs.build-docker.result }}"
           echo "Docker Compose: ${{ needs.docker-compose-test.result }}"
 

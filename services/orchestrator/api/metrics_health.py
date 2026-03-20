@@ -178,10 +178,26 @@ def health_live():
 
 @health_router.get("/health")
 def health():
-    """Health and registry versions. Returns 503 when critical deps (Supabase, Redis when QUEUE_ENABLED) fail."""
+    """Health and registry versions. Returns 503 when startup env is missing or
+    critical deps (Supabase, Redis when QUEUE_ENABLED) fail."""
+    from main import is_startup_degraded
+
+    startup_bad, startup_missing = is_startup_degraded()
+    if startup_bad:
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "degraded",
+                "reason": "startup_env_missing",
+                "missing": startup_missing,
+            },
+        )
     critical_ok, payload = _root_health_critical_ok()
     if not critical_ok:
         from fastapi.responses import JSONResponse
+
         return JSONResponse(status_code=503, content={"status": "degraded", **payload})
     return {"status": "ok", **payload}
 

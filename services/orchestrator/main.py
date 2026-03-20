@@ -66,6 +66,12 @@ AUDIT_SERVICE_URL = os.environ.get("AUDIT_SERVICE_URL", "http://localhost:8001")
 
 app = FastAPI(title="HyperAgent Orchestrator", version="0.1.0")
 
+# Startup-validation state: when critical env vars are missing in production,
+# we set this instead of killing the process so the container stays alive,
+# /health returns 503 (readable for debugging), and /health/live stays 200.
+_startup_degraded: bool = False
+_startup_missing_vars: list[str] = []
+
 
 def _is_production() -> bool:
     """True when RENDER=true or NODE_ENV=production or similar production indicators."""
@@ -76,9 +82,18 @@ def _is_production() -> bool:
     )
 
 
+def is_startup_degraded() -> tuple[bool, list[str]]:
+    """Check whether startup validation flagged missing env vars."""
+    return _startup_degraded, list(_startup_missing_vars)
+
+
 @app.on_event("startup")
 def _validate_critical_services() -> None:
-    """Fail fast in production when required services are missing. Warns in dev."""
+    """Log errors when required services are missing. Sets degraded flag instead of
+    crashing (SystemExit) so the container stays alive and /health can report the
+    exact missing vars for debugging via Coolify/K8s container logs."""
+    global _startup_degraded, _startup_missing_vars
+
     if _is_production():
         missing: list[str] = []
         redis_url = os.environ.get("REDIS_URL", "").strip()
@@ -93,23 +108,25 @@ def _validate_critical_services() -> None:
         if not supabase_url or not supabase_key:
             missing.append("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
         if missing:
+            _startup_degraded = True
+            _startup_missing_vars = missing
             logger.error(
-                "[orchestrator] Production requires: %s. Exiting.",
+                "[orchestrator] Production requires: %s. "
+                "Process will stay alive but /health returns 503 until resolved.",
                 ", ".join(missing),
             )
-            raise SystemExit(1)
 
     required = [
         ("COMPILE_SERVICE_URL", COMPILE_SERVICE_URL),
         ("AUDIT_SERVICE_URL", AUDIT_SERVICE_URL),
         ("AGENT_RUNTIME_URL", os.environ.get("AGENT_RUNTIME_URL", "").strip()),
     ]
-    missing = [k for k, v in required if not v or v.startswith("http://localhost:")]
-    if missing:
+    missing_svc = [k for k, v in required if not v or v.startswith("http://localhost:")]
+    if missing_svc:
         logger.warning(
             "[orchestrator] Critical services not configured: %s. "
             "Workflow pipeline will fail.",
-            ", ".join(missing),
+            ", ".join(missing_svc),
         )
     scrubd_path = os.environ.get("SCRUBD_PATH", "./data/SCRUBD").strip()
     labels = Path(scrubd_path).resolve() / "SCRUBD-CD" / "data" / "labels.csv"

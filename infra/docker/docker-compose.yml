@@ -44,6 +44,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=4000
+      - REDIS_URL=redis://redis:6379
       - ORCHESTRATOR_URL=http://orchestrator:8000
       - AGENT_RUNTIME_URL=http://agent-runtime:4001
       - STORAGE_SERVICE_URL=http://storage:4005
@@ -71,6 +72,7 @@ services:
       - .env
     environment:
       - PYTHONUNBUFFERED=1
+      - REDIS_URL=redis://redis:6379
       - REGISTRIES_PATH=/app/services/orchestrator/registries
       - AGENT_RUNTIME_URL=http://agent-runtime:4001
       - COMPILE_SERVICE_URL=http://compile:8004
@@ -338,6 +340,9 @@ networks:
     driver: bridge
 
 volumes:
-  sandbox-data: {}
-  qdrant_data: {}
-  redis_data: {}
+  sandbox-data:
+    name: hyperagent_sandbox-data
+  qdrant_data:
+    name: hyperagent_qdrant-data
+  redis_data:
+    name: hyperagent_redis-data

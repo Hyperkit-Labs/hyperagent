@@ -44,6 +44,14 @@ export function buildSiweMessage(params: {
   return message.prepareMessage();
 }
 
+const TRANSIENT_BOOTSTRAP_HTTP = new Set([502, 503, 504]);
+const BOOTSTRAP_MAX_ATTEMPTS = 3;
+const BOOTSTRAP_RETRY_BASE_MS = 400;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function callBootstrap(body: {
   authMethod: "siwe" | "thirdweb_inapp";
   walletAddress?: string;
@@ -51,28 +59,60 @@ async function callBootstrap(body: {
   authToken?: string;
 }): Promise<BootstrapSession> {
   const url = new URL("/api/v1/auth/bootstrap", getGatewayOrigin()).toString();
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < BOOTSTRAP_MAX_ATTEMPTS; attempt++) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(body),
+    });
+
+    if (res.ok) {
+      const data = (await res.json()) as BootstrapSession;
+      if (!data.access_token || typeof data.expires_in !== "number") {
+        throw new Error("Invalid session response");
+      }
+      return data;
+    }
+
     const text = await res.text();
     let detail: string;
     try {
-      const j = JSON.parse(text);
-      detail = (j as { message?: string }).message ?? text;
+      const j = JSON.parse(text) as { message?: string; requestId?: string };
+      detail = j.message ?? text;
     } catch {
       detail = text || res.statusText;
     }
-    throw new Error(detail || `Bootstrap failed: ${res.status}`);
+    const requestId =
+      res.headers.get("x-request-id") ??
+      res.headers.get("X-Request-Id") ??
+      (() => {
+        try {
+          const j = JSON.parse(text) as { requestId?: string };
+          return j.requestId;
+        } catch {
+          return undefined;
+        }
+      })();
+    const suffix = requestId ? ` (requestId=${requestId})` : "";
+    const err = new Error((detail || `Bootstrap failed: ${res.status}`) + suffix) as Error & {
+      status?: number;
+      requestId?: string;
+    };
+    err.status = res.status;
+    if (requestId) err.requestId = requestId;
+
+    if (TRANSIENT_BOOTSTRAP_HTTP.has(res.status) && attempt < BOOTSTRAP_MAX_ATTEMPTS - 1) {
+      lastError = err;
+      await sleep(BOOTSTRAP_RETRY_BASE_MS * (attempt + 1));
+      continue;
+    }
+    throw err;
   }
-  const data = (await res.json()) as BootstrapSession;
-  if (!data.access_token || typeof data.expires_in !== "number") {
-    throw new Error("Invalid session response");
-  }
-  return data;
+
+  throw lastError ?? new Error("Bootstrap failed after retries");
 }
 
 /**

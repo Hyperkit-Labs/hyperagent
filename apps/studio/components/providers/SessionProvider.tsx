@@ -105,7 +105,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         redirectToLoginWithNext();
         return;
       }
-      setBootstrapStatus('success');
+      // Non-auth errors (500, network, timeout): fail safe — do not grant access.
+      // Mark failed so RequireApiSession blocks the page; user can retry.
+      setBootstrapStatus('failed');
     }
   }, [pathname]);
 

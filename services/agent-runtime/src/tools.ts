@@ -1,11 +1,14 @@
 /**
  * Agent tools: call audit, compile, storage, simulation, deploy via env URLs.
+ *
+ * Simulation and IPFS are delegated to simulateDeploy.ts (canonical typed implementation).
+ * This module owns audit, compile, and high-level deploy, plus re-exports for convenience.
  */
+import { simulate, pin } from "./simulateDeploy.js";
+import type { SimulateTxResult } from "@hyperagent/core-types";
 
 const AUDIT_SERVICE_URL = process.env.AUDIT_SERVICE_URL || "http://localhost:8001";
 const COMPILE_SERVICE_URL = process.env.COMPILE_SERVICE_URL || "http://localhost:8004";
-const STORAGE_SERVICE_URL = process.env.STORAGE_SERVICE_URL || "http://localhost:4005";
-const SIMULATION_SERVICE_URL = process.env.SIMULATION_SERVICE_URL || "http://localhost:8002";
 const DEPLOY_SERVICE_URL = process.env.DEPLOY_SERVICE_URL || "http://localhost:8003";
 
 async function checkedFetch(url: string, init: RequestInit): Promise<unknown> {
@@ -42,22 +45,20 @@ export async function compileContract(contractCode: string, framework: "hardhat"
   }) as Promise<{ success: boolean; bytecode?: string; abi?: unknown[]; errors?: string[] }>;
 }
 
+/** Delegates to simulateDeploy.pin (canonical IPFS path). */
 export async function storeOnIPFS(content: string, name: string): Promise<{ cid: string; gatewayUrl: string }> {
-  const data = (await checkedFetch(`${STORAGE_SERVICE_URL}/ipfs/pin`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content, name }),
-  })) as { success?: boolean; cid?: string; gatewayUrl?: string; error?: string };
-  if (!data.success) throw new Error(data.error || "Storage failed");
-  return { cid: data.cid || "", gatewayUrl: data.gatewayUrl || "" };
+  return pin({ content, name });
 }
 
-export async function tenderlySim(params: { network: string; from: string; to: string; data: string; value?: string }): Promise<{ success: boolean; gasUsed?: number; traces?: unknown; simulationUrl?: string }> {
-  return checkedFetch(`${SIMULATION_SERVICE_URL}/simulate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(params),
-  }) as Promise<{ success: boolean; gasUsed?: number; traces?: unknown; simulationUrl?: string }>;
+/** Delegates to simulateDeploy.simulate (canonical Tenderly path). */
+export async function tenderlySim(params: { network: string; from: string; to: string; data: string; value?: string }): Promise<SimulateTxResult> {
+  return simulate({
+    network: params.network,
+    from: params.from,
+    to: params.to,
+    data: params.data,
+    value: params.value ?? "0",
+  });
 }
 
 export interface DeployPlanResult {

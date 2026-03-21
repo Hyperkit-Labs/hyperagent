@@ -158,6 +158,11 @@ app.use("/api", createProxyMiddleware(proxyOptions()));
 app.use("/docs", createProxyMiddleware(proxyOptions()));
 app.use("/openapi.json", createProxyMiddleware(proxyOptions()));
 
+/** Liveness probe: always 200 if the process is up. Use for K8s/Docker liveness checks. */
+app.get("/health/live", (_req, res) => {
+  res.json({ status: "ok", gateway: true });
+});
+
 /** Dependency-aware health: return 503 when orchestrator is down. */
 app.get("/health", async (_req, res) => {
   const supabase = getSupabaseAdmin();

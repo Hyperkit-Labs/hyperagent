@@ -31,11 +31,14 @@ describe("authBootstrap", () => {
       globalThis.fetch = originalFetch;
     });
 
-    it("throws on 503 with message", async () => {
+    const emptyHeaders = { get: () => null } as Response["headers"];
+
+    it("throws on 503 with message after transient retries", async () => {
       globalThis.fetch = async () =>
         ({
           ok: false,
           status: 503,
+          headers: emptyHeaders,
           text: async () => JSON.stringify({ message: "Auth not configured" }),
           json: async () => ({ message: "Auth not configured" }),
         }) as Response;
@@ -54,6 +57,7 @@ describe("authBootstrap", () => {
         ({
           ok: false,
           status: 401,
+          headers: emptyHeaders,
           text: async () => JSON.stringify({ message: "Invalid signature" }),
           json: async () => ({ message: "Invalid signature" }),
         }) as Response;

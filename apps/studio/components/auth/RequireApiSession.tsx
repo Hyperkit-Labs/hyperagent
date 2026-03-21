@@ -3,7 +3,7 @@
 import { ReactNode, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSessionContext } from "@/components/providers/SessionProvider";
-import { ROUTES } from "@/constants/routes";
+import { getLoginRedirectHref } from "@/lib/authRedirect";
 import { Loader2 } from "lucide-react";
 
 interface RequireApiSessionProps {
@@ -23,8 +23,7 @@ export function RequireApiSession({ children }: RequireApiSessionProps) {
   useEffect(() => {
     if (!isReady) return;
     if (!hasSession || bootstrapStatus === "failed") {
-      const next = typeof window !== "undefined" ? encodeURIComponent(window.location.pathname + window.location.search) : "";
-      router.replace(next ? `${ROUTES.LOGIN}?next=${next}` : ROUTES.LOGIN);
+      router.replace(getLoginRedirectHref());
     }
   }, [isReady, hasSession, bootstrapStatus, router]);
 

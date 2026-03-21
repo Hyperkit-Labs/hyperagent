@@ -111,7 +111,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10.20.0
+          version: 10.26.0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -208,7 +208,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10.20.0
+          version: 10.26.0
       
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -236,7 +236,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10.20.0
+          version: 10.26.0
       
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -260,7 +260,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10.20.0
+          version: 10.26.0
       
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -361,7 +361,7 @@ jobs:
         if: steps.paths.outputs.contract == 'true'
         uses: pnpm/action-setup@v4
         with:
-          version: 10.20.0
+          version: 10.26.0
 
       - name: Set up Node.js
         if: steps.paths.outputs.contract == 'true'

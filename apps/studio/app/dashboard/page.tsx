@@ -106,20 +106,9 @@ export default function DashboardPage() {
     { name: "Verified", value: metrics?.contracts?.verified ?? 0 },
   ];
   const maxBar = Math.max(1, ...trafficData.map((d) => d.value));
-  const sparklineWorkflows = [
-    { value: Math.max(0, (metrics?.workflows?.total ?? 0) - 2) },
-    { value: Math.max(0, (metrics?.workflows?.completed ?? 0) - 1) },
-    { value: metrics?.workflows?.total ?? 0 },
-    { value: metrics?.workflows?.completed ?? 0 },
-    { value: workflowsTotal ?? workflows?.length ?? 0 },
-  ];
-  const sparklineDeployments = [
-    { value: Math.max(0, deployments.length - 3) },
-    { value: Math.max(0, deployments.length - 2) },
-    { value: Math.max(0, deployments.length - 1) },
-    { value: deployments.length },
-    { value: deployments.length },
-  ];
+  // No historical time-series data available — omit sparklines rather than showing synthetic trends.
+  const sparklineWorkflows: { value: number }[] | undefined = undefined;
+  const sparklineDeployments: { value: number }[] | undefined = undefined;
   const hasActiveWorkflows = typeof metrics?.workflows?.active === "number" && metrics.workflows.active > 0;
   const terminalLines = liveLogs.length > 0
     ? liveLogs.slice(0, 5).map((entry: { message?: string; level?: string; timestamp?: string }) => ({

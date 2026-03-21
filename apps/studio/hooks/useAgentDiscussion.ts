@@ -25,14 +25,14 @@ export function useAgentDiscussion(workflowId: string | null) {
     const baseUrl = getAgentDiscussionStreamUrl(workflowId);
     const url = `${baseUrl}?token=${encodeURIComponent(token || "")}`;
 
-    if (typeof window !== "undefined" && "console" in window) {
+    if (process.env.NODE_ENV === "development" && typeof window !== "undefined" && "console" in window) {
       console.log("[ZSPS] Connecting to Discussion Stream:", baseUrl);
     }
 
     const es = new EventSource(url, { withCredentials: true });
 
     es.onopen = () => {
-      if (typeof window !== "undefined" && "console" in window) {
+      if (process.env.NODE_ENV === "development" && typeof window !== "undefined" && "console" in window) {
         console.log("[ZSPS] Discussion Stream Connected.");
       }
     };
@@ -51,7 +51,7 @@ export function useAgentDiscussion(workflowId: string | null) {
     };
 
     es.onerror = () => {
-      if (typeof window !== "undefined" && "console" in window) {
+      if (process.env.NODE_ENV === "development" && typeof window !== "undefined" && "console" in window) {
         console.error("[ZSPS] Discussion Stream Auth Failure or connection closed");
       }
       es.close();

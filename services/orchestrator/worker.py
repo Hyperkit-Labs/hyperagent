@@ -26,7 +26,7 @@ def main():
         job = dequeue(timeout=30)
         if not job:
             continue
-        run_id = job.get("run_id", "")
+        run_id = job.get("run_id") or job.get("workflow_id", "")
         retries = job.get("_retries", 0)
         logger.info("[worker] processing job run_id=%s retries=%d", run_id, retries)
         try:

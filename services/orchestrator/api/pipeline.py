@@ -95,6 +95,7 @@ def _run_workflow_pipeline_job(
                 api_keys,
                 pipeline_id,
                 checkpoint_id=workflow_id,
+                request_id=request_id,
                 resume_update={"deploy_approved": True, "user_prompt": nlp_input},
             )
             current_stage = final.get("current_stage") or "unknown"
@@ -230,8 +231,8 @@ def _run_workflow_pipeline_job(
     finally:
         try:
             api_keys.clear()
-        except Exception:
-            pass
+        except Exception as clear_err:
+            logger.debug("[pipeline] api_keys.clear() failed: %s", clear_err)
 
 
 class CreateWorkflowBody(BaseModel):

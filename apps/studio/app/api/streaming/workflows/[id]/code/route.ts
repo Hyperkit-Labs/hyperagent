@@ -120,6 +120,7 @@ export async function GET(
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
         'X-Vercel-AI-Data-Stream': 'v1',
+        'X-Request-Id': requestId,
       },
     });
   } catch (error) {

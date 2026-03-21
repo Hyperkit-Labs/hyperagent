@@ -31,7 +31,12 @@ logger = logging.getLogger(__name__)
 import context_client
 import ipfs_client
 import rag_client
-from agents.audit_agent import compute_audit_deploy_blocked, run_security_audits
+from agents.audit_agent import (
+    compute_audit_deploy_blocked,
+    has_echidna_harness,
+    run_security_audits,
+    severity_fails_gate,
+)
 from agents.codegen_agent import generate_contracts
 from agents.debate_agent import run_debate
 from agents.deploy_agent import deploy_contracts
@@ -109,11 +114,7 @@ async def spec_agent(state: AgentState) -> AgentState:
             source = "ROMA"
             try:
                 await rag_client.index_spec(run_id, spec, text=prompt)
-                cid = await ipfs_client.pin_artifact(run_id, "spec", spec)
-                if cid:
-                    await ipfs_client.record_storage(
-                        run_id, "spec", cid, project_id=state.get("project_id")
-                    )
+                await ipfs_client.pin_and_record(run_id, "spec", spec, project_id=state.get("project_id"))
             except Exception as pin_err:
                 logger.warning("[pipeline] post-spec pin/index failed: %s", pin_err)
             context_client.store_context(
@@ -243,11 +244,7 @@ async def design_agent(state: AgentState) -> AgentState:
                 ],
             )
             try:
-                cid = await ipfs_client.pin_artifact(run_id, "design", design)
-                if cid:
-                    await ipfs_client.record_storage(
-                        run_id, "design", cid, project_id=project_id
-                    )
+                await ipfs_client.pin_and_record(run_id, "design", design, project_id=project_id)
             except Exception as pin_err:
                 logger.warning("[pipeline] post-design pin failed: %s", pin_err)
             context_client.store_context(
@@ -327,11 +324,7 @@ async def codegen_agent(state: AgentState) -> AgentState:
             AIMessage(content=f"Generated {len(contracts)} files")
         ]
         try:
-            cid = await ipfs_client.pin_artifact(run_id, "contracts", contracts)
-            if cid:
-                await ipfs_client.record_storage(
-                    run_id, "contracts", cid, project_id=project_id
-                )
+            await ipfs_client.pin_and_record(run_id, "contracts", contracts, project_id=project_id)
         except Exception as pin_err:
             logger.warning("[pipeline] post-codegen pin failed: %s", pin_err)
         await _step_complete(
@@ -345,7 +338,7 @@ async def codegen_agent(state: AgentState) -> AgentState:
 
 async def security_gate_agent(state: AgentState) -> AgentState:
     """ZSPS: Scan contract source for sensitive patterns. Blocks deploy if found."""
-    import re
+    from security_patterns import scan_contracts
 
     run_id = state.get("run_id") or ""
     _step_start(run_id, "security_check")
@@ -354,20 +347,7 @@ async def security_gate_agent(state: AgentState) -> AgentState:
         await _step_complete(run_id, "security_check", output_summary="no contracts")
         return state
 
-    patterns = [
-        (r"privateKey\s*=\s*0x[a-fA-F0-9]{64}", "Private key assignment"),
-        (r"private_key\s*=\s*0x[a-fA-F0-9]{64}", "Private key assignment"),
-        (r"mnemonic\s*=\s*[\"'][^\"']{20,}[\"']", "Hardcoded mnemonic"),
-        (r"api[_-]?key\s*=\s*[\"'][^\"']+[\"']", "Hardcoded API key"),
-        (r"\.env\s*\[", "Environment variable access"),
-    ]
-    findings = []
-    for name, source in contracts.items():
-        if not isinstance(source, str):
-            continue
-        for pattern, label in patterns:
-            if re.search(pattern, source):
-                findings.append(f"CRITICAL: {label} in {name}")
+    findings = scan_contracts(contracts)
 
     if findings:
         await _step_complete(
@@ -478,27 +458,8 @@ async def scrubd_validation_agent(state: AgentState) -> AgentState:
         raise
 
 
-def _has_echidna_harness(test_files: dict) -> bool:
-    """True if test files contain Echidna invariants or assertion-heavy properties.
-    Echidna is not considered successful unless executable properties exist."""
-    if not test_files or not isinstance(test_files, dict):
-        return False
-    combined = " ".join(
-        str(v) for v in test_files.values() if isinstance(v, str)
-    ).lower()
-    return (
-        "invariant_" in combined
-        or "echidna" in combined
-        or ("assert(" in combined and "test" in combined)
-    )
-
-
-def _severity_fails_gate(severity: str, max_allowed: str) -> bool:
-    order = ("info", "low", "medium", "high", "critical")
-    try:
-        return order.index(severity.lower()) > order.index(max_allowed.lower())
-    except (ValueError, AttributeError):
-        return True
+_has_echidna_harness = has_echidna_harness
+_severity_fails_gate = severity_fails_gate
 
 
 async def audit_agent(state: AgentState) -> AgentState:
@@ -559,11 +520,7 @@ async def audit_agent(state: AgentState) -> AgentState:
             AIMessage(content=f"Audit: {len(findings)} findings")
         ]
         try:
-            cid = await ipfs_client.pin_artifact(run_id, "audit", findings)
-            if cid:
-                await ipfs_client.record_storage(
-                    run_id, "audit", cid, project_id=state.get("project_id")
-                )
+            await ipfs_client.pin_and_record(run_id, "audit", findings, project_id=state.get("project_id"))
         except Exception as pin_err:
             logger.warning("[pipeline] post-audit pin failed: %s", pin_err)
         await _step_complete(
@@ -632,11 +589,7 @@ async def simulation_agent(state: AgentState) -> AgentState:
             except Exception as gb_err:
                 logger.warning("[simulation] gas_benchmark skipped: %s", gb_err)
         try:
-            cid = await ipfs_client.pin_artifact(run_id, "simulation", results)
-            if cid:
-                await ipfs_client.record_storage(
-                    run_id, "simulation", cid, project_id=state.get("project_id")
-                )
+            await ipfs_client.pin_and_record(run_id, "simulation", results, project_id=state.get("project_id"))
         except Exception as pin_err:
             logger.warning("[pipeline] post-simulation pin failed: %s", pin_err)
         from store import update_workflow
@@ -710,11 +663,7 @@ async def security_policy_evaluator_agent(state: AgentState) -> AgentState:
         try:
             import ipfs_client
 
-            cid = await ipfs_client.pin_artifact(run_id, "security_verdict", verdict)
-            if cid:
-                await ipfs_client.record_storage(
-                    run_id, "security_verdict", cid, project_id=state.get("project_id")
-                )
+            await ipfs_client.pin_and_record(run_id, "security_verdict", verdict, project_id=state.get("project_id"))
         except Exception as pin_err:
             logger.warning("[security_policy_evaluator] pin failed: %s", pin_err)
         await _step_complete(

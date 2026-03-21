@@ -22,7 +22,12 @@ export function NotificationsDropdown() {
           }))
         );
       })
-      .catch(() => setNotifications([]));
+      .catch((err) => {
+        setNotifications([]);
+        if (process.env.NODE_ENV === 'development' && typeof console !== 'undefined') {
+          console.warn('[Notifications] fetch failed:', err);
+        }
+      });
   }, [open]);
 
   useEffect(() => {

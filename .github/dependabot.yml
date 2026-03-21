@@ -9,12 +9,16 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 15
     labels:
       - "dependencies"
       - "security"
     commit-message:
       prefix: "chore(deps)"
+    groups:
+      security-patches:
+        update-types:
+          - "security"
 
   - package-ecosystem: "docker"
     directory: "/infra/docker"

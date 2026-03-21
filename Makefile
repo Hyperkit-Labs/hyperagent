@@ -8,7 +8,7 @@ COMPOSE_FILE := docker-compose.yml
 COMPOSE_FILE_LOCAL := docker-compose.local.yml
 ENV_FILE := .env
 
-.PHONY: help up down logs test-minimal test-minimal-all restart migrate install-web run-web install-api run-api build rebuild \
+.PHONY: help up down logs test-minimal test-minimal-all verify-real-server restart migrate install-web run-web install-api run-api build rebuild \
 	build-web build-prod check-env validate-prod format-api lint-api type-check-api quality-check-api \
 	dogfood-setup dogfood-help dogfood-daemon ai-bom
 
@@ -64,6 +64,9 @@ help:
 	@echo "Minimal test suite:"
 	@echo "  make test-minimal      - Smoke + gateway auth (services must be running)"
 	@echo "  make test-minimal-all - Smoke + integration + E2E"
+	@echo ""
+	@echo "Real-server verification (last gate before production-ready):"
+	@echo "  make verify-real-server - Playwright vs live stack. Coolify: GATEWAY_BASE_URL + make run-web. Full-local: make up && make run-web."
 
 # Build Docker images for local dev (run when code changes, before make up)
 build:
@@ -274,3 +277,7 @@ test-minimal:
 
 test-minimal-all:
 	@node scripts/minimal-suite/run.mjs --all
+
+# Real-server verification: Playwright E2E against live stack. Prereq: make up && make run-web
+verify-real-server:
+	@pnpm --filter hyperagent-studio run test:e2e:real-server

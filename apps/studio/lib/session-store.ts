@@ -187,6 +187,11 @@ function notifySessionLLMUpdated(): void {
   }
 }
 
+/**
+ * Synchronous accessor: returns the cached key if available, or legacy plaintext.
+ * For encrypted keys that have not been decrypted yet, returns null.
+ * Callers that need encrypted key support should use getSessionOnlyLLMKeyAsync().
+ */
 export function getSessionOnlyLLMKey(): SessionOnlyLLMKey | null {
   if (typeof window === "undefined") return null;
   if (_decryptedCache) return _decryptedCache;
@@ -202,39 +207,23 @@ export function getSessionOnlyLLMKey(): SessionOnlyLLMKey | null {
         typeof provider === "string" &&
         ["openai", "google", "anthropic"].includes(provider)
       ) {
-        let decryptedApiKey: string | null = null;
-        // Attempt to decrypt; if the stored value is legacy plain text, fall back to it.
         const ivRaw = rec.iv;
         const saltRaw = rec.salt;
-        if (
+        const isEncrypted =
           typeof apiKeyField === "string" &&
           typeof ivRaw === "string" &&
           typeof saltRaw === "string" &&
           ivRaw &&
-          saltRaw
-        ) {
-          const iv = ivRaw;
-          const salt = saltRaw;
-          decryptedApiKey = null;
-          try {
-            // Decrypt using Web Crypto; ignore failures and treat as no key.
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            (async () => {
-              decryptedApiKey = await decryptSessionLlmApiKey({
-                cipherText: apiKeyField,
-                iv,
-                salt,
-              });
-            })();
-          } catch {
-            decryptedApiKey = null;
-          }
-        } else if (typeof apiKeyField === "string") {
-          // Legacy behavior: treat stored apiKey as plain text.
-          decryptedApiKey = apiKeyField;
+          saltRaw;
+        if (isEncrypted) {
+          // Encrypted key: kick off async decrypt and populate cache for next call.
+          void getSessionOnlyLLMKeyAsync();
+          return null;
         }
-        if (typeof decryptedApiKey === "string" && decryptedApiKey.trim()) {
-          return { provider: provider as SessionLLMProvider, apiKey: decryptedApiKey.trim() };
+        if (typeof apiKeyField === "string" && apiKeyField.trim()) {
+          const result: SessionOnlyLLMKey = { provider: provider as SessionLLMProvider, apiKey: apiKeyField.trim() };
+          _decryptedCache = result;
+          return result;
         }
       }
     }
@@ -244,25 +233,80 @@ export function getSessionOnlyLLMKey(): SessionOnlyLLMKey | null {
   return null;
 }
 
-export function setSessionOnlyLLMKey(payload: SessionOnlyLLMKey): void {
-  if (typeof window === "undefined") return;
-  (async () => {
-    try {
-      const encrypted = await encryptSessionLlmApiKey(payload.apiKey);
-      sessionStorage.setItem(
-        SESSION_LLM_PASS_THROUGH_STORAGE_KEY,
-        JSON.stringify({
-          provider: payload.provider,
-          apiKey: encrypted.cipherText,
-          iv: encrypted.iv,
-          salt: encrypted.salt,
-        })
-      );
-      window.dispatchEvent(new Event(SESSION_LLM_PASS_THROUGH_UPDATED_EVENT));
-    } catch {
-      // ignore
+/**
+ * Async accessor: properly decrypts encrypted keys using Web Crypto.
+ * Populates _decryptedCache so subsequent sync calls via getSessionOnlyLLMKey() work.
+ */
+export async function getSessionOnlyLLMKeyAsync(): Promise<SessionOnlyLLMKey | null> {
+  if (typeof window === "undefined") return null;
+  if (_decryptedCache) return _decryptedCache;
+  try {
+    const raw = sessionStorage.getItem(SESSION_LLM_PASS_THROUGH_STORAGE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as unknown;
+    if (data && typeof data === "object" && "provider" in data) {
+      const rec = data as Record<string, unknown>;
+      const provider = rec.provider;
+      const apiKeyField = rec.apiKey;
+      if (
+        typeof provider === "string" &&
+        ["openai", "google", "anthropic"].includes(provider)
+      ) {
+        let decryptedApiKey: string | null = null;
+        const ivRaw = rec.iv;
+        const saltRaw = rec.salt;
+        if (
+          typeof apiKeyField === "string" &&
+          typeof ivRaw === "string" &&
+          typeof saltRaw === "string" &&
+          ivRaw &&
+          saltRaw
+        ) {
+          try {
+            decryptedApiKey = await decryptSessionLlmApiKey({
+              cipherText: apiKeyField,
+              iv: ivRaw,
+              salt: saltRaw,
+            });
+          } catch {
+            decryptedApiKey = null;
+          }
+        } else if (typeof apiKeyField === "string") {
+          decryptedApiKey = apiKeyField;
+        }
+        if (typeof decryptedApiKey === "string" && decryptedApiKey.trim()) {
+          const result: SessionOnlyLLMKey = { provider: provider as SessionLLMProvider, apiKey: decryptedApiKey.trim() };
+          _decryptedCache = result;
+          return result;
+        }
+      }
     }
-  })();
+  } catch {
+    sessionStorage.removeItem(SESSION_LLM_PASS_THROUGH_STORAGE_KEY);
+  }
+  return null;
+}
+
+export async function setSessionOnlyLLMKey(payload: SessionOnlyLLMKey): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    const encrypted = await encryptSessionLlmApiKey(payload.apiKey);
+    sessionStorage.setItem(
+      SESSION_LLM_PASS_THROUGH_STORAGE_KEY,
+      JSON.stringify({
+        provider: payload.provider,
+        apiKey: encrypted.cipherText,
+        iv: encrypted.iv,
+        salt: encrypted.salt,
+      })
+    );
+    _decryptedCache = { provider: payload.provider, apiKey: payload.apiKey };
+    window.dispatchEvent(new Event(SESSION_LLM_PASS_THROUGH_UPDATED_EVENT));
+  } catch (err) {
+    if (typeof console !== "undefined" && console.error) {
+      console.error("[session-store] setSessionOnlyLLMKey failed:", err);
+    }
+  }
 }
 
 export function clearSessionOnlyLLMKey(): void {

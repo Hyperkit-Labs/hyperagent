@@ -14,6 +14,7 @@ import { getStoredSession, clearStoredSession, SESSION_CHANGE_EVENT } from '@/li
 import { fetchConfigStrict } from '@/lib/api';
 import type { ApiErrorWithStatus } from '@/lib/api';
 import { ROUTES } from '@/constants/routes';
+import { redirectToLoginWithNext } from '@/lib/authRedirect';
 
 export type BootstrapStatus = 'pending' | 'success' | 'failed';
 
@@ -75,13 +76,6 @@ function isProtectedPath(pathname: string): boolean {
   );
 }
 
-function redirectToLogin(): void {
-  if (typeof window === 'undefined') return;
-  const path = window.location.pathname + window.location.search;
-  const next = path && path !== ROUTES.LOGIN ? encodeURIComponent(path) : '';
-  window.location.href = next ? `${ROUTES.LOGIN}?next=${next}` : ROUTES.LOGIN;
-}
-
 /**
  * SessionProvider: single authority for session state and bootstrap status.
  * On bootstrap failure (401/503 from GET /config): redirect to /login, block protected content.
@@ -108,7 +102,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (status === 401 || status === 503) {
         clearStoredSession();
         setBootstrapStatus('failed');
-        redirectToLogin();
+        redirectToLoginWithNext();
         return;
       }
       setBootstrapStatus('success');

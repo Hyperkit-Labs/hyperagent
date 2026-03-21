@@ -32,6 +32,29 @@ TOOL_WEIGHTS: dict[str, float] = {
 SEVERITY_ORDER = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 
 
+def has_echidna_harness(test_files: dict) -> bool:
+    """True if test files contain Echidna invariants or assertion-heavy properties."""
+    if not test_files or not isinstance(test_files, dict):
+        return False
+    combined = " ".join(
+        str(v) for v in test_files.values() if isinstance(v, str)
+    ).lower()
+    return (
+        "invariant_" in combined
+        or "echidna" in combined
+        or ("assert(" in combined and "test" in combined)
+    )
+
+
+def severity_fails_gate(severity: str, max_allowed: str) -> bool:
+    """True when severity exceeds the max_allowed threshold."""
+    order = ("info", "low", "medium", "high", "critical")
+    try:
+        return order.index(severity.lower()) > order.index(max_allowed.lower())
+    except (ValueError, AttributeError):
+        return True
+
+
 def _resolve_consensus(findings: list[dict]) -> list[dict]:
     """Resolve conflicting severities from different tools using weighted evidence.
     When Slither says High but Mythril says Low for the same issue location,

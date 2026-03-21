@@ -146,12 +146,12 @@ async def run_pashov_audit(
                     r.status_code,
                     r.text[:200],
                 )
-                return [], True
+                return [], False
             data = r.json()
             text = data.get("text", "")
     except Exception as e:
         logger.warning("[pashov] audit failed: %s", e)
-        return [], True
+        return [], False
 
     findings = _parse_findings(text)
     logger.info("[pashov] run_id=%s findings=%d", run_id, len(findings))

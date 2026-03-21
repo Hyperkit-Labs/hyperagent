@@ -155,8 +155,8 @@ export async function fetchJson<T>(path: string, options?: FetchJsonOptions): Pr
             authHeaders = { Authorization: `Bearer ${session.access_token}` };
           }
         }
-      } catch {
-        // Ignore so requests still work when session is unavailable
+      } catch (authErr) {
+        reportApiError(authErr, { path, context: 'authHeaderProvider' });
       }
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);

@@ -4,16 +4,9 @@ import { useEffect } from 'react';
 import { toast } from 'sonner';
 import { setAuthHeaderProvider, setOn401Callback } from '@/lib/api';
 import { getStoredSession, clearStoredSession, getSessionTimeToExpiry, SESSION_CHANGE_EVENT } from '@/lib/session-store';
-import { ROUTES } from '@/constants/routes';
+import { redirectToLoginWithNext } from '@/lib/authRedirect';
 
 const REFRESH_BUFFER_SEC = 300; // redirect 5 min before expiry
-
-function redirectToLogin() {
-  if (typeof window === 'undefined') return;
-  const path = window.location.pathname + window.location.search;
-  const next = path && path !== ROUTES.LOGIN ? encodeURIComponent(path) : '';
-  window.location.href = next ? `${ROUTES.LOGIN}?next=${next}` : ROUTES.LOGIN;
-}
 
 /**
  * Wires gateway session (our JWT) to the API client. Every request to the gateway
@@ -32,7 +25,7 @@ export function ApiAuthProvider({ children }: { children: React.ReactNode }) {
     setOn401Callback(() => {
       clearStoredSession();
       toast.error('Session expired or not signed in. Please sign in again.');
-      redirectToLogin();
+      redirectToLoginWithNext();
     });
     return () => {
       setAuthHeaderProvider(null);
@@ -48,7 +41,7 @@ export function ApiAuthProvider({ children }: { children: React.ReactNode }) {
       return window.setTimeout(() => {
         clearStoredSession();
         toast.error('Session is about to expire. Please sign in again.');
-        redirectToLogin();
+        redirectToLoginWithNext();
       }, delay);
     }
 

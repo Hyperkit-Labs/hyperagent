@@ -4,14 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useActiveAccount } from 'thirdweb/react';
 import { useSignInWithWallet } from '@/hooks/useSignInWithWallet';
 import { clearStoredSession, getStoredSession } from '@/lib/session-store';
-import { ROUTES } from '@/constants/routes';
-
-function redirectToLogin(): void {
-  if (typeof window === 'undefined') return;
-  const path = window.location.pathname + window.location.search;
-  const next = path && path !== ROUTES.LOGIN ? encodeURIComponent(path) : '';
-  window.location.href = next ? `${ROUTES.LOGIN}?next=${next}` : ROUTES.LOGIN;
-}
+import { redirectToLoginWithNext } from '@/lib/authRedirect';
 
 /**
  * Proactive session bootstrap.
@@ -34,12 +27,12 @@ export function useAutoBootstrap(): void {
       .then((ok) => {
         if (!ok) {
           clearStoredSession();
-          redirectToLogin();
+          redirectToLoginWithNext();
         }
       })
       .catch(() => {
         clearStoredSession();
-        redirectToLogin();
+        redirectToLoginWithNext();
       })
       .finally(() => {
         bootstrappingRef.current = false;

@@ -65,6 +65,23 @@ _STAGE_TO_ARTIFACT_TYPE: dict[str, str] = {
 }
 
 
+async def pin_and_record(
+    run_id: str,
+    stage: str,
+    data: Any,
+    project_id: str | None = None,
+) -> str | None:
+    """Pin artifact to IPFS and record the CID in Supabase. One-call helper for pipeline nodes."""
+    try:
+        cid = await pin_artifact(run_id, stage, data)
+        if cid:
+            await record_storage(run_id, stage, cid, project_id=project_id)
+        return cid
+    except Exception as e:
+        logger.warning("[ipfs] pin_and_record(%s/%s) failed: %s", run_id, stage, e)
+        return None
+
+
 async def record_storage(
     run_id: str,
     stage: str,

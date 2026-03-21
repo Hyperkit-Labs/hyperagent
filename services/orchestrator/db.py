@@ -19,7 +19,7 @@ def _client():
     global _supabase
     if _supabase is None:
         url = os.environ.get("SUPABASE_URL")
-        key = os.environ.get("SUPABASE_SERVICE_KEY")
+        key = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
         if not url or not key:
             return None
         from supabase import create_client
@@ -30,7 +30,8 @@ def _client():
 
 def is_configured() -> bool:
     return bool(
-        os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_SERVICE_KEY")
+        os.environ.get("SUPABASE_URL")
+        and (os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY"))
     )
 
 
@@ -197,14 +198,18 @@ def insert_deployment(
     plan: dict[str, Any],
     network_name: str = "",
     deployment_order: int = 0,
+    wallet_user_id: str | None = None,
 ) -> dict[str, Any] | None:
     """Insert a pending deployment (plan). Returns row with id or None.
-    deployment_order: for multi-contract, lower values deploy first (0, 1, 2...)."""
+    deployment_order: for multi-contract, lower values deploy first (0, 1, 2...).
+    wallet_user_id: owner identity for RLS; resolved from run→project→wallet_user_id if not provided."""
     client = _client()
     if not client:
         return None
+    if not wallet_user_id:
+        wallet_user_id = _resolve_wallet_user_id_for_project(project_id)
     try:
-        row = {
+        row: dict[str, Any] = {
             "run_id": run_id,
             "project_id": project_id,
             "chain_id": chain_id,
@@ -214,11 +219,27 @@ def insert_deployment(
             "status": "pending",
             "deployment_order": deployment_order,
         }
+        if wallet_user_id:
+            row["wallet_user_id"] = wallet_user_id
         r = client.table("deployments").insert(row).execute()
         return r.data[0] if r.data else None
     except Exception as e:
         logger.warning("[db] insert_deployment failed: %s", e)
         return None
+
+
+def _resolve_wallet_user_id_for_project(project_id: str) -> str | None:
+    """Look up wallet_user_id from the projects table for deployment ownership."""
+    client = _client()
+    if not client or not project_id:
+        return None
+    try:
+        r = client.table("projects").select("wallet_user_id").eq("id", project_id).limit(1).execute()
+        if r.data and r.data[0].get("wallet_user_id"):
+            return r.data[0]["wallet_user_id"]
+    except Exception:
+        pass
+    return None
 
 
 def insert_simulation(

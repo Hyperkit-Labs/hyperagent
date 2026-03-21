@@ -14,7 +14,7 @@ SIM_FROM_ADDRESS = "0x0000000000000000000000000000000000000001"
 
 # Layer 5 Security: when true, pipeline fails if Tenderly is not configured (fail-closed).
 TENDERLY_SIMULATION_REQUIRED = os.environ.get(
-    "TENDERLY_SIMULATION_REQUIRED", "false"
+    "TENDERLY_SIMULATION_REQUIRED", "true"
 ).strip().lower() in ("1", "true", "yes")
 
 

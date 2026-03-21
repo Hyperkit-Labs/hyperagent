@@ -12,8 +12,10 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "test": "jest",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
+    "test:e2e": "node ./scripts/playwright-env.mjs exec playwright test",
+    "test:e2e:auth": "node ./scripts/playwright-env.mjs exec playwright test \"e2e/auth-redirect.spec.ts\" --reporter=list",
+    "test:e2e:real-server": "node ./scripts/run-real-server-verification.mjs",
+    "test:e2e:ui": "node ./scripts/playwright-env.mjs exec playwright test --ui",
     "ci": "npm ci && npm run lint && npm test"
   },
   "dependencies": {

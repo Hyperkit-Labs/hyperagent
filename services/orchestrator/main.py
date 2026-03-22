@@ -120,12 +120,23 @@ def _validate_critical_services() -> None:
         ("COMPILE_SERVICE_URL", COMPILE_SERVICE_URL),
         ("AUDIT_SERVICE_URL", AUDIT_SERVICE_URL),
         ("AGENT_RUNTIME_URL", os.environ.get("AGENT_RUNTIME_URL", "").strip()),
+        ("SIMULATION_SERVICE_URL", os.environ.get("SIMULATION_SERVICE_URL", "").strip()),
+        ("STORAGE_SERVICE_URL", os.environ.get("STORAGE_SERVICE_URL", "").strip()),
+        ("DEPLOY_SERVICE_URL", os.environ.get("DEPLOY_SERVICE_URL", "").strip()),
     ]
     missing_svc = [k for k, v in required if not v or v.startswith("http://localhost:")]
     if missing_svc:
         logger.warning(
             "[orchestrator] Critical services not configured: %s. "
             "Workflow pipeline will fail.",
+            ", ".join(missing_svc),
+        )
+    if _is_production() and missing_svc:
+        _startup_degraded = True
+        _startup_missing_vars.extend(missing_svc)
+        logger.error(
+            "[orchestrator] Production requires explicit service URLs (no localhost). "
+            "Missing or localhost: %s. /health returns 503 until resolved.",
             ", ".join(missing_svc),
         )
     scrubd_path = os.environ.get("SCRUBD_PATH", "./data/SCRUBD").strip()

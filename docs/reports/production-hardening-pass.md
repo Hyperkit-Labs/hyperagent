@@ -57,6 +57,8 @@ H-004 (Scale, partial): Production localhost handling hardened. Missing or local
 
 - Real-server verification executed: BLOCKED. Gateway and Studio were not running (make up and make run-web required). Output: "Gateway unreachable at http://localhost:4000". Proof requires operator to start stack and re-run make verify-real-server.
 
+- Deployment blocked (2026-03-22): Node monorepo builds failed under `pnpm --frozen-lockfile` due to `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`. Root cause: package.json overrides (conditional entries such as esbuild@<=0.24.2, ai@<5.0.52, next@>=16.0.1, etc.) had drifted from lockfile. Fixed by regenerating pnpm-lock.yaml with `pnpm install --no-frozen-lockfile` and aligning Dockerfile pnpm version to 10.26.0. Runtime verification cannot proceed until Coolify redeploy succeeds.
+
 ---
 
 ## 5. Duplicates Consolidated

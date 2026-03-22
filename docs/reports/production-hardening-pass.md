@@ -59,6 +59,8 @@ H-004 (Scale, partial): Production localhost handling hardened. Missing or local
 
 - Deployment blocked (2026-03-22): Node monorepo builds failed under `pnpm --frozen-lockfile` due to `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`. Root cause: package.json overrides (conditional entries such as esbuild@<=0.24.2, ai@<5.0.52, next@>=16.0.1, etc.) had drifted from lockfile. Fixed by regenerating pnpm-lock.yaml with `pnpm install --no-frozen-lockfile` and aligning Dockerfile pnpm version to 10.26.0. Runtime verification cannot proceed until Coolify redeploy succeeds.
 
+- Vercel Studio build (2026-03-22): Build failed with `Module not found: Package path ./react is not exported from package ai`. Root cause: `ai@<5.0.52` override forced ai 5+, which moved React hooks to `@ai-sdk/react` and removed `ai/react`. Fix: removed `ai@<5.0.52` override so Studio stays on ai 4.x (4.3.19), which has `ai/react`. Regenerated pnpm-lock.yaml. Also fixed workflows/page.tsx type cast (Workflow → Record).
+
 ---
 
 ## 5. Duplicates Consolidated

@@ -771,8 +771,71 @@ def _agent_logs_to_log_entries(rows: list[dict[str, Any]]) -> list[dict[str, Any
     return out
 
 
+def get_workflow_rich_from_artifacts(run_id: str) -> dict[str, Any]:
+    """Assemble rich workflow fields from project_artifacts. Used when workflow_state blob is not written.
+    Returns dict with spec, contracts, deployments, audit_findings, ui_schema, test_files (parsed from content JSON)."""
+    client = _client()
+    if not client or not _is_uuid(run_id):
+        return {}
+    import json
+    try:
+        r = (
+            client.table("project_artifacts")
+            .select("artifact_type, content, created_at")
+            .eq("run_id", run_id)
+            .order("created_at", desc=True)
+            .execute()
+        )
+        rows = list(r.data or [])
+        out: dict[str, Any] = {}
+        seen: set[str] = set()
+        for row in rows:
+            atype = (row.get("artifact_type") or "").strip()
+            if not atype or atype in seen:
+                continue
+            seen.add(atype)
+            content = row.get("content")
+            if not content:
+                continue
+            try:
+                parsed = json.loads(content) if isinstance(content, str) else content
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if atype == "spec":
+                out["spec"] = parsed
+            elif atype == "contracts":
+                out["contracts"] = parsed
+            elif atype == "deployment_record":
+                out["deployments"] = parsed if isinstance(parsed, list) else [parsed]
+            elif atype == "audit_report":
+                out["audit_findings"] = parsed if isinstance(parsed, list) else [parsed]
+            elif atype == "ui_schema":
+                out["ui_schema"] = parsed
+            elif atype == "test_files":
+                out["test_files"] = parsed if isinstance(parsed, dict) else {}
+        return out
+    except Exception as e:
+        logger.debug("[db] get_workflow_rich_from_artifacts failed: %s", e)
+        return {}
+
+
+def get_run_project_id(run_id: str) -> str | None:
+    """Return project_id for run from runs table. None if missing."""
+    client = _client()
+    if not client or not _is_uuid(run_id):
+        return None
+    try:
+        r = client.table("runs").select("project_id").eq("id", run_id).execute()
+        row = (r.data or [{}])[0] if r.data else {}
+        pid = row.get("project_id")
+        return str(pid) if pid and _is_uuid(str(pid)) else None
+    except Exception:
+        return None
+
+
 def get_workflow_state(run_id: str) -> dict[str, Any] | None:
-    """Return workflow state json for run_id from runs.workflow_state. None if not configured or missing."""
+    """Return workflow state json for run_id from runs.workflow_state. None if not configured or missing.
+    Deprecated: new writes use run_state + project_artifacts only. Kept for backward compat with historical runs."""
     client = _client()
     if not client:
         return None

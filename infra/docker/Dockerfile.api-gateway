@@ -2,7 +2,7 @@
 # Context: repo root (.)
 # npm cannot install workspace: protocol — use pnpm like other Node services in this stack.
 FROM node:20-alpine
-RUN corepack enable && corepack prepare pnpm@10.20.0 --activate
+RUN corepack enable && corepack prepare pnpm@10.26.0 --activate
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages ./packages

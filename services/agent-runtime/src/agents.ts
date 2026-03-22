@@ -3,6 +3,7 @@
  */
 
 import { generateText } from "ai";
+import type { LanguageModelV1 } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -16,7 +17,7 @@ export interface AgentContext {
   apiKeys: { openai?: string; anthropic?: string; google?: string; tenderly?: string; thirdweb?: string };
 }
 
-function getModel(provider: string, modelId: string, apiKey: string) {
+function getModel(provider: string, modelId: string, apiKey: string): LanguageModelV1 {
   switch (provider) {
     case "openai": {
       const oai = createOpenAI({ apiKey });

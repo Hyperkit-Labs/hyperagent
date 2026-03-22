@@ -128,7 +128,6 @@ def create_workflow(
             status="running",
             current_step="spec",
         )
-        _db.upsert_workflow_state(workflow_id, record)  # deprecated: full blob
     return record
 
 
@@ -201,11 +200,9 @@ def update_workflow(
             current_step=current_stage or rec.get("current_stage"),
             simulation_passed=rec.get("simulation_passed", False),
         )
-        # Blob write only when rich pipeline fields change (contracts, spec, deployments, ui_schema, audit).
-        # Status-only updates go solely to run_state.
+        # Rich pipeline fields: write to project_artifacts only. workflow_state blob writes retired (H-001).
         _rich_changed = any(x is not None for x in (contracts, spec, deployments, ui_schema, audit_findings, test_files))
         if _rich_changed:
-            _db.upsert_workflow_state(workflow_id, rec)
             proj_id = rec.get("project_id") or ""
             if _db.is_uuid(proj_id):
                 _db.upsert_workflow_artifacts(
@@ -245,15 +242,21 @@ def _normalize_status(stage: str) -> str:
 
 
 def get_workflow(workflow_id: str) -> dict[str, Any] | None:
-    """Return workflow; run_state is authoritative for status/phase. Blob supplies rich fields."""
+    """Return workflow; run_state is authoritative for status/phase. Rich fields from workflow_state (legacy) or project_artifacts."""
     if _db.is_configured():
-        # Prefer run_state for operational fields; enrich with blob for rich pipeline data.
         run_st = _db.get_run_state(workflow_id)
         blob = _db.get_workflow_state(workflow_id)
-        if run_st or blob:
+        has_rich_blob = blob and any(blob.get(k) for k in ("spec", "contracts", "deployments", "audit_findings", "ui_schema", "test_files"))
+        artifacts = _db.get_workflow_rich_from_artifacts(workflow_id) if not has_rich_blob else {}
+        if run_st or blob or artifacts:
             rec: dict[str, Any] = dict(blob) if blob else {}
+            if artifacts:
+                for k, v in artifacts.items():
+                    if v is not None:
+                        rec[k] = v
+            if not rec.get("project_id"):
+                rec["project_id"] = _db.get_run_project_id(workflow_id) or ""
             if run_st:
-                # run_state wins for these operational fields
                 if run_st.get("status"):
                     rec["status"] = _normalize_status(run_st["status"])
                 if run_st.get("phase"):
@@ -308,7 +311,13 @@ def append_deployment(
     rec["deployments"] = deploys
     rec["updated_at"] = now
     if _db.is_configured():
-        _db.upsert_workflow_state(workflow_id, rec)
+        proj_id = rec.get("project_id") or ""
+        if _db.is_uuid(proj_id):
+            _db.upsert_workflow_artifacts(
+                run_id=workflow_id,
+                project_id=proj_id,
+                deployments=deploys,
+            )
     else:
         with _lock:
             _workflows[workflow_id] = rec

@@ -304,11 +304,12 @@ export default function WorkflowsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-10">
               {filtered.map((w, i) => {
                 const isSelected = selectedWorkflows.has(w.workflow_id);
-                const stages = (w as Record<string, unknown>).stages
-                  ? ((w as Record<string, unknown>).stages as { stage: string }[]).map(s => s.stage)
+                const wRecord = w as unknown as Record<string, unknown>;
+                const stages = wRecord.stages
+                  ? (wRecord.stages as { stage: string }[]).map(s => s.stage)
                   : ["spec", "design", "codegen", "audit", "deploy"];
-                const completedStages = (w as Record<string, unknown>).stages
-                  ? ((w as Record<string, unknown>).stages as { stage: string; status: string }[]).filter(s => s.status === "completed").length
+                const completedStages = wRecord.stages
+                  ? (wRecord.stages as { stage: string; status: string }[]).filter(s => s.status === "completed").length
                   : (w.status === "completed" || w.status === "success" || w.status === "deployed" ? stages.length : 0);
                 const sIndex = completedStages;
                 

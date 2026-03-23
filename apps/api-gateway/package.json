@@ -16,7 +16,7 @@
     "cors": "^2.8.5",
     "http-proxy-middleware": "^3.0.5",
     "jsonwebtoken": "^9.0.2",
-    "ioredis": "^5.10.0",
+    "ioredis": "^5.10.1",
     "@supabase/supabase-js": "^2.47.0",
     "siwe": "^2.1.6",
     "ethers": "^6.0.0",

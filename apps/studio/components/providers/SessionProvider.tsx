@@ -5,6 +5,7 @@ import {
   useContext,
   useState,
   useEffect,
+  useLayoutEffect,
   useCallback,
   useRef,
   type ReactNode,
@@ -76,6 +77,16 @@ function isProtectedPath(pathname: string): boolean {
   );
 }
 
+/** Temporary auth-bootstrap debug. Logs in dev, or when sessionStorage DEBUG_SESSION_PROVIDER=1. Remove after diagnosing loop. */
+function logAuth(...args: unknown[]) {
+  if (
+    typeof window !== 'undefined' &&
+    (process.env.NODE_ENV === 'development' || sessionStorage.getItem('DEBUG_SESSION_PROVIDER') === '1')
+  ) {
+    console.log('[SessionProvider]', ...args);
+  }
+}
+
 /**
  * SessionProvider: single authority for session state and bootstrap status.
  * On bootstrap failure (401/503 from GET /config): redirect to /login, block protected content.
@@ -87,27 +98,37 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [bootstrapStatus, setBootstrapStatus] = useState<BootstrapStatus>('pending');
   const [isReady, setIsReady] = useState(false);
   const bootstrapAttempted = useRef(false);
+  const bootstrapInFlight = useRef(false);
 
   const runBootstrap = useCallback(async () => {
     if (!isProtectedPath(pathname ?? '')) {
       setBootstrapStatus('success');
       return;
     }
+    if (bootstrapInFlight.current) {
+      logAuth('fetchConfigStrict skipped (already in flight)');
+      return;
+    }
     try {
+      bootstrapInFlight.current = true;
       setBootstrapStatus('pending');
+      logAuth('fetchConfigStrict start pathname=', pathname);
       await fetchConfigStrict();
+      logAuth('fetchConfigStrict success');
       setBootstrapStatus('success');
     } catch (err) {
       const status = (err as ApiErrorWithStatus)?.status;
+      logAuth('fetchConfigStrict failed status=', status, 'err=', (err as Error)?.message);
       if (status === 401 || status === 503) {
         clearStoredSession();
         setBootstrapStatus('failed');
+        logAuth('redirectToLoginWithNext (401/503) pathname=', pathname, 'window.pathname=', typeof window !== 'undefined' ? window.location.pathname : 'ssr');
         redirectToLoginWithNext();
         return;
       }
-      // Non-auth errors (500, network, timeout): fail safe — do not grant access.
-      // Mark failed so RequireApiSession blocks the page; user can retry.
       setBootstrapStatus('failed');
+    } finally {
+      bootstrapInFlight.current = false;
     }
   }, [pathname]);
 
@@ -116,27 +137,37 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     await runBootstrap();
   }, [runBootstrap]);
 
-  useEffect(() => {
-    queueMicrotask(() => {
-      setHasSession(Boolean(getStoredSession()));
-      setIsReady(true);
-    });
+  useLayoutEffect(() => {
+    const session = getStoredSession();
+    const nextHasSession = Boolean(session);
+    logAuth('initial hasSession=', nextHasSession, 'stored=', session ? 'present' : 'null');
+    setHasSession(nextHasSession);
+    setIsReady(true);
   }, []);
 
   useEffect(() => {
-    const handler = () => setHasSession(Boolean(getStoredSession()));
+    const handler = () => {
+      const session = getStoredSession();
+      const next = Boolean(session);
+      logAuth('SESSION_CHANGE_EVENT hasSession=', next, '(login completed or cleared)');
+      setHasSession(next);
+    };
     window.addEventListener(SESSION_CHANGE_EVENT, handler);
     return () => window.removeEventListener(SESSION_CHANGE_EVENT, handler);
   }, []);
 
   useEffect(() => {
-    if (!isReady || pathname === undefined) return;
-    if (!isProtectedPath(pathname)) {
+    if (!isReady) return;
+    const currentPath = (pathname ?? (typeof window !== 'undefined' ? window.location.pathname : '')) || '';
+    logAuth('bootstrap effect isReady=true pathname=', pathname, 'currentPath=', currentPath, 'hasSession=', hasSession, 'protected=', isProtectedPath(currentPath));
+    if (!isProtectedPath(currentPath)) {
       setBootstrapStatus('success');
       return;
     }
     if (!hasSession) {
       setBootstrapStatus('failed');
+      logAuth('redirectToLoginWithNext (!hasSession) pathname=', pathname, 'window.pathname=', typeof window !== 'undefined' ? window.location.pathname : 'ssr');
+      redirectToLoginWithNext();
       return;
     }
     if (bootstrapAttempted.current) return;
@@ -147,6 +178,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const prevHasSession = useRef(false);
   useEffect(() => {
     if (hasSession && !prevHasSession.current) {
+      logAuth('hasSession became true (login completed) reset bootstrapAttempted');
       bootstrapAttempted.current = false;
     }
     prevHasSession.current = hasSession;

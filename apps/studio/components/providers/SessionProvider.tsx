@@ -77,12 +77,9 @@ function isProtectedPath(pathname: string): boolean {
   );
 }
 
-/** Temporary auth-bootstrap debug. Logs in dev, or when sessionStorage DEBUG_SESSION_PROVIDER=1. Remove after diagnosing loop. */
+/** Opt-in auth-bootstrap debug: `sessionStorage.setItem('DEBUG_SESSION_PROVIDER','1')` then reload. */
 function logAuth(...args: unknown[]) {
-  if (
-    typeof window !== 'undefined' &&
-    (process.env.NODE_ENV === 'development' || sessionStorage.getItem('DEBUG_SESSION_PROVIDER') === '1')
-  ) {
+  if (typeof window !== 'undefined' && sessionStorage.getItem('DEBUG_SESSION_PROVIDER') === '1') {
     console.log('[SessionProvider]', ...args);
   }
 }

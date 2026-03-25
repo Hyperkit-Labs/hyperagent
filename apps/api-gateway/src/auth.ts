@@ -86,17 +86,6 @@ export function authMiddleware(
   const requestId = (req as Request & { requestId?: string }).requestId;
   const path = normalizePath(req.originalUrl || req.path || "");
 
-  if (!IS_PRODUCTION) {
-    console.warn("[auth] path check", {
-      requestId,
-      originalUrl: req.originalUrl,
-      baseUrl: req.baseUrl,
-      path: req.path,
-      url: req.url,
-      isPublic: isPublicPathFromReq(req),
-    });
-  }
-
   if (isPublicPathFromReq(req)) {
     next();
     return;

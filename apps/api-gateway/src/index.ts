@@ -163,12 +163,27 @@ app.get("/health/live", (_req, res) => {
   res.json({ status: "ok", gateway: true });
 });
 
-/** Dependency-aware health: return 503 when orchestrator is down. */
+/**
+ * Dependency-aware health: must match what POST /api/v1/auth/bootstrap needs.
+ * Previously orchestrator-only could pass while bootstrap returned 503 (no Supabase/JWT), misleading the login page.
+ */
 app.get("/health", async (_req, res) => {
+  const authJwtConfigured = Boolean(process.env.AUTH_JWT_SECRET);
+  /** OAuth / in-app wallet verification; SIWE-only sign-in can still work without this. */
+  const thirdwebSecretConfigured = Boolean(process.env.THIRDWEB_SECRET_KEY?.trim());
   const supabase = getSupabaseAdmin();
-  const dbCheck = supabase ? await supabase.from("wallet_users").select("id").limit(1) : { error: { message: "Supabase not configured" } };
-  const dbError = dbCheck.error ? (dbCheck.error as { message?: string }).message : null;
-  const dbOk = !dbCheck.error;
+  let dbOk = false;
+  let dbError: string | null = null;
+  if (supabase) {
+    const dbCheck = await supabase.from("wallet_users").select("id").limit(1);
+    dbError = dbCheck.error ? (dbCheck.error as { message?: string }).message ?? String(dbCheck.error) : null;
+    dbOk = !dbCheck.error;
+  } else {
+    dbError = "Supabase not configured";
+  }
+
+  /** Same gates as authBootstrapHandler before issuing a session. */
+  const authSigninReady = authJwtConfigured && Boolean(supabase) && dbOk;
 
   let orchestratorOk = false;
   try {
@@ -183,18 +198,30 @@ app.get("/health", async (_req, res) => {
     orchestratorOk = false;
   }
 
-  const dbRequired = !!supabase;
-  const criticalOk = orchestratorOk && (!dbRequired || dbOk);
+  const criticalOk = orchestratorOk && authSigninReady;
   if (!criticalOk) {
-    const msg = !orchestratorOk
-      ? "Orchestrator unreachable. Check ORCHESTRATOR_URL and backend status."
-      : "Database unreachable. Check Supabase connection.";
+    let msg: string;
+    if (!orchestratorOk) {
+      msg = "Orchestrator unreachable. Check ORCHESTRATOR_URL and backend status.";
+    } else if (!authJwtConfigured) {
+      msg = "Auth not configured (AUTH_JWT_SECRET missing). Sign-in unavailable.";
+    } else if (!supabase) {
+      msg = "Supabase not configured. Sign-in unavailable.";
+    } else if (!dbOk) {
+      msg = `Database unreachable. ${dbError ?? "Check Supabase credentials and migrations."}`;
+    } else {
+      msg = "Service degraded.";
+    }
     res.status(503).json({
       status: "degraded",
       gateway: true,
       orchestrator_ok: orchestratorOk,
+      auth_jwt_configured: authJwtConfigured,
+      thirdweb_secret_configured: thirdwebSecretConfigured,
+      supabase_configured: Boolean(supabase),
       db_connected: dbOk,
       db_error: dbError,
+      auth_signin_ready: authSigninReady,
       message: msg,
     });
     return;
@@ -204,8 +231,11 @@ app.get("/health", async (_req, res) => {
     status: "ok",
     gateway: true,
     orchestrator_ok: true,
-    db_connected: dbOk,
-    db_error: dbError,
+    auth_jwt_configured: true,
+    thirdweb_secret_configured: thirdwebSecretConfigured,
+    supabase_configured: true,
+    db_connected: true,
+    auth_signin_ready: true,
   });
 });
 

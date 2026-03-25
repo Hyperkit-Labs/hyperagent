@@ -12,6 +12,7 @@ import { SlimNav } from "@/components/layout/SlimNav";
 import { StatusDock } from "@/components/layout/StatusDock";
 import { OrchestratorRail } from "@/components/layout/OrchestratorRail";
 import { useLayout } from "@/components/providers/LayoutProvider";
+import { useSession } from "@/hooks/useSession";
 import { FULL_PAGE_ROUTES, PUBLIC_ROUTE } from "@/constants/routes";
 
 function ContextSidebarWrapper() {
@@ -28,17 +29,29 @@ export function LayoutSwitcher({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const account = useActiveAccount();
+  const { isReady: sessionReady, hasSession } = useSession();
+  const walletAddress = account?.address;
+  const hasWallet = Boolean(walletAddress);
 
   useEffect(() => {
     if (!pathname || pathname === PUBLIC_ROUTE) return;
-    if (account !== undefined && !account) {
+    if (!sessionReady) return;
+    if (hasSession) return;
+    if (account !== undefined && !hasWallet) {
       router.replace(PUBLIC_ROUTE);
     }
-  }, [pathname, account, router]);
+  }, [pathname, sessionReady, hasSession, account, walletAddress, hasWallet, router]);
 
   const isFullPage = pathname && FULL_PAGE_ROUTES.includes(pathname);
 
-  if (pathname && pathname !== PUBLIC_ROUTE && account !== undefined && !account) {
+  if (
+    pathname &&
+    pathname !== PUBLIC_ROUTE &&
+    sessionReady &&
+    !hasSession &&
+    account !== undefined &&
+    !hasWallet
+  ) {
     return null;
   }
 

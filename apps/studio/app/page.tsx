@@ -47,6 +47,7 @@ import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
 import { LLMKeysCard } from "@/components/settings/LLMKeysCard";
 import { ConnectWalletNav } from "@/components/wallet/ConnectWalletNav";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
+import { useSession } from "@/hooks/useSession";
 
 type ShellView = "code" | "data" | "agents";
 
@@ -159,6 +160,7 @@ function ChatPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const account = useActiveAccountFromContext();
+  const { hasSession } = useSession();
   const [shellView, setShellView] = useState<ShellView>("code");
   const [workflowsSidebarOpen, setWorkflowsSidebarOpen] = useState(true);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(
@@ -232,14 +234,18 @@ function ChatPageContent() {
 
   const { workflows, loading: workflowsLoading } = useWorkflows({ filters: { limit: 10 } });
 
+  const workflowQuery = searchParams.get("workflow");
+  const walletAddress = account?.address;
+
   useEffect(() => {
-    if (account !== undefined && !account) {
-      const next = searchParams.get("workflow")
-        ? `${ROUTES.HOME}?workflow=${searchParams.get("workflow")}`
+    if (hasSession) return;
+    if (account !== undefined && !walletAddress) {
+      const next = workflowQuery
+        ? `${ROUTES.HOME}?workflow=${encodeURIComponent(workflowQuery)}`
         : ROUTES.HOME;
       void router.replace(`${ROUTES.LOGIN}?next=${encodeURIComponent(next)}`);
     }
-  }, [account, router, searchParams]);
+  }, [hasSession, account, router, workflowQuery, walletAddress]);
 
   useEffect(() => {
     if (prefillAppliedRef.current) return;

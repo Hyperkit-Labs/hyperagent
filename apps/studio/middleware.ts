@@ -42,6 +42,10 @@ export function middleware(request: NextRequest): NextResponse {
     return NextResponse.next();
   }
 
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next();
+  }
+
   if (
     process.env.NODE_ENV !== "production" &&
     request.cookies.get(E2E_BYPASS_COOKIE)?.value === "1"

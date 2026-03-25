@@ -14,8 +14,11 @@ export function getLoginRedirectHref(): string {
 
 /**
  * Full navigation to login (window.location). Use after clearing session on auth failure.
+ * Skips redirect when already on /login to avoid refresh loops.
  */
 export function redirectToLoginWithNext(): void {
   if (typeof window === "undefined") return;
+  const { pathname } = window.location;
+  if (pathname === ROUTES.LOGIN) return;
   window.location.href = getLoginRedirectHref();
 }

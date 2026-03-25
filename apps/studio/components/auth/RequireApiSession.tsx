@@ -22,10 +22,12 @@ export function RequireApiSession({ children }: RequireApiSessionProps) {
 
   useEffect(() => {
     if (!isReady) return;
-    if (!hasSession || bootstrapStatus === "failed") {
+    // Only redirect when there is no JWT. Do not redirect on bootstrapStatus === "failed"
+    // while hasSession is true — transient /config errors would ping-pong login ↔ app.
+    if (!hasSession) {
       router.replace(getLoginRedirectHref());
     }
-  }, [isReady, hasSession, bootstrapStatus, router]);
+  }, [isReady, hasSession, router]);
 
   if (!isReady || !hasSession || bootstrapStatus === "failed" || bootstrapStatus === "pending") {
     return (

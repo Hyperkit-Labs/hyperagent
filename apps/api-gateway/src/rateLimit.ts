@@ -120,6 +120,13 @@ export async function rateLimitMiddleware(
   res: Response,
   next: NextFunction
 ): Promise<void> {
+  const path = req.path || "";
+  /** Probes must work even when REDIS_URL is missing or Redis is down (operators, load balancers, login page). */
+  if (path === "/health" || path === "/health/live") {
+    next();
+    return;
+  }
+
   const url = (REDIS_URL || "").trim();
   if (!url || url.startsWith("#")) {
     if (NODE_ENV === "production") {
@@ -131,10 +138,6 @@ export async function rateLimitMiddleware(
       });
       return;
     }
-    next();
-    return;
-  }
-  if (req.path === "/health") {
     next();
     return;
   }

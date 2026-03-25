@@ -25,8 +25,14 @@ export function useServerStatus(pollIntervalMs = 30_000) {
         let bodyOk = false;
         if (ok) {
           try {
-            const data = await res.json();
-            bodyOk = data?.status === 'ok';
+            const data = (await res.json()) as {
+              status?: string;
+              /** Gateway /health: aligned with POST /api/v1/auth/bootstrap readiness */
+              auth_signin_ready?: boolean;
+            };
+            bodyOk =
+              data?.status === 'ok' &&
+              (data.auth_signin_ready === undefined || data.auth_signin_ready === true);
           } catch {
             bodyOk = false;
           }

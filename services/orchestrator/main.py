@@ -96,7 +96,7 @@ def _validate_critical_services() -> None:
 
     if _is_production():
         missing: list[str] = []
-        redis_url = os.environ.get("REDIS_URL", "").strip()
+        redis_url = (os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or "").strip()
         if not redis_url:
             missing.append("REDIS_URL")
         pinata_jwt = os.environ.get("PINATA_JWT", "").strip()

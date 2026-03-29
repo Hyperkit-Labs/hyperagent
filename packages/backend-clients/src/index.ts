@@ -47,7 +47,7 @@ export function getServiceUrl(service: ServiceName): string {
 }
 
 export function createRedisClient(role: "queue" | "cache" | "limiter"): unknown | null {
-  const url = process.env.REDIS_URL;
+  const url = (process.env.REDIS_URL || process.env.UPSTASH_REDIS_URL || "").trim();
   if (!url) return null;
   try {
     const Redis = require("ioredis");

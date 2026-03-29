@@ -18,7 +18,7 @@
     "ai": "^4.0.0",
     "@ai-sdk/openai": "^1.0.0",
     "@ai-sdk/anthropic": "^1.0.0",
-    "@ai-sdk/google": "^1.0.0",
+    "@ai-sdk/google": "^3.0.53",
     "zod": "^3.22.0",
     "jsonwebtoken": "^9.0.2",
     "@openzeppelin/wizard": "^0.10.7",

@@ -17,4 +17,5 @@ CREATE INDEX IF NOT EXISTS idx_agent_registrations_created_at ON agent_registrat
 COMMENT ON TABLE agent_registrations IS 'Persisted ERC-8004 on-chain registration proof from POST /api/v1/identity/register';
 
 ALTER TABLE agent_registrations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS service_role_all ON agent_registrations;
 CREATE POLICY service_role_all ON agent_registrations TO service_role USING (true) WITH CHECK (true);

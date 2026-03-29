@@ -1,17 +1,30 @@
 /**
- * Redis-backed rate limit. Security is mandatory; rate limiting protects against abuse.
- * Key pattern: rl:ip:{ip}, rl:user:{userId}. Window 60s; max 100 per window (configurable).
+ * API gateway rate limits via @upstash/ratelimit (HTTP REST). Security is mandatory in production.
  *
- * Production: REDIS_URL is required at startup. When Redis is unreachable at runtime,
- * requests are rejected (fail-closed) to avoid unmitigated abuse.
+ * Production: set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN from the Upstash console.
+ * TCP redis:// / rediss:// (REDIS_URL) is for orchestrator/workers only, not this middleware.
+ *
+ * POST /api/v1/auth/bootstrap skips the Upstash tier when NODE_ENV !== "production"
+ * (express-rate-limit on that route still applies).
  */
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
 import { Response, NextFunction } from "express";
 import { RequestWithId } from "./requestId.js";
 import { RequestWithUser } from "./auth.js";
 
-const REDIS_URL = process.env.REDIS_URL;
-const NODE_ENV = process.env.NODE_ENV || "development";
-/** When true, allow requests through when Redis is unreachable (skip rate limit). Use for local/staging when Redis is unavailable. */
+function restUrl(): string {
+  return (process.env.UPSTASH_REDIS_REST_URL || "").trim();
+}
+
+function restToken(): string {
+  return (process.env.UPSTASH_REDIS_REST_TOKEN || "").trim();
+}
+
+function nodeEnv(): string {
+  return process.env.NODE_ENV || "development";
+}
+/** When true, allow requests through when Upstash is unreachable (skip rate limit). Dev/staging only. */
 const RATE_LIMIT_BYPASS_ON_FAIL = process.env.RATE_LIMIT_BYPASS_ON_FAIL === "true";
 const RATE_LIMIT_WINDOW_SEC = Number(process.env.RATE_LIMIT_WINDOW_SEC) || 60;
 /** Multiplier applied to all rate limits. Use 2 to double limits, 0.5 to halve. Default 1. */
@@ -20,100 +33,154 @@ const RATE_LIMIT_MULTIPLIER = Math.max(0.1, Number(process.env.RATE_LIMIT_MULTIP
 const RATE_LIMIT_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_MAX_IP) || 300) * RATE_LIMIT_MULTIPLIER);
 const RATE_LIMIT_MAX_USER = Math.round((Number(process.env.RATE_LIMIT_MAX_USER) || 500) * RATE_LIMIT_MULTIPLIER);
 
-/** Stricter limit for POST llm-keys to prevent key-stuffing attacks. Window 60s. */
 const LLM_KEYS_PATH = "/api/v1/workspaces/current/llm-keys";
 const RATE_LIMIT_LLM_KEYS_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_LLM_KEYS_MAX_IP) || 10) * RATE_LIMIT_MULTIPLIER);
 const RATE_LIMIT_LLM_KEYS_MAX_USER = Math.round((Number(process.env.RATE_LIMIT_LLM_KEYS_MAX_USER) || 5) * RATE_LIMIT_MULTIPLIER);
 
-/** Stricter limit for workflow run start (POST /api/v1/workflows/generate). */
 const RATE_LIMIT_WORKFLOW_GENERATE_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_WORKFLOW_GENERATE_MAX_IP) || 20) * RATE_LIMIT_MULTIPLIER);
 const RATE_LIMIT_WORKFLOW_GENERATE_MAX_USER = Math.round((Number(process.env.RATE_LIMIT_WORKFLOW_GENERATE_MAX_USER) || 30) * RATE_LIMIT_MULTIPLIER);
 
-/** Stricter limit for deploy prepare (POST /api/v1/workflows/:id/deploy/prepare). */
 const RATE_LIMIT_DEPLOY_PREPARE_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_DEPLOY_PREPARE_MAX_IP) || 30) * RATE_LIMIT_MULTIPLIER);
 const RATE_LIMIT_DEPLOY_PREPARE_MAX_USER = Math.round((Number(process.env.RATE_LIMIT_DEPLOY_PREPARE_MAX_USER) || 50) * RATE_LIMIT_MULTIPLIER);
 
-/** Auth bootstrap: strict per-IP limit to prevent brute force. No auth yet so IP-only. */
 const BOOTSTRAP_PATH = "/api/v1/auth/bootstrap";
 const RATE_LIMIT_BOOTSTRAP_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_BOOTSTRAP_MAX_IP) || Number(process.env.RATE_LIMIT_SIWE_MAX_IP) || 5) * RATE_LIMIT_MULTIPLIER);
 const RATE_LIMIT_BOOTSTRAP_WINDOW_SEC = Number(process.env.RATE_LIMIT_SIWE_WINDOW_SEC) || Number(process.env.RATE_LIMIT_BOOTSTRAP_WINDOW_SEC) || 60;
 
-/** Lightweight reads (GET /config, /networks, /tokens/stablecoins). Tiered: strict IP for unauthenticated, user-based for authenticated. */
 const RATE_LIMIT_LIGHT_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_LIGHT_MAX_IP) || 100) * RATE_LIMIT_MULTIPLIER);
 const RATE_LIMIT_LIGHT_MAX_USER = Math.round((Number(process.env.RATE_LIMIT_LIGHT_MAX_USER) || 500) * RATE_LIMIT_MULTIPLIER);
 
-/** After Redis failure, skip reconnects for this many ms to avoid log spam. */
-const REDIS_BACKOFF_MS = 60_000;
+const REST_BACKOFF_MS = 60_000;
+let lastRestFailure = 0;
 
-let redis: { incr(key: string): Promise<number>; expire(key: string, sec: number): Promise<string>; disconnect?: () => void } | null = null;
-let lastRedisFailure = 0;
+type LimitOutcome =
+  | { ok: true }
+  | { ok: false; reason: "limit"; retryAfterSec: number }
+  | { ok: false; reason: "redis_auth" }
+  | { ok: false; reason: "redis_error" }
+  | { ok: false; reason: "redis_unavailable" };
 
-async function getRedis(): Promise<typeof redis> {
-  const url = (REDIS_URL || "").trim();
-  if (!url || url.startsWith("#")) return null;
-  if (Date.now() - lastRedisFailure < REDIS_BACKOFF_MS) return null;
-  if (redis) return redis;
+function isAuthError(err: unknown): boolean {
+  const m = err instanceof Error ? err.message : String(err);
+  const lower = m.toLowerCase();
+  return lower.includes("401") || lower.includes("unauthorized") || lower.includes("wrong token");
+}
+
+function rest503Message(reason: "redis_auth" | "redis_error" | "redis_unavailable"): string {
+  if (reason === "redis_auth") {
+    return "Rate limiting cannot authenticate to Upstash REST. Check UPSTASH_REDIS_REST_TOKEN and UPSTASH_REDIS_REST_URL.";
+  }
+  if (reason === "redis_unavailable") {
+    return "Rate limiting unavailable. Upstash REST unreachable. Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.";
+  }
+  return "Rate limiting unavailable due to an Upstash error. Check server logs and REST credentials.";
+}
+
+let redisClient: Redis | null = null;
+
+function getRedisRest(): Redis | null {
+  const url = restUrl();
+  const token = restToken();
+  if (!url || !token) return null;
+  if (Date.now() - lastRestFailure < REST_BACKOFF_MS) return null;
+  if (redisClient) return redisClient;
   try {
-    const mod = await import("ioredis");
-    const RedisClient = (mod as unknown as { default: new (url: string, opts?: object) => { incr(key: string): Promise<number>; expire(key: string, sec: number): Promise<string>; disconnect?: () => void; on?(event: string, fn: (err: Error) => void): void } }).default;
-    const opts: Record<string, unknown> = {
-      maxRetriesPerRequest: 3,
-      enableReadyCheck: true,
-      connectTimeout: 15000,
-      retryStrategy: (times: number) => (times <= 3 ? Math.min(times * 500, 2000) : null),
-    };
-    if (url.startsWith("rediss://")) {
-      opts.tls = { rejectUnauthorized: process.env.REDIS_TLS_VERIFY !== "false" };
-    }
-    const client = new RedisClient(url, opts);
-    client.on?.("error", () => {
-      lastRedisFailure = Date.now();
-      redis = null;
-      if (typeof client.disconnect === "function") client.disconnect();
-    });
-    redis = client;
-    return redis;
+    redisClient = new Redis({ url, token });
+    return redisClient;
   } catch (err) {
-    lastRedisFailure = Date.now();
-    if (NODE_ENV === "development") {
-      console.warn("[rate-limit] Redis unreachable, skipping rate limit. Set REDIS_URL to empty for quiet mode.");
+    lastRestFailure = Date.now();
+    redisClient = null;
+    if (nodeEnv() === "development") {
+      console.warn("[rate-limit] Upstash REST client init failed, skipping rate limit:", err instanceof Error ? err.message : err);
     } else {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error("[rate-limit] Redis connection failed:", msg, "URL format: use rediss:// for TLS (Supabase/Redis Cloud)");
+      console.error("[rate-limit] Upstash REST client init failed:", err instanceof Error ? err.message : err);
     }
     return null;
   }
 }
 
-async function checkLimit(
-  key: string,
-  max: number,
-  windowSec: number
-): Promise<boolean> {
-  const r = await getRedis();
-  if (!r) {
-    if (NODE_ENV === "production") return false;
-    return true;
+const limiterCache = new Map<string, Ratelimit>();
+
+function getLimiter(redis: Redis, max: number, windowSeconds: number, name: string): Ratelimit {
+  const windowLabel = `${windowSeconds} s`;
+  const key = `${name}:${max}:${windowLabel}`;
+  let lim = limiterCache.get(key);
+  if (!lim) {
+    lim = new Ratelimit({
+      redis,
+      limiter: Ratelimit.fixedWindow(max, windowLabel),
+      prefix: `hyperagent:rl:${name}`,
+      analytics: false,
+    });
+    limiterCache.set(key, lim);
   }
+  return lim;
+}
+
+function resetRestClient(): void {
+  lastRestFailure = Date.now();
+  redisClient = null;
+  limiterCache.clear();
+}
+
+async function checkLimit(
+  limiter: Ratelimit,
+  identifier: string,
+  defaultRetrySec: number
+): Promise<LimitOutcome> {
   try {
-    const count = await r.incr(key);
-    if (count === 1) await r.expire(key, windowSec);
-    return count <= max;
+    const result = await limiter.limit(identifier);
+    if (result.success) return { ok: true };
+    const retryAfterSec = Math.max(
+      1,
+      typeof result.reset === "number"
+        ? Math.ceil((result.reset - Date.now()) / 1000) || defaultRetrySec
+        : defaultRetrySec
+    );
+    return { ok: false, reason: "limit", retryAfterSec };
   } catch (err) {
-    lastRedisFailure = Date.now();
-    const r = redis;
-    redis = null;
-    if (typeof r?.disconnect === "function") r.disconnect();
-    if (NODE_ENV === "production") {
-      console.error("[rate-limit] Redis check failed for key=%s: %s", key, err instanceof Error ? err.message : err);
-      return false;
+    resetRestClient();
+    if (nodeEnv() !== "production") {
+      console.warn("[rate-limit] Upstash limit() failed, skipping rate limit:", err instanceof Error ? err.message : err);
+      return { ok: true };
     }
-    console.warn("[rate-limit] Redis check failed, skipping rate limit for 60s:", err instanceof Error ? err.message : err);
-    return true;
+    console.error("[rate-limit] Upstash limit() failed:", err instanceof Error ? err.message : err);
+    if (isAuthError(err)) return { ok: false, reason: "redis_auth" };
+    return { ok: false, reason: "redis_error" };
   }
 }
 
+function sendLimitOrRedis(
+  req: RateLimitRequest,
+  res: Response,
+  outcome: LimitOutcome,
+  limit: { retryAfterSec: number; event: string; message: string }
+): boolean {
+  if (outcome.ok) return true;
+  if (outcome.reason === "limit") {
+    logSecurityEvent(limit.event, 429, req.path, req.requestId, req.userId);
+    res.setHeader("Retry-After", String(outcome.retryAfterSec));
+    res.status(429).json({
+      error: "Too Many Requests",
+      message: limit.message,
+      requestId: req.requestId,
+    });
+    return false;
+  }
+  logSecurityEvent("rate_limit_redis", 503, req.path, req.requestId, req.userId);
+  res.status(503).json({
+    error: "Service Unavailable",
+    message: rest503Message(outcome.reason),
+    requestId: req.requestId,
+  });
+  return false;
+}
+
 export type RateLimitRequest = RequestWithId & RequestWithUser;
+
+export function hasRestRateLimitEnv(): boolean {
+  return Boolean(restUrl() && restToken());
+}
 
 export async function rateLimitMiddleware(
   req: RateLimitRequest,
@@ -121,19 +188,18 @@ export async function rateLimitMiddleware(
   next: NextFunction
 ): Promise<void> {
   const path = req.path || "";
-  /** Probes must work even when REDIS_URL is missing or Redis is down (operators, load balancers, login page). */
   if (path === "/health" || path === "/health/live") {
     next();
     return;
   }
 
-  const url = (REDIS_URL || "").trim();
-  if (!url || url.startsWith("#")) {
-    if (NODE_ENV === "production") {
+  if (!hasRestRateLimitEnv()) {
+    if (nodeEnv() === "production") {
       logSecurityEvent("rate_limit_unavailable", 503, req.path, req.requestId, req.userId);
       res.status(503).json({
         error: "Service Unavailable",
-        message: "Rate limiting required. REDIS_URL must be set in production.",
+        message:
+          "Rate limiting required. Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN in production.",
         requestId: req.requestId,
       });
       return;
@@ -141,77 +207,86 @@ export async function rateLimitMiddleware(
     next();
     return;
   }
+
+  const redis = getRedisRest();
+  if (!redis) {
+    if (nodeEnv() === "production") {
+      if (RATE_LIMIT_BYPASS_ON_FAIL) {
+        console.warn("[rate-limit] Upstash unreachable. RATE_LIMIT_BYPASS_ON_FAIL ignored in production (fail-closed).");
+      }
+      logSecurityEvent("rate_limit_unavailable", 503, req.path, req.requestId, req.userId);
+      res.status(503).json({
+        error: "Service Unavailable",
+        message: rest503Message("redis_unavailable"),
+        requestId: req.requestId,
+      });
+      return;
+    }
+    next();
+    return;
+  }
+
   const isBootstrap = req.method === "POST" && req.path === BOOTSTRAP_PATH;
   if (isBootstrap) {
+    if (nodeEnv() !== "production") {
+      next();
+      return;
+    }
     const ip = req.ip || (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
-    const bootstrapKey = `rl:ip:${ip}:bootstrap`;
-    const bootstrapOk = await checkLimit(bootstrapKey, RATE_LIMIT_BOOTSTRAP_MAX_IP, RATE_LIMIT_BOOTSTRAP_WINDOW_SEC);
-    if (!bootstrapOk) {
-      logSecurityEvent("rate_limit_bootstrap", 429, req.path, req.requestId, undefined);
-      res.setHeader("Retry-After", String(RATE_LIMIT_BOOTSTRAP_WINDOW_SEC));
-      res.status(429).json({
-        error: "Too Many Requests",
+    const lim = getLimiter(redis, RATE_LIMIT_BOOTSTRAP_MAX_IP, RATE_LIMIT_BOOTSTRAP_WINDOW_SEC, "bootstrap");
+    const bootstrapOutcome = await checkLimit(lim, ip, RATE_LIMIT_BOOTSTRAP_WINDOW_SEC);
+    if (
+      !sendLimitOrRedis(req, res, bootstrapOutcome, {
+        retryAfterSec: RATE_LIMIT_BOOTSTRAP_WINDOW_SEC,
+        event: "rate_limit_bootstrap",
         message: "Too many sign-in attempts. Try again later.",
-        requestId: req.requestId,
-      });
+      })
+    ) {
       return;
     }
     next();
     return;
   }
+
   const isLightweightRead =
     req.method === "GET" &&
-    (req.path === "/api/v1/config" || req.path === "/api/v1/config/integrations-debug" || req.path === "/api/v1/networks" || req.path === "/api/v1/tokens/stablecoins");
+    (req.path === "/api/v1/config" ||
+      req.path === "/api/v1/config/integrations-debug" ||
+      req.path === "/api/v1/networks" ||
+      req.path === "/api/v1/tokens/stablecoins");
   if (isLightweightRead) {
     const ip = req.ip || (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
     const userId = req.userId || "";
 
-    // Tiered: authenticated users get user-based limit; unauthenticated get strict IP limit
     if (userId) {
-      const userKey = `rl:user:${userId}:light`;
-      const userOk = await checkLimit(userKey, RATE_LIMIT_LIGHT_MAX_USER, RATE_LIMIT_WINDOW_SEC);
-      if (!userOk) {
-        logSecurityEvent("rate_limit_light", 429, req.path, req.requestId, userId);
-        res.setHeader("Retry-After", String(RATE_LIMIT_WINDOW_SEC));
-        res.status(429).json({
-          error: "Too Many Requests",
+      const lim = getLimiter(redis, RATE_LIMIT_LIGHT_MAX_USER, RATE_LIMIT_WINDOW_SEC, "light-user");
+      const userOutcome = await checkLimit(lim, userId, RATE_LIMIT_WINDOW_SEC);
+      if (
+        !sendLimitOrRedis(req, res, userOutcome, {
+          retryAfterSec: RATE_LIMIT_WINDOW_SEC,
+          event: "rate_limit_light",
           message: "Config/networks rate limit exceeded. Try again later.",
-          requestId: req.requestId,
-        });
+        })
+      ) {
         return;
       }
     } else {
-      const lightKey = `rl:ip:${ip}:light`;
-      const lightOk = await checkLimit(lightKey, RATE_LIMIT_LIGHT_MAX_IP, RATE_LIMIT_WINDOW_SEC);
-      if (!lightOk) {
-        logSecurityEvent("rate_limit_light", 429, req.path, req.requestId, undefined);
-        res.setHeader("Retry-After", String(RATE_LIMIT_WINDOW_SEC));
-        res.status(429).json({
-          error: "Too Many Requests",
+      const lim = getLimiter(redis, RATE_LIMIT_LIGHT_MAX_IP, RATE_LIMIT_WINDOW_SEC, "light-ip");
+      const lightOutcome = await checkLimit(lim, ip, RATE_LIMIT_WINDOW_SEC);
+      if (
+        !sendLimitOrRedis(req, res, lightOutcome, {
+          retryAfterSec: RATE_LIMIT_WINDOW_SEC,
+          event: "rate_limit_light",
           message: "Config/networks rate limit exceeded. Try again later.",
-          requestId: req.requestId,
-        });
+        })
+      ) {
         return;
       }
     }
     next();
     return;
   }
-  if (NODE_ENV === "production") {
-    const r = await getRedis();
-    if (!r) {
-      if (RATE_LIMIT_BYPASS_ON_FAIL) {
-        console.warn("[rate-limit] Redis unreachable. RATE_LIMIT_BYPASS_ON_FAIL ignored in production (fail-closed).");
-      }
-      logSecurityEvent("rate_limit_unavailable", 503, req.path, req.requestId, req.userId);
-      res.status(503).json({
-        error: "Service Unavailable",
-        message: "Rate limiting unavailable. Redis connection failed. Ensure REDIS_URL is set and reachable (use rediss:// for TLS).",
-        requestId: req.requestId,
-      });
-      return;
-    }
-  }
+
   const ip = req.ip || (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
   const userId = req.userId || "";
   const isLlmKeysPost = req.method === "POST" && req.path === LLM_KEYS_PATH;
@@ -219,103 +294,97 @@ export async function rateLimitMiddleware(
   const isDeployPrepare = req.method === "POST" && /^\/api\/v1\/workflows\/[^/]+\/deploy\/prepare$/.test(req.path);
 
   if (isWorkflowGenerate) {
-    const key = `rl:ip:${ip}:workflow-generate`;
-    const ok = await checkLimit(key, RATE_LIMIT_WORKFLOW_GENERATE_MAX_IP, RATE_LIMIT_WINDOW_SEC);
-    if (!ok) {
-      logSecurityEvent("rate_limit_workflow_generate", 429, req.path, req.requestId, userId || undefined);
-      res.setHeader("Retry-After", String(RATE_LIMIT_WINDOW_SEC));
-      res.status(429).json({
-        error: "Too Many Requests",
+    const limIp = getLimiter(redis, RATE_LIMIT_WORKFLOW_GENERATE_MAX_IP, RATE_LIMIT_WINDOW_SEC, "wf-ip");
+    const wfIp = await checkLimit(limIp, ip, RATE_LIMIT_WINDOW_SEC);
+    if (
+      !sendLimitOrRedis(req, res, wfIp, {
+        retryAfterSec: RATE_LIMIT_WINDOW_SEC,
+        event: "rate_limit_workflow_generate",
         message: "Workflow start rate limit exceeded. Try again later.",
-        requestId: req.requestId,
-      });
+      })
+    ) {
       return;
     }
     if (userId) {
-      const userKey = `rl:user:${userId}:workflow-generate`;
-      const userOk = await checkLimit(userKey, RATE_LIMIT_WORKFLOW_GENERATE_MAX_USER, RATE_LIMIT_WINDOW_SEC);
-      if (!userOk) {
-        logSecurityEvent("rate_limit_workflow_generate", 429, req.path, req.requestId, userId);
-        res.setHeader("Retry-After", String(RATE_LIMIT_WINDOW_SEC));
-        res.status(429).json({
-          error: "Too Many Requests",
+      const limU = getLimiter(redis, RATE_LIMIT_WORKFLOW_GENERATE_MAX_USER, RATE_LIMIT_WINDOW_SEC, "wf-user");
+      const wfUser = await checkLimit(limU, userId, RATE_LIMIT_WINDOW_SEC);
+      if (
+        !sendLimitOrRedis(req, res, wfUser, {
+          retryAfterSec: RATE_LIMIT_WINDOW_SEC,
+          event: "rate_limit_workflow_generate",
           message: "Workflow start rate limit exceeded.",
-          requestId: req.requestId,
-        });
+        })
+      ) {
         return;
       }
     }
   }
 
   if (isDeployPrepare) {
-    const key = `rl:ip:${ip}:deploy-prepare`;
-    const ok = await checkLimit(key, RATE_LIMIT_DEPLOY_PREPARE_MAX_IP, RATE_LIMIT_WINDOW_SEC);
-    if (!ok) {
-      logSecurityEvent("rate_limit_deploy_prepare", 429, req.path, req.requestId, userId || undefined);
-      res.setHeader("Retry-After", String(RATE_LIMIT_WINDOW_SEC));
-      res.status(429).json({
-        error: "Too Many Requests",
+    const limIp = getLimiter(redis, RATE_LIMIT_DEPLOY_PREPARE_MAX_IP, RATE_LIMIT_WINDOW_SEC, "deploy-ip");
+    const dpIp = await checkLimit(limIp, ip, RATE_LIMIT_WINDOW_SEC);
+    if (
+      !sendLimitOrRedis(req, res, dpIp, {
+        retryAfterSec: RATE_LIMIT_WINDOW_SEC,
+        event: "rate_limit_deploy_prepare",
         message: "Deploy prepare rate limit exceeded. Try again later.",
-        requestId: req.requestId,
-      });
+      })
+    ) {
       return;
     }
     if (userId) {
-      const userKey = `rl:user:${userId}:deploy-prepare`;
-      const userOk = await checkLimit(userKey, RATE_LIMIT_DEPLOY_PREPARE_MAX_USER, RATE_LIMIT_WINDOW_SEC);
-      if (!userOk) {
-        logSecurityEvent("rate_limit_deploy_prepare", 429, req.path, req.requestId, userId);
-        res.setHeader("Retry-After", String(RATE_LIMIT_WINDOW_SEC));
-        res.status(429).json({
-          error: "Too Many Requests",
+      const limU = getLimiter(redis, RATE_LIMIT_DEPLOY_PREPARE_MAX_USER, RATE_LIMIT_WINDOW_SEC, "deploy-user");
+      const dpUser = await checkLimit(limU, userId, RATE_LIMIT_WINDOW_SEC);
+      if (
+        !sendLimitOrRedis(req, res, dpUser, {
+          retryAfterSec: RATE_LIMIT_WINDOW_SEC,
+          event: "rate_limit_deploy_prepare",
           message: "Deploy prepare rate limit exceeded.",
-          requestId: req.requestId,
-        });
+        })
+      ) {
         return;
       }
     }
   }
 
-  const ipKey = `rl:ip:${ip}`;
-  const ipOk = await checkLimit(ipKey, RATE_LIMIT_MAX_IP, RATE_LIMIT_WINDOW_SEC);
-  if (!ipOk) {
-    logSecurityEvent("rate_limit", 429, req.path, req.requestId, userId || undefined);
-    res.setHeader("Retry-After", String(RATE_LIMIT_WINDOW_SEC));
-    res.status(429).json({
-      error: "Too Many Requests",
+  const limIpMain = getLimiter(redis, RATE_LIMIT_MAX_IP, RATE_LIMIT_WINDOW_SEC, "ip");
+  const ipOutcome = await checkLimit(limIpMain, ip, RATE_LIMIT_WINDOW_SEC);
+  if (
+    !sendLimitOrRedis(req, res, ipOutcome, {
+      retryAfterSec: RATE_LIMIT_WINDOW_SEC,
+      event: "rate_limit",
       message: "Rate limit exceeded. Try again later.",
-      requestId: req.requestId,
-    });
+    })
+  ) {
     return;
   }
 
   if (isLlmKeysPost) {
-    const llmKeysIpKey = `rl:ip:${ip}:llm-keys`;
-    const llmKeysIpOk = await checkLimit(llmKeysIpKey, RATE_LIMIT_LLM_KEYS_MAX_IP, RATE_LIMIT_WINDOW_SEC);
-    if (!llmKeysIpOk) {
-      logSecurityEvent("rate_limit_llm_keys", 429, req.path, req.requestId, userId || undefined);
-      res.setHeader("Retry-After", String(RATE_LIMIT_WINDOW_SEC));
-      res.status(429).json({
-        error: "Too Many Requests",
+    const limLlmIp = getLimiter(redis, RATE_LIMIT_LLM_KEYS_MAX_IP, RATE_LIMIT_WINDOW_SEC, "llm-ip");
+    const llmIp = await checkLimit(limLlmIp, ip, RATE_LIMIT_WINDOW_SEC);
+    if (
+      !sendLimitOrRedis(req, res, llmIp, {
+        retryAfterSec: RATE_LIMIT_WINDOW_SEC,
+        event: "rate_limit_llm_keys",
         message: "LLM keys endpoint rate limit exceeded. Try again later.",
-        requestId: req.requestId,
-      });
+      })
+    ) {
       return;
     }
   }
 
   if (userId) {
-    const userKey = isLlmKeysPost ? `rl:user:${userId}:llm-keys` : `rl:user:${userId}`;
     const userMax = isLlmKeysPost ? RATE_LIMIT_LLM_KEYS_MAX_USER : RATE_LIMIT_MAX_USER;
-    const userOk = await checkLimit(userKey, userMax, RATE_LIMIT_WINDOW_SEC);
-    if (!userOk) {
-      logSecurityEvent("rate_limit", 429, req.path, req.requestId, userId);
-      res.setHeader("Retry-After", String(RATE_LIMIT_WINDOW_SEC));
-      res.status(429).json({
-        error: "Too Many Requests",
+    const name = isLlmKeysPost ? "llm-user" : "user";
+    const limUser = getLimiter(redis, userMax, RATE_LIMIT_WINDOW_SEC, name);
+    const userOutcome = await checkLimit(limUser, userId, RATE_LIMIT_WINDOW_SEC);
+    if (
+      !sendLimitOrRedis(req, res, userOutcome, {
+        retryAfterSec: RATE_LIMIT_WINDOW_SEC,
+        event: "rate_limit",
         message: "User rate limit exceeded.",
-        requestId: req.requestId,
-      });
+      })
+    ) {
       return;
     }
   }

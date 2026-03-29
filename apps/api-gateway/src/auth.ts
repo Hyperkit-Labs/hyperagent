@@ -11,7 +11,6 @@ export interface RequestWithUser extends Request {
   walletAddress?: string;
 }
 
-const AUTH_JWT_SECRET = process.env.AUTH_JWT_SECRET;
 const NODE_ENV = process.env.NODE_ENV || "development";
 const IS_PRODUCTION = NODE_ENV === "production";
 const REQUIRE_AUTH = process.env.REQUIRE_AUTH !== "false" || NODE_ENV === "production";
@@ -27,6 +26,9 @@ function normalizePath(input: string): string {
 const PUBLIC_PATHS = new Set([
   "/",
   "/health",
+  "/health/live",
+  "/api/v1/health",
+  "/api/v1/health/live",
   "/auth/bootstrap",
   "/api/v1/auth/bootstrap",
   "/api/v1/config",
@@ -91,7 +93,8 @@ export function authMiddleware(
     return;
   }
 
-  if (!AUTH_JWT_SECRET) {
+  const authJwtSecret = process.env.AUTH_JWT_SECRET;
+  if (!authJwtSecret) {
     if (REQUIRE_AUTH) {
       traceAuth(path, requestId, false, "none", "503_no_secret");
       logSecurityEvent("auth_failure", 503, path, requestId, undefined);
@@ -116,7 +119,7 @@ export function authMiddleware(
 
   const token = auth.slice(7);
   try {
-    const payload = jwt.verify(token, AUTH_JWT_SECRET) as { sub?: string; wallet_address?: string };
+    const payload = jwt.verify(token, authJwtSecret) as { sub?: string; wallet_address?: string };
     if (payload?.sub) {
       req.userId = payload.sub;
     }

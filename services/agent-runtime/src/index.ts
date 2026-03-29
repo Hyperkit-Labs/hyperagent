@@ -21,7 +21,7 @@ app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
 app.use(express.json({ limit: "2mb" }));
 
 function requireInternalAuth(req: express.Request, res: express.Response, next: express.NextFunction): void {
-  if (req.path === "/health") return next();
+  if (req.path === "/health" || req.path === "/health/live") return next();
   const hasSession = !!req.header("X-Agent-Session");
   const hasToken = INTERNAL_AUTH_TOKEN && req.header("X-Internal-Token") === INTERNAL_AUTH_TOKEN;
   const hasBody = !!(req.body?.context?.apiKeys && Object.keys(req.body.context.apiKeys).length > 0);

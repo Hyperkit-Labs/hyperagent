@@ -30,9 +30,10 @@ export function useServerStatus(pollIntervalMs = 30_000) {
               /** Gateway /health: aligned with POST /api/v1/auth/bootstrap readiness */
               auth_signin_ready?: boolean;
             };
+            /** 200 + auth_signin_ready: sign-in works even when status is degraded (orchestrator down). */
             bodyOk =
-              data?.status === 'ok' &&
-              (data.auth_signin_ready === undefined || data.auth_signin_ready === true);
+              data?.auth_signin_ready === true &&
+              (data?.status === 'ok' || data?.status === 'degraded');
           } catch {
             bodyOk = false;
           }

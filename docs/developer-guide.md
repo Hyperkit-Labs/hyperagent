@@ -45,7 +45,7 @@ The repo is a monorepo (pnpm workspaces). Main areas:
 2. **Environment**
    - Copy `.env.example` to `.env` at repo root.
    - For Studio: set `NEXT_PUBLIC_THIRDWEB_CLIENT_ID`, `NEXT_PUBLIC_API_URL` (e.g. `http://localhost:4000` when using gateway).
-   - For backend: set `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `REDIS_URL` for full functionality.
+   - For backend: set `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (gateway rate limits), and `REDIS_URL` (TCP for orchestrator queue/checkpointer when enabled).
 
 3. **Run backend (Docker)**
    ```bash

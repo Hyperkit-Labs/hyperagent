@@ -1,9 +1,10 @@
 /**
  * Unit tests: auth bootstrap handler. 400/503/401 responses.
  */
-import { beforeAll } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import express, { json } from "express";
 import request from "supertest";
+import { isMissingTableError } from "./authBootstrap.js";
 
 beforeAll(() => {
   process.env.AUTH_JWT_SECRET = "";
@@ -18,6 +19,23 @@ async function getApp() {
   app.all("/api/v1/auth/bootstrap", authBootstrapHandler);
   return app;
 }
+
+describe("isMissingTableError", () => {
+  it("is true for undefined relation (missing migration)", () => {
+    expect(isMissingTableError('relation "wallet_users" does not exist', undefined)).toBe(true);
+    expect(isMissingTableError("relation \"public.wallet_users\" does not exist", "42P01")).toBe(true);
+  });
+
+  it("is false when message mentions wallet_users but table exists (RLS / permission)", () => {
+    expect(
+      isMissingTableError(
+        'new row violates row-level security policy for table "wallet_users"',
+        undefined
+      )
+    ).toBe(false);
+    expect(isMissingTableError("permission denied for table wallet_users", undefined)).toBe(false);
+  });
+});
 
 describe("authBootstrapHandler", () => {
   it("returns 405 for GET", async () => {

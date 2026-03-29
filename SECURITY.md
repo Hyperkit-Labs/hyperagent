@@ -59,10 +59,10 @@ Studio is a thin client. All pipeline logic, BYOK handling, and safety gates liv
 |-----------|-------------------------|
 | **JWT auth** | `AUTH_JWT_SECRET` required for production. Validates `Authorization: Bearer` on all `/api/v1` routes except public paths. |
 | **Public paths** | `/health`, `/api/v1/auth/bootstrap`, `/api/v1/config`, `/api/v1/networks`, `/api/v1/tokens/stablecoins` are unauthenticated. |
-| **Rate limiting** | Redis-backed. Per-IP and per-user limits. Stricter limits for LLM keys, workflow start, and deploy prepare. Fail-closed when Redis unavailable in production. |
+| **Rate limiting** | Upstash REST (`@upstash/ratelimit`). Per-IP and per-user limits. Stricter limits for LLM keys, workflow start, and deploy prepare. Fail-closed when Upstash REST is unavailable in production. |
 | **Request validation** | Request ID for tracing; structured security event logging. |
 
-**Required env:** `AUTH_JWT_SECRET`, `REDIS_URL`, `REQUIRE_AUTH=true` (or unset; default enforced).
+**Required env:** `AUTH_JWT_SECRET`, `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (gateway rate limiting), `REQUIRE_AUTH=true` (or unset; default enforced).
 
 ---
 
@@ -151,7 +151,7 @@ See `docs/runbooks/BYOK-key-lifecycle.md` for rotation and re-key procedures.
 ## Deployment Checklist
 
 1. Set `AUTH_JWT_SECRET` (`openssl rand -base64 32`).
-2. Set `REDIS_URL` (Redis Cloud or self-hosted).
+2. Set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (Upstash console → REST API). Set `REDIS_URL` for orchestrator TCP (e.g. `redis://default:TOKEN@....upstash.io:6379`).
 3. Set `LLM_KEY_ENCRYPTION_KEY` (strong secret for BYOK).
 4. Set `REQUIRE_AUTH=true` or leave unset (default: enforced).
 5. Set `CORS_ORIGINS` to production domains.

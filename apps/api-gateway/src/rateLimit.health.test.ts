@@ -1,48 +1,48 @@
 /**
- * Ensures /health and /health/live bypass Redis requirement so probes work when REDIS_URL is unset.
+ * Ensures /health and /health/live bypass Upstash REST requirement so probes work when REST env is unset.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { rateLimitMiddleware } from "./rateLimit.js";
 import type { Response, NextFunction } from "express";
 
+const savedRestUrl = process.env.UPSTASH_REDIS_REST_URL;
+const savedRestToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 const savedNodeEnv = process.env.NODE_ENV;
-const savedRedisUrl = process.env.REDIS_URL;
 
 describe("rateLimitMiddleware health bypass", () => {
   beforeEach(() => {
-    vi.resetModules();
+    delete process.env.UPSTASH_REDIS_REST_URL;
+    delete process.env.UPSTASH_REDIS_REST_TOKEN;
     process.env.NODE_ENV = "production";
-    process.env.REDIS_URL = "";
   });
 
   afterEach(() => {
-    process.env.NODE_ENV = savedNodeEnv;
-    if (savedRedisUrl === undefined) delete process.env.REDIS_URL;
-    else process.env.REDIS_URL = savedRedisUrl;
+    if (savedRestUrl === undefined) delete process.env.UPSTASH_REDIS_REST_URL;
+    else process.env.UPSTASH_REDIS_REST_URL = savedRestUrl;
+    if (savedRestToken === undefined) delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    else process.env.UPSTASH_REDIS_REST_TOKEN = savedRestToken;
+    if (savedNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = savedNodeEnv;
+    vi.restoreAllMocks();
   });
 
-  it("calls next() for /health without Redis in production", async () => {
-    const { rateLimitMiddleware } = await import("./rateLimit.js");
+  it("calls next() for /health without Upstash REST in production", async () => {
     const next = vi.fn() as NextFunction;
-    const res = { status: vi.fn().mockReturnThis(), json: vi.fn() } as unknown as Response;
     await rateLimitMiddleware(
       { path: "/health", requestId: "t1" } as Parameters<typeof rateLimitMiddleware>[0],
-      res,
+      {} as Response,
       next
     );
-    expect(next).toHaveBeenCalled();
-    expect(res.status).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledTimes(1);
   });
 
-  it("calls next() for /health/live without Redis in production", async () => {
-    const { rateLimitMiddleware } = await import("./rateLimit.js");
+  it("calls next() for /health/live without Upstash REST in production", async () => {
     const next = vi.fn() as NextFunction;
-    const res = { status: vi.fn().mockReturnThis(), json: vi.fn() } as unknown as Response;
     await rateLimitMiddleware(
       { path: "/health/live", requestId: "t2" } as Parameters<typeof rateLimitMiddleware>[0],
-      res,
+      {} as Response,
       next
     );
-    expect(next).toHaveBeenCalled();
-    expect(res.status).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledTimes(1);
   });
 });

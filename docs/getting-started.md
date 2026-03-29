@@ -36,7 +36,7 @@ Get HyperAgent running and find help. For detailed usage, see the [user guide](u
    ```bash
    make up
    ```
-   This starts the API gateway (port 4000), orchestrator, agent-runtime, compile, and audit services. Requires `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, and `REDIS_URL` in `.env` for full functionality.
+   This starts the API gateway (port 4000), orchestrator, agent-runtime, compile, and audit services. Requires `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, Upstash REST credentials (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`) for production gateway rate limiting, and `REDIS_URL` (TCP) for orchestrator queue/checkpointer when those features are on.
 
 5. **Start the frontend (Studio)**
    ```bash

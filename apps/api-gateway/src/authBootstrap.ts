@@ -73,11 +73,15 @@ async function verifyThirdwebAuthToken(authToken: string): Promise<string | null
   }
 }
 
+type BootstrapUserResult =
+  | { userId: string }
+  | { error: string; status: number; code?: string };
+
 async function bootstrapUser(
   supabase: SupabaseClient,
   walletAddress: string,
   authProvider: "siwe_eoa" | "thirdweb_inapp"
-): Promise<{ userId: string } | { error: string; status: number }> {
+): Promise<BootstrapUserResult> {
   const walletAddressNorm = walletAddress.toLowerCase();
 
   const { data, error } = await supabase
@@ -94,15 +98,36 @@ async function bootstrapUser(
     .single();
 
   if (error) {
-    debugLog("authBootstrap:upsertError", "wallet_users upsert failed", { msg: error.message });
-    if (isMissingTableError(error.message, (error as { code?: string }).code)) {
-      return { error: "Database schema missing. Run Supabase migrations.", status: 503 };
+    const pgCode = (error as { code?: string }).code;
+    debugLog("authBootstrap:upsertError", "wallet_users upsert failed", {
+      msg: error.message,
+      code: pgCode,
+    });
+    console.error(
+      "[auth-bootstrap] wallet_users upsert failed:",
+      JSON.stringify({ message: error.message, code: pgCode, hint: (error as { hint?: string }).hint })
+    );
+    if (isMissingTableError(error.message, pgCode)) {
+      return {
+        error: "Database schema missing. Run Supabase migrations for wallet_users.",
+        status: 503,
+        code: "SCHEMA_MISSING",
+      };
     }
-    return { error: "Internal Server Error", status: 500 };
+    return {
+      error: "Sign-in could not be completed. Please try again later.",
+      status: 500,
+      code: "WALLET_UPSERT_FAILED",
+    };
   }
 
   if (!data?.id) {
-    return { error: "Internal Server Error", status: 500 };
+    console.error("[auth-bootstrap] wallet_users upsert returned no id (empty row)");
+    return {
+      error: "Sign-in could not be completed. Check gateway logs for database errors.",
+      status: 500,
+      code: "WALLET_UPSERT_NO_ID",
+    };
   }
 
   await ensureWalletUserProvisioned(supabase, data.id);
@@ -227,7 +252,14 @@ export async function authBootstrapHandler(req: Request, res: Response): Promise
   const result = await bootstrapUser(supabase, walletAddress, authProvider);
 
   if ("error" in result) {
-    res.status(result.status).json({ error: "Service Unavailable", message: result.error });
+    const status = result.status;
+    const errorTitle =
+      status === 503 ? "Service Unavailable" : status >= 400 && status < 500 ? "Bad Request" : "Internal Server Error";
+    res.status(status).json({
+      error: errorTitle,
+      message: result.error,
+      ...(result.code ? { code: result.code } : {}),
+    });
     return;
   }
 

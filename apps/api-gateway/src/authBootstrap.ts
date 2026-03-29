@@ -30,13 +30,14 @@ function debugLog(location: string, message: string, data: Record<string, unknow
   }
 }
 
-function isMissingTableError(msg: string | undefined, code?: string): boolean {
+/** True only for undefined table/relation (Postgres 42P01). Do not match on substring "wallet_users": RLS and permission errors mention that table but are not missing-schema. */
+export function isMissingTableError(msg: string | undefined, code?: string): boolean {
+  if (code === "42P01") return true;
   if (!msg) return false;
   const m = msg.toLowerCase();
   return (
-    ((m.includes("relation") || m.includes("table")) && (m.includes("does not exist") || m.includes("doesn't exist"))) ||
-    m.includes("wallet_users") ||
-    code === "42P01"
+    (m.includes("relation") || m.includes("table")) &&
+    (m.includes("does not exist") || m.includes("doesn't exist"))
   );
 }
 

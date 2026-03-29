@@ -1,24 +1,10 @@
-# CI override: adds Redis, uses minimal env. Use with compose -f docker-compose.yml -f docker-compose.ci.yml
+# CI smoke test overlay (no local Redis). Replaces api-gateway `environment` so NODE_ENV is not
+# production; the gateway can start without Upstash REST. Real deploys use docker-compose.yml only.
 services:
-  redis:
-    image: redis:7-alpine
-    container_name: hyperagent-redis-ci
-    networks:
-      - hyperagent
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 3
-
-  orchestrator:
-    depends_on:
-      redis:
-        condition: service_healthy
-    environment:
-      REDIS_URL: redis://redis:6379/0
-
   api-gateway:
-    depends_on:
-      orchestrator:
-        condition: service_healthy
+    environment:
+      - NODE_ENV=test
+      - PORT=4000
+      - ORCHESTRATOR_URL=http://orchestrator:8000
+      - AGENT_RUNTIME_URL=http://agent-runtime:4001
+      - STORAGE_SERVICE_URL=http://storage:4005

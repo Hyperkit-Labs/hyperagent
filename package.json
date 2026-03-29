@@ -26,7 +26,8 @@
     "status": "git status",
     "changes": "git status --porcelain",
     "staged": "git diff --cached --name-only",
-    "db:apply-migrations": "node scripts/apply-supabase-migrations.mjs"
+    "db:apply-migrations": "node scripts/apply-supabase-migrations.mjs",
+    "docs:auth-snapshots": "node scripts/export-auth-snapshots.mjs"
   },
   "keywords": [
     "smart-contracts",

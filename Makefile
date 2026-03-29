@@ -22,10 +22,10 @@ help:
 	@echo "HyperAgent (run from repo root):"
 	@echo ""
 	@echo "Development:"
-	@echo "  make up          - Start lite backend (5-6 services, cloud Supabase + Redis)"
+	@echo "  make up          - Start lite backend (5-6 services, cloud Supabase + Upstash)"
 	@echo "  make up-full     - Start with roma-service, codegen (legacy)"
 	@echo "  make up-tools    - Start with hyperagent-tools (port 9000); set TOOLS_BASE_URL=http://hyperagent-tools:9000 in .env"
-	@echo "  make up-local    - Start full stack with local postgres, redis, vectordb"
+	@echo "  make up-local    - Start full stack with local postgres and vectordb (Upstash from .env)"
 	@echo "  make up-contabo  - Start Contabo production stack (for local testing)"
 	@echo "  make build       - Build Docker images for local dev (run when code changes)"
 	@echo "  make rebuild     - Force rebuild Docker images from scratch"
@@ -78,11 +78,11 @@ rebuild:
 	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) build --no-cache
 	@echo "[+] Docker images rebuilt. Run 'make up' to start."
 
-# Start lite stack (5-6 services). ROMA/codegen in-process. Cloud Supabase + Redis.
+# Start lite stack (5-6 services). ROMA/codegen in-process. Cloud Supabase + Upstash.
 up:
 	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) up -d
 	@echo "[+] Backend up (lite). Gateway: http://localhost:4000  Run Studio: make run-web"
-	@echo "    Requires SUPABASE_URL, REDIS_URL in .env. Stop: make down   Logs: make logs"
+	@echo "    Requires SUPABASE_URL, REDIS_URL (TCP), Upstash REST vars for production gateway. Stop: make down   Logs: make logs"
 
 # Start full stack with roma-service, codegen (legacy).
 up-full:
@@ -95,11 +95,11 @@ up-tools:
 	@echo "[+] Backend up with hyperagent-tools. Gateway: http://localhost:4000  Tools: http://localhost:9000"
 	@echo "    Ensure TOOLS_BASE_URL=http://hyperagent-tools:9000 in .env for compile/audit to use remote tools"
 
-# Start full stack with local postgres, redis, vectordb (heavier).
+# Start full stack with local postgres and vectordb (heavier). Redis protocol via Upstash in .env.
 up-local:
 	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) --profile local-db up -d
 	@echo "[+] Backend up (full local). Gateway: http://localhost:4000"
-	@echo "    Local postgres:54322  redis:6379  vectordb:6333"
+	@echo "    Local postgres:54322  vectordb:6333  REDIS_URL + REST creds in .env"
 
 # Start Contabo production stack (for local testing; Coolify uses infra/docker/docker-compose.yml).
 # Run from repo root with --project-directory . so paths resolve correctly.

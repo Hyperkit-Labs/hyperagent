@@ -1,9 +1,8 @@
 """
-Redis job queue for pipeline. Enqueue workflow runs; worker consumes and executes.
+Redis-protocol job queue for pipeline (Upstash TCP or other). Enqueue workflow runs; worker consumes and executes.
 Keys: queue:hyperagent:pipeline, queue:hyperagent:dead. Set REDIS_URL and QUEUE_ENABLED=1 to enable.
 
-Redis separation: Use REDIS_QUEUE_URL for queue when set (separate from LangGraph checkpoint/cache).
-When not set, falls back to REDIS_URL. LangGraph checkpointer uses REDIS_URL only.
+Queue and checkpointer both use REDIS_URL (same Upstash TCP URL).
 """
 
 from __future__ import annotations
@@ -11,6 +10,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+
+from redis_util import effective_redis_url
 
 logger = logging.getLogger(__name__)
 
@@ -21,14 +22,14 @@ QUEUE_MAX_RETRIES = int(os.environ.get("QUEUE_MAX_RETRIES", "3"))
 
 
 def _get_redis():
-    url = (os.environ.get("REDIS_QUEUE_URL") or os.environ.get("REDIS_URL") or "").strip()
+    url = (os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or "").strip()
     if not url:
         return None
     try:
         import redis
-        return redis.from_url(url, decode_responses=True)
+        return redis.from_url(effective_redis_url(url), decode_responses=True)
     except Exception as e:
-        logger.warning("[queue] Redis unavailable: %s", e)
+        logger.warning("[queue] Upstash unavailable: %s", e)
         return None
 
 

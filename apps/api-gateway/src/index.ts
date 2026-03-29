@@ -14,7 +14,6 @@ config({ path: resolve(__dirname, "../../../.env") });
 import cors from "cors";
 import express from "express";
 import { createProxyMiddleware, responseInterceptor } from "http-proxy-middleware";
-import rateLimit from "express-rate-limit";
 import { requestIdMiddleware, RequestWithId } from "./requestId.js";
 import { otelRequestSpanMiddleware, getTraceparentHeader } from "@hyperagent/backend-middleware";
 import { authMiddleware, RequestWithUser } from "./auth.js";
@@ -84,6 +83,10 @@ const jsonParser = express.json({ limit: "2mb" });
 
 app.use(requestIdMiddleware);
 app.use(otelRequestSpanMiddleware);
+/** Liveness before auth so probes never depend on PUBLIC_PATHS or JWT config. */
+app.get("/health/live", (_req, res) => {
+  res.json({ status: "ok", gateway: true });
+});
 app.use(authMiddleware);
 app.use((req, res, next) => {
   (rateLimitMiddleware as (req: express.Request, res: express.Response, next: express.NextFunction) => Promise<void>)(req, res, next).catch(next);
@@ -137,14 +140,8 @@ function proxyOptions(): Record<string, unknown> {
   };
 }
 
-// Single auth entrypoint: SIWE and thirdweb OAuth/in-app. Both upsert wallet_users and issue session JWT.
-const authBootstrapRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // limit each IP to 20 auth bootstrap requests per windowMs
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.post("/api/v1/auth/bootstrap", authBootstrapRateLimiter, jsonParser, authBootstrapHandler);
+// Single auth entrypoint: SIWE and thirdweb OAuth/in-app. Bootstrap rate limits: rateLimitMiddleware (Upstash) in production.
+app.post("/api/v1/auth/bootstrap", jsonParser, authBootstrapHandler);
 
 // Primary: versioned API (proxied; raw body stream forwarded to orchestrator)
 app.use("/api/v1", createProxyMiddleware(proxyOptions()));
@@ -157,11 +154,6 @@ app.use("/api", createProxyMiddleware(proxyOptions()));
 // OpenAPI docs (Swagger UI) and schema
 app.use("/docs", createProxyMiddleware(proxyOptions()));
 app.use("/openapi.json", createProxyMiddleware(proxyOptions()));
-
-/** Liveness probe: always 200 if the process is up. Use for K8s/Docker liveness checks. */
-app.get("/health/live", (_req, res) => {
-  res.json({ status: "ok", gateway: true });
-});
 
 /**
  * Dependency-aware health: HTTP 503 only when sign-in cannot work (same gates as auth bootstrap).

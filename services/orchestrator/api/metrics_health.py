@@ -28,6 +28,7 @@ from store import count_workflows
 import credits_supabase
 
 from observability import p95_latency_ms
+from redis_util import effective_redis_url
 
 logger = logging.getLogger(__name__)
 
@@ -58,13 +59,13 @@ def _check_supabase_health() -> dict[str, Any]:
 
 
 def _check_redis_health() -> dict[str, Any]:
-    """Ping Redis when REDIS_URL is set."""
-    url = (os.environ.get("REDIS_URL") or "").strip()
+    """Ping Redis TCP (e.g. Upstash) when REDIS_URL is set."""
+    url = (os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or "").strip()
     if not url or url.startswith("#"):
         return {"status": "not_configured"}
     try:
         from redis import Redis
-        r = Redis.from_url(url)
+        r = Redis.from_url(effective_redis_url(url))
         r.ping()
         return {"status": "ok"}
     except ImportError:
@@ -157,7 +158,7 @@ def _root_health_critical_ok() -> tuple[bool, dict[str, Any]]:
     supabase = _check_supabase_health()
     redis = _check_redis_health()
     queue_enabled = os.environ.get("QUEUE_ENABLED", "").strip() in ("1", "true", "yes")
-    redis_url = (os.environ.get("REDIS_URL") or "").strip()
+    redis_url = (os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or "").strip()
     redis_configured = bool(redis_url and not redis_url.startswith("#"))
     db_ok = supabase.get("status") in ("ok", "not_configured")
     redis_ok = redis.get("status") == "ok" if (queue_enabled and redis_configured) else True
@@ -186,6 +187,7 @@ def health():
     if startup_bad:
         from fastapi.responses import JSONResponse
 
+        logger.warning("[health] GET /health startup_env_missing: %s", startup_missing)
         return JSONResponse(
             status_code=503,
             content={
@@ -198,6 +200,12 @@ def health():
     if not critical_ok:
         from fastapi.responses import JSONResponse
 
+        logger.warning(
+            "[health] GET /health not critical_ok: supabase=%s redis=%s queue_enabled=%s",
+            payload.get("supabase"),
+            payload.get("redis"),
+            payload.get("queue_enabled"),
+        )
         return JSONResponse(status_code=503, content={"status": "degraded", **payload})
     return {"status": "ok", **payload}
 

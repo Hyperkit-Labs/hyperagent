@@ -1,13 +1,13 @@
 # Local development stack. Run from repo root: docker compose -f infra/docker/docker-compose.local.yml up
 # Use: make up (Makefile points here)
 #
-# LITE (default): 5-6 services. ROMA/codegen in-process. Cloud Supabase + Redis.
+# LITE (default): 5-6 services. ROMA/codegen in-process. Cloud Supabase + REDIS_URL (TCP) + Upstash REST for gateway when production-like.
 #   make up
 #
 # FULL: All services including roma-service, codegen (legacy).
 #   make up-full
 #
-# FULL LOCAL: Include local postgres, redis, vectordb (heavier).
+# FULL LOCAL: Include local postgres and vectordb (heavier). Redis is Upstash-only (no local redis container).
 #   make up-local
 #
 # REMOTE TOOLS: Set TOOLS_BASE_URL to use remote hyperagent-tools (Contabo/Coolify or fly.io).
@@ -256,23 +256,6 @@ services:
       timeout: 5s
       retries: 5
 
-  redis:
-    image: redis:7-alpine
-    container_name: hyperagent-redis
-    profiles:
-      - local-db
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - hyperagent
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   vectordb:
     image: qdrant/qdrant:latest
     container_name: hyperagent-vectordb
@@ -292,5 +275,4 @@ networks:
 
 volumes:
   supabase_data:
-  redis_data:
   qdrant_data:

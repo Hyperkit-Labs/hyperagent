@@ -356,7 +356,7 @@ def workflows_generate(
         if _queue.QUEUE_ENABLED:
             raise HTTPException(
                 status_code=503,
-                detail="Pipeline queue unavailable. Set REDIS_URL and ensure Redis is running. Worker must consume jobs.",
+                detail="Pipeline queue unavailable. Set REDIS_URL and ensure the worker is consuming jobs.",
             )
         raise HTTPException(
             status_code=503,

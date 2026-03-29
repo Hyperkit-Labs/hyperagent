@@ -226,7 +226,9 @@ def _get_checkpointer():
     """Return Redis-backed checkpointer if REDIS_URL is set, else MemorySaver."""
     import os
 
-    redis_url = (os.environ.get("REDIS_URL") or "").strip()
+    from redis_util import effective_redis_url
+
+    redis_url = effective_redis_url((os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or "").strip())
     if redis_url:
         try:
             from langgraph.checkpoint.redis import RedisSaver

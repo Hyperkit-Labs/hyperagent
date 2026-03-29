@@ -4,8 +4,7 @@
  * Production: set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN from the Upstash console.
  * TCP redis:// / rediss:// (REDIS_URL) is for orchestrator/workers only, not this middleware.
  *
- * POST /api/v1/auth/bootstrap skips the Upstash tier when NODE_ENV !== "production"
- * (express-rate-limit on that route still applies).
+ * POST /api/v1/auth/bootstrap skips the Upstash tier when NODE_ENV !== "production".
  */
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";

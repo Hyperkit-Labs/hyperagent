@@ -157,16 +157,6 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-      
-      redis:
-        image: redis:7-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
     
     steps:
       - uses: actions/checkout@v4
@@ -191,7 +181,6 @@ jobs:
         run: |
           pytest tests/ -v --ignore=tests/integration/docker/
         env:
-          REDIS_URL: redis://localhost:6379/0
           DATABASE_URL: postgresql://test_user:test_password@localhost:5432/hyperagent_test
           ENVIRONMENT: test
 
@@ -299,16 +288,6 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-      
-      redis:
-        image: redis:7-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
     
     steps:
       - uses: actions/checkout@v4
@@ -333,7 +312,6 @@ jobs:
         run: |
           pytest tests/ -v --ignore=tests/integration/docker/
         env:
-          REDIS_URL: redis://localhost:6379/0
           DATABASE_URL: postgresql://test_user:test_password@localhost:5432/hyperagent_test
           ENVIRONMENT: test
 
@@ -462,11 +440,12 @@ jobs:
       
       - name: Create minimal .env for CI
         run: |
-          # CI-only: minimal env for Docker smoke test. Orchestrator is not in production mode
-          # (no NODE_ENV/RENDER/ENVIRONMENT), so strict production checks do not run.
-          # For real integration tests, use GitHub secrets (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY).
-          cat > .env << 'EOF'
-          REDIS_URL=redis://localhost:6379/0
+          # CI-only: minimal env for Docker smoke test. docker-compose.ci.yml sets api-gateway NODE_ENV=test
+          # so Upstash REST is not required for gateway startup. Optional secrets: UPSTASH_REDIS_CI_REST_* for stricter smoke.
+          cat > .env << EOF
+          UPSTASH_REDIS_REST_URL=${{ secrets.UPSTASH_REDIS_CI_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN=${{ secrets.UPSTASH_REDIS_CI_REST_TOKEN }}
+          REDIS_URL=${{ secrets.UPSTASH_REDIS_CI_URL }}
           SUPABASE_URL=https://ci-test.supabase.co
           SUPABASE_SERVICE_ROLE_KEY=ci-test-key-do-not-use-in-production
           EOF

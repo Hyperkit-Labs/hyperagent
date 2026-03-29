@@ -35,6 +35,14 @@ describe("isMissingTableError", () => {
     ).toBe(false);
     expect(isMissingTableError("permission denied for table wallet_users", undefined)).toBe(false);
   });
+
+  it("is true when Postgres code is 42P01", () => {
+    expect(isMissingTableError("relation missing", "42P01")).toBe(true);
+  });
+
+  it("is false for undefined message and code", () => {
+    expect(isMissingTableError(undefined, undefined)).toBe(false);
+  });
 });
 
 describe("authBootstrapHandler", () => {

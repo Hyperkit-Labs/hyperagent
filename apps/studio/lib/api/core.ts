@@ -126,12 +126,14 @@ export function reportApiError(error: unknown, context: { path?: string; [key: s
 
 export interface FetchJsonOptions extends RequestInit {
   timeoutMs?: number;
+  /** When true, do not invoke global on401Callback (e.g. SessionProvider handles /config failures). */
+  suppressOn401?: boolean;
 }
 
 let _apiBaseLogged = false;
 
 export async function fetchJson<T>(path: string, options?: FetchJsonOptions): Promise<T> {
-  const { timeoutMs, ...init } = options ?? {};
+  const { timeoutMs, suppressOn401, ...init } = options ?? {};
   const timeout = timeoutMs ?? API_REQUEST_TIMEOUT_MS;
   const maxRetries = 3;
   const retryDelay = 1000;
@@ -168,7 +170,7 @@ export async function fetchJson<T>(path: string, options?: FetchJsonOptions): Pr
         headers: {
           ...authHeaders,
           'Content-Type': 'application/json',
-          ...(options?.headers as Record<string, string>),
+          ...(init.headers as Record<string, string>),
         },
       });
 
@@ -209,7 +211,7 @@ export async function fetchJson<T>(path: string, options?: FetchJsonOptions): Pr
           console.warn(`[API] ${path} → ${res.status}`, message.slice(0, 80));
         }
         if (res.status >= 400 && res.status < 500 && res.status !== 408) {
-          if (res.status === 401 && on401Callback) {
+          if (res.status === 401 && on401Callback && !suppressOn401) {
             try {
               on401Callback();
             } catch {

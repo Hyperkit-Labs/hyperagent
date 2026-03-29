@@ -12,25 +12,9 @@
 #   - Disable Git submodules and LFS in Advanced > Git (Coolify #4746)
 #   - Set env vars in Shared Env
 #
-# External: Supabase (DB). Redis runs locally (colocated) for rate limit + LangGraph checkpointer.
-# Set REDIS_URL=redis://redis:6379 for local Redis. Use managed Redis (rediss://) when scaling to multi-node.
+# External: Supabase (DB). Gateway: Upstash REST in .env. Orchestrator TCP: REDIS_URL (e.g. Upstash redis:// / rediss://).
 
 services:
-  redis:
-    image: redis:7-alpine
-    container_name: hyperagent-redis
-    restart: unless-stopped
-    volumes:
-      - redis_data:/data
-    networks:
-      - hyperagent
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    # Internal only; no ports exposed to host. Use redis://redis:6379 from other services.
-
   api-gateway:
     build:
       context: .
@@ -44,19 +28,17 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=4000
-      - REDIS_URL=redis://redis:6379
       - ORCHESTRATOR_URL=http://orchestrator:8000
       - AGENT_RUNTIME_URL=http://agent-runtime:4001
       - STORAGE_SERVICE_URL=http://storage:4005
     depends_on:
-      redis:
-        condition: service_healthy
       orchestrator:
         condition: service_healthy
     networks:
       - hyperagent
+    # Liveness only: full /health calls Supabase + orchestrator and can flap when upstreams are slow.
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:4000/health"]
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:4000/health/live"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -72,7 +54,6 @@ services:
       - .env
     environment:
       - PYTHONUNBUFFERED=1
-      - REDIS_URL=redis://redis:6379
       - REGISTRIES_PATH=/app/services/orchestrator/registries
       - AGENT_RUNTIME_URL=http://agent-runtime:4001
       - COMPILE_SERVICE_URL=http://compile:8004
@@ -93,8 +74,6 @@ services:
       retries: 5
       start_period: 60s
     depends_on:
-      redis:
-        condition: service_healthy
       agent-runtime:
         condition: service_healthy
       simulation:
@@ -344,5 +323,3 @@ volumes:
     name: hyperagent_sandbox-data
   qdrant_data:
     name: hyperagent_qdrant-data
-  redis_data:
-    name: hyperagent_redis-data

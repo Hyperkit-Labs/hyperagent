@@ -49,7 +49,7 @@ export async function getConfig(): Promise<RuntimeConfig> {
 }
 
 export async function fetchConfigStrict(): Promise<RuntimeConfig> {
-  return fetchJson<RuntimeConfig>('/config');
+  return fetchJson<RuntimeConfig>('/config', { suppressOn401: true });
 }
 
 export async function getConfiguredLLMProviders(

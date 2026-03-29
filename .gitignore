@@ -237,6 +237,7 @@ lerna-debug.log*
 out/
 .nuxt/
 .cache/
+**/.vitest-cache/
 .parcel-cache/
 .vuepress/dist/
 .serverless/
@@ -529,3 +530,4 @@ infra/k8s/overlays/*/secrets/*.yaml
 
 ./github/issues/*
 ./github/pr-bodies/*
+.cursor/mcp.json

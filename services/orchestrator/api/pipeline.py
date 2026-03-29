@@ -359,8 +359,8 @@ def workflows_generate(
                 detail="Pipeline queue unavailable. Set REDIS_URL and ensure the worker is consuming jobs.",
             )
         raise HTTPException(
-            status_code=503,
-            detail="Pipeline requires queue. Set QUEUE_ENABLED=1 and REDIS_URL. Run worker: python -m worker",
+            status_code=501,
+            detail="Pipeline queue not configured. Set QUEUE_ENABLED=1 and REDIS_URL. Run worker: python -m worker",
         )
     logger.info("[generate] queued pipeline job workflow_id=%s", workflow_id)
     return {"workflow_id": workflow_id, "status": "running"}

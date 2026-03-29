@@ -108,6 +108,7 @@ def assert_workflow_owner(w: dict[str, Any], request: Request) -> None:
     """Raise 403 if authenticated user does not own the workflow.
     Checks both user_id and wallet_user_id for backward compatibility
     during the identity column migration period."""
+    # Remove wallet_user_id fallback once all workflows store owner as wallet_users.id in user_id.
     caller = get_caller_id(request)
     owner = w.get("user_id") or ""
     wallet_owner = w.get("wallet_user_id") or ""

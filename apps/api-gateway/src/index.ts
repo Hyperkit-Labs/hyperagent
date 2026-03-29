@@ -1,7 +1,7 @@
 /**
  * HyperAgent API Gateway
  * Versioned proxy /api/v1 to orchestrator; legacy /run, /runs.
- * Required: JWT auth (AUTH_JWT_SECRET), Redis rate limit (REDIS_URL). Security is mandatory.
+ * Required: JWT auth (AUTH_JWT_SECRET), Upstash REST rate limit (UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN). Security is mandatory.
  */
 import { config } from "dotenv";
 import { dirname, resolve } from "path";
@@ -18,19 +18,19 @@ import rateLimit from "express-rate-limit";
 import { requestIdMiddleware, RequestWithId } from "./requestId.js";
 import { otelRequestSpanMiddleware, getTraceparentHeader } from "@hyperagent/backend-middleware";
 import { authMiddleware, RequestWithUser } from "./auth.js";
-import { rateLimitMiddleware } from "./rateLimit.js";
+import { rateLimitMiddleware, hasRestRateLimitEnv } from "./rateLimit.js";
 import { authBootstrapHandler, getSupabaseAdmin } from "./authBootstrap.js";
 
 const ORCHESTRATOR_URL = process.env.ORCHESTRATOR_URL || "http://localhost:8000";
 const NODE_ENV = process.env.NODE_ENV || "development";
-const REDIS_URL = process.env.REDIS_URL;
-
 /** Upstream timeout (ms). If orchestrator does not respond, gateway returns 502 instead of hanging.
  * Default 25s kills SSE during long builds. Set PROXY_TIMEOUT_MS=660000 for real-time terminal (10+ min). */
 const PROXY_TIMEOUT_MS = Number(process.env.PROXY_TIMEOUT_MS) || 25_000;
 
-if (NODE_ENV === "production" && !REDIS_URL) {
-  console.error("[API Gateway] Production requires REDIS_URL for rate limiting. Set REDIS_URL or start will be refused.");
+if (NODE_ENV === "production" && !hasRestRateLimitEnv()) {
+  console.error(
+    "[API Gateway] Production requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN for rate limiting (Upstash REST). Copy them from the Upstash console."
+  );
   process.exit(1);
 }
 
@@ -164,8 +164,10 @@ app.get("/health/live", (_req, res) => {
 });
 
 /**
- * Dependency-aware health: must match what POST /api/v1/auth/bootstrap needs.
- * Previously orchestrator-only could pass while bootstrap returned 503 (no Supabase/JWT), misleading the login page.
+ * Dependency-aware health: HTTP 503 only when sign-in cannot work (same gates as auth bootstrap).
+ * Orchestrator failures use JSON status "degraded" with HTTP 200 so probes and the login page
+ * stay green when the gateway + DB + JWT are fine; orchestrator often returns 503 for its own
+ * Redis/queue/Supabase while the process is still reachable (see GET /health vs /health/live there).
  */
 app.get("/health", async (_req, res) => {
   const authJwtConfigured = Boolean(process.env.AUTH_JWT_SECRET);
@@ -185,57 +187,76 @@ app.get("/health", async (_req, res) => {
   /** Same gates as authBootstrapHandler before issuing a session. */
   const authSigninReady = authJwtConfigured && Boolean(supabase) && dbOk;
 
-  let orchestratorOk = false;
-  try {
+  const orchBase = ORCHESTRATOR_URL.replace(/\/$/, "");
+
+  async function fetchOrch(path: string, ms: number): Promise<Response | null> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
-    const r = await fetch(`${ORCHESTRATOR_URL.replace(/\/$/, "")}/health`, {
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-    orchestratorOk = r.ok;
-  } catch {
-    orchestratorOk = false;
+    const timeout = setTimeout(() => controller.abort(), ms);
+    try {
+      const r = await fetch(`${orchBase}${path}`, { signal: controller.signal });
+      clearTimeout(timeout);
+      return r;
+    } catch {
+      clearTimeout(timeout);
+      return null;
+    }
   }
 
-  const criticalOk = orchestratorOk && authSigninReady;
-  if (!criticalOk) {
+  const [rLive, rHealth] = await Promise.all([
+    fetchOrch("/health/live", 2000),
+    fetchOrch("/health", 3000),
+  ]);
+
+  const orchestratorOk = rHealth !== null && rHealth.ok;
+  /** Any TCP/HTTP response from orchestrator (including 503 on /health) counts as reachable. */
+  const orchestratorReachable =
+    (rLive !== null && rLive.ok) || rHealth !== null;
+
+  const basePayload = {
+    gateway: true,
+    orchestrator_ok: orchestratorOk,
+    orchestrator_reachable: orchestratorReachable,
+    auth_jwt_configured: authJwtConfigured,
+    thirdweb_secret_configured: thirdwebSecretConfigured,
+    supabase_configured: Boolean(supabase),
+    db_connected: dbOk,
+    db_error: dbError,
+    auth_signin_ready: authSigninReady,
+  };
+
+  if (!authSigninReady) {
     let msg: string;
-    if (!orchestratorOk) {
-      msg = "Orchestrator unreachable. Check ORCHESTRATOR_URL and backend status.";
-    } else if (!authJwtConfigured) {
+    if (!authJwtConfigured) {
       msg = "Auth not configured (AUTH_JWT_SECRET missing). Sign-in unavailable.";
     } else if (!supabase) {
       msg = "Supabase not configured. Sign-in unavailable.";
     } else if (!dbOk) {
       msg = `Database unreachable. ${dbError ?? "Check Supabase credentials and migrations."}`;
     } else {
-      msg = "Service degraded.";
+      msg = "Sign-in not ready.";
     }
     res.status(503).json({
       status: "degraded",
-      gateway: true,
-      orchestrator_ok: orchestratorOk,
-      auth_jwt_configured: authJwtConfigured,
-      thirdweb_secret_configured: thirdwebSecretConfigured,
-      supabase_configured: Boolean(supabase),
-      db_connected: dbOk,
-      db_error: dbError,
-      auth_signin_ready: authSigninReady,
+      ...basePayload,
       message: msg,
     });
     return;
   }
 
-  res.json({
-    status: "ok",
-    gateway: true,
-    orchestrator_ok: true,
-    auth_jwt_configured: true,
-    thirdweb_secret_configured: thirdwebSecretConfigured,
-    supabase_configured: true,
-    db_connected: true,
-    auth_signin_ready: true,
+  const overallStatus = orchestratorOk ? "ok" : "degraded";
+  let message: string | undefined;
+  if (!orchestratorReachable) {
+    message =
+      "Orchestrator unreachable (no response from /health or /health/live). Check ORCHESTRATOR_URL and that the orchestrator service is running. Workflows will fail until it is reachable.";
+  } else if (!orchestratorOk) {
+    message =
+      "Orchestrator is reachable but GET /health is not OK (often Redis, Supabase, or queue config on the orchestrator). Sign-in works; pipeline runs may fail until orchestrator /health is healthy.";
+  }
+
+  res.status(200).json({
+    status: overallStatus,
+    ...basePayload,
+    ...(message ? { message } : {}),
   });
 });
 

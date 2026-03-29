@@ -2,7 +2,7 @@
 """
 Pipeline worker: consumes queue:hyperagent:pipeline, runs pipeline via workflow.run_pipeline.
 Retries on failure up to QUEUE_MAX_RETRIES; sends to dead-letter queue when exhausted.
-Set QUEUE_ENABLED=1 and REDIS_URL. Run as separate process/container.
+Set QUEUE_ENABLED=1 and REDIS_URL (TCP, e.g. Upstash). Run as separate process/container.
 """
 
 import asyncio

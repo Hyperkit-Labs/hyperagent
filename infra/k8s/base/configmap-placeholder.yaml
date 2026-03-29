@@ -16,4 +16,4 @@ data: {}
 ---
 # Secrets are not committed. Create api-gateway-secrets and orchestrator-secrets
 # in the namespace (e.g. from external secrets or CI) with keys such as
-# SUPABASE_URL, SUPABASE_ANON_KEY, REDIS_URL, JWT_SECRET_KEY, etc.
+# SUPABASE_URL, SUPABASE_ANON_KEY, UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN, REDIS_URL, JWT_SECRET_KEY, etc.

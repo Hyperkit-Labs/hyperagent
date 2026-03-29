@@ -96,6 +96,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [isReady, setIsReady] = useState(false);
   const bootstrapAttempted = useRef(false);
   const bootstrapInFlight = useRef(false);
+  /** After 401/503 config failure, block re-bootstrap until a new session is stored (prevents clear → SESSION_CHANGE → retry loops). */
+  const bootstrapFailed = useRef(false);
 
   const runBootstrap = useCallback(async () => {
     if (!isProtectedPath(pathname ?? '')) {
@@ -117,6 +119,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const status = (err as ApiErrorWithStatus)?.status;
       logAuth('fetchConfigStrict failed status=', status, 'err=', (err as Error)?.message);
       if (status === 401 || status === 503) {
+        bootstrapFailed.current = true;
         clearStoredSession();
         setBootstrapStatus('failed');
         logAuth('redirectToLoginWithNext (401/503) pathname=', pathname, 'window.pathname=', typeof window !== 'undefined' ? window.location.pathname : 'ssr');
@@ -131,6 +134,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const recheckBootstrap = useCallback(async () => {
     bootstrapAttempted.current = false;
+    bootstrapFailed.current = false;
     await runBootstrap();
   }, [runBootstrap]);
 
@@ -146,6 +150,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const handler = () => {
       const session = getStoredSession();
       const next = Boolean(session);
+      if (next) {
+        bootstrapFailed.current = false;
+      }
       logAuth('SESSION_CHANGE_EVENT hasSession=', next, '(login completed or cleared)');
       setHasSession(next);
     };
@@ -165,6 +172,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setBootstrapStatus('failed');
       logAuth('redirectToLoginWithNext (!hasSession) pathname=', pathname, 'window.pathname=', typeof window !== 'undefined' ? window.location.pathname : 'ssr');
       redirectToLoginWithNext();
+      return;
+    }
+    if (bootstrapFailed.current) {
+      logAuth('bootstrap skipped (bootstrapFailed after auth/config failure)');
       return;
     }
     if (bootstrapAttempted.current) return;

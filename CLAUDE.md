@@ -47,7 +47,7 @@ HyperAgent is an AI-powered smart contract development platform that transforms 
 - **Language**: Python 3.11+
 - **Framework**: FastAPI 0.100+
 - **Orchestration**: LangGraph for agent workflows
-- **Queue**: Redis for worker pools
+- **Queue**: Upstash (Redis protocol) for worker pools and rate limits
 - **Database**: Supabase (PostgreSQL) with RLS
 - **Vector DB**: Pinecone for RAG
 - **Memory**: Acontext for long-term agent memory
@@ -200,8 +200,8 @@ configs/
 ## Environment Configuration
 
 ### Development
-- Use `.env` for environment-specific config; production uses cloud DB (Supabase) and Redis (Redis Cloud or container)
-- Docker Compose for backend stack (cloud config via DATABASE_URL, REDIS_URL)
+- Use `.env` for environment-specific config; production uses cloud DB (Supabase), Upstash REST for gateway rate limits (`UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`), and `REDIS_URL` TCP for orchestrator queue/checkpointer
+- Docker Compose for backend stack (cloud config via Supabase env vars and the Redis/Upstash variables above)
 - K8s overlays for development environment
 
 ### Staging

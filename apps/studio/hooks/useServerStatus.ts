@@ -3,9 +3,28 @@
 import { useState, useEffect } from 'react';
 import { getApiBase } from '@/lib/api';
 
-export type ServerStatus = 'up' | 'down' | 'loading';
+/** up = sign-in ready; signin_unavailable = gateway reachable but auth prereqs fail; down = unreachable or unexpected response */
+export type ServerStatus = 'up' | 'down' | 'signin_unavailable' | 'loading';
 
-/** Simple server status from /health (no auth). Used on login page. */
+type HealthBody = {
+  status?: string;
+  auth_signin_ready?: boolean;
+};
+
+function interpretHealthResponse(res: Response, data: HealthBody): ServerStatus {
+  if (res.ok && res.status === 200) {
+    const ready =
+      data.auth_signin_ready === true &&
+      (data.status === 'ok' || data.status === 'degraded');
+    if (ready) return 'up';
+    if (data.auth_signin_ready === false) return 'signin_unavailable';
+    return 'down';
+  }
+  if (data.auth_signin_ready === false) return 'signin_unavailable';
+  return 'down';
+}
+
+/** Gateway /health (no auth). Distinguishes sign-in readiness from total outage. */
 export function useServerStatus(pollIntervalMs = 30_000) {
   const [status, setStatus] = useState<ServerStatus>('loading');
 
@@ -21,24 +40,14 @@ export function useServerStatus(pollIntervalMs = 30_000) {
           signal: AbortSignal.timeout(5000),
         });
         if (!isMounted) return;
-        const ok = res.ok && res.status === 200;
-        let bodyOk = false;
-        if (ok) {
-          try {
-            const data = (await res.json()) as {
-              status?: string;
-              /** Gateway /health: aligned with POST /api/v1/auth/bootstrap readiness */
-              auth_signin_ready?: boolean;
-            };
-            /** 200 + auth_signin_ready: sign-in works even when status is degraded (orchestrator down). */
-            bodyOk =
-              data?.auth_signin_ready === true &&
-              (data?.status === 'ok' || data?.status === 'degraded');
-          } catch {
-            bodyOk = false;
-          }
+        const text = await res.text();
+        let data: HealthBody = {};
+        try {
+          data = text ? (JSON.parse(text) as HealthBody) : {};
+        } catch {
+          data = {};
         }
-        setStatus(bodyOk ? 'up' : 'down');
+        setStatus(interpretHealthResponse(res, data));
       } catch {
         if (isMounted) setStatus('down');
       }

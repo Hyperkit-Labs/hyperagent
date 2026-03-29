@@ -101,8 +101,13 @@ function getRedisRest(): Redis | null {
 
 const limiterCache = new Map<string, Ratelimit>();
 
+/** @upstash/ratelimit fixedWindow expects a Duration template (e.g. "60 s"), not a plain string. */
+function durationSeconds(seconds: number): `${number} s` {
+  return `${seconds} s` as `${number} s`;
+}
+
 function getLimiter(redis: Redis, max: number, windowSeconds: number, name: string): Ratelimit {
-  const windowLabel = `${windowSeconds} s`;
+  const windowLabel = durationSeconds(windowSeconds);
   const key = `${name}:${max}:${windowLabel}`;
   let lim = limiterCache.get(key);
   if (!lim) {

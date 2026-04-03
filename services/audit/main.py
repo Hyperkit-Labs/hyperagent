@@ -24,6 +24,14 @@ except ImportError:
 TOOLS_BASE_URL = (os.environ.get("TOOLS_BASE_URL") or "").rstrip("/")
 TOOLS_API_KEY = os.environ.get("TOOLS_API_KEY", "")
 
+
+def _assert_within(base: Path, target: Path) -> Path:
+    """Resolve *target* and verify it stays inside *base*. Raises HTTPException on escape."""
+    resolved = target.resolve()
+    if not resolved.is_relative_to(base.resolve()):
+        raise HTTPException(status_code=400, detail="Path escapes workspace boundary")
+    return resolved
+
 app = FastAPI(title="HyperAgent Audit Service", version="0.1.0")
 
 
@@ -95,7 +103,7 @@ def _run_slither_impl(workdir: Path, contract_name: str, code: str, detectors: s
     src.mkdir(parents=True, exist_ok=True)
     if "pragma solidity" not in code.strip().lower():
         code = "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n" + code
-    (src / f"{contract_name}.sol").write_text(code)
+    _assert_within(workdir, src / f"{contract_name}.sol").write_text(code)
     (workdir / "foundry.toml").write_text('[profile.default]\nsolc = "0.8.24"\n')
     cmd = ["slither", str(src), "--json", "-"]
     if detectors:
@@ -132,7 +140,7 @@ def _run_mythril(workdir: Path, contract_name: str, code: str) -> list[dict]:
     src.mkdir(parents=True, exist_ok=True)
     if "pragma solidity" not in code.strip().lower():
         code = "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n" + code
-    (src / f"{contract_name}.sol").write_text(code)
+    _assert_within(workdir, src / f"{contract_name}.sol").write_text(code)
     try:
         result = subprocess.run(
             ["myth", "analyze", str(src / f"{contract_name}.sol"), "-o", "json"],
@@ -253,7 +261,7 @@ def _run_echidna(workdir: Path, contract_name: str, code: str) -> list[dict]:
     src.mkdir(parents=True, exist_ok=True)
     if "pragma solidity" not in code.strip().lower():
         code = "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n" + code
-    (src / f"{contract_name}.sol").write_text(code)
+    _assert_within(workdir, src / f"{contract_name}.sol").write_text(code)
     (workdir / "foundry.toml").write_text('[profile.default]\nsolc = "0.8.24"\n')
     harness_code = harness_file.read_text()
     if contract_name not in harness_code:

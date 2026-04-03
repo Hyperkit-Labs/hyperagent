@@ -5,7 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useActiveAccountFromContext } from "@/components/providers/ActiveAccountContext";
 import { useAppChat, hasActiveByokKey } from "@/hooks/useAppChat";
 import { useWorkflowProgress } from "@/hooks/useWorkflowProgress";
-import { createWorkflow, DEFAULT_NETWORK, getErrorMessage, handleApiError, requireLLMKeys, LLM_KEYS_REQUIRED_MESSAGE, isByokStorageOrMigrationError, BYOK_SAVE_AGAIN_HINT, isCreditsError } from "@/lib/api";
+import { createWorkflow, DEFAULT_NETWORK, getErrorMessage, requireLLMKeys, LLM_KEYS_REQUIRED_MESSAGE, isByokStorageOrMigrationError, BYOK_SAVE_AGAIN_HINT, isCreditsError } from "@/lib/api";
+import { workflowCreateFailureMessage } from "@/lib/sadPathCopy";
+import {
+  clearHomeWorkflowDraft,
+  loadHomeWorkflowDraft,
+  saveHomeWorkflowDraft,
+} from "@/lib/workflowDraftStorage";
 import { getSessionOnlyLLMKey, SESSION_LLM_PASS_THROUGH_UPDATED_EVENT } from "@/lib/session-store";
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
 import { StarterGrid } from "@/components/chat/StarterGrid";
@@ -260,8 +266,28 @@ function ChatPageContent() {
       prefillAppliedRef.current = true;
       const decoded = decodeURIComponent(templateId);
       setInput(decoded ? `Build a ${decoded.replace(/-/g, " ")}` : "");
+      return;
     }
-  }, [searchParams, setInput]);
+    const draft = loadHomeWorkflowDraft();
+    if (draft?.input?.trim()) {
+      prefillAppliedRef.current = true;
+      setInput(draft.input);
+      if (draft.networkId?.trim()) {
+        setBuildNetwork(draft.networkId);
+      }
+    }
+  }, [searchParams, setInput, setBuildNetwork]);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      if (!input.trim()) {
+        clearHomeWorkflowDraft();
+        return;
+      }
+      saveHomeWorkflowDraft({ input, networkId: buildNetwork || null });
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [input, buildNetwork]);
 
   useEffect(() => {
     const workflowIdFromMessage = sdkMessages
@@ -362,6 +388,7 @@ function ChatPageContent() {
         network: networkId,
       };
       const { workflow_id } = await createWorkflow(body);
+      clearHomeWorkflowDraft();
       setSelectedWorkflowId(workflow_id);
       setSystemMessages((prev) => [
         ...prev,
@@ -375,7 +402,12 @@ function ChatPageContent() {
       router.replace(`${ROUTES.HOME}?workflow=${workflow_id}`, { scroll: false });
     } catch (e) {
       lastCreateErrorRef.current = e;
-      setCreateError(handleApiError(e));
+      const msg = getErrorMessage(e);
+      if (isByokStorageOrMigrationError(msg)) {
+        setCreateError(`${msg} ${BYOK_SAVE_AGAIN_HINT}`.trim());
+      } else {
+        setCreateError(workflowCreateFailureMessage(e));
+      }
     } finally {
       setCreatingWorkflow(false);
     }

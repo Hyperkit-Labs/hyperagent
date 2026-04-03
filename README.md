@@ -101,16 +101,14 @@ HyperAgent is an AI-powered multi-agent platform that turns natural-language spe
 5. **Backend (optional)**  
    If a backend is provided (e.g. API + Docker), follow its run instructions so the API is available at the URL set in `NEXT_PUBLIC_API_URL`. The web app calls that URL for workflows and data.
 
-For full setup and usage, see [Getting started](docs/getting-started.md) and [Developer guide](docs/developer-guide.md).
+For full setup and usage, see [Getting started](docs/getting-started.md) and the [Contributor guide](docs/developer-guide.md).
 
 ## Documentation
 
-- [Docs index](docs/README.md) – Onboarding, users, and developers.
+- [Docs index](docs/README.md) – Onboarding, Studio usage, and contributor references.
 - [Getting started](docs/getting-started.md) – First-time setup and run locally.
-- [User guide](docs/user-guide.md) – How to use HyperAgent Studio (connect, BYOK, run workflows).
-- [Developer guide](docs/developer-guide.md) – Repo structure, local setup, contributing.
-- [Platform Blueprint](external/docs/detailed/draft.md) – Full specification (SOA, A2A, ERC-8004, pipeline, registries).
-- [Project Details](external/docs/detailed/Project%20Details.md) – Goals, architecture, tech stack, roadmap.
+- [Studio guide](docs/user-guide.md) – HyperAgent Studio (connect, BYOK, run workflows).
+- [Contributor guide](docs/developer-guide.md) – Repository layout, local setup, contributing.
 
 ## Contributing
 

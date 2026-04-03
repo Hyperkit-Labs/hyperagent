@@ -222,7 +222,8 @@ def consume(
     metadata: dict[str, Any] | None = None,
 ) -> tuple[bool, float]:
     """Deduct credits for a workflow step or agent action. Returns (success, balance_after).
-    Uses atomic consume_credits RPC when available to prevent double-spend under concurrency."""
+    Uses atomic consume_credits RPC when available to prevent double-spend under concurrency.
+    """
     if not user_id or not is_configured() or amount <= 0:
         return False, 0.0
     client = _client()
@@ -391,7 +392,9 @@ def refund(
             if attempt < 2:
                 time.sleep(0.1 * (attempt + 1))
 
-    return _refund_fallback(user_id, amount, original_reference_id, reason, refund_metadata)
+    return _refund_fallback(
+        user_id, amount, original_reference_id, reason, refund_metadata
+    )
 
 
 def _refund_fallback(

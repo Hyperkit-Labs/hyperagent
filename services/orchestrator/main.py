@@ -97,7 +97,9 @@ def _validate_critical_services() -> None:
 
     if _is_production():
         missing: list[str] = []
-        redis_url = (os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or "").strip()
+        redis_url = (
+            os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or ""
+        ).strip()
         if not redis_url:
             missing.append("REDIS_URL")
         pinata_jwt = os.environ.get("PINATA_JWT", "").strip()
@@ -111,7 +113,11 @@ def _validate_critical_services() -> None:
         if missing:
             _startup_degraded = True
             _startup_missing_vars = missing
-            strict = os.environ.get("STRICT_STARTUP", "").strip().lower() in ("1", "true", "yes")
+            strict = os.environ.get("STRICT_STARTUP", "").strip().lower() in (
+                "1",
+                "true",
+                "yes",
+            )
             if strict:
                 logger.critical(
                     "[orchestrator] STRICT_STARTUP: aborting. Missing required env: %s",
@@ -131,7 +137,10 @@ def _validate_critical_services() -> None:
         ("COMPILE_SERVICE_URL", COMPILE_SERVICE_URL),
         ("AUDIT_SERVICE_URL", AUDIT_SERVICE_URL),
         ("AGENT_RUNTIME_URL", os.environ.get("AGENT_RUNTIME_URL", "").strip()),
-        ("SIMULATION_SERVICE_URL", os.environ.get("SIMULATION_SERVICE_URL", "").strip()),
+        (
+            "SIMULATION_SERVICE_URL",
+            os.environ.get("SIMULATION_SERVICE_URL", "").strip(),
+        ),
         ("STORAGE_SERVICE_URL", os.environ.get("STORAGE_SERVICE_URL", "").strip()),
         ("DEPLOY_SERVICE_URL", os.environ.get("DEPLOY_SERVICE_URL", "").strip()),
     ]
@@ -170,10 +179,12 @@ def _start_reconciliation_schedule() -> None:
 
     def _reconcile_loop():
         import time as _time
+
         _time.sleep(60)
         while True:
             try:
                 from billing_reconciliation import find_drifted_users
+
                 drifted = find_drifted_users(threshold=0.01, limit=200)
                 if drifted:
                     logger.warning(
@@ -186,7 +197,9 @@ def _start_reconciliation_schedule() -> None:
                 logger.error("[reconciliation] scheduled check failed: %s", e)
             _time.sleep(interval_s)
 
-    t = threading.Thread(target=_reconcile_loop, daemon=True, name="billing-reconciliation")
+    t = threading.Thread(
+        target=_reconcile_loop, daemon=True, name="billing-reconciliation"
+    )
     t.start()
     logger.info("[orchestrator] billing reconciliation scheduled every %ds", interval_s)
 
@@ -226,7 +239,9 @@ try:
     app.add_middleware(X402EnforcementMiddleware)
     logger.info("[orchestrator] x402 enforcement middleware loaded")
 except ImportError:
-    logger.warning("[orchestrator] x402_middleware not available; x402 enforcement disabled")
+    logger.warning(
+        "[orchestrator] x402_middleware not available; x402 enforcement disabled"
+    )
 
 # Include routers. Order matters: more specific routes (e.g. /generate) before parametric ({workflow_id}).
 app.include_router(pipeline_router)

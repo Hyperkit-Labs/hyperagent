@@ -27,6 +27,16 @@ except ImportError:
 TOOLS_BASE_URL = (os.environ.get("TOOLS_BASE_URL") or "").rstrip("/")
 TOOLS_API_KEY = os.environ.get("TOOLS_API_KEY", "")
 
+_MAX_SOURCE_LEN = 500_000
+
+
+def _assert_within(base: Path, target: Path) -> Path:
+    """Resolve *target* and verify it stays inside *base*. Raises HTTPException on escape."""
+    resolved = target.resolve()
+    if not resolved.is_relative_to(base.resolve()):
+        raise HTTPException(status_code=400, detail="Path escapes workspace boundary")
+    return resolved
+
 app = FastAPI(title="HyperAgent Compile Service", version="0.1.0")
 
 
@@ -116,7 +126,8 @@ class CompileResponse(BaseModel):
 
 def _extract_contract_name(source: str) -> str:
     """Extract first contract name from Solidity source. Handles inheritance (is X, Y)."""
-    match = re.search(r"contract\s+(\w+)[^{]*\{", source)
+    snippet = source[:10_000]
+    match = re.search(r"contract\s+(\w+)\s*(?:\{|is\s)", snippet)
     raw = match.group(1) if match else "Contract"
     if not re.match(r"^[a-zA-Z0-9_]+$", raw):
         return "Contract"
@@ -162,7 +173,7 @@ def _compile_foundry_multi(workdir: Path, files: dict[str, str], entry_contract:
     src.mkdir(parents=True, exist_ok=True)
     for name, content in files.items():
         safe = _safe_sol_filename(name)
-        path = src / safe
+        path = _assert_within(workdir, src / safe)
         code = _strip_markdown_fences(content)
         if "pragma solidity" not in code.strip().lower():
             code = "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n" + code
@@ -196,7 +207,7 @@ def _compile_foundry_impl(workdir: Path, contract_name: str, contract_code: str)
     src.mkdir(parents=True, exist_ok=True)
     if "pragma solidity" not in contract_code.strip().lower():
         contract_code = "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n" + contract_code
-    (src / f"{contract_name}.sol").write_text(contract_code)
+    _assert_within(workdir, src / f"{contract_name}.sol").write_text(contract_code)
     (workdir / "foundry.toml").write_text("[profile.default]\nsolc = \"0.8.24\"\n")
     try:
         result = subprocess.run(
@@ -237,7 +248,7 @@ def _compile_hardhat_multi(workdir: Path, files: dict[str, str], entry_contract:
         code = _strip_markdown_fences(content)
         if "pragma solidity" not in code.strip().lower():
             code = "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n" + code
-        (contracts_dir / safe).write_text(code, encoding="utf-8")
+        _assert_within(workdir, contracts_dir / safe).write_text(code, encoding="utf-8")
     (workdir / "hardhat.config.js").write_text(
         """module.exports = { solidity: "0.8.24", paths: { sources: "./contracts" } };\n"""
     )
@@ -275,7 +286,7 @@ def _compile_hardhat(workdir: Path, contract_name: str, contract_code: str) -> t
     contracts_dir.mkdir(parents=True, exist_ok=True)
     if "pragma solidity" not in contract_code.strip().lower():
         contract_code = "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n" + contract_code
-    (contracts_dir / f"{contract_name}.sol").write_text(contract_code)
+    _assert_within(workdir, contracts_dir / f"{contract_name}.sol").write_text(contract_code)
     (workdir / "hardhat.config.js").write_text(
         """module.exports = { solidity: "0.8.24", paths: { sources: "./contracts" } };\n"""
     )
@@ -413,7 +424,7 @@ def compile_contract(req: CompileRequest) -> CompileResponse:
                 for name, content in req.files.items():
                     if isinstance(content, str):
                         safe_name = _safe_sol_filename(name)
-                        (src / safe_name).write_text(content, encoding="utf-8")
+                        _assert_within(workdir, src / safe_name).write_text(content, encoding="utf-8")
             if req.framework == "foundry":
                 success, bytecode, abi, errors = _compile_foundry_impl(workdir, contract_name, code_single)
             else:

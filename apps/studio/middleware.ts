@@ -4,8 +4,40 @@ import { ROUTES } from "@/constants/routes";
 
 const SESSION_COOKIE_NAME = "hyperagent_has_session";
 const SESSION_EXPIRES_COOKIE_NAME = "hyperagent_session_expires";
-/** Carries the raw JWT so middleware can inspect exp without localStorage. Set by session-store. */
 const SESSION_TOKEN_COOKIE_NAME = "hyperagent_session_token";
+
+function generateNonce(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function applySecurityHeaders(res: NextResponse, nonce: string): void {
+  const csp = [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    "style-src 'self' 'unsafe-inline'",
+    "connect-src 'self' https://api.openai.com https://api.anthropic.com https://*.thirdweb.com https://*.supabase.co wss://*.supabase.co",
+    "img-src 'self' data: https:",
+    "font-src 'self' data:",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join("; ");
+
+  res.headers.set("Content-Security-Policy", csp);
+  res.headers.set("X-Frame-Options", "DENY");
+  res.headers.set("X-Content-Type-Options", "nosniff");
+  res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+
+  if (process.env.NODE_ENV === "production") {
+    res.headers.set(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains; preload",
+    );
+  }
+}
 
 function _redirectToLogin(request: NextRequest): NextResponse {
   const url = request.nextUrl.clone();
@@ -38,12 +70,33 @@ const E2E_BYPASS_COOKIE = "PLAYWRIGHT_E2E";
 /** All routes except /login require a valid, non-expired session. */
 export function middleware(request: NextRequest): NextResponse {
   const pathname = request.nextUrl.pathname;
+  const nonce = generateNonce();
+
   if (pathname === ROUTES.LOGIN) {
-    return NextResponse.next();
+    const res = NextResponse.next();
+    applySecurityHeaders(res, nonce);
+    res.headers.set("x-nonce", nonce);
+    return res;
   }
 
-  if (pathname.startsWith('/api/')) {
-    return NextResponse.next();
+  if (pathname.startsWith("/api/")) {
+    const PUBLIC_API_PREFIXES = ["/api/auth/"];
+    const isPublicApi = PUBLIC_API_PREFIXES.some((p) => pathname.startsWith(p));
+    if (isPublicApi) {
+      return NextResponse.next();
+    }
+
+    const token =
+      request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
+      request.cookies.get(SESSION_TOKEN_COOKIE_NAME)?.value;
+
+    if (!token || !_isValidJwt(token)) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const res = NextResponse.next();
+    res.headers.set("x-nonce", nonce);
+    return res;
   }
 
   if (
@@ -51,7 +104,9 @@ export function middleware(request: NextRequest): NextResponse {
     request.cookies.get(E2E_BYPASS_COOKIE)?.value === "1"
   ) {
     const res = NextResponse.next();
+    applySecurityHeaders(res, nonce);
     res.headers.set("x-e2e-bypass", "1");
+    res.headers.set("x-nonce", nonce);
     return res;
   }
 
@@ -65,7 +120,10 @@ export function middleware(request: NextRequest): NextResponse {
     if (!_isValidJwt(rawToken)) {
       return _redirectToLogin(request);
     }
-    return NextResponse.next();
+    const res = NextResponse.next();
+    applySecurityHeaders(res, nonce);
+    res.headers.set("x-nonce", nonce);
+    return res;
   }
 
   const now = Math.floor(Date.now() / 1000);
@@ -77,7 +135,10 @@ export function middleware(request: NextRequest): NextResponse {
     }
   }
 
-  return NextResponse.next();
+  const res = NextResponse.next();
+  applySecurityHeaders(res, nonce);
+  res.headers.set("x-nonce", nonce);
+  return res;
 }
 
 /**

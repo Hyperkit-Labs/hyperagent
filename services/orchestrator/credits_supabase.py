@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import os
 import time
+import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -162,7 +163,15 @@ def _top_up_fallback(
     reference_type: str | None,
     metadata: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
-    """Fallback when RPC not available (e.g. migration not run). Non-atomic."""
+    """Fallback when RPC not available (e.g. migration not run). Non-atomic.
+    Blocked in production to prevent race conditions and double-spend."""
+    if os.environ.get("NODE_ENV", "").lower() == "production":
+        logger.error(
+            "[credits] top_up fallback blocked in production user_id=%s amount=%s",
+            user_id,
+            amount,
+        )
+        return None
     client = _client()
     if not client:
         return None
@@ -264,7 +273,15 @@ def _consume_fallback(
     reference_type: str | None,
     metadata: dict[str, Any] | None,
 ) -> tuple[bool, float]:
-    """Fallback when consume_credits RPC not available. Non-atomic, race-prone."""
+    """Fallback when consume_credits RPC not available. Non-atomic, race-prone.
+    Blocked in production to prevent double-spend and balance drift."""
+    if os.environ.get("NODE_ENV", "").lower() == "production":
+        logger.error(
+            "[credits] consume fallback blocked in production user_id=%s amount=%s",
+            user_id,
+            amount,
+        )
+        return False, 0.0
     client = _client()
     if not client:
         return False, 0.0
@@ -310,3 +327,121 @@ def has_sufficient_credits(
     """Return True if user has at least amount credits (for pre-check before running a step)."""
     info = get_balance(user_id)
     return (info.get("balance") or 0) >= amount
+
+
+def refund(
+    user_id: str,
+    amount: float,
+    original_reference_id: str | None = None,
+    reason: str = "refund",
+    metadata: dict[str, Any] | None = None,
+) -> tuple[bool, float]:
+    """Refund credits back to a user. Returns (success, balance_after).
+
+    Uses the same atomic RPC path as top_up but records the transaction
+    as a refund with a link to the original charge reference.
+    """
+    if not user_id or not is_configured() or amount <= 0:
+        return False, 0.0
+    client = _client()
+    if not client:
+        return False, 0.0
+
+    refund_metadata = {"reason": reason}
+    if original_reference_id:
+        refund_metadata["original_reference_id"] = original_reference_id
+    if metadata:
+        refund_metadata.update(metadata)
+
+    for attempt in range(3):
+        try:
+            r = client.rpc(
+                "top_up_credits",
+                {
+                    "p_user_id": user_id,
+                    "p_amount": str(amount),
+                    "p_currency": "USD",
+                    "p_reference_id": f"refund_{original_reference_id or 'manual'}_{uuid.uuid4().hex[:12]}",
+                    "p_reference_type": "refund",
+                    "p_metadata": refund_metadata,
+                },
+            ).execute()
+            data = r.data
+            if data is None:
+                break
+            row = data[0] if isinstance(data, list) and data else data
+            if not isinstance(row, dict):
+                break
+            balance = float(row.get("balance", 0))
+            logger.info(
+                "[credits] refund success user_id=%s amount=%s balance=%s ref=%s",
+                user_id,
+                amount,
+                balance,
+                original_reference_id,
+            )
+            return True, balance
+        except Exception as e:
+            logger.warning(
+                "[credits] refund RPC attempt=%s user_id=%s error=%s",
+                attempt + 1,
+                user_id,
+                e,
+            )
+            if attempt < 2:
+                time.sleep(0.1 * (attempt + 1))
+
+    return _refund_fallback(user_id, amount, original_reference_id, reason, refund_metadata)
+
+
+def _refund_fallback(
+    user_id: str,
+    amount: float,
+    original_reference_id: str | None,
+    reason: str,
+    metadata: dict[str, Any],
+) -> tuple[bool, float]:
+    """Fallback refund when RPC is unavailable. Only allowed in non-production."""
+    if os.environ.get("NODE_ENV", "").lower() == "production":
+        logger.error(
+            "[credits] refund fallback blocked in production user_id=%s amount=%s",
+            user_id,
+            amount,
+        )
+        return False, 0.0
+
+    client = _client()
+    if not client:
+        return False, 0.0
+    ensure_user_credits_row(user_id)
+    try:
+        r = (
+            client.table("user_credits")
+            .select("balance")
+            .eq("user_id", user_id)
+            .execute()
+        )
+        row = (r.data or [None])[0] if r.data else None
+        if not row:
+            return False, 0.0
+        current = float(Decimal(str(row.get("balance") or 0)))
+        new_balance = current + amount
+        client.table("user_credits").update(
+            {
+                "balance": str(new_balance),
+                "updated_at": datetime.now(UTC).isoformat(),
+            }
+        ).eq("user_id", user_id).execute()
+        client.table("credit_transactions").insert(
+            {
+                "user_id": user_id,
+                "amount": str(amount),
+                "balance_after": str(new_balance),
+                "tx_type": "refund",
+                "reference_id": f"refund_{original_reference_id or 'manual'}_{uuid.uuid4().hex[:12]}",
+            }
+        ).execute()
+        return True, new_balance
+    except Exception as e:
+        logger.warning("[credits] refund fallback user_id=%s error=%s", user_id, e)
+        return False, 0.0

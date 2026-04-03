@@ -296,7 +296,7 @@ export async function POST(req: Request) {
           const cause = error instanceof Error && error.cause instanceof Error ? error.cause.message : '';
           const combined = [msg, cause].filter(Boolean).join(' | ').slice(0, 500);
           logError('stream error provider=%s: %s', providerLabel, combined);
-          return combined || `${providerLabel} request failed. Check your API key and quota.`;
+          return `${providerLabel} request failed. Check your API key and quota.`;
         },
       });
     } catch (err) {
@@ -305,7 +305,7 @@ export async function POST(req: Request) {
       const combined = [message, cause].filter(Boolean).join(' | ').slice(0, 500);
       logError('pre-stream error provider=%s: %s', providerLabel, combined, err);
       return new Response(
-        JSON.stringify({ error: combined || 'LLM request failed. Check your API key and quota.' }),
+        JSON.stringify({ error: 'LLM request failed. Check your API key and quota.' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } },
       );
     }

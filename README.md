@@ -10,7 +10,7 @@
 ![Status](https://img.shields.io/badge/status-active-success)
 <!-- Badges: end -->
 
-HyperAgent is an AI-powered smart contract development platform that transforms natural language specifications into production-ready, audited contracts deployed across multiple EVM chains in minutes.
+HyperAgent is an AI-assisted smart contract development platform that turns natural language specifications into draft artifacts with automated checks, an audit workflow, simulation, and deploy preparation across EVM chains.
 
 </div>
 
@@ -29,7 +29,7 @@ HyperAgent is an AI-powered smart contract development platform that transforms 
 
 ## Overview
 
-HyperAgent is an AI-powered multi-agent platform that turns natural-language specifications into production-ready, audited, simulated, and deployed smart contracts across multiple EVM networks. The system uses a microservice and service-oriented architecture (SOA). Agents communicate via the Agent2Agent (A2A) protocol with ERC-8004 on-chain registries for identity, reputation, and validation. LLM access is BYOK: no server-side LLM keys for user workloads; keys are stored in an isolated, encrypted environment and used only for that user's runs.
+HyperAgent is an AI-powered multi-agent platform that turns natural-language specifications into draft contracts and artifacts with automated checks, audit workflow stages, Tenderly simulation, and deploy preparation across multiple EVM networks. The system uses a microservice and service-oriented architecture (SOA). Agents communicate via the Agent2Agent (A2A) protocol with ERC-8004 on-chain registries for identity, reputation, and validation. LLM access is BYOK: no server-side LLM keys for user workloads; keys are stored in an isolated, encrypted environment and used only for that user's runs.
 
 **Goal:** Make end-to-end smart contract development verifiable, repeatable, and safe. Developers go from "idea in English" to deployed and monitored contract with as few manual steps as possible, while preserving auditability and human oversight where needed.
 
@@ -49,7 +49,7 @@ HyperAgent is an AI-powered multi-agent platform that turns natural-language spe
 
 **Core stack:** Python/FastAPI, Next.js/React/TypeScript, Supabase (PostgreSQL), VectorDB (e.g., Pinecone), Redis, Acontext, Docker, Tenderly. Smart contract tooling: Hardhat, Foundry, Thirdweb SDK.
 
-**Pipeline:** SpecAgent (versioned Spec Lock) → Design and Proposal agents → CodegenAgent (streaming guardrails) → Autofixer and audit agents (Slither, Mythril, MythX, Echidna) → TenderlySimAgent → DeployAgent and VerifyAgent → MonitorAgent. Safety is enforced through Spec Lock, simulation-first validation via Tenderly, and mandatory security tooling.
+**Pipeline:** SpecAgent (versioned Spec Lock) → Design and Proposal agents → CodegenAgent (streaming guardrails) → Autofixer and audit agents (Slither, Mythril, MythX, Echidna) → TenderlySimAgent → DeployAgent and VerifyAgent → MonitorAgent. Safety is enforced through Spec Lock, Tenderly simulation in the workflow, and mandatory security tooling where the pipeline is configured.
 
 **Deployment:** Vercel (frontend), Contabo/Coolify (backend).
 
@@ -57,14 +57,14 @@ HyperAgent is an AI-powered multi-agent platform that turns natural-language spe
 
 ## Features
 
-- **Natural language to contracts** – Describe behavior in plain language; get Solidity, tests, and audit-ready artifacts.
+- **Natural language to contracts** – Describe behavior in plain language; get Solidity, tests, and artifacts for the audit workflow (static analysis and fuzzing).
 - **BYOK** – Bring your own LLM keys (OpenAI, Anthropic, Google, OpenRouter); no server-side LLM config for user workloads.
-- **Simulation-first** – Tenderly integration for transaction simulation and reports before deployment.
+- **Tenderly simulation** – Transaction simulation and reports in the pipeline before deploy when your environment and workflow enable it.
 - **Security tooling** – Slither, Mythril, MythX, Echidna as mandatory pipeline stages.
 - **Multi-chain** – Chain and SDK registries for plug-and-play networks
-- **Account abstraction** – ERC-4337 and EIP-7702 via Thirdweb; x402 metering where configured.
-- **Observability** – OpenTelemetry, MLflow, Tenderly monitoring, Dune dashboards.
-- **RAG and memory** – Curated corpora and Acontext for long-term agent memory; IPFS/Pinata, Arweave, Filecoin for artifacts.
+- **Account abstraction** – ERC-4337 and EIP-7702 via Thirdweb; optional x402 metering when enabled in registry and environment.
+- **Metrics and tracing** – OpenTelemetry, MLflow, Tenderly monitoring, Dune dashboards where the deployment wires them.
+- **RAG and memory** – Curated corpora and Acontext for long-term agent memory; artifact storage via IPFS/Pinata (and compatible providers) per `docs/storage-policy.md`.
 
 ## Quick Start
 
@@ -106,6 +106,7 @@ For full setup and usage, see [Getting started](docs/getting-started.md) and the
 ## Documentation
 
 - [Docs index](docs/README.md) – Onboarding, Studio usage, and contributor references.
+- **MkDocs site** – `pip install -r requirements-docs.txt && mkdocs serve` for searchable HTML (see [docs/documentation-site.md](docs/documentation-site.md)).
 - [Getting started](docs/getting-started.md) – First-time setup and run locally.
 - [Studio guide](docs/user-guide.md) – HyperAgent Studio (connect, BYOK, run workflows).
 - [Contributor guide](docs/developer-guide.md) – Repository layout, local setup, contributing.

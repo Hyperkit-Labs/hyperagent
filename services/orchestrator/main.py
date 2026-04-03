@@ -110,9 +110,19 @@ def _validate_critical_services() -> None:
         if missing:
             _startup_degraded = True
             _startup_missing_vars = missing
+            strict = os.environ.get("STRICT_STARTUP", "").strip().lower() in ("1", "true", "yes")
+            if strict:
+                logger.critical(
+                    "[orchestrator] STRICT_STARTUP: aborting. Missing required env: %s",
+                    ", ".join(missing),
+                )
+                raise SystemExit(
+                    f"STRICT_STARTUP: missing required env vars: {', '.join(missing)}"
+                )
             logger.error(
                 "[orchestrator] Production requires: %s. "
-                "Process will stay alive but /health returns 503 until resolved.",
+                "Process will stay alive but /health returns 503 until resolved. "
+                "Set STRICT_STARTUP=1 to abort instead.",
                 ", ".join(missing),
             )
 
@@ -174,6 +184,16 @@ async def log_request_id(request: Request, call_next):
     response.headers["X-Response-Time-Ms"] = f"{elapsed * 1000:.0f}"
     return response
 
+
+# x402 enforcement middleware: intercepts protected endpoints for external callers.
+# Internal callers (Studio users with X-User-Id) skip x402 and use credits instead.
+try:
+    from x402_middleware import X402EnforcementMiddleware
+
+    app.add_middleware(X402EnforcementMiddleware)
+    logger.info("[orchestrator] x402 enforcement middleware loaded")
+except ImportError:
+    logger.warning("[orchestrator] x402_middleware not available; x402 enforcement disabled")
 
 # Include routers. Order matters: more specific routes (e.g. /generate) before parametric ({workflow_id}).
 app.include_router(pipeline_router)

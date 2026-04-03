@@ -13,7 +13,9 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-IS_PRODUCTION = os.environ.get("NODE_ENV") == "production" or os.environ.get("ENV") == "production"
+IS_PRODUCTION = (
+    os.environ.get("NODE_ENV") == "production" or os.environ.get("ENV") == "production"
+)
 
 
 def build_trace_payload(
@@ -67,15 +69,19 @@ async def write_trace(
         run_id, step_type, step_index, status, output_summary, error_message, extra
     )
     import json
+
     payload_str = json.dumps(payload, default=str)
     blob_id = _stub_trace_id(run_id, step_type, step_index)
     da_cert, ref_block = None, None
 
     try:
         from ipfs_client import is_configured, pin_json
+
         if is_configured():
             name = f"trace/{run_id}/{step_type}/{step_index}.json"
-            cid = await pin_json(payload, name, {"run_id": run_id, "step_type": step_type})
+            cid = await pin_json(
+                payload, name, {"run_id": run_id, "step_type": step_type}
+            )
             if cid:
                 blob_id = cid
     except Exception as e:
@@ -83,6 +89,7 @@ async def write_trace(
 
     try:
         from da_client import is_configured as da_ok, submit_blob
+
         if da_ok():
             da_cert, ref_block = await submit_blob(blob_id, payload_str)
     except RuntimeError:
@@ -92,10 +99,15 @@ async def write_trace(
 
     if IS_PRODUCTION:
         from da_client import is_configured as da_ok
+
         if da_ok() and not (da_cert or ref_block):
-            raise RuntimeError("EigenDA enabled but trace produced no DA cert or reference block") from None
+            raise RuntimeError(
+                "EigenDA enabled but trace produced no DA cert or reference block"
+            ) from None
         if blob_id.startswith("stub:"):
-            raise RuntimeError("IPFS/Storage Provider unavailable. Verifiable trace is mandatory in production.") from None
+            raise RuntimeError(
+                "IPFS/Storage Provider unavailable. Verifiable trace is mandatory in production."
+            ) from None
     return blob_id, da_cert, ref_block
 
 

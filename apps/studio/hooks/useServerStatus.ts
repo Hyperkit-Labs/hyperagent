@@ -3,25 +3,35 @@
 import { useState, useEffect } from 'react';
 import { getApiBase } from '@/lib/api';
 
-/** up = sign-in ready; signin_unavailable = gateway reachable but auth prereqs fail; down = unreachable or unexpected response */
-export type ServerStatus = 'up' | 'down' | 'signin_unavailable' | 'loading';
+/** up = sign-in ready; degraded = gateway alive, orchestrator or deps unhealthy; signin_unavailable = gateway reachable but auth prereqs fail; down = unreachable */
+export type ServerStatus = 'up' | 'down' | 'degraded' | 'signin_unavailable' | 'loading';
 
 type HealthBody = {
   status?: string;
   auth_signin_ready?: boolean;
+  orchestrator_ok?: boolean;
+  orchestrator_reachable?: boolean;
+  pipeline_ready?: boolean;
+  message?: string;
 };
 
 function interpretHealthResponse(res: Response, data: HealthBody): ServerStatus {
-  if (res.ok && res.status === 200) {
-    const ready =
-      data.auth_signin_ready === true &&
-      (data.status === 'ok' || data.status === 'degraded');
-    if (ready) return 'up';
+  if (!res.ok) {
     if (data.auth_signin_ready === false) return 'signin_unavailable';
     return 'down';
   }
+
   if (data.auth_signin_ready === false) return 'signin_unavailable';
-  return 'down';
+
+  if (data.status === 'ok' && data.auth_signin_ready === true) return 'up';
+
+  if (data.status === 'degraded') {
+    if (data.auth_signin_ready === true) return 'degraded';
+    return 'signin_unavailable';
+  }
+
+  if (data.auth_signin_ready === true) return 'up';
+  return 'degraded';
 }
 
 /** Gateway /health (no auth). Distinguishes sign-in readiness from total outage. */

@@ -277,7 +277,9 @@ def pricing_usage_api(
 
 
 # Reconciliation router
-reconciliation_router = APIRouter(prefix="/api/v1/billing/reconciliation", tags=["billing", "reconciliation"])
+reconciliation_router = APIRouter(
+    prefix="/api/v1/billing/reconciliation", tags=["billing", "reconciliation"]
+)
 
 
 @reconciliation_router.get("")
@@ -289,9 +291,13 @@ def reconciliation_status_api(
         raise HTTPException(status_code=401, detail="X-User-Id required")
     try:
         from billing_reconciliation import reconcile_user
+
         result = reconcile_user(x_user_id)
         if result is None:
-            return {"status": "not_configured", "message": "Billing reconciliation unavailable (DB not configured)"}
+            return {
+                "status": "not_configured",
+                "message": "Billing reconciliation unavailable (DB not configured)",
+            }
         return {"status": "ok", **result.to_dict()}
     except Exception as e:
         logger.error("[reconciliation] API error user_id=%s: %s", x_user_id, e)
@@ -303,6 +309,7 @@ def reconciliation_all_api() -> dict[str, Any]:
     """Run reconciliation for all users. Admin/internal use."""
     try:
         from billing_reconciliation import find_drifted_users
+
         drifted = find_drifted_users(threshold=0.01, limit=200)
         return {"status": "ok", "drifted_count": len(drifted), "drifted_users": drifted}
     except Exception as e:

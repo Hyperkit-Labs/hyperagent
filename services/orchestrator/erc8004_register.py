@@ -55,25 +55,38 @@ def register_on_chain(chain_id: int, agent_uri: str | None = None) -> dict[str, 
     rpc_url = rpc_explorer[0]
     if not rpc_url:
         return {"success": False, "error": "RPC URL empty"}
-    uri = (agent_uri or os.environ.get("ERC8004_AGENT_URI") or "https://hyperkitlabs.com/agent.json").strip()
+    uri = (
+        agent_uri
+        or os.environ.get("ERC8004_AGENT_URI")
+        or "https://hyperkitlabs.com/agent.json"
+    ).strip()
     try:
         from web3 import Web3
         from eth_account import Account
+
         w3 = Web3(Web3.HTTPProvider(rpc_url))
         if not w3.is_connected():
             return {"success": False, "error": "RPC connection failed"}
         acct = Account.from_key(pk)
-        contract = w3.eth.contract(address=Web3.to_checksum_address(registry_addr), abi=IDENTITY_REGISTRY_ABI)
-        tx = contract.functions.register(uri).build_transaction({
-            "from": acct.address,
-            "gas": 300_000,
-            "chainId": chain_id,
-        })
+        contract = w3.eth.contract(
+            address=Web3.to_checksum_address(registry_addr), abi=IDENTITY_REGISTRY_ABI
+        )
+        tx = contract.functions.register(uri).build_transaction(
+            {
+                "from": acct.address,
+                "gas": 300_000,
+                "chainId": chain_id,
+            }
+        )
         signed = acct.sign_transaction(tx)
         tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
         receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
         if receipt.get("status") != 1:
-            return {"success": False, "error": "Transaction reverted", "txHash": tx_hash.hex()}
+            return {
+                "success": False,
+                "error": "Transaction reverted",
+                "txHash": tx_hash.hex(),
+            }
         agent_id = None
         transfer_topic = Web3.keccak(text="Transfer(address,address,uint256)")
         for log in receipt.get("logs") or []:
@@ -84,7 +97,12 @@ def register_on_chain(chain_id: int, agent_uri: str | None = None) -> dict[str, 
                 break
         if agent_id is None:
             agent_id = 0
-        logger.info("[erc8004] registered chain=%s agentId=%s tx=%s", chain_id, agent_id, tx_hash.hex())
+        logger.info(
+            "[erc8004] registered chain=%s agentId=%s tx=%s",
+            chain_id,
+            agent_id,
+            tx_hash.hex(),
+        )
         return {
             "success": True,
             "agentId": str(agent_id),

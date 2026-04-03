@@ -296,7 +296,9 @@ def get_platform_track_record_api() -> dict[str, Any]:
 
     if db.is_configured():
         try:
-            audit_count = db.count_completed_audits()
+            audit_steps = db.count_completed_audits()
+            audit_rs = db.count_completed_audits_from_run_state()
+            audit_count = max(audit_steps, audit_rs)
             findings_count = db.count_security_findings()
             researchers_count = db.count_distinct_auditors()
             deployments_count = db.count_deployments()
@@ -306,26 +308,29 @@ def get_platform_track_record_api() -> dict[str, Any]:
             contracts_deployed = deployments_count
             source = "database"
             if audit_count == 0 and findings_count == 0:
-                states = db.list_workflow_states(limit=500)
-                if states:
-                    audit_count_legacy = sum(
-                        1
-                        for s in states
-                        if any(
-                            st.get("stage") == "audit"
-                            and st.get("status") == "completed"
-                            for st in (s.get("stages") or [])
+                try:
+                    states = db.list_workflow_states(limit=500)
+                    if states:
+                        audit_count_legacy = sum(
+                            1
+                            for s in states
+                            if any(
+                                st.get("stage") == "audit"
+                                and st.get("status") == "completed"
+                                for st in (s.get("stages") or [])
+                            )
                         )
-                    )
-                    total_findings = sum(
-                        len(s.get("audit_findings") or []) for s in states
-                    )
-                    if audit_count_legacy > 0:
-                        audits = audit_count_legacy
-                    if total_findings > 0:
-                        vulnerabilities = total_findings
-        except Exception:
-            pass
+                        total_findings = sum(
+                            len(s.get("audit_findings") or []) for s in states
+                        )
+                        if audit_count_legacy > 0:
+                            audits = audit_count_legacy
+                        if total_findings > 0:
+                            vulnerabilities = total_findings
+                except Exception as le:
+                    logger.warning("[track-record] legacy workflow_state merge failed: %s", le)
+        except Exception as e:
+            logger.warning("[track-record] database metrics failed: %s", e)
 
     return {
         "audits_completed": audits,

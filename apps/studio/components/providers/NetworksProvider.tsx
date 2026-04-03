@@ -7,7 +7,8 @@ import {
   useMemo,
 } from "react";
 import useSWR from "swr";
-import { getNetworks, getErrorMessage, type NetworkConfig } from "@/lib/api";
+import { getNetworks, type NetworkConfig } from "@/lib/api";
+import { networkRegistryFailureMessage } from "@/lib/sadPathCopy";
 
 const NETWORKS_SWR_KEY = "networks";
 /** Cache networks for 24h. Network list rarely changes; reduces API load by ~90%. */
@@ -61,7 +62,7 @@ export function NetworksProvider({ children }: { children: React.ReactNode }) {
     () => ({
       networks: data ?? [],
       loading: isLoading,
-      error: error ? getErrorMessage(error, "Failed to fetch networks") : null,
+      error: error ? networkRegistryFailureMessage(error) : null,
       refetch,
       getNetworkByChainId,
       getNetworkById,

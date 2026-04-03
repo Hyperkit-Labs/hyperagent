@@ -111,11 +111,15 @@ def get_waiver_requirements() -> list[str]:
     spec = _get_security_spec()
     deploy = spec.get("deploy", {})
     req = deploy.get("waiver_requires", [])
-    return list(req) if req else [
-        "approver_id",
-        "approver_role",
-        "reason",
-        "expiry_at",
-        "evidence_refs",
-        "linked_run_id",
-    ]
+    return (
+        list(req)
+        if req
+        else [
+            "approver_id",
+            "approver_role",
+            "reason",
+            "expiry_at",
+            "evidence_refs",
+            "linked_run_id",
+        ]
+    )

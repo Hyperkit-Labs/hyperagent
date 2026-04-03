@@ -89,7 +89,11 @@ def _build_viem_wagmi_zip(
                 "name": app_name,
                 "version": "0.1.0",
                 "private": True,
-                "scripts": {"dev": "next dev", "build": "next build", "start": "next start"},
+                "scripts": {
+                    "dev": "next dev",
+                    "build": "next build",
+                    "start": "next start",
+                },
                 "dependencies": deps,
                 "devDependencies": {
                     "typescript": "^5.0.0",
@@ -144,23 +148,26 @@ def _build_viem_wagmi_zip(
     if not contracts_list:
         contracts_list = [{"address": contract_addr, "name": "Contract"}]
     contracts_json = json.dumps(
-        [{"address": c.get("address", ""), "name": c.get("name", "Contract")} for c in contracts_list]
+        [
+            {"address": c.get("address", ""), "name": c.get("name", "Contract")}
+            for c in contracts_list
+        ]
     )
     zf.writestr(
         "src/lib/contract.ts",
-        f'''export const CONTRACTS = {contracts_json} as const;
+        f"""export const CONTRACTS = {contracts_json} as const;
 export const CONTRACT_ADDRESS = "{contract_addr}" as const;
 export const CHAIN_ID = {chain_id};
 export const RPC_URL = "{rpc_url_escaped}";
 export const EXPLORER_URL = "{explorer_url_escaped}";
 export const ABI = {abi_json} as const;
-''',
+""",
     )
     files_written.append("src/lib/contract.ts")
 
     zf.writestr(
         "src/lib/wagmi.ts",
-        f'''import {{ http, createConfig }} from "wagmi";
+        f"""import {{ http, createConfig }} from "wagmi";
 import {{ injected }} from "wagmi/connectors";
 import {{ CHAIN_ID, RPC_URL }} from "./contract";
 
@@ -175,7 +182,7 @@ export const config = createConfig({{
   connectors: [injected()],
   transports: {{ [CHAIN_ID]: http(RPC_URL) }},
 }});
-''',
+""",
     )
     files_written.append("src/lib/wagmi.ts")
 
@@ -184,14 +191,18 @@ export const config = createConfig({{
         if a["fn"] == "balanceOf":
             read_cards.append(
                 '<div className="p-4 bg-zinc-800/80 rounded-lg border border-zinc-700">'
-                '<span className="text-zinc-400 text-sm">' + (a.get("label", a["fn"]) or "balanceOf") + '</span>'
+                '<span className="text-zinc-400 text-sm">'
+                + (a.get("label", a["fn"]) or "balanceOf")
+                + "</span>"
                 '<div className="text-white font-mono mt-1">{balanceOfResult?.data !== undefined ? formatUnits(balanceOfResult.data as bigint, decimalsResult?.data ?? 18) : "-"}</div>'
                 "</div>"
             )
         elif a["fn"] == "totalSupply":
             read_cards.append(
                 '<div className="p-4 bg-zinc-800/80 rounded-lg border border-zinc-700">'
-                '<span className="text-zinc-400 text-sm">' + (a.get("label", a["fn"]) or "totalSupply") + '</span>'
+                '<span className="text-zinc-400 text-sm">'
+                + (a.get("label", a["fn"]) or "totalSupply")
+                + "</span>"
                 '<div className="text-white font-mono mt-1">{totalSupplyResult?.data !== undefined ? formatUnits(totalSupplyResult.data as bigint, decimalsResult?.data ?? 18) : "-"}</div>'
                 "</div>"
             )
@@ -209,7 +220,9 @@ export const config = createConfig({{
         if a["fn"] == "mint":
             write_forms.append(
                 '<div className="p-4 bg-zinc-800/50 rounded-lg border border-zinc-700 space-y-2">'
-                '<h3 className="text-sm font-medium text-zinc-300">' + (a.get("label", a["fn"]) or "mint") + '</h3>'
+                '<h3 className="text-sm font-medium text-zinc-300">'
+                + (a.get("label", a["fn"]) or "mint")
+                + "</h3>"
                 '<input placeholder="Recipient address" value={mintTo} onChange={e => setMintTo(e.target.value)} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm text-white" />'
                 '<input placeholder="Amount" value={mintAmount} onChange={e => setMintAmount(e.target.value)} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm text-white" />'
                 '<button onClick={() => writeMint()} disabled={isMintPending} className="px-4 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 text-sm">{isMintPending ? "Pending..." : "Mint"}</button>'
@@ -219,7 +232,9 @@ export const config = createConfig({{
         elif a["fn"] == "burn":
             write_forms.append(
                 '<div className="p-4 bg-zinc-800/50 rounded-lg border border-zinc-700 space-y-2">'
-                '<h3 className="text-sm font-medium text-zinc-300">' + (a.get("label", a["fn"]) or "burn") + '</h3>'
+                '<h3 className="text-sm font-medium text-zinc-300">'
+                + (a.get("label", a["fn"]) or "burn")
+                + "</h3>"
                 '<input placeholder="Amount" value={burnAmount} onChange={e => setBurnAmount(e.target.value)} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm text-white" />'
                 '<button onClick={() => writeBurn()} disabled={isBurnPending} className="px-4 py-2 rounded bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50 text-sm">{isBurnPending ? "Pending..." : "Burn"}</button>'
                 '{burnTxHash && <a href={`${EXPLORER_URL}/tx/${burnTxHash}`} target="_blank" rel="noopener noreferrer" className="text-xs text-sky-400 block mt-1">View tx</a>}'
@@ -228,7 +243,9 @@ export const config = createConfig({{
         elif a["fn"] == "transfer":
             write_forms.append(
                 '<div className="p-4 bg-zinc-800/50 rounded-lg border border-zinc-700 space-y-2">'
-                '<h3 className="text-sm font-medium text-zinc-300">' + (a.get("label", a["fn"]) or "transfer") + '</h3>'
+                '<h3 className="text-sm font-medium text-zinc-300">'
+                + (a.get("label", a["fn"]) or "transfer")
+                + "</h3>"
                 '<input placeholder="To address" value={transferTo} onChange={e => setTransferTo(e.target.value)} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm text-white" />'
                 '<input placeholder="Amount" value={transferAmount} onChange={e => setTransferAmount(e.target.value)} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm text-white" />'
                 '<button onClick={() => writeTransfer()} disabled={isTransferPending} className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 text-sm">{isTransferPending ? "Pending..." : "Transfer"}</button>'
@@ -236,11 +253,19 @@ export const config = createConfig({{
                 "</div>"
             )
 
-    read_cards_str = "\n".join(read_cards) if read_cards else '<p className="text-zinc-500 text-sm">No read actions.</p>'
-    write_forms_str = "\n".join(write_forms) if write_forms else '<p className="text-zinc-500 text-sm">No write actions in ABI.</p>'
+    read_cards_str = (
+        "\n".join(read_cards)
+        if read_cards
+        else '<p className="text-zinc-500 text-sm">No read actions.</p>'
+    )
+    write_forms_str = (
+        "\n".join(write_forms)
+        if write_forms
+        else '<p className="text-zinc-500 text-sm">No write actions in ABI.</p>'
+    )
     schema_name = json.dumps(schema.get("name", "dApp"))
 
-    page_content = f'''"use client";
+    page_content = f""""use client";
 
 import {{ useState }} from "react";
 import {{ WagmiProvider, useAccount, useConnect, useReadContract, useWriteContract }} from "wagmi";
@@ -332,14 +357,14 @@ export default function Home() {{
     </WagmiProvider>
   );
 }}
-'''
+"""
     zf.writestr("src/app/page.tsx", page_content)
     files_written.append("src/app/page.tsx")
 
     layout_title = schema.get("name", "dApp").replace('"', '\\"')
     zf.writestr(
         "src/app/layout.tsx",
-        f'''import type {{ Metadata }} from "next";
+        f"""import type {{ Metadata }} from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {{ title: "{layout_title}", description: "Generated by HyperAgent" }};
@@ -347,9 +372,12 @@ export const metadata: Metadata = {{ title: "{layout_title}", description: "Gene
 export default function RootLayout({{ children }}: {{ children: React.ReactNode }}) {{
   return <html lang="en"><body>{{children}}</body></html>;
 }}
-''',
+""",
     )
-    zf.writestr("src/app/globals.css", "@tailwind base;\\n@tailwind components;\\n@tailwind utilities;\\n")
+    zf.writestr(
+        "src/app/globals.css",
+        "@tailwind base;\\n@tailwind components;\\n@tailwind utilities;\\n",
+    )
     files_written.extend(["src/app/layout.tsx", "src/app/globals.css"])
 
     readme = f"""# {schema.get('name', 'dApp')}
@@ -413,6 +441,7 @@ async def export_ui_app_api(
         raise HTTPException(status_code=404, detail="Workflow not found")
     if request:
         from .common import assert_workflow_owner
+
         assert_workflow_owner(w, request)
     schema = w.get("ui_schema")
     if not schema:
@@ -446,7 +475,9 @@ async def export_ui_app_api(
     chain_entry = get_chain(chain_id)
     cl = (chain_entry or {}).get("chainlist") or {}
     chain_name = (
-        cl.get("name", f"Chain {chain_id}") if isinstance(cl, dict) else f"Chain {chain_id}"
+        cl.get("name", f"Chain {chain_id}")
+        if isinstance(cl, dict)
+        else f"Chain {chain_id}"
     )
 
     buf = io.BytesIO()
@@ -472,7 +503,9 @@ async def export_ui_app_api(
 
         test_files = w.get("test_files") or {}
         for name, code in test_files.items():
-            if isinstance(code, str) and (name.endswith(".sol") or name.endswith(".t.sol")):
+            if isinstance(code, str) and (
+                name.endswith(".sol") or name.endswith(".t.sol")
+            ):
                 path = name if "/" in name else f"test/{name}"
                 zf.writestr(path, code)
                 files_list.append(path)
@@ -489,7 +522,10 @@ async def export_ui_app_api(
                     with httpx.Client(timeout=get_timeout("main")) as client:
                         r = client.post(
                             f"{COMPILE_SERVICE_URL}/compile",
-                            json={"contractCode": contracts_dict[first_name], "framework": "hardhat"},
+                            json={
+                                "contractCode": contracts_dict[first_name],
+                                "framework": "hardhat",
+                            },
                             headers=headers,
                         )
                         r.raise_for_status()
@@ -504,7 +540,7 @@ async def export_ui_app_api(
                             args_ts = f"[{json.dumps(constructor_args[0])}, {json.dumps(constructor_args[1])}]"
                         else:
                             args_ts = "[]"
-                        deploy_script = f'''import {{ createWalletClient, http }} from "viem";
+                        deploy_script = f"""import {{ createWalletClient, http }} from "viem";
 import {{ privateKeyToAccount }} from "viem/accounts";
 import {{ defineChain }} from "viem";
 import {{ CHAIN_ID, RPC_URL }} from "../src/lib/contract";
@@ -524,14 +560,29 @@ async function main() {{
   console.log("Explorer:", "{explorer_base}/tx/" + hash);
 }}
 main().catch(console.error);
-'''
+"""
                         zf.writestr("scripts/deploy.ts", deploy_script)
-                        zf.writestr("contracts/Contract.sol", contracts_dict[first_name])
+                        zf.writestr(
+                            "contracts/Contract.sol", contracts_dict[first_name]
+                        )
                         zf.writestr(
                             "scripts/chain.config.json",
-                            json.dumps({"chainId": chain_id, "rpcUrl": rpc_url, "explorerUrl": explorer_url}, indent=2),
+                            json.dumps(
+                                {
+                                    "chainId": chain_id,
+                                    "rpcUrl": rpc_url,
+                                    "explorerUrl": explorer_url,
+                                },
+                                indent=2,
+                            ),
                         )
-                        files_list.extend(["scripts/deploy.ts", "contracts/Contract.sol", "scripts/chain.config.json"])
+                        files_list.extend(
+                            [
+                                "scripts/deploy.ts",
+                                "contracts/Contract.sol",
+                                "scripts/chain.config.json",
+                            ]
+                        )
                 except Exception as e:
                     logger.warning("[export] deploy script skipped: %s", e)
 
@@ -550,8 +601,16 @@ main().catch(console.error);
     coolify_deployment_id = None
 
     if deploy_target in ("sandbox", "coolify"):
-        base_url = (os.environ.get("SANDBOX_DEPLOY_URL") or os.environ.get("COOLIFY_DEPLOY_URL") or "").rstrip("/")
-        token = (os.environ.get("SANDBOX_DEPLOY_TOKEN") or os.environ.get("COOLIFY_TOKEN") or "").strip()
+        base_url = (
+            os.environ.get("SANDBOX_DEPLOY_URL")
+            or os.environ.get("COOLIFY_DEPLOY_URL")
+            or ""
+        ).rstrip("/")
+        token = (
+            os.environ.get("SANDBOX_DEPLOY_TOKEN")
+            or os.environ.get("COOLIFY_TOKEN")
+            or ""
+        ).strip()
         if not base_url or not token:
             raise HTTPException(
                 status_code=503,
@@ -562,7 +621,11 @@ main().catch(console.error);
             async with httpx.AsyncClient(timeout=180.0) as client:
                 files = {"file": (filename, zip_bytes, "application/zip")}
                 data = {"project_name": project_name, "workflow_id": workflow_id}
-                deploy_endpoint = base_url if base_url.rstrip("/").endswith("deploy") else f"{base_url.rstrip('/')}/deploy"
+                deploy_endpoint = (
+                    base_url
+                    if base_url.rstrip("/").endswith("deploy")
+                    else f"{base_url.rstrip('/')}/deploy"
+                )
                 r = await client.post(
                     deploy_endpoint,
                     headers={"Authorization": f"Bearer {token}"},
@@ -572,16 +635,27 @@ main().catch(console.error);
                 r.raise_for_status()
                 data = r.json()
                 sandbox_url = data.get("url") or data.get("deployment_url")
-                sandbox_deployment_id = data.get("deployment_id") or data.get("deployment_uuid")
+                sandbox_deployment_id = data.get("deployment_id") or data.get(
+                    "deployment_uuid"
+                )
                 if deploy_target == "coolify":
                     coolify_url = sandbox_url
                     coolify_deployment_id = sandbox_deployment_id
         except httpx.HTTPStatusError as e:
-            logger.warning("[export] sandbox/coolify deploy HTTP error: %s %s", e.response.status_code, e.response.text[:500])
-            raise HTTPException(status_code=502, detail=f"Sandbox deployment failed: {e.response.text[:200]}")
+            logger.warning(
+                "[export] sandbox/coolify deploy HTTP error: %s %s",
+                e.response.status_code,
+                e.response.text[:500],
+            )
+            raise HTTPException(
+                status_code=502,
+                detail=f"Sandbox deployment failed: {e.response.text[:200]}",
+            )
         except Exception as e:
             logger.warning("[export] sandbox deploy error: %s", e)
-            raise HTTPException(status_code=502, detail=f"Sandbox deployment failed: {str(e)[:200]}")
+            raise HTTPException(
+                status_code=502, detail=f"Sandbox deployment failed: {str(e)[:200]}"
+            )
 
     if deploy_target == "vercel":
         token = (os.environ.get("VERCEL_TOKEN") or "").strip()
@@ -598,11 +672,21 @@ main().catch(console.error);
                 raw = zf.read(name)
                 try:
                     content = raw.decode("utf-8")
-                    vercel_files.append({"file": name, "data": content, "encoding": "utf-8"})
+                    vercel_files.append(
+                        {"file": name, "data": content, "encoding": "utf-8"}
+                    )
                 except UnicodeDecodeError:
-                    vercel_files.append({"file": name, "data": base64.b64encode(raw).decode("ascii"), "encoding": "base64"})
+                    vercel_files.append(
+                        {
+                            "file": name,
+                            "data": base64.b64encode(raw).decode("ascii"),
+                            "encoding": "base64",
+                        }
+                    )
         if not vercel_files:
-            raise HTTPException(status_code=500, detail="No files in export for Vercel deployment")
+            raise HTTPException(
+                status_code=500, detail="No files in export for Vercel deployment"
+            )
         project_name = f"{app_name}-{workflow_id[:8]}"
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
@@ -612,36 +696,57 @@ main().catch(console.error);
                     json={
                         "name": project_name,
                         "files": vercel_files,
-                        "projectSettings": {"framework": "nextjs", "buildCommand": "npm run build", "installCommand": "npm install"},
+                        "projectSettings": {
+                            "framework": "nextjs",
+                            "buildCommand": "npm run build",
+                            "installCommand": "npm install",
+                        },
                         "target": "production",
                     },
                 )
                 r.raise_for_status()
                 data = r.json()
-                vercel_url = data.get("url") or (data.get("alias", [None])[0] if data.get("alias") else None)
+                vercel_url = data.get("url") or (
+                    data.get("alias", [None])[0] if data.get("alias") else None
+                )
                 vercel_deployment_id = data.get("id")
                 if vercel_url and not vercel_url.startswith("http"):
                     vercel_url = f"https://{vercel_url}"
         except httpx.HTTPStatusError as e:
-            logger.warning("[export] Vercel deploy HTTP error: %s %s", e.response.status_code, e.response.text[:500])
-            raise HTTPException(status_code=502, detail=f"Vercel deployment failed: {e.response.text[:200]}")
+            logger.warning(
+                "[export] Vercel deploy HTTP error: %s %s",
+                e.response.status_code,
+                e.response.text[:500],
+            )
+            raise HTTPException(
+                status_code=502,
+                detail=f"Vercel deployment failed: {e.response.text[:200]}",
+            )
         except Exception as e:
             logger.warning("[export] Vercel deploy error: %s", e)
-            raise HTTPException(status_code=502, detail=f"Vercel deployment failed: {str(e)[:200]}")
+            raise HTTPException(
+                status_code=502, detail=f"Vercel deployment failed: {str(e)[:200]}"
+            )
 
     if deploy_target == "ipfs":
         try:
             import ipfs_client
+
             if ipfs_client.is_configured():
                 content_b64 = base64.b64encode(zip_bytes).decode("ascii")
                 cid = await ipfs_client.pin_json(
-                    content_b64, f"{app_name}-{workflow_id[:8]}.zip.b64", {"workflow_id": workflow_id}
+                    content_b64,
+                    f"{app_name}-{workflow_id[:8]}.zip.b64",
+                    {"workflow_id": workflow_id},
                 )
                 if cid:
                     ipfs_cid = cid
                     from registries import get_chain
+
                     chain_entry = get_chain(chain_id)
-                    gateway = (chain_entry or {}).get("ipfs_gateway") or "https://gateway.pinata.cloud"
+                    gateway = (chain_entry or {}).get(
+                        "ipfs_gateway"
+                    ) or "https://gateway.pinata.cloud"
                     ipfs_gateway_url = f"{gateway.rstrip('/')}/ipfs/{cid}"
         except Exception as e:
             logger.warning("[export] IPFS pin failed: %s", e)

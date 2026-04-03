@@ -41,9 +41,14 @@ async def test_write_trace_production_stub_raises(monkeypatch):
     """In production, stub blob_id raises RuntimeError."""
     monkeypatch.setenv("NODE_ENV", "production")
     monkeypatch.setenv("ENV", "production")
+    monkeypatch.setenv("EIGENDA_ENABLED", "0")
+    monkeypatch.delenv("EIGENDA_PRIVATE_KEY", raising=False)
     import importlib
+
+    import da_client
     import trace_writer as m
 
+    importlib.reload(da_client)
     importlib.reload(m)
 
     if not m.IS_PRODUCTION:

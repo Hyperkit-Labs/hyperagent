@@ -1,7 +1,10 @@
 """Shared auth and request helpers for orchestrator API routes."""
 
+import hashlib
+import hmac
 import json
 import logging
+import os
 import re
 from typing import Any
 
@@ -11,6 +14,28 @@ _SAFE_IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
 _SAFE_NAME = re.compile(r"^[A-Za-z0-9 _\-]{1,64}$")
 
 logger = logging.getLogger(__name__)
+
+_IDENTITY_HMAC_SECRET = os.environ.get("IDENTITY_HMAC_SECRET", "").strip()
+
+
+def _verify_user_id_hmac(user_id: str, sig_header: str) -> bool:
+    """Verify HMAC signature on X-User-Id sent by the gateway."""
+    if not _IDENTITY_HMAC_SECRET:
+        return True
+    if not sig_header:
+        return False
+    dot = sig_header.rfind(".")
+    if dot < 1:
+        return False
+    uid_from_sig = sig_header[:dot]
+    sig_hex = sig_header[dot + 1:]
+    if uid_from_sig != user_id:
+        return False
+    expected = hmac.new(_IDENTITY_HMAC_SECRET.encode(), user_id.encode(), hashlib.sha256).hexdigest()
+    try:
+        return hmac.compare_digest(sig_hex, expected)
+    except Exception:
+        return False
 
 
 def _log_byok_event(event: str, user_id: str, action: str) -> None:
@@ -61,10 +86,24 @@ def _create_agent_session_jwt_if_configured(
 
 
 def get_caller_id(request: Request) -> str | None:
-    """Extract authenticated user id from gateway-injected header."""
-    return (
+    """Extract authenticated user id from gateway-injected header.
+    When IDENTITY_HMAC_SECRET is set, verifies the x-user-id-sig HMAC.
+    Rejects spoofed headers in production."""
+    user_id = (
         request.headers.get("X-User-Id") or request.headers.get("x-user-id") or ""
     ).strip() or None
+    if not user_id:
+        return None
+    if _IDENTITY_HMAC_SECRET:
+        sig = (request.headers.get("x-user-id-sig") or "").strip()
+        if not _verify_user_id_hmac(user_id, sig):
+            logger.warning(
+                "[security] X-User-Id HMAC verification failed for user_id=%s path=%s",
+                user_id[:16],
+                request.url.path,
+            )
+            return None
+    return user_id
 
 
 def _run_status_for_store(status: str) -> str:

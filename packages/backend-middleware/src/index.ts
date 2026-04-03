@@ -100,5 +100,37 @@ export function validateRequiredSecrets(
   }
 }
 
+/**
+ * HMAC-sign a user identity header so downstream services can verify the gateway set it.
+ * Uses HMAC-SHA256 with IDENTITY_HMAC_SECRET. Format: "userId.hex_signature"
+ */
+export function signUserId(userId: string, secret: string): string {
+  if (!userId || !secret) return userId;
+  const { createHmac } = require("crypto") as typeof import("crypto");
+  const sig = createHmac("sha256", secret).update(userId).digest("hex");
+  return `${userId}.${sig}`;
+}
+
+/**
+ * Verify and extract the userId from a signed header. Returns the bare userId if valid, null if tampered.
+ */
+export function verifySignedUserId(signed: string, secret: string): string | null {
+  if (!signed || !secret) return null;
+  const dot = signed.lastIndexOf(".");
+  if (dot < 1) return null;
+  const userId = signed.substring(0, dot);
+  const sig = signed.substring(dot + 1);
+  const { createHmac, timingSafeEqual } = require("crypto") as typeof import("crypto");
+  const expected = createHmac("sha256", secret).update(userId).digest("hex");
+  try {
+    if (timingSafeEqual(Buffer.from(sig, "hex"), Buffer.from(expected, "hex"))) {
+      return userId;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export { otelRequestSpanMiddleware, getTraceparentHeader } from "./otel.js";
 export { createLogger } from "./logger.js";

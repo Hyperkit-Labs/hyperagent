@@ -45,7 +45,10 @@ from agents.exploit_simulation_agent import run_exploit_simulation
 from agents.oz_wizard_client import generate_contracts_oz
 from agents.pashov_audit_agent import run_pashov_audit
 from agents.scrubd_agent import run_scrubd_validation
-from agents.simulation_agent import run_tenderly_simulations, run_tenderly_simulations_bundle
+from agents.simulation_agent import (
+    run_tenderly_simulations,
+    run_tenderly_simulations_bundle,
+)
 from agents.test_generation_agent import generate_tests
 from agents.monitor_agent import run_monitor
 from agents.ui_scaffold_agent import generate_ui_schema
@@ -70,7 +73,10 @@ async def spec_agent(state: AgentState) -> AgentState:
             agent_session_jwt = state.get("agent_session_jwt") or None
             template_id_from_state = (state.get("template_id") or "").strip()
             acontext_hits = context_client.search_context(
-                user_id, query=prompt[:200] if prompt else None, context_type="pattern", limit=3
+                user_id,
+                query=prompt[:200] if prompt else None,
+                context_type="pattern",
+                limit=3,
             )
             rag_context = await rag_client.query_specs(prompt, limit=3, user_id=user_id)
             rag_templates = await rag_client.query_templates(
@@ -114,13 +120,19 @@ async def spec_agent(state: AgentState) -> AgentState:
             source = "ROMA"
             try:
                 await rag_client.index_spec(run_id, spec, text=prompt)
-                await ipfs_client.pin_and_record(run_id, "spec", spec, project_id=state.get("project_id"))
+                await ipfs_client.pin_and_record(
+                    run_id, "spec", spec, project_id=state.get("project_id")
+                )
             except Exception as pin_err:
                 logger.warning("[pipeline] post-spec pin/index failed: %s", pin_err)
             context_client.store_context(
                 user_id,
                 "pattern",
-                {"spec_summary": spec.get("token_type", "contract"), "run_id": run_id, "prompt_preview": prompt[:300] if prompt else ""},
+                {
+                    "spec_summary": spec.get("token_type", "contract"),
+                    "run_id": run_id,
+                    "prompt_preview": prompt[:300] if prompt else "",
+                },
                 metadata={"run_id": run_id, "project_id": project_id},
             )
             state["messages"] = list(state.get("messages", [])) + [
@@ -156,7 +168,9 @@ async def human_review_agent(state: AgentState) -> AgentState:
 
     run_id = state.get("run_id") or state.get("project_id", "")
     if db.is_configured() and run_id:
-        db.insert_step(run_id, _step_index("human_review"), "human_review", status="pending")
+        db.insert_step(
+            run_id, _step_index("human_review"), "human_review", status="pending"
+        )
         db.insert_agent_log(
             run_id,
             "human_review",
@@ -244,13 +258,19 @@ async def design_agent(state: AgentState) -> AgentState:
                 ],
             )
             try:
-                await ipfs_client.pin_and_record(run_id, "design", design, project_id=project_id)
+                await ipfs_client.pin_and_record(
+                    run_id, "design", design, project_id=project_id
+                )
             except Exception as pin_err:
                 logger.warning("[pipeline] post-design pin failed: %s", pin_err)
             context_client.store_context(
                 user_id,
                 "pattern",
-                {"design_components": len(design.get("components", [])), "run_id": run_id, "framework": state["framework"]},
+                {
+                    "design_components": len(design.get("components", [])),
+                    "run_id": run_id,
+                    "framework": state["framework"],
+                },
                 metadata={"run_id": run_id, "project_id": project_id},
             )
             state["messages"] = list(state.get("messages", [])) + [
@@ -324,7 +344,9 @@ async def codegen_agent(state: AgentState) -> AgentState:
             AIMessage(content=f"Generated {len(contracts)} files")
         ]
         try:
-            await ipfs_client.pin_and_record(run_id, "contracts", contracts, project_id=project_id)
+            await ipfs_client.pin_and_record(
+                run_id, "contracts", contracts, project_id=project_id
+            )
         except Exception as pin_err:
             logger.warning("[pipeline] post-codegen pin failed: %s", pin_err)
         await _step_complete(
@@ -520,7 +542,9 @@ async def audit_agent(state: AgentState) -> AgentState:
             AIMessage(content=f"Audit: {len(findings)} findings")
         ]
         try:
-            await ipfs_client.pin_and_record(run_id, "audit", findings, project_id=state.get("project_id"))
+            await ipfs_client.pin_and_record(
+                run_id, "audit", findings, project_id=state.get("project_id")
+            )
         except Exception as pin_err:
             logger.warning("[pipeline] post-audit pin failed: %s", pin_err)
         await _step_complete(
@@ -540,10 +564,9 @@ async def simulation_agent(state: AgentState) -> AgentState:
     try:
         contracts = _ensure_contracts_dict(state.get("contracts"))
         deployments = state.get("deployments") or []
-        use_bundle = (
-            os.environ.get("SIMULATION_USE_BUNDLE", "false").strip().lower()
-            in ("1", "true", "yes")
-        )
+        use_bundle = os.environ.get(
+            "SIMULATION_USE_BUNDLE", "false"
+        ).strip().lower() in ("1", "true", "yes")
         has_init_txs = any(
             (d.get("plan") or d).get("init_txs")
             for d in deployments
@@ -589,7 +612,9 @@ async def simulation_agent(state: AgentState) -> AgentState:
             except Exception as gb_err:
                 logger.warning("[simulation] gas_benchmark skipped: %s", gb_err)
         try:
-            await ipfs_client.pin_and_record(run_id, "simulation", results, project_id=state.get("project_id"))
+            await ipfs_client.pin_and_record(
+                run_id, "simulation", results, project_id=state.get("project_id")
+            )
         except Exception as pin_err:
             logger.warning("[pipeline] post-simulation pin failed: %s", pin_err)
         from store import update_workflow
@@ -663,7 +688,9 @@ async def security_policy_evaluator_agent(state: AgentState) -> AgentState:
         try:
             import ipfs_client
 
-            await ipfs_client.pin_and_record(run_id, "security_verdict", verdict, project_id=state.get("project_id"))
+            await ipfs_client.pin_and_record(
+                run_id, "security_verdict", verdict, project_id=state.get("project_id")
+            )
         except Exception as pin_err:
             logger.warning("[security_policy_evaluator] pin failed: %s", pin_err)
         await _step_complete(
@@ -673,9 +700,7 @@ async def security_policy_evaluator_agent(state: AgentState) -> AgentState:
         )
         return state
     except Exception as e:
-        await _step_complete(
-            run_id, "security_policy_evaluator", error_message=str(e)
-        )
+        await _step_complete(run_id, "security_policy_evaluator", error_message=str(e))
         state["security_verdict"] = None
         state["security_approved_for_deploy"] = False
         state["current_stage"] = "security_failed"
@@ -793,7 +818,11 @@ async def deploy_agent(state: AgentState) -> AgentState:
         context_client.store_context(
             user_id,
             "pattern",
-            {"deployments_count": len(deployments), "run_id": run_id, "chains": [d.get("chain_id") for d in deployments if d.get("chain_id")]},
+            {
+                "deployments_count": len(deployments),
+                "run_id": run_id,
+                "chains": [d.get("chain_id") for d in deployments if d.get("chain_id")],
+            },
             metadata={"run_id": run_id, "project_id": project_id},
         )
         state["messages"] = list(state.get("messages", [])) + [

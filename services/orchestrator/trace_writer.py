@@ -1,7 +1,9 @@
 """
 Trace writer: build AgentTraceBlob-shaped payload, pin to IPFS when configured.
+EigenDA (da_client) is only used to anchor trace blobs for provenance, not as bulk storage.
+
 Returns real CID as blob_id when IPFS configured; otherwise stub for run_steps.
-In production, stub mode is logged as unverifiable; IPFS is required for provenance.
+In production, stub mode is invalid; IPFS is required for verifiable provenance when storage is enforced.
 """
 
 from __future__ import annotations

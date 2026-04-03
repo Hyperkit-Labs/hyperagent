@@ -45,6 +45,7 @@ from api import (
     runs_router,
     sandbox_router,
     security_router,
+    storage_webhooks_router,
     ui_export_router,
     workflows_router,
     workflows_streaming_router,
@@ -204,6 +205,38 @@ def _start_reconciliation_schedule() -> None:
     logger.info("[orchestrator] billing reconciliation scheduled every %ds", interval_s)
 
 
+@app.on_event("startup")
+def _start_storage_reconciliation_schedule() -> None:
+    """Background re-verification of IPFS gateway URLs for storage_records (pinned/failed)."""
+    import threading
+
+    interval_s = int(os.environ.get("STORAGE_RECONCILE_INTERVAL_SEC", "0"))
+    if interval_s <= 0:
+        return
+
+    def _storage_loop():
+        import time as _time
+
+        _time.sleep(120)
+        while True:
+            try:
+                from storage_reconciliation import run_storage_reconciliation_pass
+
+                run_storage_reconciliation_pass()
+            except Exception as e:
+                logger.error("[orchestrator] storage reconciliation pass failed: %s", e)
+            _time.sleep(interval_s)
+
+    t = threading.Thread(
+        target=_storage_loop, daemon=True, name="storage-reconciliation"
+    )
+    t.start()
+    logger.info(
+        "[orchestrator] storage gateway reconciliation scheduled every %ds",
+        interval_s,
+    )
+
+
 @app.middleware("http")
 async def log_request_id(request: Request, call_next):
     """Set and log x-request-id for trace correlation. Records latency for p95 SLO.
@@ -262,6 +295,7 @@ app.include_router(credits_router)
 app.include_router(payments_router)
 app.include_router(pricing_router)
 app.include_router(reconciliation_router)
+app.include_router(storage_webhooks_router)
 app.include_router(health_router)
 app.include_router(api_health_router)
 app.include_router(config_router)

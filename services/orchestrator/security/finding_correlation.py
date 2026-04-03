@@ -37,7 +37,15 @@ def correlate_findings(
     """Deduplicate and correlate findings. Mark corroboratedBy for Pashov when
     a deterministic tool reports the same issue."""
     if match_on is None:
-        match_on = ["file", "contract", "function", "swc_id", "swcId", "normalized_title", "title"]
+        match_on = [
+            "file",
+            "contract",
+            "function",
+            "swc_id",
+            "swcId",
+            "normalized_title",
+            "title",
+        ]
 
     out: list[dict[str, Any]] = []
     for f in findings:

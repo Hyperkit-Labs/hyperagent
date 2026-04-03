@@ -163,6 +163,12 @@ See `docs/runbooks/BYOK-key-lifecycle.md` for rotation and re-key procedures.
 
 ---
 
+## Policy vs implementation
+
+This file is the policy. A living **gap register** (aligned areas, claims to avoid, and missing enforcement) is maintained in [`docs/security/implementation-gap-register.md`](docs/security/implementation-gap-register.md).
+
+---
+
 ## Reporting Vulnerabilities
 
 Report security issues privately. Do not open public issues for vulnerabilities.

@@ -69,9 +69,7 @@ async def _compile_contract(
         return None
     if r.status_code != 200:
         breaker.record_failure()
-        logger.warning(
-            "[deploy] compile HTTP %s for %s", r.status_code, contract_name
-        )
+        logger.warning("[deploy] compile HTTP %s for %s", r.status_code, contract_name)
         return None
     data = r.json()
     if not data.get("success") or not data.get("bytecode"):
@@ -171,7 +169,11 @@ async def deploy_contracts(
         deploy_breaker = get_breaker(_DEPLOY_BREAKER_NAME)
         for chain_id in chain_ids:
             if not deploy_breaker.can_execute():
-                logger.warning("[deploy] circuit open, skipping chain=%s contract=%s", chain_id, contract_name)
+                logger.warning(
+                    "[deploy] circuit open, skipping chain=%s contract=%s",
+                    chain_id,
+                    contract_name,
+                )
                 continue
             try:
                 plan = await get_deploy_provider().get_deploy_plan(

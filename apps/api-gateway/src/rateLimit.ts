@@ -11,6 +11,7 @@ import { Redis } from "@upstash/redis";
 import { Response, NextFunction } from "express";
 import { RequestWithId } from "./requestId.js";
 import { RequestWithUser } from "./auth.js";
+import { log } from "./logger.js";
 
 function restUrl(): string {
   return (process.env.UPSTASH_REDIS_REST_URL || "").trim();
@@ -48,6 +49,9 @@ const RATE_LIMIT_BOOTSTRAP_WINDOW_SEC = Number(process.env.RATE_LIMIT_SIWE_WINDO
 
 const RATE_LIMIT_LIGHT_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_LIGHT_MAX_IP) || 100) * RATE_LIMIT_MULTIPLIER);
 const RATE_LIMIT_LIGHT_MAX_USER = Math.round((Number(process.env.RATE_LIMIT_LIGHT_MAX_USER) || 500) * RATE_LIMIT_MULTIPLIER);
+
+const RATE_LIMIT_BYOK_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_BYOK_MAX_IP) || 15) * RATE_LIMIT_MULTIPLIER);
+const RATE_LIMIT_BYOK_MAX_USER = Math.round((Number(process.env.RATE_LIMIT_BYOK_MAX_USER) || 10) * RATE_LIMIT_MULTIPLIER);
 
 const REST_BACKOFF_MS = 60_000;
 let lastRestFailure = 0;
@@ -89,10 +93,11 @@ function getRedisRest(): Redis | null {
   } catch (err) {
     lastRestFailure = Date.now();
     redisClient = null;
+    const errMsg = err instanceof Error ? err.message : String(err);
     if (nodeEnv() === "development") {
-      console.warn("[rate-limit] Upstash REST client init failed, skipping rate limit:", err instanceof Error ? err.message : err);
+      log.warn({ err: errMsg }, "Upstash REST client init failed, skipping rate limit");
     } else {
-      console.error("[rate-limit] Upstash REST client init failed:", err instanceof Error ? err.message : err);
+      log.error({ err: errMsg }, "Upstash REST client init failed");
     }
     return null;
   }
@@ -144,11 +149,12 @@ async function checkLimit(
     return { ok: false, reason: "limit", retryAfterSec };
   } catch (err) {
     resetRestClient();
+    const errMsg = err instanceof Error ? err.message : String(err);
     if (nodeEnv() !== "production") {
-      console.warn("[rate-limit] Upstash limit() failed, skipping rate limit:", err instanceof Error ? err.message : err);
+      log.warn({ err: errMsg }, "Upstash limit() failed, skipping rate limit");
       return { ok: true };
     }
-    console.error("[rate-limit] Upstash limit() failed:", err instanceof Error ? err.message : err);
+    log.error({ err: errMsg }, "Upstash limit() failed");
     if (isAuthError(err)) return { ok: false, reason: "redis_auth" };
     return { ok: false, reason: "redis_error" };
   }
@@ -216,7 +222,7 @@ export async function rateLimitMiddleware(
   if (!redis) {
     if (nodeEnv() === "production") {
       if (RATE_LIMIT_BYPASS_ON_FAIL) {
-        console.warn("[rate-limit] Upstash unreachable. RATE_LIMIT_BYPASS_ON_FAIL ignored in production (fail-closed).");
+        log.warn("Upstash unreachable. RATE_LIMIT_BYPASS_ON_FAIL ignored in production (fail-closed)");
       }
       logSecurityEvent("rate_limit_unavailable", 503, req.path, req.requestId, req.userId);
       res.status(503).json({
@@ -293,6 +299,37 @@ export async function rateLimitMiddleware(
 
   const ip = req.ip || (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
   const userId = req.userId || "";
+
+  const isByokRoute = req.path.startsWith("/api/v1/byok");
+  if (isByokRoute) {
+    const limIp = getLimiter(redis, RATE_LIMIT_BYOK_MAX_IP, RATE_LIMIT_WINDOW_SEC, "byok-ip");
+    const byokIp = await checkLimit(limIp, ip, RATE_LIMIT_WINDOW_SEC);
+    if (
+      !sendLimitOrRedis(req, res, byokIp, {
+        retryAfterSec: RATE_LIMIT_WINDOW_SEC,
+        event: "rate_limit_byok",
+        message: "BYOK key management rate limit exceeded. Try again later.",
+      })
+    ) {
+      return;
+    }
+    if (userId) {
+      const limU = getLimiter(redis, RATE_LIMIT_BYOK_MAX_USER, RATE_LIMIT_WINDOW_SEC, "byok-user");
+      const byokUser = await checkLimit(limU, userId, RATE_LIMIT_WINDOW_SEC);
+      if (
+        !sendLimitOrRedis(req, res, byokUser, {
+          retryAfterSec: RATE_LIMIT_WINDOW_SEC,
+          event: "rate_limit_byok",
+          message: "BYOK key management rate limit exceeded.",
+        })
+      ) {
+        return;
+      }
+    }
+    next();
+    return;
+  }
+
   const isLlmKeysPost = req.method === "POST" && req.path === LLM_KEYS_PATH;
   const isWorkflowGenerate = req.method === "POST" && req.path === "/api/v1/workflows/generate";
   const isDeployPrepare = req.method === "POST" && /^\/api\/v1\/workflows\/[^/]+\/deploy\/prepare$/.test(req.path);
@@ -406,5 +443,5 @@ function logSecurityEvent(
   const payload: Record<string, unknown> = { event, status, path };
   if (requestId) payload.requestId = requestId;
   if (userId) payload.userId = userId;
-  console.warn("[security]", JSON.stringify(payload));
+  log.warn(payload, "security event");
 }

@@ -58,7 +58,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 black isort mypy bandit
+          pip install flake8 "black==24.10.0" isort mypy bandit
       
       - name: Run Black formatter check
         run: black --check services/orchestrator/
@@ -122,6 +122,10 @@ jobs:
         with:
           node-version: '20'
           cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: pnpm audit (Node)
         run: pnpm audit --audit-level=high
@@ -293,11 +297,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       
+      - name: Build Studio (E2E uses next start in CI)
+        run: pnpm --filter hyperagent-studio run build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+      
       - name: Install Playwright browsers
         run: pnpm --filter hyperagent-studio exec playwright install --with-deps chromium
       
       - name: Run E2E tests
         run: pnpm --filter hyperagent-studio run test:e2e
+        env:
+          CI: 'true'
 
   # ============================================================================
   # STAGE 4: INTEGRATION TESTS
@@ -346,6 +357,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://test_user:test_password@localhost:5432/hyperagent_test
           ENVIRONMENT: test
+          EIGENDA_ENABLED: "0"
+          EIGENDA_PRIVATE_KEY: ""
 
   # Path-gated: blocks agent-runtime / simulation Docker builds if @hyperagent/ai-tools breaks.
   ai-tools-tenderly-contract:

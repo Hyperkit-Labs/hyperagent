@@ -9,8 +9,11 @@ from typing import Literal, TypedDict
 class SecurityGateError(Exception):
     """Raised when deployment is blocked by security policy verdict."""
 
-    def __init__(self, message: str = "Deployment blocked by security policy verdict") -> None:
+    def __init__(
+        self, message: str = "Deployment blocked by security policy verdict"
+    ) -> None:
         super().__init__(message)
+
 
 GateStatus = Literal["PASS", "FAIL", "WAIVED", "NOT_APPLICABLE"]
 FinalDecision = Literal["APPROVED", "REJECTED", "APPROVED_WITH_WAIVER"]

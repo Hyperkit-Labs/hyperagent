@@ -3,7 +3,7 @@
  */
 
 import { FALLBACK_DEFAULT_NETWORK_ID, FALLBACK_DEFAULT_CHAIN_ID } from '@/constants/defaults';
-import { fetchJson, reportApiError, BYOK_REQUEST_TIMEOUT_MS } from './core';
+import { fetchJson, fetchJsonAuthed, reportApiError, BYOK_REQUEST_TIMEOUT_MS } from './core';
 
 export const workspaceHeaders = (workspaceId?: string): Record<string, string> =>
   workspaceId ? { 'X-Workspace-Id': workspaceId } : {};
@@ -49,13 +49,13 @@ export async function getConfig(): Promise<RuntimeConfig> {
 }
 
 export async function fetchConfigStrict(): Promise<RuntimeConfig> {
-  return fetchJson<RuntimeConfig>('/config', { suppressOn401: true });
+  return fetchJson<RuntimeConfig>('/config');
 }
 
 export async function getConfiguredLLMProviders(
   workspaceId?: string
 ): Promise<{ configured_providers: string[] }> {
-  return fetchJson('/workspaces/current/llm-keys', {
+  return fetchJsonAuthed('/workspaces/current/llm-keys', {
     credentials: 'include',
     headers: workspaceHeaders(workspaceId),
     timeoutMs: BYOK_REQUEST_TIMEOUT_MS,
@@ -75,7 +75,7 @@ export async function setLLMKeys(
   keys: Record<string, string>,
   workspaceId?: string
 ): Promise<{ configured_providers: string[] }> {
-  return fetchJson('/workspaces/current/llm-keys', {
+  return fetchJsonAuthed('/workspaces/current/llm-keys', {
     method: 'POST',
     headers: workspaceHeaders(workspaceId),
     body: JSON.stringify({ keys }),
@@ -84,7 +84,7 @@ export async function setLLMKeys(
 }
 
 export async function deleteLLMKeys(workspaceId?: string): Promise<{ success: boolean }> {
-  return fetchJson('/workspaces/current/llm-keys', {
+  return fetchJsonAuthed('/workspaces/current/llm-keys', {
     method: 'DELETE',
     headers: workspaceHeaders(workspaceId),
     timeoutMs: BYOK_REQUEST_TIMEOUT_MS,
@@ -96,7 +96,7 @@ export async function validateLLMKey(
   apiKey?: string,
   workspaceId?: string
 ): Promise<{ valid: boolean; latency_ms?: number; error?: string }> {
-  return fetchJson('/workspaces/current/llm-keys/validate', {
+  return fetchJsonAuthed('/workspaces/current/llm-keys/validate', {
     method: 'POST',
     headers: workspaceHeaders(workspaceId),
     body: JSON.stringify({ provider, api_key: apiKey || undefined }),

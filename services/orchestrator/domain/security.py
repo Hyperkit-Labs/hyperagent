@@ -7,10 +7,25 @@ from typing import Any
 
 EXPLOIT_SIM_CONTRACT_TYPE_TO_POC: dict[str, list[str]] = {
     "dex": ["src/test/DEX", "src/test/uniswap", "src/test/2024-04", "src/test/2024-05"],
-    "lending": ["src/test/lending", "src/test/aave", "src/test/2024-04", "src/test/2024-05"],
+    "lending": [
+        "src/test/lending",
+        "src/test/aave",
+        "src/test/2024-04",
+        "src/test/2024-05",
+    ],
     "vault": ["src/test/vault", "src/test/2024-04", "src/test/2024-05"],
-    "erc20": ["src/test/2024-04", "src/test/2024-05", "src/test/erc20", "src/test/token"],
-    "erc721": ["src/test/nft", "src/test/2024-04", "src/test/2024-05", "src/test/erc721"],
+    "erc20": [
+        "src/test/2024-04",
+        "src/test/2024-05",
+        "src/test/erc20",
+        "src/test/token",
+    ],
+    "erc721": [
+        "src/test/nft",
+        "src/test/2024-04",
+        "src/test/2024-05",
+        "src/test/erc721",
+    ],
     "nft": ["src/test/nft", "src/test/2024-04", "src/test/2024-05", "src/test/erc721"],
 }
 
@@ -55,4 +70,8 @@ def resolve_contract_type(spec: dict[str, Any], design: dict[str, Any]) -> str:
 
 def get_poc_paths_for_contract_type(contract_type: str) -> list[str]:
     """Return PoC test paths for the given contract type."""
-    return list(EXPLOIT_SIM_CONTRACT_TYPE_TO_POC.get(contract_type, EXPLOIT_SIM_CONTRACT_TYPE_TO_POC["erc20"]))
+    return list(
+        EXPLOIT_SIM_CONTRACT_TYPE_TO_POC.get(
+            contract_type, EXPLOIT_SIM_CONTRACT_TYPE_TO_POC["erc20"]
+        )
+    )

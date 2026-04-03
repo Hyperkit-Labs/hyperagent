@@ -18,40 +18,42 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const prTitle = context.payload.pull_request.title;
-            const spamRegex = /^(feat|chore|fix)(\(.*\))?\s*:/i;
+            const pr = context.payload.pull_request;
+            const prTitle = pr.title;
+            const prBody = pr.body || '';
+            const author = pr.user.login;
 
-            if (spamRegex.test(prTitle)) {
-              // Leave a comment explaining why
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.payload.pull_request.number,
-                body: `## PR Closed as Spam
-
-            This PR was automatically closed because the title format \`feat:\`, \`fix:\`, or \`chore:\` is commonly associated with spam contributions.
-
-            If this is a legitimate contribution, please:
-            1. Review our contribution guidelines
-            2. Use the correct PR title format: \`directory, ...: description\`
-            3. Open a new PR with the proper title format
-
-            Thank you for your understanding.`
-              });
-
-              // Close the PR
-              await github.rest.pulls.update({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: context.payload.pull_request.number,
-                state: 'closed'
-              });
-
-              core.setFailed('PR closed as spam due to suspicious title format');
+            const knownBots = ['dependabot[bot]', 'renovate[bot]', 'github-actions[bot]'];
+            if (knownBots.includes(author)) {
+              console.log(`Trusted bot author: ${author}, skipping spam check`);
               return;
             }
 
-            console.log('✅ PR passed spam check');
+            const spamSignals = [];
+            if (prTitle.length < 5) spamSignals.push('title too short');
+            if (/^\d+$/.test(prTitle)) spamSignals.push('title is only numbers');
+            if (/^[a-z]{1,3}$/.test(prTitle)) spamSignals.push('title is gibberish');
+            if (prBody.length === 0 && !prTitle.startsWith('Merge')) spamSignals.push('empty body');
+            if (/https?:\/\/(?!github\.com)/i.test(prBody) && prBody.length < 50) spamSignals.push('suspicious external link in short body');
+
+            if (spamSignals.length >= 2) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                body: `## PR flagged as potential spam\n\nSignals: ${spamSignals.join(', ')}.\n\nIf this is a legitimate contribution, a maintainer will reopen it.`
+              });
+              await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                state: 'closed'
+              });
+              core.setFailed('PR closed as potential spam');
+              return;
+            }
+
+            console.log('PR passed spam check');
 
       - name: Checkout repository
         uses: actions/checkout@v4

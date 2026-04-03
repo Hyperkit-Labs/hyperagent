@@ -18,6 +18,14 @@ app = FastAPI(title="HyperAgent Tools Service", version="0.1.0")
 TOOLS_API_KEY = os.environ.get("TOOLS_API_KEY")
 
 
+def _assert_within(base: Path, target: Path) -> Path:
+    """Resolve *target* and verify it stays inside *base*. Raises HTTPException on escape."""
+    resolved = target.resolve()
+    if not resolved.is_relative_to(base.resolve()):
+        raise HTTPException(status_code=400, detail="Path escapes workspace boundary")
+    return resolved
+
+
 def _require_api_key(x_tools_api_key: str | None = Header(None, alias="X-TOOLS-API-KEY")) -> None:
     """When TOOLS_API_KEY is set, require X-TOOLS-API-KEY header on requests."""
     if TOOLS_API_KEY and x_tools_api_key != TOOLS_API_KEY:
@@ -71,7 +79,8 @@ def _strip_markdown_fences(source: str) -> str:
 
 def _extract_contract_name(source: str) -> str:
     """Extract first contract name from Solidity source."""
-    match = re.search(r"contract\s+(\w+)[^{]*\{", source)
+    snippet = source[:10_000]
+    match = re.search(r"contract\s+(\w+)\s*(?:\{|is\s)", snippet)
     raw = match.group(1) if match else "Contract"
     if not re.match(r"^[a-zA-Z0-9_]+$", raw):
         return "Contract"
@@ -116,7 +125,7 @@ def _run_slither(workdir: Path, files: dict[str, str], entry: str) -> list[dict]
     contracts_dir.mkdir(parents=True, exist_ok=True)
     for path, content in files.items():
         safe = _safe_sol_filename(path)
-        dst = contracts_dir / safe
+        dst = _assert_within(workdir, contracts_dir / safe)
         code = content.strip()
         if "pragma solidity" not in code.lower():
             code = "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n" + code

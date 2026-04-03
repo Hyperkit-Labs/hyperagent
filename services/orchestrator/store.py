@@ -116,7 +116,8 @@ def create_workflow(
 ) -> dict[str, Any]:
     """Create a new workflow record; persist to Supabase when configured, always keep in-memory copy.
     Writes to run_state when migration applied; keeps upsert_workflow_state for backward compat (deprecated).
-    When Supabase not configured, evicts oldest workflows when over IN_MEMORY_WORKFLOW_LIMIT."""
+    When Supabase not configured, evicts oldest workflows when over IN_MEMORY_WORKFLOW_LIMIT.
+    """
     record = _new_record(workflow_id, intent, network, user_id, project_id, template_id)
     with _lock:
         _workflows[workflow_id] = record
@@ -201,7 +202,17 @@ def update_workflow(
             simulation_passed=rec.get("simulation_passed", False),
         )
         # Rich pipeline fields: write to project_artifacts only. workflow_state blob writes retired (H-001).
-        _rich_changed = any(x is not None for x in (contracts, spec, deployments, ui_schema, audit_findings, test_files))
+        _rich_changed = any(
+            x is not None
+            for x in (
+                contracts,
+                spec,
+                deployments,
+                ui_schema,
+                audit_findings,
+                test_files,
+            )
+        )
         if _rich_changed:
             proj_id = rec.get("project_id") or ""
             if _db.is_uuid(proj_id):
@@ -246,8 +257,22 @@ def get_workflow(workflow_id: str) -> dict[str, Any] | None:
     if _db.is_configured():
         run_st = _db.get_run_state(workflow_id)
         blob = _db.get_workflow_state(workflow_id)
-        has_rich_blob = blob and any(blob.get(k) for k in ("spec", "contracts", "deployments", "audit_findings", "ui_schema", "test_files"))
-        artifacts = _db.get_workflow_rich_from_artifacts(workflow_id) if not has_rich_blob else {}
+        has_rich_blob = blob and any(
+            blob.get(k)
+            for k in (
+                "spec",
+                "contracts",
+                "deployments",
+                "audit_findings",
+                "ui_schema",
+                "test_files",
+            )
+        )
+        artifacts = (
+            _db.get_workflow_rich_from_artifacts(workflow_id)
+            if not has_rich_blob
+            else {}
+        )
         if run_st or blob or artifacts:
             rec: dict[str, Any] = dict(blob) if blob else {}
             if artifacts:

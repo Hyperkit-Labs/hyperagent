@@ -100,7 +100,8 @@ def _is_pashov_corroborated(
     deterministic_findings: list[dict],
 ) -> bool:
     """True if Pashov finding is corroborated by Slither/Mythril/Echidna/Tenderly.
-    Corroboration: same or overlapping location/title/category from a deterministic tool."""
+    Corroboration: same or overlapping location/title/category from a deterministic tool.
+    """
     det_tools = set(get_deterministic_tools())
     p_title = (pashov_finding.get("title") or "").lower()
     p_desc = (pashov_finding.get("description") or "").lower()
@@ -169,7 +170,9 @@ def _finding_blocks_deploy(
 
     if "pashov" in tool:
         if deploy_rule == "block_only_when_corroborated":
-            if _is_pashov_corroborated(finding, [f for f in all_findings if f != finding]):
+            if _is_pashov_corroborated(
+                finding, [f for f in all_findings if f != finding]
+            ):
                 return severity in ("high", "critical")
             return False
 
@@ -207,11 +210,15 @@ async def _run_audit_via_execution_backend(
         on_log = None
         if is_configured() and run_id:
             from db import insert_agent_log
+
             def _on_log(tool: str, line: str) -> None:
                 insert_agent_log(run_id, tool, "audit", line[:4096], log_level="info")
+
             on_log = _on_log
         if OPENSANDBOX_ENABLED and hasattr(backend, "run_multi_engine_audit"):
-            result = await backend.run_multi_engine_audit(code, contract_name, on_log=on_log)
+            result = await backend.run_multi_engine_audit(
+                code, contract_name, on_log=on_log
+            )
         else:
             result = await backend.run_audit(
                 code, contract_name, tools=list(AUDIT_TOOLS), on_log=on_log

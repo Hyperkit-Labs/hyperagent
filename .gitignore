@@ -39,8 +39,8 @@ skills-lock.json
 .env
 .env.*
 !.env.example
-  !.env.template
-  !.env.*.example
+!.env.template
+!.env.*.example
 .env.deployer
 .env.local
 .env.*.local
@@ -408,6 +408,11 @@ test-results/
 test-results.xml
 playwright-report/
 **/playwright-report/
+# Playwright local caches (Windows-friendly paths under apps/studio)
+**/.playwright-cache/
+**/.playwright-tmp/
+blob-report/
+**/blob-report/
 
 # Dogfood QA output (reports, screenshots, videos). Opt-in to commit specific reports.
 dogfood-output/
@@ -468,6 +473,9 @@ Gemfile.lock
 local/
 .local/
 *.local
+.direnv/
+.envrc
+.tool-versions.local
 
 # Backup files
 *.bak
@@ -488,6 +496,8 @@ backup-*/
 .railway
 .now
 .turbo
+turbo-task-graph.html
+turbo-build-graph.html
 
 # ============================================================
 # DOCUMENTATION & SCRIPTS (Project-specific ignores)

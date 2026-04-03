@@ -127,7 +127,7 @@ export default function SecurityPage() {
                 <div className="space-y-3">
                   {hasFindings ? (
                     findings.map((vuln) => (
-                      <div key={vuln.id ?? vuln.run_id ?? Math.random()} className="bg-[var(--color-bg-base)] border border-[var(--color-border-subtle)] rounded-lg p-3">
+                      <div key={vuln.id ?? vuln.run_id ?? `vuln-${findings.indexOf(vuln)}`} className="bg-[var(--color-bg-base)] border border-[var(--color-border-subtle)] rounded-lg p-3">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${(vuln.severity ?? "").toLowerCase() === "high" || (vuln.severity ?? "").toLowerCase() === "critical" ? "bg-red-500/10 text-red-400 border border-red-500/20" : (vuln.severity ?? "").toLowerCase() === "medium" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : "bg-blue-500/10 text-blue-400 border border-blue-500/20"}`}>

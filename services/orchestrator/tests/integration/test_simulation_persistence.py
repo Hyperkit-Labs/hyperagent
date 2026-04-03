@@ -8,7 +8,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(
+    0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
 
 @pytest.fixture
@@ -16,7 +18,9 @@ def mock_sim_provider():
     with patch("providers.get_simulation_provider") as m:
         prov = m.return_value
         prov.simulate = AsyncMock(return_value={"success": True, "gasUsed": 150000})
-        prov.simulate_bundle = AsyncMock(return_value={"success": True, "gasUsed": 200000})
+        prov.simulate_bundle = AsyncMock(
+            return_value={"success": True, "gasUsed": 200000}
+        )
         yield m
 
 
@@ -34,7 +38,10 @@ async def test_simulation_agent_persists_result(mock_sim_provider, in_memory_sto
     deployments = [
         {
             "chain_id": 5003,
-            "plan": {"bytecode": "0x608060405234801561001057600080fd5b50", "chainId": 5003},
+            "plan": {
+                "bytecode": "0x608060405234801561001057600080fd5b50",
+                "chainId": 5003,
+            },
         }
     ]
     result = await run_tenderly_simulations(

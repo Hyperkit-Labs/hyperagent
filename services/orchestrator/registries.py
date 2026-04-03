@@ -261,17 +261,72 @@ def get_high_severity_swc() -> list[str]:
 # Static chain metadata for chains where thirdweb/capabilities lack rpc/explorer/name.
 # Used when capabilities.yaml is the source and does not override these fields.
 _CHAIN_ID_METADATA: dict[int, dict[str, Any]] = {
-    1: {"name": "Ethereum Mainnet", "symbol": "ETH", "rpc": "https://ethereum.publicnode.com", "explorer": "https://etherscan.io"},
-    56: {"name": "BNB Smart Chain", "symbol": "BNB", "rpc": "https://bsc-dataseed.binance.org", "explorer": "https://bscscan.com"},
-    204: {"name": "opBNB", "symbol": "BNB", "rpc": "https://opbnb-mainnet-rpc.bnbchain.org", "explorer": "https://opbnb.bscscan.com"},
-    314: {"name": "Filecoin", "symbol": "FIL", "rpc": "https://api.node.glif.io/rpc/v1", "explorer": "https://filfox.info"},
-    5000: {"name": "Mantle", "symbol": "MNT", "rpc": "https://rpc.mantle.xyz", "explorer": "https://explorer.mantle.xyz"},
-    8453: {"name": "Base", "symbol": "ETH", "rpc": "https://mainnet.base.org", "explorer": "https://basescan.org"},
-    43113: {"name": "Avalanche Fuji", "symbol": "AVAX", "rpc": "https://api.avax-test.network/ext/bc/C/rpc", "explorer": "https://testnet.snowtrace.io"},
-    43114: {"name": "Avalanche C-Chain", "symbol": "AVAX", "rpc": "https://api.avax.network/ext/bc/C/rpc", "explorer": "https://snowtrace.io"},
-    42161: {"name": "Arbitrum One", "symbol": "ETH", "rpc": "https://arb1.arbitrum.io/rpc", "explorer": "https://arbiscan.io"},
-    324705682: {"name": "SKALE Base Sepolia", "symbol": "CREDIT", "rpc": "https://base-sepolia-testnet.skalenodes.com/v1/jubilant-horrible-ancha", "explorer": "https://base-sepolia-testnet-explorer.skalenodes.com/"},
-    1187947933: {"name": "SKALE Base", "symbol": "CREDIT", "rpc": "https://skale-base.skalenodes.com/v1/base", "explorer": "https://skale-base-explorer.skalenodes.com/"},
+    1: {
+        "name": "Ethereum Mainnet",
+        "symbol": "ETH",
+        "rpc": "https://ethereum.publicnode.com",
+        "explorer": "https://etherscan.io",
+    },
+    56: {
+        "name": "BNB Smart Chain",
+        "symbol": "BNB",
+        "rpc": "https://bsc-dataseed.binance.org",
+        "explorer": "https://bscscan.com",
+    },
+    204: {
+        "name": "opBNB",
+        "symbol": "BNB",
+        "rpc": "https://opbnb-mainnet-rpc.bnbchain.org",
+        "explorer": "https://opbnb.bscscan.com",
+    },
+    314: {
+        "name": "Filecoin",
+        "symbol": "FIL",
+        "rpc": "https://api.node.glif.io/rpc/v1",
+        "explorer": "https://filfox.info",
+    },
+    5000: {
+        "name": "Mantle",
+        "symbol": "MNT",
+        "rpc": "https://rpc.mantle.xyz",
+        "explorer": "https://explorer.mantle.xyz",
+    },
+    8453: {
+        "name": "Base",
+        "symbol": "ETH",
+        "rpc": "https://mainnet.base.org",
+        "explorer": "https://basescan.org",
+    },
+    43113: {
+        "name": "Avalanche Fuji",
+        "symbol": "AVAX",
+        "rpc": "https://api.avax-test.network/ext/bc/C/rpc",
+        "explorer": "https://testnet.snowtrace.io",
+    },
+    43114: {
+        "name": "Avalanche C-Chain",
+        "symbol": "AVAX",
+        "rpc": "https://api.avax.network/ext/bc/C/rpc",
+        "explorer": "https://snowtrace.io",
+    },
+    42161: {
+        "name": "Arbitrum One",
+        "symbol": "ETH",
+        "rpc": "https://arb1.arbitrum.io/rpc",
+        "explorer": "https://arbiscan.io",
+    },
+    324705682: {
+        "name": "SKALE Base Sepolia",
+        "symbol": "CREDIT",
+        "rpc": "https://base-sepolia-testnet.skalenodes.com/v1/jubilant-horrible-ancha",
+        "explorer": "https://base-sepolia-testnet-explorer.skalenodes.com/",
+    },
+    1187947933: {
+        "name": "SKALE Base",
+        "symbol": "CREDIT",
+        "rpc": "https://skale-base.skalenodes.com/v1/base",
+        "explorer": "https://skale-base-explorer.skalenodes.com/",
+    },
 }
 
 
@@ -298,16 +353,28 @@ def _chain_list_from_capabilities() -> list[dict[str, Any]]:
         category = cap.get("category") or "mainnet"
         native = cap.get("nativeCurrency") or {}
         static = _CHAIN_ID_METADATA.get(chain_id)
-        name = cap.get("name") or (static.get("name") if static else None) or slug.replace("-", " ").title()
-        symbol = (native.get("symbol") if native else None) or (static.get("symbol") if static else "ETH")
+        name = (
+            cap.get("name")
+            or (static.get("name") if static else None)
+            or slug.replace("-", " ").title()
+        )
+        symbol = (native.get("symbol") if native else None) or (
+            static.get("symbol") if static else "ETH"
+        )
         rpc = (cap.get("rpcUrl") or "").strip() or (static.get("rpc") if static else "")
-        explorer = (cap.get("explorerUrl") or "").strip() or (static.get("explorer") if static else "")
+        explorer = (cap.get("explorerUrl") or "").strip() or (
+            static.get("explorer") if static else ""
+        )
         cl = {
             "name": name,
             "chainId": chain_id,
             "rpcUrls": [rpc] if rpc else [],
             "blockExplorerUrls": [explorer] if explorer else [],
-            "nativeCurrency": {"name": native.get("name") or name, "symbol": symbol, "decimals": native.get("decimals", 18)},
+            "nativeCurrency": {
+                "name": native.get("name") or name,
+                "symbol": symbol,
+                "decimals": native.get("decimals", 18),
+            },
         }
         ha = {
             "slug": slug,
@@ -317,7 +384,9 @@ def _chain_list_from_capabilities() -> list[dict[str, Any]]:
             "defaults": cap.get("defaults") or {},
             "aa": cap.get("aa"),
         }
-        out.append({"id": chain_id, "enabled": enabled, "chainlist": cl, "hyperagent": ha})
+        out.append(
+            {"id": chain_id, "enabled": enabled, "chainlist": cl, "hyperagent": ha}
+        )
     return out
 
 

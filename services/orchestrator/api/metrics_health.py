@@ -58,8 +58,13 @@ def _check_supabase_health() -> dict[str, Any]:
     return {"status": "not_configured"}
 
 
+_redis_consecutive_failures: int = 0
+
+
 def _check_redis_health() -> dict[str, Any]:
-    """Ping Redis TCP (e.g. Upstash) when REDIS_URL is set."""
+    """Ping Redis TCP (e.g. Upstash) when REDIS_URL is set.
+    Emits structured alert log on consecutive failures (x402 replay protection depends on Redis)."""
+    global _redis_consecutive_failures
     url = (os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or "").strip()
     if not url or url.startswith("#"):
         return {"status": "not_configured"}
@@ -67,11 +72,22 @@ def _check_redis_health() -> dict[str, Any]:
         from redis import Redis
         r = Redis.from_url(effective_redis_url(url))
         r.ping()
+        if _redis_consecutive_failures > 0:
+            logger.info("[redis] connection restored after %d consecutive failures", _redis_consecutive_failures)
+        _redis_consecutive_failures = 0
         return {"status": "ok"}
     except ImportError:
         return {"status": "not_configured", "message": "redis package not installed"}
     except Exception as e:
-        return {"status": "error", "error": str(e)[:200]}
+        _redis_consecutive_failures += 1
+        err_msg = str(e)[:200]
+        logger.error(
+            "[alert][redis] connection failed (consecutive=%d): %s. "
+            "x402 nonce replay protection is degraded. Queue operations may fail.",
+            _redis_consecutive_failures,
+            err_msg,
+        )
+        return {"status": "error", "error": err_msg, "consecutive_failures": _redis_consecutive_failures}
 
 
 def _check_service_health(name: str, url: str, timeout: float = 2.0) -> dict[str, Any]:
@@ -152,6 +168,29 @@ def _metrics_since_from_time_range(time_range: str) -> str | None:
 health_router = APIRouter(tags=["health"])
 
 
+def _check_dead_letter_queue() -> dict[str, Any]:
+    """Check dead letter queue depth. High depth indicates failed jobs that need investigation."""
+    url = (os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or "").strip()
+    if not url or url.startswith("#"):
+        return {"status": "not_configured", "depth": 0}
+    try:
+        from redis import Redis
+        r = Redis.from_url(effective_redis_url(url))
+        depth = r.llen("queue:hyperagent:dead")
+        result: dict[str, Any] = {"status": "ok", "depth": depth}
+        if depth > 0:
+            logger.warning(
+                "[alert][dlq] dead letter queue has %d unprocessed jobs. Investigate via GET /api/v1/health/detailed.",
+                depth,
+            )
+            result["status"] = "warning"
+        return result
+    except ImportError:
+        return {"status": "not_configured", "depth": 0}
+    except Exception as e:
+        return {"status": "error", "depth": -1, "error": str(e)[:200]}
+
+
 def _root_health_critical_ok() -> tuple[bool, dict[str, Any]]:
     """Check critical deps (Supabase when configured, Redis when QUEUE_ENABLED). Returns (ok, payload)."""
     payload: dict[str, Any] = {"registries": get_registry_versions()}
@@ -166,6 +205,8 @@ def _root_health_critical_ok() -> tuple[bool, dict[str, Any]]:
     payload["supabase"] = supabase
     payload["redis"] = redis
     payload["queue_enabled"] = queue_enabled
+    if queue_enabled and redis_configured:
+        payload["dead_letter_queue"] = _check_dead_letter_queue()
     return critical_ok, payload
 
 
@@ -282,6 +323,9 @@ def health_detailed() -> dict[str, Any]:
         services["tools"] = tools_status
         if tools_status.get("status") == "offline":
             services["tools"]["message"] = "Toolchain offline; compile/audit may fail when using remote tools"
+    queue_enabled = os.environ.get("QUEUE_ENABLED", "").strip() in ("1", "true", "yes")
+    if queue_enabled:
+        services["dead_letter_queue"] = _check_dead_letter_queue()
     return {"status": "ok", "services": services, "registries": versions}
 
 

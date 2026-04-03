@@ -126,11 +126,13 @@ def reconcile_user(user_id: str) -> ReconciliationResult | None:
         for p in payment_rows.data or []:
             wf_id = (p.get("metadata") or {}).get("workflow_id")
             if wf_id and wf_id not in tx_refs:
-                orphan_payments.append({
-                    "payment_id": p.get("id"),
-                    "resource_id": p.get("resource_id"),
-                    "workflow_id": wf_id,
-                })
+                orphan_payments.append(
+                    {
+                        "payment_id": p.get("id"),
+                        "resource_id": p.get("resource_id"),
+                        "workflow_id": wf_id,
+                    }
+                )
 
         drift = round(stored - computed, 4)
 
@@ -156,12 +158,7 @@ def reconcile_all(limit: int = 100) -> list[ReconciliationResult]:
         return []
 
     try:
-        r = (
-            client.table("user_credits")
-            .select("user_id")
-            .limit(limit)
-            .execute()
-        )
+        r = client.table("user_credits").select("user_id").limit(limit).execute()
         results: list[ReconciliationResult] = []
         for row in r.data or []:
             uid = row.get("user_id")
@@ -175,7 +172,9 @@ def reconcile_all(limit: int = 100) -> list[ReconciliationResult]:
         return []
 
 
-def find_drifted_users(threshold: float = 0.01, limit: int = 100) -> list[dict[str, Any]]:
+def find_drifted_users(
+    threshold: float = 0.01, limit: int = 100
+) -> list[dict[str, Any]]:
     """Return users whose stored balance differs from computed balance."""
     results = reconcile_all(limit=limit)
     return [r.to_dict() for r in results if abs(r.drift) >= threshold]

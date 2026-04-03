@@ -104,7 +104,9 @@ async def invoke_roma_spec(
             from circuit_breaker import CircuitOpenError, get_breaker
 
             async def _call_roma() -> dict[str, Any] | None:
-                async with httpx.AsyncClient(timeout=float(ROMA_SPEC_TIMEOUT)) as client:
+                async with httpx.AsyncClient(
+                    timeout=float(ROMA_SPEC_TIMEOUT)
+                ) as client:
                     r = await client.post(
                         f"{ROMA_URL.rstrip('/')}/spec",
                         json={

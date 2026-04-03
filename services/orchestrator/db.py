@@ -352,6 +352,7 @@ def insert_agent_registration(
 
 # Truncation limits (F-016). Content exceeding limits is cut; full content stored in IPFS when PINATA_* configured.
 # Large artifacts: use storage_backend=ipfs and cid for full retrieval; inline content may be truncated.
+# Filecoin: when FILECOIN_ARCHIVAL_ENABLED and LIGHTHOUSE_API_KEY, orchestrator registers CIDs via Lighthouse Filecoin First (see filecoin_client.py).
 ARTIFACT_CONTENT_LIMIT = 65535  # project_artifacts.content, run_step outputs
 AGENT_LOG_MESSAGE_LIMIT = 4096  # agent_log.message
 OUTPUT_SUMMARY_LIMIT = 4096  # run_step.output_summary
@@ -1138,3 +1139,133 @@ def get_recent_activity_logs(limit: int = 50) -> list[dict[str, Any]]:
     except Exception as e:
         logger.warning("[db] unknown failed: %s", e)
         return []
+
+
+def list_storage_records_for_reconciliation(
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    """Rows needing gateway re-verification (pinned/failed, ipfs). Empty if misconfigured or schema mismatch."""
+    client = _client()
+    if not client:
+        return []
+    try:
+        r = (
+            client.table("storage_records")
+            .select("id,cid,gateway_url,status,metadata,storage_type")
+            .eq("storage_type", "ipfs")
+            .in_("status", ["pinned", "failed"])
+            .limit(limit)
+            .execute()
+        )
+        return list(r.data or [])
+    except Exception as e:
+        logger.warning("[db] list_storage_records_for_reconciliation failed: %s", e)
+        return []
+
+
+def patch_storage_record(record_id: str, fields: dict[str, Any]) -> bool:
+    """Update storage_records by primary key."""
+    client = _client()
+    if not client or not record_id or not fields:
+        return False
+    try:
+        client.table("storage_records").update(fields).eq("id", record_id).execute()
+        return True
+    except Exception as e:
+        logger.warning("[db] patch_storage_record failed: %s", e)
+        return False
+
+
+def update_storage_records_by_cid(
+    cid: str,
+    fields: dict[str, Any],
+    storage_type: str = "ipfs",
+) -> bool:
+    """Update all matching pipeline rows (e.g. webhook confirms pin)."""
+    client = _client()
+    if not client or not cid or not fields:
+        return False
+    try:
+        q = client.table("storage_records").update(fields).eq("cid", cid)
+        if storage_type:
+            q = q.eq("storage_type", storage_type)
+        q.execute()
+        return True
+    except Exception as e:
+        logger.warning("[db] update_storage_records_by_cid failed: %s", e)
+        return False
+
+
+def merge_metadata_dict(existing: Any, patch: dict[str, Any]) -> dict[str, Any]:
+    """Merge JSONB metadata with a patch dict."""
+    base: dict[str, Any]
+    if existing is None:
+        base = {}
+    elif isinstance(existing, dict):
+        base = dict(existing)
+    elif isinstance(existing, str):
+        import json
+
+        try:
+            base = dict(json.loads(existing))
+        except Exception:
+            base = {}
+    else:
+        base = {}
+    base.update(patch)
+    return base
+
+
+def list_storage_records_for_filecoin_deal_poll(
+    limit: int = 25,
+    status: str = "deal_pending",
+) -> list[dict[str, Any]]:
+    """Filecoin rows awaiting deal status updates (Lighthouse)."""
+    client = _client()
+    if not client:
+        return []
+    try:
+        r = (
+            client.table("storage_records")
+            .select("id,cid,gateway_url,status,metadata,storage_type")
+            .eq("storage_type", "filecoin")
+            .eq("status", status)
+            .limit(limit)
+            .execute()
+        )
+        return list(r.data or [])
+    except Exception as e:
+        logger.warning("[db] list_storage_records_for_filecoin_deal_poll failed: %s", e)
+        return []
+
+
+def reconcile_storage_records_webhook(
+    cid: str,
+    status: str,
+    meta_patch: dict[str, Any],
+    storage_type: str = "ipfs",
+) -> int:
+    """Select rows by cid, merge metadata, set status. Returns count of rows updated."""
+    client = _client()
+    if not client or not cid:
+        return 0
+    n = 0
+    try:
+        r = (
+            client.table("storage_records")
+            .select("id,metadata")
+            .eq("cid", cid)
+            .eq("storage_type", storage_type)
+            .execute()
+        )
+        for row in r.data or []:
+            rid = row.get("id")
+            if not rid:
+                continue
+            merged = merge_metadata_dict(row.get("metadata"), meta_patch)
+            if patch_storage_record(str(rid), {"status": status, "metadata": merged}):
+                n += 1
+        return n
+    except Exception as e:
+        logger.warning("[db] reconcile_storage_records_webhook failed: %s", e)
+        return 0

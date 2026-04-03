@@ -44,7 +44,9 @@ async def test_pashov_http_error_returns_false(monkeypatch):
             return FakeResponse()
 
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: FakeClient())
-    findings, success = await run_pashov_audit({"Test.sol": "pragma solidity ^0.8.0;"}, {})
+    findings, success = await run_pashov_audit(
+        {"Test.sol": "pragma solidity ^0.8.0;"}, {}
+    )
     assert success is False, "HTTP error must fail-closed"
     assert findings == []
 
@@ -66,7 +68,9 @@ async def test_pashov_exception_returns_false(monkeypatch):
             raise httpx.ConnectTimeout("timeout")
 
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: FailClient())
-    findings, success = await run_pashov_audit({"Test.sol": "pragma solidity ^0.8.0;"}, {})
+    findings, success = await run_pashov_audit(
+        {"Test.sol": "pragma solidity ^0.8.0;"}, {}
+    )
     assert success is False, "Exception must fail-closed"
     assert findings == []
 
@@ -94,6 +98,8 @@ async def test_pashov_success_returns_true(monkeypatch):
             return OkResponse()
 
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: OkClient())
-    findings, success = await run_pashov_audit({"Test.sol": "pragma solidity ^0.8.0;"}, {})
+    findings, success = await run_pashov_audit(
+        {"Test.sol": "pragma solidity ^0.8.0;"}, {}
+    )
     assert success is True
     assert findings == []

@@ -9,6 +9,9 @@ on:
   schedule:
     - cron: '0 2 * * *'  # Daily security scan
 
+permissions:
+  contents: read
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
@@ -76,6 +79,9 @@ jobs:
   security-scan:
     name: '[*] Security Scan'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@v4
       
@@ -371,6 +377,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write
     
     steps:
       - uses: actions/checkout@v4

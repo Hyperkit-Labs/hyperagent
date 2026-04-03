@@ -134,13 +134,15 @@ async def run_tenderly_simulations_bundle(
         ]
         for itx in init_txs:
             if isinstance(itx, dict) and itx.get("data"):
-                bundle_txs.append({
-                    "network_id": network,
-                    "from": itx.get("from", SIM_FROM_ADDRESS),
-                    "to": itx.get("to"),
-                    "input": itx["data"],
-                    "value": itx.get("value", "0"),
-                })
+                bundle_txs.append(
+                    {
+                        "network_id": network,
+                        "from": itx.get("from", SIM_FROM_ADDRESS),
+                        "to": itx.get("to"),
+                        "input": itx["data"],
+                        "value": itx.get("value", "0"),
+                    }
+                )
 
         if len(bundle_txs) == 1:
             result = await provider.simulate(
@@ -152,13 +154,16 @@ async def run_tenderly_simulations_bundle(
         else:
             try:
                 result = await provider.simulate_bundle(
-                    simulations=[{
-                        "network_id": tx["network_id"],
-                        "from": tx["from"],
-                        "to": tx.get("to"),
-                        "input": tx["input"],
-                        "value": tx.get("value", "0"),
-                    } for tx in bundle_txs]
+                    simulations=[
+                        {
+                            "network_id": tx["network_id"],
+                            "from": tx["from"],
+                            "to": tx.get("to"),
+                            "input": tx["input"],
+                            "value": tx.get("value", "0"),
+                        }
+                        for tx in bundle_txs
+                    ]
                 )
             except Exception as e:
                 result = {"success": False, "error": str(e), "gasUsed": 0}

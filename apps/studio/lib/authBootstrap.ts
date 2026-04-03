@@ -79,9 +79,17 @@ async function callBootstrap(body: {
 
     const text = await res.text();
     let detail: string;
+    let responseCode: string | undefined;
     try {
-      const j = JSON.parse(text) as { message?: string; requestId?: string };
-      detail = j.message ?? text;
+      const j = JSON.parse(text) as { message?: string; error?: string; requestId?: string; code?: string };
+      detail = (j.message ?? j.error ?? text).trim() || text;
+      const c = typeof j.code === "string" ? j.code.trim() : "";
+      if (c) {
+        responseCode = c;
+        if (!detail.toUpperCase().includes(c.toUpperCase())) {
+          detail = `${detail} [${c}]`;
+        }
+      }
     } catch {
       detail = text || res.statusText;
     }
@@ -100,9 +108,11 @@ async function callBootstrap(body: {
     const err = new Error((detail || `Bootstrap failed: ${res.status}`) + suffix) as Error & {
       status?: number;
       requestId?: string;
+      code?: string;
     };
     err.status = res.status;
     if (requestId) err.requestId = requestId;
+    if (responseCode) err.code = responseCode;
 
     if (TRANSIENT_BOOTSTRAP_HTTP.has(res.status) && attempt < BOOTSTRAP_MAX_ATTEMPTS - 1) {
       lastError = err;
@@ -118,14 +128,28 @@ async function callBootstrap(body: {
 /**
  * Bootstrap via SIWE: build message, sign with wallet, send to backend.
  */
+function studioPublicOriginUrl(): URL | null {
+  const raw = process.env.NEXT_PUBLIC_STUDIO_ORIGIN?.trim();
+  if (!raw) return null;
+  try {
+    return new URL(raw.startsWith("http") ? raw : `https://${raw}`);
+  } catch {
+    return null;
+  }
+}
+
 export async function bootstrapWithSiwe(params: {
   address: string;
   chainId?: number;
   signMessage: (message: string) => Promise<string>;
 }): Promise<BootstrapSession> {
-  const domain = typeof window !== "undefined" ? window.location.host : "localhost";
+  const fixed = studioPublicOriginUrl();
+  const domain = fixed?.host ?? (typeof window !== "undefined" ? window.location.host : "localhost");
+  const uri =
+    fixed?.origin ??
+    (typeof window !== "undefined" ? window.location.origin : "https://localhost");
   const chainId = params.chainId ?? 1;
-  const messageBody = buildSiweMessage({ address: params.address, domain, chainId });
+  const messageBody = buildSiweMessage({ address: params.address, domain, chainId, uri });
   const signature = await params.signMessage(messageBody);
   return callBootstrap({
     authMethod: "siwe",

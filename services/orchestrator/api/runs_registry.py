@@ -251,7 +251,11 @@ async def rpc_test_api(
             )
         latency_ms = int((time.perf_counter() - start) * 1000)
         if r.status_code != 200:
-            return {"ok": False, "error": f"HTTP {r.status_code}", "latency_ms": latency_ms}
+            return {
+                "ok": False,
+                "error": f"HTTP {r.status_code}",
+                "latency_ms": latency_ms,
+            }
         try:
             j = r.json()
             if j.get("error"):
@@ -268,7 +272,11 @@ async def rpc_test_api(
             "latency_ms": int((time.perf_counter() - start) * 1000),
         }
     except Exception as e:
-        return {"ok": False, "error": str(e)[:200], "latency_ms": int((time.perf_counter() - start) * 1000)}
+        return {
+            "ok": False,
+            "error": str(e)[:200],
+            "latency_ms": int((time.perf_counter() - start) * 1000),
+        }
 
 
 @registry_router.get("/tokens/stablecoins")
@@ -304,11 +312,14 @@ def get_platform_track_record_api() -> dict[str, Any]:
                         1
                         for s in states
                         if any(
-                            st.get("stage") == "audit" and st.get("status") == "completed"
+                            st.get("stage") == "audit"
+                            and st.get("status") == "completed"
                             for st in (s.get("stages") or [])
                         )
                     )
-                    total_findings = sum(len(s.get("audit_findings") or []) for s in states)
+                    total_findings = sum(
+                        len(s.get("audit_findings") or []) for s in states
+                    )
                     if audit_count_legacy > 0:
                         audits = audit_count_legacy
                     if total_findings > 0:
@@ -329,7 +340,11 @@ def get_platform_track_record_api() -> dict[str, Any]:
 def get_presets_api() -> list[dict[str, Any]]:
     """Return presets from token template registry."""
     return [
-        {"id": t["id"], "name": t.get("name", t["id"]), "description": t.get("description", "")}
+        {
+            "id": t["id"],
+            "name": t.get("name", t["id"]),
+            "description": t.get("description", ""),
+        }
         for t in get_templates_for_api()
     ]
 
@@ -338,7 +353,11 @@ def get_presets_api() -> list[dict[str, Any]]:
 def get_blueprints_api() -> list[dict[str, Any]]:
     """Return blueprints from token template registry."""
     return [
-        {"id": t["id"], "name": t.get("name", t["id"]), "description": t.get("description", "")}
+        {
+            "id": t["id"],
+            "name": t.get("name", t["id"]),
+            "description": t.get("description", ""),
+        }
         for t in get_templates_for_api()
     ]
 
@@ -356,7 +375,11 @@ def search_templates_api(q: str = "") -> list[dict[str, Any]]:
     if not q or not q.strip():
         return all_t
     ql = q.lower().strip()
-    return [t for t in all_t if ql in (t.get("name") or "").lower() or ql in (t.get("id") or "").lower()]
+    return [
+        t
+        for t in all_t
+        if ql in (t.get("name") or "").lower() or ql in (t.get("id") or "").lower()
+    ]
 
 
 # Logs router
@@ -455,7 +478,10 @@ class ContractCallBody(BaseModel):
 def contract_read_api(body: ContractReadBody) -> dict[str, Any]:
     """Contract read (view/pure) via chain RPC."""
     if not body.contract_address or not body.function_name:
-        return {"success": False, "error": "contract_address and function_name required"}
+        return {
+            "success": False,
+            "error": "contract_address and function_name required",
+        }
     if not body.abi:
         return {"success": False, "error": "abi required for contract read"}
     chain_id = body.chain_id
@@ -485,7 +511,10 @@ def contract_read_api(body: ContractReadBody) -> dict[str, Any]:
 def contract_call_api(body: ContractCallBody) -> dict[str, Any]:
     """Build unsigned transaction for contract write."""
     if not body.contract_address or not body.function_name:
-        return {"success": False, "error": "contract_address and function_name required"}
+        return {
+            "success": False,
+            "error": "contract_address and function_name required",
+        }
     abi = body.abi or []
     if not abi:
         return {"success": False, "error": "abi required for contract call"}
@@ -513,7 +542,11 @@ def contract_call_api(body: ContractCallBody) -> dict[str, Any]:
     )
     if not ok:
         return {"success": False, "error": err or "Build tx failed"}
-    return {"success": True, "transaction": tx, "message": "Sign and send with your wallet"}
+    return {
+        "success": True,
+        "transaction": tx,
+        "message": "Sign and send with your wallet",
+    }
 
 
 # LLM keys router
@@ -531,6 +564,7 @@ class LLMKeyValidateBody(BaseModel):
 
 def _require_user_id_for_byok(x_user_id: str | None) -> None:
     import llm_keys_supabase
+
     if llm_keys_supabase._is_configured() and not (x_user_id and x_user_id.strip()):
         raise HTTPException(
             status_code=401,
@@ -550,6 +584,7 @@ def _trace_llm_keys(
         request.headers.get("x-request-id") or request.headers.get("X-Request-Id") or ""
     ).strip() or None
     import llm_keys_supabase
+
     payload = {
         "trace": "llm_keys",
         "method": method,
@@ -579,20 +614,37 @@ def get_llm_keys(
     try:
         _require_user_id_for_byok(x_user_id)
     except HTTPException:
-        _trace_llm_keys(request, "GET", x_user_id, x_workspace_id, "401_missing_x_user_id")
+        _trace_llm_keys(
+            request, "GET", x_user_id, x_workspace_id, "401_missing_x_user_id"
+        )
         raise
     wid = x_workspace_id or DEFAULT_WORKSPACE
     if x_user_id and llm_keys_supabase._is_configured():
         from .common import _log_byok_event
+
         db.ensure_wallet_user_profile(x_user_id)
         _log_byok_event("byok_access", x_user_id, "get_configured_providers")
         providers = llm_keys_supabase.get_configured_providers(x_user_id)
-        _trace_llm_keys(request, "GET", x_user_id, x_workspace_id, "success", provider_count=len(providers))
+        _trace_llm_keys(
+            request,
+            "GET",
+            x_user_id,
+            x_workspace_id,
+            "success",
+            provider_count=len(providers),
+        )
         return {"configured_providers": providers}
     if llm_keys_supabase._is_configured():
         return {"configured_providers": []}
     providers = get_configured_providers(wid)
-    _trace_llm_keys(request, "GET", x_user_id, x_workspace_id, "success", provider_count=len(providers))
+    _trace_llm_keys(
+        request,
+        "GET",
+        x_user_id,
+        x_workspace_id,
+        "success",
+        provider_count=len(providers),
+    )
     return {"configured_providers": providers}
 
 
@@ -611,13 +663,18 @@ def post_llm_keys(
     try:
         _require_user_id_for_byok(x_user_id)
     except HTTPException:
-        _trace_llm_keys(request, "POST", x_user_id, x_workspace_id, "401_missing_x_user_id")
+        _trace_llm_keys(
+            request, "POST", x_user_id, x_workspace_id, "401_missing_x_user_id"
+        )
         raise
     if os.environ.get("ENV") == "production" and not (
-        os.environ.get("LLM_KEY_ENCRYPTION_KEY") or os.environ.get("LLM_KEY_KMS_KEY_ARN")
+        os.environ.get("LLM_KEY_ENCRYPTION_KEY")
+        or os.environ.get("LLM_KEY_KMS_KEY_ARN")
     ):
         if x_user_id and (body.keys or {}):
-            _trace_llm_keys(request, "POST", x_user_id, x_workspace_id, "503_missing_encryption_key")
+            _trace_llm_keys(
+                request, "POST", x_user_id, x_workspace_id, "503_missing_encryption_key"
+            )
             raise HTTPException(
                 status_code=503,
                 detail="BYOK requires LLM_KEY_ENCRYPTION_KEY or LLM_KEY_KMS_KEY_ARN in production",
@@ -625,16 +682,31 @@ def post_llm_keys(
     wid = x_workspace_id or DEFAULT_WORKSPACE
     if x_user_id and llm_keys_supabase._is_configured():
         from .common import _log_byok_event
+
         db.ensure_wallet_user_profile(x_user_id)
         _log_byok_event("byok_access", x_user_id, "set_keys")
         providers = llm_keys_supabase.set_keys_for_user(x_user_id, body.keys or {})
         if body.keys and not providers:
-            _trace_llm_keys(request, "POST", x_user_id, x_workspace_id, "error_storage", provider_count=0)
+            _trace_llm_keys(
+                request,
+                "POST",
+                x_user_id,
+                x_workspace_id,
+                "error_storage",
+                provider_count=0,
+            )
             raise HTTPException(
                 status_code=503,
                 detail="BYOK storage failed. Check LLM_KEY_ENCRYPTION_KEY, SUPABASE_URL, and SUPABASE_SERVICE_KEY.",
             )
-        _trace_llm_keys(request, "POST", x_user_id, x_workspace_id, "success", provider_count=len(providers))
+        _trace_llm_keys(
+            request,
+            "POST",
+            x_user_id,
+            x_workspace_id,
+            "success",
+            provider_count=len(providers),
+        )
         return {"configured_providers": providers}
     if llm_keys_supabase._is_configured():
         raise HTTPException(
@@ -642,7 +714,14 @@ def post_llm_keys(
             detail="BYOK persistence is configured; sign in and use the gateway so X-User-Id is set.",
         )
     providers = set_keys(wid, body.keys or {})
-    _trace_llm_keys(request, "POST", x_user_id, x_workspace_id, "success", provider_count=len(providers))
+    _trace_llm_keys(
+        request,
+        "POST",
+        x_user_id,
+        x_workspace_id,
+        "success",
+        provider_count=len(providers),
+    )
     return {"configured_providers": providers}
 
 
@@ -660,11 +739,14 @@ def delete_llm_keys(
     try:
         _require_user_id_for_byok(x_user_id)
     except HTTPException:
-        _trace_llm_keys(request, "DELETE", x_user_id, x_workspace_id, "401_missing_x_user_id")
+        _trace_llm_keys(
+            request, "DELETE", x_user_id, x_workspace_id, "401_missing_x_user_id"
+        )
         raise
     wid = x_workspace_id or DEFAULT_WORKSPACE
     if x_user_id and llm_keys_supabase._is_configured():
         from .common import _log_byok_event
+
         _log_byok_event("byok_access", x_user_id, "delete_keys")
         llm_keys_supabase.delete_keys_for_user(x_user_id)
         _trace_llm_keys(request, "DELETE", x_user_id, x_workspace_id, "success")
@@ -708,7 +790,9 @@ async def validate_llm_key(
     return out
 
 
-async def _validate_llm_key_provider(provider: str, api_key: str) -> tuple[bool, int | None, str | None]:
+async def _validate_llm_key_provider(
+    provider: str, api_key: str
+) -> tuple[bool, int | None, str | None]:
     """Validate API key by calling provider models endpoint. Returns (valid, latency_ms, error)."""
     provider = provider.strip().lower()
     key = (api_key or "").strip()
@@ -779,7 +863,11 @@ async def _quick_demo_via_docker_sandbox(
             detail="Docker sandbox not configured: set SANDBOX_API_URL and OPENSANDBOX_API_KEY",
         )
     create_url = f"{SANDBOX_API_URL}/sandbox/create"
-    payload = {"tarball_url": tarball_url, "timeout_minutes": timeout_minutes, "port": 8545}
+    payload = {
+        "tarball_url": tarball_url,
+        "timeout_minutes": timeout_minutes,
+        "port": 8545,
+    }
     async with httpx.AsyncClient(timeout=120) as client:
         r = await client.post(
             create_url,
@@ -816,7 +904,9 @@ async def quick_demo_api(
         raise HTTPException(status_code=404, detail="Workflow not found")
     if request:
         assert_workflow_owner(w, request)
-    base = (os.environ.get("ORCHESTRATOR_PUBLIC_URL") or str(request.base_url)).rstrip("/")
+    base = (os.environ.get("ORCHESTRATOR_PUBLIC_URL") or str(request.base_url)).rstrip(
+        "/"
+    )
     tarball_url = f"{base}/api/v1/workflows/{workflow_id}/tarball"
     return await _quick_demo_via_docker_sandbox(tarball_url=tarball_url)
 
@@ -833,6 +923,8 @@ async def debug_sandbox_api(workflow_id: str, request: Request) -> dict[str, Any
     if not w:
         raise HTTPException(status_code=404, detail="Workflow not found")
     assert_workflow_owner(w, request)
-    base = (os.environ.get("ORCHESTRATOR_PUBLIC_URL") or str(request.base_url)).rstrip("/")
+    base = (os.environ.get("ORCHESTRATOR_PUBLIC_URL") or str(request.base_url)).rstrip(
+        "/"
+    )
     tarball_url = f"{base}/api/v1/workflows/{workflow_id}/tarball"
     return await _quick_demo_via_docker_sandbox(tarball_url=tarball_url)

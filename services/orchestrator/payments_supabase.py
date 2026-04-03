@@ -245,8 +245,14 @@ def insert_payment(
     transaction_hash: str | None = None,
     status: str = "completed",
     metadata: dict[str, Any] | None = None,
+    idempotency_key: str | None = None,
 ) -> dict[str, Any] | None:
-    """Append a payment record. Used when a paid action completes."""
+    """Append a payment record with idempotency protection.
+
+    When idempotency_key is provided, duplicate inserts with the same key
+    return the existing row instead of creating a new record. This prevents
+    double-charging on retries and duplicate payment entries.
+    """
     if not user_id or not is_configured():
         return None
     client = _client()
@@ -254,8 +260,31 @@ def insert_payment(
         return None
     if status not in ("pending", "completed", "failed", "refunded"):
         status = "completed"
+
+    if idempotency_key:
+        try:
+            existing = (
+                client.table("payment_history")
+                .select("*")
+                .eq("idempotency_key", idempotency_key)
+                .execute()
+            )
+            if existing.data and len(existing.data) > 0:
+                logger.info(
+                    "[payments] idempotent hit key=%s user_id=%s",
+                    idempotency_key,
+                    user_id,
+                )
+                return existing.data[0]
+        except Exception as e:
+            logger.warning(
+                "[payments] idempotency check failed key=%s error=%s",
+                idempotency_key,
+                e,
+            )
+
     try:
-        row = {
+        row: dict[str, Any] = {
             "user_id": user_id,
             "amount": str(amount),
             "currency": currency or "USD",
@@ -266,6 +295,8 @@ def insert_payment(
             "status": status,
             "metadata": metadata or {},
         }
+        if idempotency_key:
+            row["idempotency_key"] = idempotency_key
         r = client.table("payment_history").insert(row).execute()
         return r.data[0] if r.data else None
     except Exception as e:

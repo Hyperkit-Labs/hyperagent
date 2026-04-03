@@ -11,7 +11,9 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-SIMULATION_SERVICE_URL = (os.environ.get("SIMULATION_SERVICE_URL") or "http://localhost:8002").rstrip("/")
+SIMULATION_SERVICE_URL = (
+    os.environ.get("SIMULATION_SERVICE_URL") or "http://localhost:8002"
+).rstrip("/")
 
 # ERC20 totalSupply() selector; ERC721 balanceOf(address) selector (address param: zero-padded)
 ERC20_TOTAL_SUPPLY = "0x18160ddd"
@@ -32,7 +34,10 @@ def _read_call_data(abi: list) -> tuple[str | None, str | None]:
             return ERC20_TOTAL_SUPPLY, None
         if name == "balanceOf" and entry.get("stateMutability") in ("view", "pure"):
             return ERC721_BALANCE_OF + "0" * 24, None
-    return None, "ABI has no totalSupply or balanceOf; monitor supports ERC20/ERC721 only"
+    return (
+        None,
+        "ABI has no totalSupply or balanceOf; monitor supports ERC20/ERC721 only",
+    )
 
 
 async def run_monitor(deployments: list[dict], run_id: str) -> dict:
@@ -55,7 +60,13 @@ async def run_monitor(deployments: list[dict], run_id: str) -> dict:
         abi = dep.get("abi") or dep.get("plan", {}).get("abi") or []
         data, unsupported = _read_call_data(abi)
         if data is None:
-            failed.append({"address": addr, "chain_id": chain_id, "error": unsupported or "unsupported contract type"})
+            failed.append(
+                {
+                    "address": addr,
+                    "chain_id": chain_id,
+                    "error": unsupported or "unsupported contract type",
+                }
+            )
             continue
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
@@ -74,16 +85,36 @@ async def run_monitor(deployments: list[dict], run_id: str) -> dict:
                     if j.get("success"):
                         verified.append({"address": addr, "chain_id": chain_id})
                     else:
-                        failed.append({"address": addr, "chain_id": chain_id, "error": j.get("error", "simulation failed")})
+                        failed.append(
+                            {
+                                "address": addr,
+                                "chain_id": chain_id,
+                                "error": j.get("error", "simulation failed"),
+                            }
+                        )
                 else:
-                    failed.append({"address": addr, "chain_id": chain_id, "error": f"HTTP {r.status_code}"})
+                    failed.append(
+                        {
+                            "address": addr,
+                            "chain_id": chain_id,
+                            "error": f"HTTP {r.status_code}",
+                        }
+                    )
         except Exception as e:
-            failed.append({"address": addr, "chain_id": chain_id, "error": str(e)[:200]})
+            failed.append(
+                {"address": addr, "chain_id": chain_id, "error": str(e)[:200]}
+            )
     ok = len(failed) == 0
-    logger.info("[monitor] run_id=%s verified=%d failed=%d", run_id, len(verified), len(failed))
+    logger.info(
+        "[monitor] run_id=%s verified=%d failed=%d", run_id, len(verified), len(failed)
+    )
     return {
         "ok": ok,
-        "message": f"Verified {len(verified)} contract(s)" if ok else f"{len(failed)} contract(s) verification failed",
+        "message": (
+            f"Verified {len(verified)} contract(s)"
+            if ok
+            else f"{len(failed)} contract(s) verification failed"
+        ),
         "verified": verified,
         "failed": failed if failed else None,
         "deployments_count": len(deployments),

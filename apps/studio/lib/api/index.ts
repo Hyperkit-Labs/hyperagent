@@ -22,6 +22,8 @@ export {
   type ApiErrorWithStatus,
   type NormalizeApiErrorOptions,
   type FetchJsonOptions,
+  fetchJson,
+  fetchJsonAuthed,
 } from './core';
 
 export {

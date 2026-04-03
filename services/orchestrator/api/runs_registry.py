@@ -164,10 +164,15 @@ def _approve_spec_impl(run_id: str, request: Request | None = None) -> dict[str,
             "message": "Resumed from design",
         }
     except Exception as e:
-        update_workflow(run_id, status="failed", error=str(e))
+        err_msg = str(e)[:500]
+        logger.exception("[approve_spec] resume failed run_id=%s", run_id)
+        update_workflow(run_id, status="failed", error=err_msg)
         if db.is_configured():
-            db.update_run(run_id, status="failed", error_message=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+            db.update_run(run_id, status="failed", error_message=err_msg)
+        raise HTTPException(
+            status_code=500,
+            detail="Pipeline resume failed. Check logs for details.",
+        )
 
 
 @runs_router.patch("/{run_id}/approve_spec")

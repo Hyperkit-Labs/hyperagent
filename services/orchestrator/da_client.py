@@ -1,6 +1,11 @@
 """
-EigenDA blob submission for trace anchoring.
-When EIGENDA_ENABLED and EIGENDA_PRIVATE_KEY set, submits blob to EigenDA via powerloom-eigenda.
+EigenDA blob submission for trace anchoring and provenance only.
+
+This is not a general-purpose file or artifact bucket. Use IPFS/pinning flows in
+ipfs_client for content-addressed artifacts. EigenDA here anchors trace payloads
+already identified by blob_id (often an IPFS CID).
+
+When EIGENDA_ENABLED and EIGENDA_PRIVATE_KEY are set, submits via powerloom-eigenda.
 Returns (da_cert, reference_block) for run_steps. No-op when not configured.
 """
 

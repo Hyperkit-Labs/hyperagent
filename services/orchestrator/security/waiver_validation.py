@@ -9,6 +9,7 @@ from typing import Any
 def get_waiver_requirements() -> list[str]:
     try:
         from .policy_loader import get_waiver_requirements as _get
+
         return _get()
     except Exception:
         return [

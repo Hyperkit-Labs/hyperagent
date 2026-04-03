@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-HyperAgent is an AI-powered smart contract development platform that transforms natural language specifications into production-ready, audited contracts deployed across multiple EVM chains in minutes.
+HyperAgent is an AI-assisted smart contract development platform that turns natural language specifications into draft artifacts with automated checks, an audit workflow, simulation, and deploy preparation across EVM chains.
 
 ## Core Principles
 
@@ -17,7 +17,7 @@ HyperAgent is an AI-powered smart contract development platform that transforms 
 - Multi-chain support (Mantle, Avalanche, BNB, SKALE, Protocol Labs, and others) is a roadmap goal that is enabled by modular chain adapters, but **must not** expand beyond the MVP chain until the single-chain path is stable and meeting SLOs.
 - Chain adapters remain modular and independently deployable, but new chains are added only after the MVP path has clear success metrics and reliable observability.
 
-### 3. Security & Observability First
+### 3. Security Tooling and Observability
 - Automated security audits (Slither, Mythril, MythX, Echidna)
 - Tenderly simulations before deployment
 - OpenTelemetry for distributed tracing
@@ -25,7 +25,7 @@ HyperAgent is an AI-powered smart contract development platform that transforms 
 - Dune Analytics for on-chain metrics
 
 ### 4. Developer Experience
-- Natural language to production in minutes
+- Natural language to pipeline runs and draft artifacts with checks
 - TypeScript SDK for programmatic access
 - CLI for terminal-based workflows
 - Comprehensive documentation and examples

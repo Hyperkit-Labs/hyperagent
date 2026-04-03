@@ -5,6 +5,7 @@
 import { FALLBACK_DEFAULT_NETWORK_ID } from '@/constants/defaults';
 import type { Workflow } from '@/lib/types';
 import {
+  fetchJson,
   fetchJsonAuthed,
   reportApiError,
   getApiBase,
@@ -85,7 +86,8 @@ const TRACK_RECORD_DEFAULTS: PlatformTrackRecord = {
 };
 
 export async function getPlatformTrackRecord(signal?: AbortSignal): Promise<PlatformTrackRecord> {
-  return fetchJsonAuthed<PlatformTrackRecord>('/platform/track-record', { signal }).catch((e) => {
+  // Public endpoint: use unauthenticated fetch so missing session never forces zeros on the login page.
+  return fetchJson<PlatformTrackRecord>('/platform/track-record', { signal }).catch((e) => {
     reportApiError(e, { path: '/platform/track-record' });
     return TRACK_RECORD_DEFAULTS;
   });

@@ -5,6 +5,7 @@
  */
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import { log } from "./logger.js";
 
 export interface RequestWithUser extends Request {
   userId?: string;
@@ -77,7 +78,7 @@ function traceAuth(
     authScheme,
     outcome,
   };
-  console.warn("[auth]", JSON.stringify(payload));
+  log.warn(payload, "auth trace");
 }
 
 export function authMiddleware(
@@ -98,7 +99,7 @@ export function authMiddleware(
     if (REQUIRE_AUTH) {
       traceAuth(path, requestId, false, "none", "503_no_secret");
       logSecurityEvent("auth_failure", 503, path, requestId, undefined);
-      console.error("[auth] Production requires AUTH_JWT_SECRET");
+      log.fatal("Production requires AUTH_JWT_SECRET");
       res.status(503).json({ error: "Service Unavailable", message: "Auth not configured" });
       return;
     }
@@ -145,5 +146,5 @@ function logSecurityEvent(
   const payload: Record<string, unknown> = { event, status, path };
   if (requestId) payload.requestId = requestId;
   if (userId) payload.userId = userId;
-  console.warn("[security]", JSON.stringify(payload));
+  log.warn(payload, "security event");
 }

@@ -15,7 +15,8 @@ import { PageTitle } from "@/components/layout/PageTitle";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
-type ContractEntry = { id: string; workflowId?: string; address?: string; network?: string; name?: string; abi?: any[]; transactionHash?: string; createdAt?: string };
+interface AbiItem { type?: string; name?: string; inputs?: { type: string; name: string }[]; outputs?: { type: string; name: string }[]; stateMutability?: string }
+type ContractEntry = { id: string; workflowId?: string; address?: string; network?: string; name?: string; abi?: AbiItem[]; transactionHash?: string; createdAt?: string };
 
 function ContractInteract({ contract }: { contract: ContractEntry }) {
   const [fn, setFn] = useState("");
@@ -69,7 +70,7 @@ function ContractInteract({ contract }: { contract: ContractEntry }) {
   };
 
   const selectedFnDetails = abiFunctions.find(f => f.name === fn);
-  const paramsPlaceholder = selectedFnDetails?.inputs?.map((input: any) => `${input.type} ${input.name}`).join(", ") || "arg1, arg2";
+  const paramsPlaceholder = selectedFnDetails?.inputs?.map((input: { type: string; name: string }) => `${input.type} ${input.name}`).join(", ") || "arg1, arg2";
 
   return (
     <div className="mt-4 border-t border-[var(--color-border-subtle)] pt-4 space-y-4 animate-enter">

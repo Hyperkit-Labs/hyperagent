@@ -10,7 +10,12 @@ ENV_FILE := .env
 
 .PHONY: help up down logs test-minimal test-minimal-all verify-real-server restart migrate install-web run-web install-api run-api build rebuild \
 	build-web build-prod check-env validate-prod format-api lint-api type-check-api quality-check-api \
-	dogfood-setup dogfood-help dogfood-daemon ai-bom
+	dogfood-setup dogfood-help dogfood-daemon ai-bom kill-ports
+
+# Free common HyperAgent dev ports (Studio, gateway, services). Uses kill-port (pnpm).
+kill-ports:
+	@pnpm run kill-ports
+	@echo "[+] kill-ports done"
 
 # Dogfood: default scope and date (override: make dogfood-setup SCOPE=settings-byok DOGFOOD_DATE=2025-02-24)
 DOGFOOD_SCOPE ?= full
@@ -57,6 +62,9 @@ help:
 	@echo "  make dogfood-setup [SCOPE=full|settings-byok|...] - Create output dir and report template"
 	@echo "  make dogfood-help  - Show dogfood checklist and doc link"
 	@echo "  make dogfood-daemon - Start agent-browser daemon (Windows fix; run in separate terminal)"
+	@echo ""
+	@echo "Ports (free local dev listeners; same as: pnpm kill-ports):"
+	@echo "  make kill-ports  - Stop processes on 3000,3300,4000,4005,8000,8001,8004,8005,9000"
 	@echo ""
 	@echo "Security:"
 	@echo "  make ai-bom [ARGS=...] - AI-BOM scan (excludes .next for speed; run from repo root)"

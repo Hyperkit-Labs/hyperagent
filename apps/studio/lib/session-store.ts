@@ -46,6 +46,15 @@ const SESSION_LLM_CRYPTO_ITERATIONS = 100000;
 const SESSION_LLM_CRYPTO_ALGO = "AES-GCM";
 
 /**
+ * Returns a proper ArrayBuffer from a Uint8Array.
+ * Needed because Uint8Array.buffer may be a slice of a larger backing buffer,
+ * which Node.js webcrypto rejects for PBKDF2 salt, IV, etc.
+ */
+function toAB(arr: Uint8Array): ArrayBuffer {
+  return arr.buffer.slice(arr.byteOffset, arr.byteOffset + arr.byteLength);
+}
+
+/**
  * Returns true when `window.crypto.subtle` is available (HTTPS or localhost).
  * HTTP on non-localhost origins disables SubtleCrypto in all major browsers.
  */
@@ -96,12 +105,12 @@ async function deriveSessionEntropy(): Promise<Uint8Array> {
   const bucket = getTimestampBucket();
   const enc = new TextEncoder();
   const raw = enc.encode(`${sub}${nonce}${bucket}`);
-  const hash = await window.crypto.subtle.digest("SHA-256", raw.buffer as ArrayBuffer);
+  const hash = await window.crypto.subtle.digest("SHA-256", toAB(raw));
   return new Uint8Array(hash);
 }
 
 function pbkdf2Salt(salt: Uint8Array): ArrayBuffer {
-  return Uint8Array.from(salt).buffer as ArrayBuffer;
+  return toAB(Uint8Array.from(salt));
 }
 
 async function deriveSessionLlmCryptoKey(salt: Uint8Array): Promise<CryptoKey> {
@@ -111,7 +120,7 @@ async function deriveSessionLlmCryptoKey(salt: Uint8Array): Promise<CryptoKey> {
   const entropy = await deriveSessionEntropy();
   const baseKey = await window.crypto.subtle.importKey(
     "raw",
-    entropy.buffer as ArrayBuffer,
+    toAB(entropy),
     { name: "PBKDF2" },
     false,
     ["deriveKey"]
@@ -139,9 +148,9 @@ async function encryptSessionLlmApiKey(plainText: string): Promise<{ cipherText:
   const salt = window.crypto.getRandomValues(new Uint8Array(16));
   const key = await deriveSessionLlmCryptoKey(salt);
   const cipherBuffer = await window.crypto.subtle.encrypt(
-    { name: SESSION_LLM_CRYPTO_ALGO, iv: iv.buffer as ArrayBuffer },
+    { name: SESSION_LLM_CRYPTO_ALGO, iv: toAB(iv) },
     key,
-    enc.encode(plainText)
+    toAB(enc.encode(plainText))
   );
   const cipherArray = new Uint8Array(cipherBuffer);
   return {
@@ -161,9 +170,9 @@ async function decryptSessionLlmApiKey(params: { cipherText: string; iv: string;
   const saltBytes = Uint8Array.from(atob(salt), c => c.charCodeAt(0));
   const key = await deriveSessionLlmCryptoKey(saltBytes);
   const plainBuffer = await window.crypto.subtle.decrypt(
-    { name: SESSION_LLM_CRYPTO_ALGO, iv: ivBytes.buffer as ArrayBuffer },
+    { name: SESSION_LLM_CRYPTO_ALGO, iv: toAB(ivBytes) },
     key,
-    cipherBytes.buffer as ArrayBuffer
+    toAB(cipherBytes)
   );
   const dec = new TextDecoder();
   return dec.decode(plainBuffer);
@@ -182,7 +191,7 @@ async function deriveKey(salt: Uint8Array): Promise<CryptoKey> {
   const entropy = await deriveSessionEntropy();
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
-    entropy.buffer as ArrayBuffer,
+    toAB(entropy),
     "PBKDF2",
     false,
     ["deriveBits", "deriveKey"]
@@ -202,9 +211,9 @@ async function encrypt(plaintext: string): Promise<{ ciphertext: string; iv: str
   const key = await deriveKey(salt);
   const enc = new TextEncoder();
   const ciphertext = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv: iv.buffer as ArrayBuffer },
+    { name: "AES-GCM", iv: toAB(iv) },
     key,
-    enc.encode(plaintext)
+    toAB(enc.encode(plaintext))
   );
   return {
     ciphertext: btoa(String.fromCharCode(...new Uint8Array(ciphertext))),
@@ -220,9 +229,9 @@ async function decrypt(ciphertext: string, iv: string, salt: string): Promise<st
   const ivArr = new Uint8Array(atob(iv).split("").map((c) => c.charCodeAt(0)));
   const cipherArr = new Uint8Array(atob(ciphertext).split("").map((c) => c.charCodeAt(0)));
   const dec = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: ivArr.buffer as ArrayBuffer },
+    { name: "AES-GCM", iv: toAB(ivArr) },
     key,
-    cipherArr.buffer as ArrayBuffer
+    toAB(cipherArr)
   );
   return new TextDecoder().decode(dec);
 }

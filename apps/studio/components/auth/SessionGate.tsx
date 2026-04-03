@@ -2,6 +2,7 @@
 
 import { useActiveAccount, useConnectModal } from "thirdweb/react";
 import { useSignInWithWallet } from "@/hooks/useSignInWithWallet";
+import { useSessionContext } from "@/components/providers/SessionProvider";
 import { getThirdwebClient } from "@/lib/thirdwebClient";
 import { getConnectConfig } from "@/lib/connectWallets";
 import { Loader2, Wallet } from "lucide-react";
@@ -22,6 +23,7 @@ export function SessionGate({
 }: SessionGateProps) {
   const account = useActiveAccount();
   const { signIn, isLoading, error } = useSignInWithWallet();
+  const { recheckBootstrap } = useSessionContext();
   const { connect, isConnecting } = useConnectModal();
   const client = getThirdwebClient();
 
@@ -63,7 +65,12 @@ export function SessionGate({
         ) : (
           <button
             type="button"
-            onClick={() => void signIn()}
+            onClick={() => {
+              void (async () => {
+                const ok = await signIn();
+                if (ok) await recheckBootstrap();
+              })();
+            }}
             disabled={isLoading}
             className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg btn-primary-gradient text-sm font-medium text-white hover:shadow-[0_0_24px_var(--color-primary-alpha-50)] hover:-translate-y-0.5 disabled:opacity-50 transition-all duration-200"
           >
@@ -78,7 +85,7 @@ export function SessionGate({
         </p>
       )}
       {error && (
-        <p className="text-xs text-[var(--color-semantic-error)]">
+        <p className="text-xs text-[var(--color-semantic-error)] whitespace-pre-line">
           {error}
         </p>
       )}

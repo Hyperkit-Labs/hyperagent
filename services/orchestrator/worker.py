@@ -52,7 +52,12 @@ def main():
             if retries < QUEUE_MAX_RETRIES:
                 job["_retries"] = retries + 1
                 if enqueue(job):
-                    logger.info("[worker] job run_id=%s re-queued (retry %d/%d)", run_id, retries + 1, QUEUE_MAX_RETRIES)
+                    logger.info(
+                        "[worker] job run_id=%s re-queued (retry %d/%d)",
+                        run_id,
+                        retries + 1,
+                        QUEUE_MAX_RETRIES,
+                    )
             else:
                 send_to_dead(job, str(e))
 

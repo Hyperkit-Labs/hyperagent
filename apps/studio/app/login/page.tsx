@@ -46,22 +46,26 @@ function LoginContent() {
           className={`h-2 w-2 shrink-0 rounded-full ${
             serverStatus === "up"
               ? "bg-emerald-500"
-              : serverStatus === "signin_unavailable"
+              : serverStatus === "degraded"
                 ? "bg-amber-500"
-                : serverStatus === "down"
-                  ? "bg-red-500"
-                  : "animate-pulse bg-amber-500"
+                : serverStatus === "signin_unavailable"
+                  ? "bg-amber-500"
+                  : serverStatus === "down"
+                    ? "bg-red-500"
+                    : "animate-pulse bg-amber-500"
           }`}
           aria-hidden
         />
         <span className="text-[var(--color-text-secondary)]">
           {serverStatus === "up"
             ? "Server: Up"
-            : serverStatus === "signin_unavailable"
-              ? "Sign-in unavailable"
-              : serverStatus === "down"
-                ? "Server offline"
-                : "Checking\u2026"}
+            : serverStatus === "degraded"
+              ? "Server: Degraded"
+              : serverStatus === "signin_unavailable"
+                ? "Sign-in unavailable"
+                : serverStatus === "down"
+                  ? "Server offline"
+                  : "Checking\u2026"}
         </span>
       </div>
 

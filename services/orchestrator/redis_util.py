@@ -9,7 +9,9 @@ from urllib.parse import quote, urlparse, urlunparse
 def _raw_tcp_url(url: str | None = None) -> str:
     if url is not None:
         return url.strip()
-    return (os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or "").strip()
+    return (
+        os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or ""
+    ).strip()
 
 
 def effective_redis_url(url: str | None = None) -> str:
@@ -22,8 +24,16 @@ def effective_redis_url(url: str | None = None) -> str:
     raw = _raw_tcp_url(url)
     if not raw or raw.startswith("#"):
         return raw
-    password = (os.environ.get("REDIS_PASSWORD") or os.environ.get("UPSTASH_REDIS_PASSWORD") or "").strip()
-    username = (os.environ.get("REDIS_USERNAME") or os.environ.get("UPSTASH_REDIS_USERNAME") or "").strip()
+    password = (
+        os.environ.get("REDIS_PASSWORD")
+        or os.environ.get("UPSTASH_REDIS_PASSWORD")
+        or ""
+    ).strip()
+    username = (
+        os.environ.get("REDIS_USERNAME")
+        or os.environ.get("UPSTASH_REDIS_USERNAME")
+        or ""
+    ).strip()
     if not password and not username:
         return raw
     try:
@@ -39,4 +49,13 @@ def effective_redis_url(url: str | None = None) -> str:
     else:
         userinfo = f":{quote(password, safe='')}"
     netloc = f"{userinfo}@{host}{port}"
-    return urlunparse((parsed.scheme, netloc, parsed.path or "", parsed.params, parsed.query, parsed.fragment))
+    return urlunparse(
+        (
+            parsed.scheme,
+            netloc,
+            parsed.path or "",
+            parsed.params,
+            parsed.query,
+            parsed.fragment,
+        )
+    )

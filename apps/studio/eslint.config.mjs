@@ -7,13 +7,14 @@ const eslintConfig = defineConfig([
   ...nextTs,
   // Override default ignores of eslint-config-next.
   globalIgnores([
-    // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
     "dogfood-output/**",
     "playwright-report/**",
+    ".playwright-cache/**",
+    "e2e/**",
   ]),
   // Downgrade strict react-hooks rules to warnings so CI passes while we address them
   {

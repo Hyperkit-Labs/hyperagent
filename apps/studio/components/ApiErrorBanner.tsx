@@ -19,7 +19,7 @@ export function ApiErrorBanner({ error, onRetry, className = "" }: ApiErrorBanne
       role="alert"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="flex-1 min-w-0">{error}</p>
+        <p className="flex-1 min-w-0 whitespace-pre-line">{error}</p>
         {onRetry && (
           <button
             type="button"

@@ -19,6 +19,11 @@ if (!process.env.TEMP) process.env.TEMP = tmpDir;
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000';
 
+/** CI: use production server (requires `pnpm build` first). Local: dev server. */
+const webServerCommand = process.env.CI
+  ? 'pnpm exec next start -p 3000'
+  : 'pnpm dev';
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -36,9 +41,9 @@ export default defineConfig({
   webServer: process.env.PLAYWRIGHT_REAL_SERVER
     ? undefined
     : {
-        command: 'pnpm dev',
+        command: webServerCommand,
         url: baseURL,
         reuseExistingServer: !process.env.CI,
-        timeout: 120000,
+        timeout: process.env.CI ? 180000 : 120000,
       },
 });

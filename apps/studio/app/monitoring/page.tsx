@@ -16,6 +16,8 @@ import {
   filterLogsByParams,
 } from "@/components/monitoring/MonitoringFilterBar";
 
+interface LogEntry { message?: string; service?: string; level?: string; timestamp?: string; [key: string]: unknown }
+
 const TYPE_LABELS: Record<string, string> = {
   contracts: "Smart Contracts",
   security: "Security",
@@ -42,7 +44,7 @@ function MonitoringContent() {
   const logList = useMemo(() => {
     if (!searchQuery) return baseLogList;
     const q = searchQuery.toLowerCase();
-    return baseLogList.filter((log: any) => 
+    return baseLogList.filter((log: LogEntry) => 
       (log.message || "").toLowerCase().includes(q) || 
       (log.service || "").toLowerCase().includes(q)
     );
@@ -50,15 +52,15 @@ function MonitoringContent() {
 
   const stats = useMemo(() => {
     const list = logs ?? [];
-    const info = list.filter((l: any) => l.level === "info").length;
-    const warn = list.filter((l: any) => l.level === "warn").length;
-    const err = list.filter((l: any) => l.level === "error").length;
+    const info = list.filter((l: LogEntry) => l.level === "info").length;
+    const warn = list.filter((l: LogEntry) => l.level === "warn").length;
+    const err = list.filter((l: LogEntry) => l.level === "error").length;
     const total = info + warn + err || 1;
     return { info, warn, err, infoPct: (info/total)*100, warnPct: (warn/total)*100, errPct: (err/total)*100 };
   }, [logs]);
 
   const recentErrors = useMemo(() => {
-    return (logs ?? []).filter((l: any) => l.level === "error").length;
+    return (logs ?? []).filter((l: LogEntry) => l.level === "error").length;
   }, [logs]);
 
   return (

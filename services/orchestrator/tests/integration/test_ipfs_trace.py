@@ -15,8 +15,14 @@ sys.path.insert(
 
 @pytest.fixture
 def mock_storage_provider():
-    with patch("ipfs_client.is_configured", return_value=True), patch(
-        "ipfs_client.pin_json", new_callable=AsyncMock, return_value="QmTestTrace123"
+    with (
+        patch("ipfs_client.is_configured", return_value=True),
+        patch(
+            "ipfs_client.pin_json",
+            new_callable=AsyncMock,
+            return_value="QmTestTrace123",
+        ),
+        patch("da_client.is_configured", return_value=False),
     ):
         yield
 

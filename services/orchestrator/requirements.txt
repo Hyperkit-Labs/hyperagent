@@ -13,7 +13,8 @@ web3>=6.0.0
 redis>=5.0.0
 datasets>=2.14.0
 # Execution backend (Local + OpenSandbox); optional opensandbox-sdk for OPENSANDBOX_ENABLED
--e ../../packages/execution-backend
+# Installed separately: in Docker via explicit pip install, in CI via "pip install -e packages/execution-backend"
+# Do NOT add an -e line here; the relative path breaks when pip runs from repo root.
 # OpenTelemetry (optional): set OPENTELEMETRY_ENABLED=1 and OTEL_EXPORTER_OTLP_ENDPOINT for tracing
 opentelemetry-api>=1.20.0
 opentelemetry-sdk>=1.20.0

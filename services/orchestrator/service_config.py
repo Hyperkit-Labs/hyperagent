@@ -17,7 +17,9 @@ SERVICES = {
     "vectordb": ("VECTORDB_URL", "http://localhost:8010"),
 }
 
-IS_PRODUCTION = os.environ.get("NODE_ENV") == "production" or os.environ.get("ENV") == "production"
+IS_PRODUCTION = (
+    os.environ.get("NODE_ENV") == "production" or os.environ.get("ENV") == "production"
+)
 
 
 def get_service_url(service: str) -> str:

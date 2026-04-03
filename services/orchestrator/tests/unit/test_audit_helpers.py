@@ -2,6 +2,7 @@
 
 import sys
 import os
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from agents.audit_agent import has_echidna_harness, severity_fails_gate
@@ -13,13 +14,19 @@ class TestHasEchidnaHarness:
         assert has_echidna_harness(None) is False
 
     def test_invariant_keyword(self):
-        assert has_echidna_harness({"test.sol": "function invariant_balance() public {"}) is True
+        assert (
+            has_echidna_harness({"test.sol": "function invariant_balance() public {"})
+            is True
+        )
 
     def test_echidna_keyword(self):
         assert has_echidna_harness({"test.sol": "// echidna configuration"}) is True
 
     def test_assert_with_test(self):
-        assert has_echidna_harness({"test.sol": "function testFoo() { assert(x > 0); }"}) is True
+        assert (
+            has_echidna_harness({"test.sol": "function testFoo() { assert(x > 0); }"})
+            is True
+        )
 
     def test_assert_without_test(self):
         assert has_echidna_harness({"lib.sol": "assert(x > 0);"}) is False

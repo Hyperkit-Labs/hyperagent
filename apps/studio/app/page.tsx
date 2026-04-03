@@ -621,7 +621,7 @@ function ChatPageContent() {
                       <span className="text-[var(--color-primary-light)]"><NumberTicker value={2} /></span> minutes
                     </h2>
                     <p className="text-sm text-[var(--color-text-tertiary)] max-w-lg mx-auto">
-                      Describe your smart contract, and I'll generate, audit, and prepare it for deployment on any EVM chain.
+                      Describe your smart contract, and I&apos;ll generate, audit, and prepare it for deployment on any EVM chain.
                     </p>
                   </motion.div>
                   <StarterGrid

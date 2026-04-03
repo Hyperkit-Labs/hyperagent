@@ -7,7 +7,12 @@ import sys
 
 import pytest
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+sys.path.insert(
+    0,
+    os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    ),
+)
 
 _TEST_FERNET_KEY = "PyDnoXvIlbKMLEoBFs_iApA1vqi3YPOJWXKoAPYUkAo="
 

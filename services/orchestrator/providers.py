@@ -34,7 +34,11 @@ async def _retry_http(
     for attempt in range(RETRY_MAX_ATTEMPTS):
         try:
             return await fn()
-        except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError) as e:
+        except (
+            httpx.ConnectError,
+            httpx.TimeoutException,
+            httpx.RemoteProtocolError,
+        ) as e:
             last_err = e
             if attempt < RETRY_MAX_ATTEMPTS - 1:
                 delay = RETRY_BASE_DELAY_SEC * (2**attempt)
@@ -101,7 +105,9 @@ class SimulationProvider(Protocol):
         """Run single simulation; returns SimulateTxResult-shaped dict."""
         ...
 
-    async def simulate_bundle(self, simulations: list[dict[str, Any]]) -> dict[str, Any]:
+    async def simulate_bundle(
+        self, simulations: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """Run bundled simulations; returns SimulateBundleResult-shaped dict."""
         ...
 
@@ -127,7 +133,11 @@ class SimulationHttpProvider:
         breaker = get_breaker("simulation")
         if not breaker.can_execute():
             logger.warning("[simulation] circuit open, skipping simulate")
-            return {"success": False, "error": "Simulation service circuit open", "gasUsed": 0}
+            return {
+                "success": False,
+                "error": "Simulation service circuit open",
+                "gasUsed": 0,
+            }
         headers = _trace_headers()
         payload: dict[str, Any] = {
             "network": network,
@@ -141,7 +151,9 @@ class SimulationHttpProvider:
 
         async def _do_simulate() -> dict[str, Any]:
             async def _req() -> dict[str, Any]:
-                async with httpx.AsyncClient(timeout=get_timeout("simulation")) as client:
+                async with httpx.AsyncClient(
+                    timeout=get_timeout("simulation")
+                ) as client:
                     r = await client.post(
                         f"{self.base_url}/simulate",
                         headers=headers,
@@ -162,7 +174,11 @@ class SimulationHttpProvider:
             result = await breaker.call(_do_simulate)
             return result
         except CircuitOpenError:
-            return {"success": False, "error": "Simulation service circuit open", "gasUsed": 0}
+            return {
+                "success": False,
+                "error": "Simulation service circuit open",
+                "gasUsed": 0,
+            }
 
     async def simulate_bundle(
         self,
@@ -175,13 +191,19 @@ class SimulationHttpProvider:
         breaker = get_breaker("simulation")
         if not breaker.can_execute():
             logger.warning("[simulation] circuit open, skipping simulate_bundle")
-            return {"success": False, "error": "Simulation service circuit open", "gasUsed": 0}
+            return {
+                "success": False,
+                "error": "Simulation service circuit open",
+                "gasUsed": 0,
+            }
         headers = _trace_headers()
         payload: dict[str, Any] = {"simulations": simulations}
 
         async def _do_bundle() -> dict[str, Any]:
             async def _req() -> dict[str, Any]:
-                async with httpx.AsyncClient(timeout=get_timeout("simulation")) as client:
+                async with httpx.AsyncClient(
+                    timeout=get_timeout("simulation")
+                ) as client:
                     r = await client.post(
                         f"{self.base_url}/simulate-bundle",
                         headers=headers,
@@ -201,7 +223,11 @@ class SimulationHttpProvider:
         try:
             return await breaker.call(_do_bundle)
         except CircuitOpenError:
-            return {"success": False, "error": "Simulation service circuit open", "gasUsed": 0}
+            return {
+                "success": False,
+                "error": "Simulation service circuit open",
+                "gasUsed": 0,
+            }
 
 
 # ---------------------------------------------------------------------------
@@ -246,7 +272,9 @@ class DeployHttpProvider:
 
         async def _do_deploy() -> dict[str, Any]:
             async def _req() -> dict[str, Any]:
-                async with httpx.AsyncClient(timeout=get_timeout("deploy_client")) as client:
+                async with httpx.AsyncClient(
+                    timeout=get_timeout("deploy_client")
+                ) as client:
                     r = await client.post(
                         f"{self.base_url}/deploy",
                         headers=headers,
@@ -263,7 +291,9 @@ class DeployHttpProvider:
                         err = body.get("error", body)
                     except Exception:
                         err = r.text[:500] if r.text else r.reason_phrase
-                    logger.warning("[deploy] %s %s: %s", r.status_code, self.base_url, err)
+                    logger.warning(
+                        "[deploy] %s %s: %s", r.status_code, self.base_url, err
+                    )
                 r.raise_for_status()
                 return r.json()
 

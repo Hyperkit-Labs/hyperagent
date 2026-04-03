@@ -19,13 +19,22 @@ import pytest
 # x402 middleware tests
 # ---------------------------------------------------------------------------
 
+
 class TestX402Middleware:
     """Tests for x402_middleware module."""
 
     def test_parse_payment_header_json(self):
         from x402_middleware import _parse_payment_header
 
-        raw = json.dumps({"nonce": "abc12345", "amount": 0.15, "payer": "0x1", "signature": "0xsig", "valid_before": int(time.time()) + 300})
+        raw = json.dumps(
+            {
+                "nonce": "abc12345",
+                "amount": 0.15,
+                "payer": "0x1",
+                "signature": "0xsig",
+                "valid_before": int(time.time()) + 300,
+            }
+        )
         result = _parse_payment_header(raw)
         assert result is not None
         assert result["nonce"] == "abc12345"
@@ -35,7 +44,15 @@ class TestX402Middleware:
         import base64
         from x402_middleware import _parse_payment_header
 
-        payload = json.dumps({"nonce": "test1234", "amount": 1.0, "payer": "0x2", "signature": "sig", "valid_before": 9999999999})
+        payload = json.dumps(
+            {
+                "nonce": "test1234",
+                "amount": 1.0,
+                "payer": "0x2",
+                "signature": "sig",
+                "valid_before": 9999999999,
+            }
+        )
         encoded = base64.b64encode(payload.encode()).decode()
         result = _parse_payment_header(encoded)
         assert result is not None
@@ -119,6 +136,7 @@ class TestX402Middleware:
 # billing.py tests
 # ---------------------------------------------------------------------------
 
+
 class TestBillingModule:
     """Tests for billing.py helper functions."""
 
@@ -158,6 +176,7 @@ class TestBillingModule:
 # credits_supabase fallback guard tests
 # ---------------------------------------------------------------------------
 
+
 class TestCreditsFallbackGuard:
     """Test that non-atomic fallbacks are blocked in production."""
 
@@ -194,6 +213,7 @@ class TestCreditsFallbackGuard:
 # ---------------------------------------------------------------------------
 # Reconciliation tests
 # ---------------------------------------------------------------------------
+
 
 class TestReconciliation:
     """Tests for billing_reconciliation module."""
@@ -246,6 +266,7 @@ class TestReconciliation:
 # Payment idempotency tests
 # ---------------------------------------------------------------------------
 
+
 class TestPaymentIdempotency:
     """Tests for insert_payment idempotency key behavior."""
 
@@ -254,7 +275,12 @@ class TestPaymentIdempotency:
     def test_idempotent_insert_returns_existing(self, _cfg, mock_client):
         from payments_supabase import insert_payment
 
-        existing_row = {"id": "pay_1", "user_id": "u1", "amount": "0.15", "idempotency_key": "key1"}
+        existing_row = {
+            "id": "pay_1",
+            "user_id": "u1",
+            "amount": "0.15",
+            "idempotency_key": "key1",
+        }
         mock_table = MagicMock()
         mock_select = MagicMock()
         mock_select.eq.return_value = mock_select
@@ -286,6 +312,7 @@ class TestPaymentIdempotency:
 # ---------------------------------------------------------------------------
 # Credit invariant tests
 # ---------------------------------------------------------------------------
+
 
 class TestCreditInvariants:
     """Tests for credit accounting invariants (balance, consume, refund)."""
@@ -336,28 +363,31 @@ class TestCreditInvariants:
         from credits_supabase import refund
 
         mock_rpc = MagicMock()
-        mock_rpc.execute.return_value = MagicMock(
-            data=[{"balance": 20.0}]
-        )
+        mock_rpc.execute.return_value = MagicMock(data=[{"balance": 20.0}])
         mock_client.return_value.rpc.return_value = mock_rpc
 
         refund("user1", 5.0, original_reference_id="w1", reason="test")
 
         call_args = mock_client.return_value.rpc.call_args
         if call_args:
-            ref_id = call_args[1].get("p_reference_id", "") if len(call_args) > 1 else ""
+            ref_id = (
+                call_args[1].get("p_reference_id", "") if len(call_args) > 1 else ""
+            )
             if not ref_id and call_args[0]:
                 params = call_args[0][1] if len(call_args[0]) > 1 else {}
                 ref_id = params.get("p_reference_id", "")
             if ref_id:
                 assert "refund_w1_" in ref_id
                 ts_part = ref_id.split("_")[-1]
-                assert len(ts_part) == 12, f"Expected UUID hex suffix (12 chars), got: {ts_part}"
+                assert (
+                    len(ts_part) == 12
+                ), f"Expected UUID hex suffix (12 chars), got: {ts_part}"
 
 
 # ---------------------------------------------------------------------------
 # Queue failure compensation tests
 # ---------------------------------------------------------------------------
+
 
 class TestQueueCompensation:
     """Tests that credit refund occurs when queue enqueue fails."""
@@ -379,7 +409,10 @@ class TestQueueCompensation:
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.post(
             "/api/v1/workflows/generate",
-            json={"nlp_input": "Create an ERC-20 token", "api_keys": {"openai": "sk-test"}},
+            json={
+                "nlp_input": "Create an ERC-20 token",
+                "api_keys": {"openai": "sk-test"},
+            },
             headers={"X-User-Id": "00000000-0000-0000-0000-000000000001"},
         )
         assert resp.status_code == 503
@@ -391,6 +424,7 @@ class TestQueueCompensation:
 # x402 nonce cache Redis integration
 # ---------------------------------------------------------------------------
 
+
 class TestX402NonceCacheRedis:
     """Tests that nonce cache prefers Redis and logs prod warning on fallback."""
 
@@ -398,6 +432,7 @@ class TestX402NonceCacheRedis:
     @patch.dict(os.environ, {"NODE_ENV": "production"})
     def test_check_replay_warns_in_production_without_redis(self, _redis):
         import x402_middleware
+
         x402_middleware._nonce_cache.clear()
         x402_middleware._nonce_cache_warned = False
 
@@ -407,6 +442,7 @@ class TestX402NonceCacheRedis:
     @patch("x402_middleware._redis_client")
     def test_check_replay_uses_redis_when_available(self, mock_redis_fn):
         import x402_middleware
+
         mock_redis = MagicMock()
         mock_redis.set.return_value = True
         mock_redis_fn.return_value = mock_redis
@@ -418,6 +454,7 @@ class TestX402NonceCacheRedis:
     @patch("x402_middleware._redis_client")
     def test_check_replay_redis_detects_duplicate(self, mock_redis_fn):
         import x402_middleware
+
         mock_redis = MagicMock()
         mock_redis.set.return_value = False
         mock_redis_fn.return_value = mock_redis
@@ -430,12 +467,23 @@ class TestX402NonceCacheRedis:
 # Startup validation tests
 # ---------------------------------------------------------------------------
 
+
 class TestStartupValidation:
     """Tests for production startup validation behavior."""
 
-    @patch.dict(os.environ, {"RENDER": "true", "REDIS_URL": "", "SUPABASE_URL": "", "SUPABASE_SERVICE_ROLE_KEY": ""}, clear=False)
+    @patch.dict(
+        os.environ,
+        {
+            "RENDER": "true",
+            "REDIS_URL": "",
+            "SUPABASE_URL": "",
+            "SUPABASE_SERVICE_ROLE_KEY": "",
+        },
+        clear=False,
+    )
     def test_startup_degraded_when_missing_prod_vars(self):
         import main
+
         main._startup_degraded = False
         main._startup_missing_vars = []
         main._validate_critical_services()

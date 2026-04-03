@@ -12,12 +12,51 @@ function generateNonce(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/** Same sources as next.config.ts `connect-src` so combined CSP policies allow gateway + BYOK LLMs + wallets. */
+function connectSrcDirective(): string {
+  const apiUrl =
+    process.env.NEXT_PUBLIC_API_URL ??
+    (process.env.NODE_ENV === "production" ? "" : "http://localhost:4000");
+  let apiOrigin = "";
+  try {
+    if (apiUrl && apiUrl.startsWith("http")) apiOrigin = new URL(apiUrl).origin;
+    else if (apiUrl) apiOrigin = apiUrl;
+  } catch {
+    apiOrigin = "";
+  }
+  return [
+    "'self'",
+    apiOrigin,
+    "http://localhost:4000",
+    "http://127.0.0.1:4000",
+    "https://api.openai.com",
+    "https://api.anthropic.com",
+    "https://generativelanguage.googleapis.com",
+    "https://api.together.xyz",
+    "wss:",
+    "https://*.thirdweb.com",
+    "https://*.supabase.co",
+    "wss://*.supabase.co",
+    "https://base-sepolia-testnet.skalenodes.com",
+    "https://skale-base.skalenodes.com",
+    "https://sepolia.base.org",
+    "https://*.bundler.thirdweb.com",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 function applySecurityHeaders(res: NextResponse, nonce: string): void {
+  // next dev + webpack HMR / react-refresh use eval(); production keeps nonce + strict-dynamic only.
+  const scriptSrc =
+    process.env.NODE_ENV === "production"
+      ? `'self' 'nonce-${nonce}' 'strict-dynamic'`
+      : `'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval'`;
   const csp = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    `script-src ${scriptSrc}`,
     "style-src 'self' 'unsafe-inline'",
-    "connect-src 'self' https://api.openai.com https://api.anthropic.com https://*.thirdweb.com https://*.supabase.co wss://*.supabase.co",
+    `connect-src ${connectSrcDirective()}`,
     "img-src 'self' data: https:",
     "font-src 'self' data:",
     "frame-ancestors 'none'",

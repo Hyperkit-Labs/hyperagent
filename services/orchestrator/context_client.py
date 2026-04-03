@@ -26,6 +26,7 @@ def _ensure_acontext():
         return
     try:
         import importlib.util
+
         _ctx_dir = os.path.join(os.path.dirname(__file__), "..", "context")
         _adapter_path = os.path.join(_ctx_dir, "acontext_adapter.py")
         if not os.path.isfile(_adapter_path):
@@ -58,7 +59,13 @@ def store_context(
     if _acontext_store is None:
         return False
     try:
-        _acontext_store(user_id, context_type, content, agent_name=agent_name, metadata=metadata or {})
+        _acontext_store(
+            user_id,
+            context_type,
+            content,
+            agent_name=agent_name,
+            metadata=metadata or {},
+        )
         return True
     except Exception as e:
         logger.warning("[context] store failed: %s", e)
@@ -77,7 +84,13 @@ def search_context(
     if _acontext_search is None:
         return []
     try:
-        return _acontext_search(user_id, query=query, context_type=context_type, agent_name=agent_name, limit=limit)
+        return _acontext_search(
+            user_id,
+            query=query,
+            context_type=context_type,
+            agent_name=agent_name,
+            limit=limit,
+        )
     except Exception as e:
         logger.warning("[context] search failed: %s", e)
         return []

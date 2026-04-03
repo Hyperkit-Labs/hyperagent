@@ -3,7 +3,7 @@
  */
 
 import { FALLBACK_DEFAULT_CHAIN_ID } from '@/constants/defaults';
-import { fetchJson } from './core';
+import { fetchJsonAuthed } from './core';
 
 export interface PrepareDeployParams {
   chainId?: number;
@@ -17,7 +17,7 @@ export async function prepareDeploymentTransaction(
   const chainId = params?.chainId ?? FALLBACK_DEFAULT_CHAIN_ID;
   const mainnet_confirm = params?.mainnet_confirm ?? false;
   const qs = new URLSearchParams({ chain_id: String(chainId) });
-  return fetchJson(`/workflows/${workflowId}/deploy/prepare?${qs}`, {
+  return fetchJsonAuthed(`/workflows/${workflowId}/deploy/prepare?${qs}`, {
     method: 'POST',
     body: JSON.stringify({ mainnet_confirm }),
   });
@@ -33,7 +33,7 @@ export async function completeDeployment(
     chainId?: number;
   }
 ): Promise<unknown> {
-  return fetchJson(`/workflows/${workflowId}/deploy/complete`, {
+  return fetchJsonAuthed(`/workflows/${workflowId}/deploy/complete`, {
     method: 'POST',
     body: JSON.stringify(body),
   });

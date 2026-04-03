@@ -110,12 +110,16 @@ def normalize_scrubd(raw: dict[str, Any]) -> ToolResult:
     findings_raw = raw.get("findings", [])
     findings: list[NormalizedFinding] = []
     for i, f in enumerate(findings_raw):
-        sev = _normalize_severity(f.get("severity") or ("high" if not passed else "low"))
+        sev = _normalize_severity(
+            f.get("severity") or ("high" if not passed else "low")
+        )
         findings.append(
             NormalizedFinding(
                 id=f"scrubd:{i}:{f.get('type', '')}:{f.get('location', '')}",
                 tool="scrubd",
-                title=_normalize_title(f.get("title") or f.get("type") or "SCRUBD pattern"),
+                title=_normalize_title(
+                    f.get("title") or f.get("type") or "SCRUBD pattern"
+                ),
                 description=str(f.get("description") or f.get("message") or ""),
                 severity=sev,
                 corroboratedBy=[],
@@ -158,7 +162,9 @@ def normalize_echidna(raw: dict[str, Any]) -> ToolResult:
                 id="echidna:property-falsified",
                 tool="echidna",
                 title="Property falsified",
-                description=str(raw.get("reason") or "Echidna property or assertion failed"),
+                description=str(
+                    raw.get("reason") or "Echidna property or assertion failed"
+                ),
                 severity="high",
                 corroboratedBy=[],
                 waivable=False,

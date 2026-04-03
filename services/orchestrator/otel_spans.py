@@ -12,9 +12,10 @@ from typing import Any, Generator
 
 logger = logging.getLogger(__name__)
 
-_OTEL_ENABLED = (
-    os.environ.get("OPENTELEMETRY_ENABLED", "").strip().lower()
-    in ("1", "true", "yes")
+_OTEL_ENABLED = os.environ.get("OPENTELEMETRY_ENABLED", "").strip().lower() in (
+    "1",
+    "true",
+    "yes",
 )
 
 _tracer = None
@@ -34,12 +35,19 @@ def _get_tracer():  # type: ignore[no-untyped-def]
         endpoint = (os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT") or "").strip()
         if endpoint:
             try:
-                from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+                from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+                    OTLPSpanExporter,
+                )
+
                 provider = TracerProvider()
-                provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
+                provider.add_span_processor(
+                    BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint))
+                )
                 trace.set_tracer_provider(provider)
             except ImportError:
-                logger.debug("opentelemetry-exporter-otlp not installed, spans in-process only")
+                logger.debug(
+                    "opentelemetry-exporter-otlp not installed, spans in-process only"
+                )
 
         _tracer = trace.get_tracer("hyperagent.orchestrator", "0.1.0")
         return _tracer
@@ -79,7 +87,9 @@ def span(
 
 
 @contextmanager
-def request_span(method: str, path: str, request_id: str | None = None) -> Generator[None, None, None]:
+def request_span(
+    method: str, path: str, request_id: str | None = None
+) -> Generator[None, None, None]:
     """Create an HTTP request span when OPENTELEMETRY_ENABLED. Use in middleware."""
     t = _get_tracer()
     if t is None:

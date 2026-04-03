@@ -61,7 +61,7 @@ export async function loadChainRegistry(): Promise<Map<number, { rpcUrl: string;
       cached = buildMap(spec);
       return cached;
     } catch (e) {
-      console.warn(`[ChainRegistry] URL fetch failed (${(e as Error).message}), trying local path`);
+      process.stderr.write(JSON.stringify({ level: "warn", service: "deploy", msg: `ChainRegistry URL fetch failed: ${(e as Error).message}, trying local path` }) + "\n");
     }
   }
   if (CHAIN_REGISTRY_PATH) {

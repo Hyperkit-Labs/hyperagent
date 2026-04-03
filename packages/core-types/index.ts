@@ -174,3 +174,102 @@ export interface AgentTraceBlob {
   output_summary?: string;
   error_message?: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// ERC-8004 Agent Identity Registry (deployed on-chain)
+// ---------------------------------------------------------------------------
+
+/**
+ * Official ERC-8004 contract addresses. The identity registry is an ERC-1155
+ * token contract where each agentId is a uint256 token ID.
+ */
+export const ERC8004_ADDRESSES = {
+  SKALE_BASE_SEPOLIA: "0x8004A818BFB912233c491871b3d84c89A494BD9e" as const,
+} as const;
+
+export const ERC8004_CHAIN_IDS = {
+  SKALE_BASE_SEPOLIA: 324705682,
+} as const;
+
+// ---------------------------------------------------------------------------
+// BYOK types and security utilities
+// ---------------------------------------------------------------------------
+
+export type LLMProvider = "openai" | "anthropic" | "google";
+
+export const LLM_PROVIDERS: readonly LLMProvider[] = ["openai", "anthropic", "google"] as const;
+
+export interface EncryptedKeyPayload {
+  cipherText: string;
+  iv: string;
+  salt: string;
+  version: number;
+}
+
+export interface ByokValidateBody {
+  provider: LLMProvider;
+  encryptedKey: EncryptedKeyPayload;
+}
+
+export interface ByokValidateResponse {
+  valid: boolean;
+  provider: LLMProvider;
+  maskedKey: string;
+}
+
+export interface ByokSaveBody {
+  provider: LLMProvider;
+  encryptedKey: EncryptedKeyPayload;
+}
+
+export interface ByokSaveResponse {
+  success: boolean;
+  validatedAt: string;
+}
+
+export interface ByokDeleteResponse {
+  success: boolean;
+}
+
+export interface ByokStatusResponse {
+  providers: Record<LLMProvider, boolean>;
+}
+
+export function detectProviderFromKey(raw: string): LLMProvider | null {
+  if (raw.startsWith("sk-ant-")) return "anthropic";
+  if (raw.startsWith("sk-")) return "openai";
+  if (/^AIza/.test(raw)) return "google";
+  return null;
+}
+
+export function maskApiKey(raw: string): string {
+  if (raw.length <= 8) return "****";
+  return `${raw.slice(0, 5)}...${raw.slice(-4)}`;
+}
+
+/**
+ * Wraps sensitive key material so accidental serialization/logging
+ * never reveals the raw value. Use getRawUnsafe() only at the point
+ * of actual crypto or provider API usage.
+ */
+export class KeyMaterial {
+  #value: string;
+  constructor(value: string) {
+    this.#value = value;
+  }
+  toString(): string {
+    return "[REDACTED]";
+  }
+  toJSON(): string {
+    return "[REDACTED]";
+  }
+  valueOf(): string {
+    return "[REDACTED]";
+  }
+  getRawUnsafe(): string {
+    return this.#value;
+  }
+  get masked(): string {
+    return maskApiKey(this.#value);
+  }
+}

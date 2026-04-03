@@ -980,6 +980,38 @@ def count_completed_audits() -> int:
         return 0
 
 
+def count_completed_audits_from_run_state() -> int:
+    """Count runs whose pipeline moved past the audit node (run_state.phase).
+
+    Newer pipelines write run_state on every stage; run_steps may be missing on older or partial imports.
+    Phases after audit completes: simulation (pass) or audit_failed (audit finished with gate failure).
+    """
+    client = _client()
+    if not client:
+        return 0
+    phases_after_audit = (
+        "simulation",
+        "audit_failed",
+        "security_policy_evaluator",
+        "exploit_sim",
+        "deploy",
+        "monitor",
+        "ui_scaffold",
+    )
+    try:
+        r = (
+            client.table("run_state")
+            .select("run_id")
+            .in_("phase", phases_after_audit)
+            .execute()
+        )
+        run_ids = {row.get("run_id") for row in (r.data or []) if row.get("run_id")}
+        return len(run_ids)
+    except Exception as e:
+        logger.debug("[db] count_completed_audits_from_run_state failed: %s", e)
+        return 0
+
+
 def count_security_findings() -> int:
     """Total count of security findings from security_findings table."""
     client = _client()

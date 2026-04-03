@@ -7,7 +7,12 @@ import sys
 
 import pytest
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+sys.path.insert(
+    0,
+    os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    ),
+)
 
 
 def test_build_trace_payload():
@@ -38,6 +43,7 @@ async def test_write_trace_production_stub_raises(monkeypatch):
     monkeypatch.setenv("ENV", "production")
     import importlib
     import trace_writer as m
+
     importlib.reload(m)
 
     if not m.IS_PRODUCTION:

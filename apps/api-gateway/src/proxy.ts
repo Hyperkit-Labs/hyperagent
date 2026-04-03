@@ -1,10 +1,12 @@
 import type { ClientRequest } from "http";
 import type express from "express";
-import { getTraceparentHeader } from "@hyperagent/backend-middleware";
+import { getTraceparentHeader, signUserId } from "@hyperagent/backend-middleware";
 import type { RequestWithId } from "./requestId.js";
 import type { RequestWithUser } from "./auth.js";
 import { log } from "./logger.js";
 import { responseInterceptor } from "http-proxy-middleware";
+
+const IDENTITY_HMAC_SECRET = process.env.IDENTITY_HMAC_SECRET || "";
 
 export function createProxyOptions(
   orchestratorUrl: string,
@@ -27,7 +29,13 @@ export function createProxyOptions(
       if (r.headers["x-agent-session"]) proxyReq.setHeader("x-agent-session", r.headers["x-agent-session"] as string);
       proxyReq.removeHeader("x-user-id");
       proxyReq.removeHeader("X-User-Id");
-      if (r.userId) proxyReq.setHeader("x-user-id", r.userId);
+      proxyReq.removeHeader("x-user-id-sig");
+      if (r.userId) {
+        proxyReq.setHeader("x-user-id", r.userId);
+        if (IDENTITY_HMAC_SECRET) {
+          proxyReq.setHeader("x-user-id-sig", signUserId(r.userId, IDENTITY_HMAC_SECRET));
+        }
+      }
     },
     onError(err: Error, req: express.Request, res: express.Response) {
       const id = (req as RequestWithId).requestId;

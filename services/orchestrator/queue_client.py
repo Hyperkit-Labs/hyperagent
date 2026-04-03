@@ -17,16 +17,23 @@ logger = logging.getLogger(__name__)
 
 QUEUE_KEY = "queue:hyperagent:pipeline"
 DEAD_QUEUE_KEY = "queue:hyperagent:dead"
-QUEUE_ENABLED = (os.environ.get("QUEUE_ENABLED") or "").strip().lower() in ("1", "true", "yes")
+QUEUE_ENABLED = (os.environ.get("QUEUE_ENABLED") or "").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+)
 QUEUE_MAX_RETRIES = int(os.environ.get("QUEUE_MAX_RETRIES", "3"))
 
 
 def _get_redis():
-    url = (os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or "").strip()
+    url = (
+        os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or ""
+    ).strip()
     if not url:
         return None
     try:
         import redis
+
         return redis.from_url(effective_redis_url(url), decode_responses=True)
     except Exception as e:
         logger.warning("[queue] Upstash unavailable: %s", e)
@@ -71,6 +78,8 @@ def send_to_dead(job: dict, error: str) -> None:
     try:
         payload = {**job, "_dead_reason": error}
         r.rpush(DEAD_QUEUE_KEY, json.dumps(payload))
-        logger.warning("[queue] job run_id=%s sent to dead queue: %s", job.get("run_id"), error)
+        logger.warning(
+            "[queue] job run_id=%s sent to dead queue: %s", job.get("run_id"), error
+        )
     except Exception as e:
         logger.warning("[queue] send_to_dead failed: %s", e)

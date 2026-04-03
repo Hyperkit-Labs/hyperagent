@@ -4,6 +4,7 @@
  * Optional OTel request spans when OPENTELEMETRY_ENABLED.
  */
 
+import { randomUUID } from "crypto";
 import type { Request, Response, NextFunction } from "express";
 
 export const REQUEST_ID_HEADER = "x-request-id";
@@ -12,17 +13,92 @@ export interface RequestWithId extends Request {
   requestId?: string;
 }
 
+const NODE_ENV = process.env.NODE_ENV || "development";
+const IS_PRODUCTION = NODE_ENV === "production";
+
 /**
- * Injects x-request-id from headers into req.requestId for downstream use.
- * Logs in non-production when id is present.
+ * Injects x-request-id into req.requestId. Generates a UUID when the header
+ * is missing so every request is traceable. Echoes the ID back via response header.
  */
-export function requestIdMiddleware(req: Request, _res: Response, next: NextFunction): void {
-  const id = (req.headers[REQUEST_ID_HEADER] as string)?.trim() || "";
+export function requestIdMiddleware(req: Request, res: Response, next: NextFunction): void {
+  const incoming = (req.headers[REQUEST_ID_HEADER] as string)?.trim();
+  const id = incoming || randomUUID();
   (req as RequestWithId).requestId = id;
-  if (id && process.env.NODE_ENV !== "production") {
-    console.log(`[${process.env.npm_package_name || "service"}] requestId=${id} path=${req.path}`);
-  }
+  res.setHeader(REQUEST_ID_HEADER, id);
   next();
 }
 
+/**
+ * Centralized internal-service auth guard.
+ * In production, REFUSES all non-health requests when the token is not configured (fail-closed).
+ * In development, allows passthrough when token is empty.
+ */
+export function requireInternalToken(token: string) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (req.path === "/health" || req.path === "/health/live") return next();
+    if (!token) {
+      if (IS_PRODUCTION) {
+        res.status(503).json({ error: "Service not configured: INTERNAL_SERVICE_TOKEN missing" });
+        return;
+      }
+      return next();
+    }
+    if (req.header("X-Internal-Token") === token) return next();
+    res.status(401).json({ error: "Unauthorized" });
+  };
+}
+
+/**
+ * Wraps an async route handler so unhandled errors return a safe 500
+ * with requestId, without leaking internal details to clients.
+ */
+export function safeHandler(
+  label: string,
+  fn: (req: Request, res: Response) => Promise<void>,
+): (req: Request, res: Response) => void {
+  return (req: Request, res: Response) => {
+    fn(req, res).catch((e: unknown) => {
+      const requestId = (req as RequestWithId).requestId;
+      const detail = e instanceof Error ? e.message : String(e);
+      const payload = { level: "error", label, requestId, error: detail };
+      try {
+        process.stderr.write(JSON.stringify(payload) + "\n");
+      } catch {
+        process.stderr.write(`[${label}] ${detail}\n`);
+      }
+      if (!res.headersSent) {
+        res.status(500).json({
+          error: IS_PRODUCTION ? "An internal error occurred" : detail,
+          requestId,
+        });
+      }
+    });
+  };
+}
+
+/**
+ * Startup secrets validator. Call on boot; fails fast if any required env var is missing.
+ * Logs secret names only (never values).
+ */
+export function validateRequiredSecrets(
+  secrets: readonly string[],
+  label: string,
+): void {
+  const missing: string[] = [];
+  for (const name of secrets) {
+    if (!process.env[name]?.trim()) missing.push(name);
+  }
+  if (missing.length > 0) {
+    const msg = `[${label}] Missing required secrets: ${missing.join(", ")}`;
+    const payload = IS_PRODUCTION
+      ? JSON.stringify({ level: "fatal", label, missing })
+      : JSON.stringify({ level: "warn", label, missing });
+    process.stderr.write(payload + "\n");
+    if (IS_PRODUCTION) {
+      throw new Error(msg);
+    }
+  }
+}
+
 export { otelRequestSpanMiddleware, getTraceparentHeader } from "./otel.js";
+export { createLogger } from "./logger.js";

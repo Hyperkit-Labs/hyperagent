@@ -16,26 +16,20 @@ import { fetchConfigStrict } from '@/lib/api';
 import type { ApiErrorWithStatus } from '@/lib/api';
 import { ROUTES } from '@/constants/routes';
 import { redirectToLoginWithNext } from '@/lib/authRedirect';
+import { bootstrapConfigFailureMessage, getErrorRequestId } from '@/lib/sadPathCopy';
 
 export type BootstrapStatus = 'pending' | 'success' | 'failed';
 
 export interface SessionContextValue {
-  /** True when a valid session exists (JWT in store). */
   hasSession: boolean;
-  /** Bootstrap: pending | success | failed. Failed = 401/503 from config; redirect to login. */
   bootstrapStatus: BootstrapStatus;
-  /** True after first client mount (avoids hydration mismatch). */
   isReady: boolean;
-  /** Manually trigger bootstrap re-check (e.g. after sign-in). */
+  /** User-safe message when bootstrap failed without invalidating the JWT (e.g. 503/429). */
+  bootstrapError: string | null;
   recheckBootstrap: () => Promise<void>;
 }
 
-const SessionContext = createContext<SessionContextValue>({
-  hasSession: false,
-  bootstrapStatus: 'pending',
-  isReady: false,
-  recheckBootstrap: async () => {},
-});
+const SessionContext = createContext<SessionContextValue | null>(null);
 
 export function useSessionContext(): SessionContextValue {
   const ctx = useContext(SessionContext);
@@ -45,7 +39,6 @@ export function useSessionContext(): SessionContextValue {
   return ctx;
 }
 
-/** Routes that require session. All others (e.g. /login) skip bootstrap. */
 const PROTECTED_PATHS: (string | ((p: string) => boolean))[] = [
   ROUTES.HOME,
   ROUTES.DASHBOARD,
@@ -77,84 +70,107 @@ function isProtectedPath(pathname: string): boolean {
   );
 }
 
-/** Opt-in auth-bootstrap debug: `sessionStorage.setItem('DEBUG_SESSION_PROVIDER','1')` then reload. */
 function logAuth(...args: unknown[]) {
-  if (typeof window !== 'undefined' && sessionStorage.getItem('DEBUG_SESSION_PROVIDER') === '1') {
+  if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && sessionStorage.getItem('DEBUG_SESSION_PROVIDER') === '1') {
     console.log('[SessionProvider]', ...args);
   }
 }
 
 /**
- * SessionProvider: single authority for session state and bootstrap status.
- * On bootstrap failure (401/503 from GET /config): redirect to /login, block protected content.
- * Prevents ghost state where wallet is connected but backend is unreachable or session invalid.
+ * Single owner of session + authenticated bootstrap (GET /config).
+ * Clears session and redirects only on 401/403. 503/429 stay logged-in with bootstrapError + retry.
  */
 export function SessionProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [hasSession, setHasSession] = useState(false);
   const [bootstrapStatus, setBootstrapStatus] = useState<BootstrapStatus>('pending');
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
-  const bootstrapAttempted = useRef(false);
   const bootstrapInFlight = useRef(false);
-  /** After 401/503 config failure, block re-bootstrap until a new session is stored (prevents clear → SESSION_CHANGE → retry loops). */
-  const bootstrapFailed = useRef(false);
+  const redirectingRef = useRef(false);
+
+  const safeRedirectToLogin = useCallback(() => {
+    if (redirectingRef.current) return;
+    redirectingRef.current = true;
+    redirectToLoginWithNext();
+  }, []);
 
   const runBootstrap = useCallback(async () => {
-    if (!isProtectedPath(pathname ?? '')) {
+    const path = pathname ?? '';
+    if (!isProtectedPath(path)) {
       setBootstrapStatus('success');
+      setBootstrapError(null);
       return;
     }
+
+    const session = getStoredSession();
+    if (!session?.access_token) {
+      setBootstrapStatus('failed');
+      setBootstrapError(null);
+      safeRedirectToLogin();
+      return;
+    }
+
     if (bootstrapInFlight.current) {
-      logAuth('fetchConfigStrict skipped (already in flight)');
+      logAuth('runBootstrap skipped (in flight)');
       return;
     }
+
+    bootstrapInFlight.current = true;
+    setBootstrapStatus('pending');
+    setBootstrapError(null);
+    logAuth('fetchConfigStrict start pathname=', path);
+
     try {
-      bootstrapInFlight.current = true;
-      setBootstrapStatus('pending');
-      logAuth('fetchConfigStrict start pathname=', pathname);
       await fetchConfigStrict();
-      logAuth('fetchConfigStrict success');
       setBootstrapStatus('success');
+      setBootstrapError(null);
+      redirectingRef.current = false;
+      logAuth('fetchConfigStrict success');
     } catch (err) {
       const status = (err as ApiErrorWithStatus)?.status;
-      logAuth('fetchConfigStrict failed status=', status, 'err=', (err as Error)?.message);
-      if (status === 401 || status === 503) {
-        bootstrapFailed.current = true;
+      const code = (err as ApiErrorWithStatus & { code?: string })?.code;
+      logAuth('fetchConfigStrict failed status=', status, 'code=', code, 'err=', (err as Error)?.message);
+      setBootstrapStatus('failed');
+
+      if (status === 401 || status === 403) {
         clearStoredSession();
-        setBootstrapStatus('failed');
-        logAuth('redirectToLoginWithNext (401/503) pathname=', pathname, 'window.pathname=', typeof window !== 'undefined' ? window.location.pathname : 'ssr');
-        redirectToLoginWithNext();
+        setBootstrapError(null);
+        safeRedirectToLogin();
         return;
       }
-      setBootstrapStatus('failed');
+
+      const requestId = getErrorRequestId(err);
+      const rawMessage = err instanceof Error && err.message ? err.message : 'Could not verify your session with the server.';
+      setBootstrapError(bootstrapConfigFailureMessage(status, code, rawMessage, requestId));
     } finally {
       bootstrapInFlight.current = false;
     }
-  }, [pathname]);
+  }, [pathname, safeRedirectToLogin]);
 
   const recheckBootstrap = useCallback(async () => {
-    bootstrapAttempted.current = false;
-    bootstrapFailed.current = false;
+    redirectingRef.current = false;
+    setBootstrapError(null);
     await runBootstrap();
   }, [runBootstrap]);
 
   useLayoutEffect(() => {
     const session = getStoredSession();
-    const nextHasSession = Boolean(session);
-    logAuth('initial hasSession=', nextHasSession, 'stored=', session ? 'present' : 'null');
-    setHasSession(nextHasSession);
+    setHasSession(Boolean(session));
     setIsReady(true);
+    logAuth('initial hasSession=', Boolean(session));
   }, []);
 
   useEffect(() => {
     const handler = () => {
       const session = getStoredSession();
       const next = Boolean(session);
-      if (next) {
-        bootstrapFailed.current = false;
-      }
-      logAuth('SESSION_CHANGE_EVENT hasSession=', next, '(login completed or cleared)');
       setHasSession(next);
+      if (next) {
+        redirectingRef.current = false;
+        setBootstrapError(null);
+      }
+      logAuth('SESSION_CHANGE_EVENT hasSession=', next);
     };
     window.addEventListener(SESSION_CHANGE_EVENT, handler);
     return () => window.removeEventListener(SESSION_CHANGE_EVENT, handler);
@@ -162,40 +178,30 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isReady) return;
-    const currentPath = (pathname ?? (typeof window !== 'undefined' ? window.location.pathname : '')) || '';
-    logAuth('bootstrap effect isReady=true pathname=', pathname, 'currentPath=', currentPath, 'hasSession=', hasSession, 'protected=', isProtectedPath(currentPath));
-    if (!isProtectedPath(currentPath)) {
+    const path = (pathname ?? (typeof window !== 'undefined' ? window.location.pathname : '')) || '';
+    logAuth('route effect pathname=', path, 'hasSession=', hasSession);
+
+    if (!isProtectedPath(path)) {
       setBootstrapStatus('success');
+      setBootstrapError(null);
       return;
     }
+
     if (!hasSession) {
       setBootstrapStatus('failed');
-      logAuth('redirectToLoginWithNext (!hasSession) pathname=', pathname, 'window.pathname=', typeof window !== 'undefined' ? window.location.pathname : 'ssr');
-      redirectToLoginWithNext();
+      setBootstrapError(null);
+      safeRedirectToLogin();
       return;
     }
-    if (bootstrapFailed.current) {
-      logAuth('bootstrap skipped (bootstrapFailed after auth/config failure)');
-      return;
-    }
-    if (bootstrapAttempted.current) return;
-    bootstrapAttempted.current = true;
-    void runBootstrap();
-  }, [isReady, pathname, hasSession, runBootstrap]);
 
-  const prevHasSession = useRef(false);
-  useEffect(() => {
-    if (hasSession && !prevHasSession.current) {
-      logAuth('hasSession became true (login completed) reset bootstrapAttempted');
-      bootstrapAttempted.current = false;
-    }
-    prevHasSession.current = hasSession;
-  }, [hasSession]);
+    void runBootstrap();
+  }, [isReady, pathname, hasSession, runBootstrap, safeRedirectToLogin]);
 
   const value: SessionContextValue = {
     hasSession,
     bootstrapStatus,
     isReady,
+    bootstrapError,
     recheckBootstrap,
   };
 

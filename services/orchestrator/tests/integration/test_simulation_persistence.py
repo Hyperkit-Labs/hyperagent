@@ -15,7 +15,8 @@ sys.path.insert(
 
 @pytest.fixture
 def mock_sim_provider():
-    with patch("providers.get_simulation_provider") as m:
+    # Patch where simulation_agent uses it (import-bound name), not providers module only.
+    with patch("agents.simulation_agent.get_simulation_provider") as m:
         prov = m.return_value
         prov.simulate = AsyncMock(return_value={"success": True, "gasUsed": 150000})
         prov.simulate_bundle = AsyncMock(

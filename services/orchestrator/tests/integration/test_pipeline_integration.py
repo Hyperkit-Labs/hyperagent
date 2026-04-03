@@ -10,7 +10,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(
+    0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
 
 @pytest.fixture
@@ -94,5 +96,6 @@ def test_circuit_breaker_recovery():
     cb.record_failure()
     assert not cb.can_execute()
     import time
+
     time.sleep(0.02)
     assert cb.can_execute()

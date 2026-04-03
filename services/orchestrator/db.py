@@ -19,7 +19,9 @@ def _client():
     global _supabase
     if _supabase is None:
         url = os.environ.get("SUPABASE_URL")
-        key = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        key = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get(
+            "SUPABASE_SERVICE_ROLE_KEY"
+        )
         if not url or not key:
             return None
         from supabase import create_client
@@ -31,7 +33,10 @@ def _client():
 def is_configured() -> bool:
     return bool(
         os.environ.get("SUPABASE_URL")
-        and (os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY"))
+        and (
+            os.environ.get("SUPABASE_SERVICE_KEY")
+            or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        )
     )
 
 
@@ -54,7 +59,9 @@ def ensure_user_profile(
     user_id: str, wallet_address: str | None = None, display_name: str | None = None
 ) -> bool:
     """Deprecated. Use wallet_users + wallet_user_profiles. Kept for backward compat; no-op."""
-    logger.debug("[db] ensure_user_profile deprecated; wallet_users is the only principal")
+    logger.debug(
+        "[db] ensure_user_profile deprecated; wallet_users is the only principal"
+    )
     return True
 
 
@@ -202,7 +209,8 @@ def insert_deployment(
 ) -> dict[str, Any] | None:
     """Insert a pending deployment (plan). Returns row with id or None.
     deployment_order: for multi-contract, lower values deploy first (0, 1, 2...).
-    wallet_user_id: owner identity for RLS; resolved from run→project→wallet_user_id if not provided."""
+    wallet_user_id: owner identity for RLS; resolved from run→project→wallet_user_id if not provided.
+    """
     client = _client()
     if not client:
         return None
@@ -234,7 +242,13 @@ def _resolve_wallet_user_id_for_project(project_id: str) -> str | None:
     if not client or not project_id:
         return None
     try:
-        r = client.table("projects").select("wallet_user_id").eq("id", project_id).limit(1).execute()
+        r = (
+            client.table("projects")
+            .select("wallet_user_id")
+            .eq("id", project_id)
+            .limit(1)
+            .execute()
+        )
         if r.data and r.data[0].get("wallet_user_id"):
             return r.data[0]["wallet_user_id"]
     except Exception:
@@ -338,10 +352,10 @@ def insert_agent_registration(
 
 # Truncation limits (F-016). Content exceeding limits is cut; full content stored in IPFS when PINATA_* configured.
 # Large artifacts: use storage_backend=ipfs and cid for full retrieval; inline content may be truncated.
-ARTIFACT_CONTENT_LIMIT = 65535   # project_artifacts.content, run_step outputs
-AGENT_LOG_MESSAGE_LIMIT = 4096   # agent_log.message
-OUTPUT_SUMMARY_LIMIT = 4096      # run_step.output_summary
-ERROR_MESSAGE_LIMIT = 2048       # run_step.error_message, agent_log.message (when error)
+ARTIFACT_CONTENT_LIMIT = 65535  # project_artifacts.content, run_step outputs
+AGENT_LOG_MESSAGE_LIMIT = 4096  # agent_log.message
+OUTPUT_SUMMARY_LIMIT = 4096  # run_step.output_summary
+ERROR_MESSAGE_LIMIT = 2048  # run_step.error_message, agent_log.message (when error)
 
 
 def _truncate_and_warn(
@@ -433,6 +447,7 @@ def upsert_workflow_artifacts(
     if not _is_uuid(project_id) or not _is_uuid(run_id):
         return
     import json
+
     try:
         if spec:
             insert_project_artifact(
@@ -569,7 +584,11 @@ def insert_agent_log(
                 "stage": stage,
                 "message": effective_msg,
                 "log_level": log_level,
-                "metadata": {**(metadata or {}), "was_truncated": was_truncated} if was_truncated else (metadata or {}),
+                "metadata": (
+                    {**(metadata or {}), "was_truncated": was_truncated}
+                    if was_truncated
+                    else (metadata or {})
+                ),
             }
         ).execute()
         return True
@@ -736,7 +755,9 @@ def _run_steps_to_log_entries(rows: list[dict[str, Any]]) -> list[dict[str, Any]
         elif step:
             msg = f"[{step}] {row.get('status', '')}"
         level = "error" if row.get("status") == "failed" else "info"
-        truncated_msg, _ = _truncate_and_warn(msg, 2048, "run_step log message", row.get("run_id"))
+        truncated_msg, _ = _truncate_and_warn(
+            msg, 2048, "run_step log message", row.get("run_id")
+        )
         out.append(
             {
                 "message": truncated_msg or msg or "-",
@@ -759,7 +780,9 @@ def _agent_logs_to_log_entries(rows: list[dict[str, Any]]) -> list[dict[str, Any
             msg = f"[{agent}] {msg}"
         elif agent:
             msg = f"[{agent}] {row.get('stage', '')}"
-        truncated_msg, _ = _truncate_and_warn(msg, 2048, "agent_log message", row.get("run_id"))
+        truncated_msg, _ = _truncate_and_warn(
+            msg, 2048, "agent_log message", row.get("run_id")
+        )
         out.append(
             {
                 "message": truncated_msg or msg or "-",
@@ -773,11 +796,13 @@ def _agent_logs_to_log_entries(rows: list[dict[str, Any]]) -> list[dict[str, Any
 
 def get_workflow_rich_from_artifacts(run_id: str) -> dict[str, Any]:
     """Assemble rich workflow fields from project_artifacts. Used when workflow_state blob is not written.
-    Returns dict with spec, contracts, deployments, audit_findings, ui_schema, test_files (parsed from content JSON)."""
+    Returns dict with spec, contracts, deployments, audit_findings, ui_schema, test_files (parsed from content JSON).
+    """
     client = _client()
     if not client or not _is_uuid(run_id):
         return {}
     import json
+
     try:
         r = (
             client.table("project_artifacts")
@@ -835,7 +860,8 @@ def get_run_project_id(run_id: str) -> str | None:
 
 def get_workflow_state(run_id: str) -> dict[str, Any] | None:
     """Return workflow state json for run_id from runs.workflow_state. None if not configured or missing.
-    Deprecated: new writes use run_state + project_artifacts only. Kept for backward compat with historical runs."""
+    Deprecated: new writes use run_state + project_artifacts only. Kept for backward compat with historical runs.
+    """
     client = _client()
     if not client:
         return None
@@ -979,7 +1005,9 @@ def list_security_findings(
         if run_id and _is_uuid(run_id):
             r = (
                 client.table("security_findings")
-                .select("id, run_id, tool, severity, category, title, description, location, status, created_at")
+                .select(
+                    "id, run_id, tool, severity, category, title, description, location, status, created_at"
+                )
                 .eq("run_id", run_id)
                 .order("created_at", desc=True)
                 .limit(limit)
@@ -1007,7 +1035,9 @@ def list_security_findings(
                 return []
             r = (
                 client.table("security_findings")
-                .select("id, run_id, tool, severity, category, title, description, location, status, created_at")
+                .select(
+                    "id, run_id, tool, severity, category, title, description, location, status, created_at"
+                )
                 .in_("run_id", run_ids[:500])
                 .order("created_at", desc=True)
                 .limit(limit)
@@ -1016,7 +1046,9 @@ def list_security_findings(
             return list(r.data) if r.data else []
         r = (
             client.table("security_findings")
-            .select("id, run_id, tool, severity, category, title, description, location, status, created_at")
+            .select(
+                "id, run_id, tool, severity, category, title, description, location, status, created_at"
+            )
             .order("created_at", desc=True)
             .limit(min(limit, 500))
             .execute()
@@ -1046,7 +1078,9 @@ def count_distinct_auditors() -> int:
             if isinstance(runs_data, dict):
                 projects_data = runs_data.get("projects")
                 if isinstance(projects_data, dict):
-                    uid = projects_data.get("wallet_user_id") or projects_data.get("user_id")
+                    uid = projects_data.get("wallet_user_id") or projects_data.get(
+                        "user_id"
+                    )
                     if uid:
                         user_ids.add(str(uid))
         return len(user_ids)

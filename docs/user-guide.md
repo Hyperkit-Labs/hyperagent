@@ -1,33 +1,33 @@
-# User guide
+# Studio guide
 
-How to use HyperAgent Studio as an end user: connect, configure keys, and run workflows.
+How to use HyperAgent Studio: connect a wallet, configure keys, and run workflows.
 
 ---
 
 ## What HyperAgent does
 
-HyperAgent turns natural language into smart contracts. You describe what you want; the platform generates Solidity, runs security checks and simulations, and can deploy to supported EVM chains. You stay in control of your keys and approvals.
+HyperAgent turns natural language into smart contracts. Describe the intent in the app; the platform generates Solidity, runs security checks and simulations, and can deploy to supported EVM chains. Wallet keys and approvals stay under local control.
 
 ---
 
 ## Core flow
 
-1. **Connect** – Connect your wallet in the web app (e.g. MetaMask, WalletConnect). This identifies you and is used for deployment and payments.
-2. **BYOK (Bring your own keys)** – Add your LLM API keys (e.g. OpenAI, Anthropic, Google, OpenRouter) in Settings. Keys are stored in an isolated, encrypted environment and used only for your workflows. The platform does not use server-side LLM keys for your runs.
-3. **Approved** – After keys are set and validated, you can run workflows.
-4. **Run** – Start a workflow: describe your contract in chat, then the pipeline runs spec, design, codegen, audit, Tenderly simulation and report, and (if you choose) deployment. You see simulation and report in the same flow.
+1. **Connect** – Connect a wallet in the web app (for example MetaMask or WalletConnect). Used for identity, deployment, and payments.
+2. **BYOK (Bring your own keys)** – Add LLM API keys (OpenAI, Anthropic, Google, OpenRouter, and others) in Settings. Keys are stored in an isolated, encrypted environment and used only for workflows tied to that account. The platform does not rely on server-side LLM keys for those runs.
+3. **Validation** – After keys are set and validated, workflows become available.
+4. **Run** – Start a workflow: describe the contract in chat, then the pipeline runs spec, design, codegen, audit, Tenderly simulation and report, and optional deployment. Simulation and report appear in the same flow.
 
-You can remove your key configuration at any time; keys are then wiped with no long-lived exposure.
+Key configuration can be removed at any time; keys are wiped without long-lived exposure.
 
 ---
 
-## Using the web app (Studio)
+## Web app areas (Studio)
 
-- **Dashboard** – Overview of workflows, deployments, and metrics. Onboarding checklist for first-time setup.
-- **Workflows** – Create and monitor runs. View status, logs, and results. Workflows persist in Supabase when the backend is configured.
-- **Contracts** – View generated Solidity and ABIs.
-- **Deployments** – See deployment records and explorer links when you deploy.
-- **Settings** – Add, view, or remove LLM keys (BYOK). Keys are encrypted and never returned to the client.
+- **Dashboard** – Workflows, deployments, and metrics. Onboarding checklist for first-time setup.
+- **Workflows** – Create and monitor runs. Status, logs, and results. Workflows persist in Supabase when the backend is configured.
+- **Contracts** – Generated Solidity and ABIs.
+- **Deployments** – Deployment records and explorer links after deploy.
+- **Settings** – Add, view, or remove LLM keys (BYOK). Keys are encrypted and not returned in full to the client.
 - **Payments** – Add credits (USDC/USDT) when `CREDITS_ENABLED` is on. Credits are consumed per workflow run.
 
 ---
@@ -35,13 +35,13 @@ You can remove your key configuration at any time; keys are then wiped with no l
 ## Security and simulation
 
 - Generated code is audited with static analysis (Slither, Mythril) and simulated (Tenderly) before deployment.
-- Always review the audit and simulation report before deploying to mainnet.
-- Use testnets first when trying new workflows.
+- Review the audit and simulation report before deploying to mainnet.
+- Prefer testnets when evaluating new workflows.
 
 ---
 
-## Where to go next
+## Related docs
 
 - **First-time setup:** [Getting started](getting-started.md)
-- **Running and changing the code:** [Developer guide](developer-guide.md)
+- **Repository and local stack:** [Contributor guide](developer-guide.md)
 - **Troubleshooting:** [Troubleshooting](troubleshooting.md)

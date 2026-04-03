@@ -9,7 +9,6 @@ Flow:
     or [END (failed)]
 """
 
-
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
@@ -228,7 +227,11 @@ def _get_checkpointer():
 
     from redis_util import effective_redis_url
 
-    redis_url = effective_redis_url((os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or "").strip())
+    redis_url = effective_redis_url(
+        (
+            os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or ""
+        ).strip()
+    )
     if redis_url:
         try:
             from langgraph.checkpoint.redis import RedisSaver
@@ -314,7 +317,11 @@ def run_pipeline(
         initial.update(initial_state_override)
     import logging
 
-    from observability import inc_pipeline_runs_completed, inc_pipeline_runs_failed, inc_pipeline_runs_total
+    from observability import (
+        inc_pipeline_runs_completed,
+        inc_pipeline_runs_failed,
+        inc_pipeline_runs_total,
+    )
 
     inc_pipeline_runs_total()
     logging.getLogger(__name__).info(

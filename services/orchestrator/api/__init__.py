@@ -27,7 +27,12 @@ Orchestrator API routers. Mount in main.py:
   app.include_router(metrics_router)
 """
 
-from .billing import credits_router, payments_router, pricing_router, reconciliation_router
+from .billing import (
+    credits_router,
+    payments_router,
+    pricing_router,
+    reconciliation_router,
+)
 from .runs_registry import (
     agents_router,
     approve_spec_legacy_router,

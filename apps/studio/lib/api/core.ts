@@ -76,6 +76,8 @@ export function getErrorMessage(error: unknown, fallback = 'Request failed'): st
 
 export interface ApiErrorWithStatus extends Error {
   status?: number;
+  code?: string;
+  requestId?: string;
 }
 
 export interface NormalizeApiErrorOptions {
@@ -126,14 +128,28 @@ export function reportApiError(error: unknown, context: { path?: string; [key: s
 
 export interface FetchJsonOptions extends RequestInit {
   timeoutMs?: number;
-  /** When true, do not invoke global on401Callback (e.g. SessionProvider handles /config failures). */
+  /**
+   * When true, invoke global on401Callback on 401 (clear session + redirect).
+   * Default false: transport stays passive; SessionProvider and explicit callers own auth UX.
+   */
+  invokeGlobal401OnUnauthorized?: boolean;
+  /** @deprecated Use omit invokeGlobal401OnUnauthorized instead. When true, blocks global 401 even if invoke flag is set. */
   suppressOn401?: boolean;
 }
 
 let _apiBaseLogged = false;
 
+/**
+ * Same as fetchJson but opts into global 401 handling (logout + redirect) for authenticated API calls.
+ */
+export async function fetchJsonAuthed<T>(path: string, options?: FetchJsonOptions): Promise<T> {
+  return fetchJson<T>(path, { ...options, invokeGlobal401OnUnauthorized: true });
+}
+
 export async function fetchJson<T>(path: string, options?: FetchJsonOptions): Promise<T> {
-  const { timeoutMs, suppressOn401, ...init } = options ?? {};
+  const { timeoutMs, suppressOn401, invokeGlobal401OnUnauthorized, ...init } = options ?? {};
+  const shouldFireGlobal401 =
+    invokeGlobal401OnUnauthorized === true && suppressOn401 !== true;
   const timeout = timeoutMs ?? API_REQUEST_TIMEOUT_MS;
   const maxRetries = 3;
   const retryDelay = 1000;
@@ -179,10 +195,12 @@ export async function fetchJson<T>(path: string, options?: FetchJsonOptions): Pr
       if (!res.ok) {
         const errorText = await res.text().catch(() => res.statusText);
         let message = errorText || `HTTP ${res.status}: ${res.statusText}`;
+        let apiCode: string | undefined;
         try {
           const j = JSON.parse(errorText) as {
             message?: string;
             error?: string;
+            code?: string;
             detail?: string | Array<{ msg?: string }>;
           };
           if (typeof j.message === 'string') message = j.message;
@@ -190,11 +208,13 @@ export async function fetchJson<T>(path: string, options?: FetchJsonOptions): Pr
           else if (typeof j.detail === 'string') message = j.detail;
           else if (Array.isArray(j.detail) && j.detail.length > 0 && typeof j.detail[0]?.msg === 'string')
             message = j.detail[0].msg;
+          if (typeof j.code === 'string') apiCode = j.code;
         } catch {
           // keep message as errorText
         }
-        const error = new Error(message) as ApiErrorWithStatus;
+        const error = new Error(message) as ApiErrorWithStatus & { code?: string };
         error.status = res.status;
+        if (apiCode) error.code = apiCode;
         const requestId =
           res.headers.get('X-Request-Id') ??
           res.headers.get('x-request-id') ??
@@ -206,12 +226,12 @@ export async function fetchJson<T>(path: string, options?: FetchJsonOptions): Pr
               return undefined;
             }
           })();
-        if (requestId) (error as Error & { requestId?: string }).requestId = requestId;
+        if (requestId) error.requestId = requestId;
         if (process.env.NODE_ENV === 'development' && typeof console !== 'undefined') {
           console.warn(`[API] ${path} → ${res.status}`, message.slice(0, 80));
         }
         if (res.status >= 400 && res.status < 500 && res.status !== 408) {
-          if (res.status === 401 && on401Callback && !suppressOn401) {
+          if (res.status === 401 && on401Callback && shouldFireGlobal401) {
             try {
               on401Callback();
             } catch {

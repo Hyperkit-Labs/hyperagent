@@ -382,7 +382,7 @@ def _resume_deploy_approval_job(
                     stages=stages,
                 )
     except Exception as e:
-        err_msg = str(e)
+        err_msg = str(e)[:500]
         logger.exception(
             "[orchestrator] deploy approval resume failed workflow_id=%s", workflow_id
         )
@@ -615,8 +615,15 @@ def prepare_deploy_api(
             )
             r.raise_for_status()
             data = r.json()
-    except Exception as e:
-        return {"workflow_id": workflow_id, "error": str(e), "chainId": chain_id}
+    except Exception:
+        logger.exception(
+            "[orchestrator] compile request failed workflow_id=%s", workflow_id
+        )
+        return {
+            "workflow_id": workflow_id,
+            "error": "Compilation service request failed. Check logs for details.",
+            "chainId": chain_id,
+        }
     if not data.get("success") or not data.get("bytecode"):
         return {
             "workflow_id": workflow_id,

@@ -5,8 +5,12 @@
 
 import cors from "cors";
 import express from "express";
-import { requestIdMiddleware, otelRequestSpanMiddleware } from "@hyperagent/backend-middleware";
+import { requestIdMiddleware, otelRequestSpanMiddleware, requireInternalToken, safeHandler, validateRequiredSecrets, createLogger } from "@hyperagent/backend-middleware";
+
+const log = createLogger("storage");
 import { createDefaultStorage } from "./backends.js";
+
+validateRequiredSecrets(["INTERNAL_SERVICE_TOKEN"], "storage");
 
 const MAX_BODY_BYTES = 5 * 1024 * 1024;
 const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS) || 60_000;
@@ -34,64 +38,53 @@ function rateLimit(req: express.Request): boolean {
   return entry.count <= RATE_LIMIT_MAX_PER_IP;
 }
 
+// Periodic cleanup of expired rate-limit entries to prevent unbounded Map growth
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of ipCounts) {
+    if (now >= entry.resetAt) ipCounts.delete(ip);
+  }
+}, RATE_LIMIT_WINDOW_MS);
+
 const storage = createDefaultStorage();
 
 const INTERNAL_TOKEN = (process.env.INTERNAL_SERVICE_TOKEN || "").trim();
 
-function requireInternalAuth(
-  req: express.Request,
-  res: express.Response,
-  next: express.NextFunction
-): void {
-  if (req.path === "/health") return next();
-  if (!INTERNAL_TOKEN) return next();
-  const token = req.header("X-Internal-Token");
-  if (token === INTERNAL_TOKEN) return next();
-  res.status(401).json({ error: "Unauthorized: X-Internal-Token required when INTERNAL_SERVICE_TOKEN is set" });
-}
-
 const app = express();
 app.use(requestIdMiddleware);
 app.use(otelRequestSpanMiddleware);
-app.use(requireInternalAuth);
+app.use(requireInternalToken(INTERNAL_TOKEN));
 app.use(cors());
 app.use(express.json({ limit: MAX_BODY_BYTES }));
 
-app.post("/ipfs/pin", async (req, res) => {
+app.post("/ipfs/pin", safeHandler("storage-pin", async (req, res) => {
   if (!rateLimit(req)) {
-    return res.status(429).json({ error: "Rate limit exceeded" });
+    res.status(429).json({ error: "Rate limit exceeded" });
+    return;
   }
-  try {
-    const { content, name } = req.body as { content: string; name: string };
-    if (!storage) {
-      return res.status(503).json({ error: "PINATA_JWT not configured" });
-    }
-    const result = await storage.pin(content ?? "", name ?? "unnamed");
-    res.json({
-      success: true,
-      cid: result.cid,
-      gatewayUrl: result.gatewayUrl,
-      size: JSON.stringify({ name, content }).length,
-    });
-  } catch (e: unknown) {
-    console.error("[Storage] Pin error:", e);
-    res.status(500).json({ error: e instanceof Error ? e.message : "Pin failed" });
+  const { content, name } = req.body as { content: string; name: string };
+  if (!storage) {
+    res.status(503).json({ error: "PINATA_JWT not configured" });
+    return;
   }
-});
+  const result = await storage.pin(content ?? "", name ?? "unnamed");
+  res.json({
+    success: true,
+    cid: result.cid,
+    gatewayUrl: result.gatewayUrl,
+    size: JSON.stringify({ name, content }).length,
+  });
+}));
 
-app.post("/ipfs/unpin", async (req, res) => {
-  try {
-    const { cid } = req.body as { cid: string };
-    if (!storage) {
-      return res.status(503).json({ error: "PINATA_JWT not configured" });
-    }
-    await storage.unpin(cid);
-    res.json({ success: true, cid });
-  } catch (e: unknown) {
-    console.error("[Storage] Unpin error:", e);
-    res.status(500).json({ error: e instanceof Error ? e.message : "Unpin failed" });
+app.post("/ipfs/unpin", safeHandler("storage-unpin", async (req, res) => {
+  const { cid } = req.body as { cid: string };
+  if (!storage) {
+    res.status(503).json({ error: "PINATA_JWT not configured" });
+    return;
   }
-});
+  await storage.unpin(cid);
+  res.json({ success: true, cid });
+}));
 
 app.get("/health", (_req, res) => {
   res.json({
@@ -102,5 +95,5 @@ app.get("/health", (_req, res) => {
 
 const port = Number(process.env.PORT) || 4005;
 app.listen(port, "0.0.0.0", () => {
-  console.log(`[Storage] listening on ${port}`);
+  log.info({ port }, "storage service started");
 });

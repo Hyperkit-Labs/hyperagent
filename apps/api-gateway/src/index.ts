@@ -87,6 +87,8 @@ app.get("/health/live", (_req, res) => {
   res.json({ status: "ok", gateway: true });
 });
 
+app.get("/health", healthHandler(ORCHESTRATOR_URL));
+
 app.use(authMiddleware);
 app.use((req, res, next) => {
   (rateLimitMiddleware as (req: express.Request, res: express.Response, next: express.NextFunction) => Promise<void>)(req, res, next).catch(next);
@@ -105,8 +107,6 @@ app.use("/runs", createProxyMiddleware(proxyOpts()));
 app.use("/api", createProxyMiddleware(proxyOpts()));
 app.use("/docs", createProxyMiddleware(proxyOpts()));
 app.use("/openapi.json", createProxyMiddleware(proxyOpts()));
-
-app.get("/health", healthHandler(ORCHESTRATOR_URL));
 
 const port = Number(process.env.PORT) || 4000;
 app.listen(port, "0.0.0.0", () => {

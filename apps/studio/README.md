@@ -21,6 +21,7 @@ Next.js frontend application for HyperAgent - AI Agent Platform for On-Chain Sma
 ### Installation
 
 1. Install dependencies:
+
 ```bash
 npm install
 ```
@@ -31,6 +32,7 @@ npm install
 All environment variables should be configured in the root `.env` file, not in the frontend directory.
 
 Required variables in root `.env`:
+
 ```
 # Thirdweb (Required for wallet connect and x402 payments)
 NEXT_PUBLIC_THIRDWEB_CLIENT_ID=your_thirdweb_client_id

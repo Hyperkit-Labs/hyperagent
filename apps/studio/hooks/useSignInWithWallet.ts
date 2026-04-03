@@ -4,30 +4,11 @@ import { useState, useCallback } from "react";
 import { useActiveAccount, useActiveWallet, useActiveWalletChain } from "thirdweb/react";
 import { signMessage } from "thirdweb/utils";
 import { bootstrapWithSiwe, bootstrapWithThirdwebInApp } from "@/lib/authBootstrap";
+import { getErrorRequestId, signInFailureMessage } from "@/lib/sadPathCopy";
 import { clearStoredSession, setStoredSession } from "@/lib/session-store";
 
 const AUTH_TOKEN_MAX_RETRIES = 3;
 const AUTH_TOKEN_RETRY_BASE_MS = 500;
-
-function normalizeAuthError(raw: string): string {
-  const lower = raw.toLowerCase();
-  if (lower.includes("missing or invalid authorization") || lower.includes("authorization header")) {
-    return "Sign-in not completed yet. Connect your wallet and try again.";
-  }
-  if (lower.includes("invalid or expired token")) {
-    return "Session expired. Please sign in again.";
-  }
-  if (lower.includes("invalid signature")) {
-    return "Signature verification failed. Please try signing in again.";
-  }
-  if (lower.includes("invalid or expired thirdweb")) {
-    return "Wallet session expired. Please reconnect and sign in again.";
-  }
-  if (lower.includes("failed to fetch") || lower.includes("network")) {
-    return "Unable to reach server. Check your connection and try again.";
-  }
-  return raw;
-}
 
 async function getAuthTokenWithRetry(
   getAuth: (() => string | null | Promise<string>) | undefined,
@@ -86,9 +67,14 @@ export function useSignInWithWallet() {
       return true;
     } catch (err) {
       clearStoredSession();
+      const status = err && typeof err === "object" && "status" in err ? (err as { status?: number }).status : undefined;
       const raw = err instanceof Error ? err.message : "Sign in failed.";
-      const msg = normalizeAuthError(raw);
-      setError(msg);
+      const code =
+        err && typeof err === "object" && "code" in err
+          ? String((err as { code?: string }).code ?? "").trim()
+          : "";
+      const requestId = getErrorRequestId(err);
+      setError(signInFailureMessage(status, code || undefined, raw, requestId));
       return false;
     } finally {
       setIsLoading(false);

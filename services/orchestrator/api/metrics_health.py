@@ -173,8 +173,33 @@ def _root_health_critical_ok() -> tuple[bool, dict[str, Any]]:
 def health_live():
     """Liveness: HTTP 200 if the app process is serving. No I/O to Supabase, Redis, or downstream services.
     Use this for Docker/Kubernetes liveness so transient dependency failures do not mark the container dead.
-    Readiness and dependency status remain on GET /health."""
+    Readiness and dependency status remain on GET /health and /health/ready."""
     return {"status": "ok"}
+
+
+@health_router.get("/health/ready")
+def health_ready():
+    """Readiness: checks critical dependencies (Supabase, Redis when QUEUE_ENABLED).
+    Returns 503 if any critical dep is unreachable. Use for K8s readiness probes
+    so traffic is not routed to pods that cannot serve requests."""
+    from main import is_startup_degraded
+
+    startup_bad, startup_missing = is_startup_degraded()
+    if startup_bad:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=503,
+            content={"status": "not_ready", "reason": "startup_degraded", "missing": startup_missing},
+        )
+
+    critical_ok, payload = _root_health_critical_ok()
+    if not critical_ok:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=503,
+            content={"status": "not_ready", "reason": "dependency_failure", **payload},
+        )
+    return {"status": "ready"}
 
 
 @health_router.get("/health")

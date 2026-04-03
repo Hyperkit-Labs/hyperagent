@@ -28,10 +28,12 @@ def _verify_user_id_hmac(user_id: str, sig_header: str) -> bool:
     if dot < 1:
         return False
     uid_from_sig = sig_header[:dot]
-    sig_hex = sig_header[dot + 1:]
+    sig_hex = sig_header[dot + 1 :]
     if uid_from_sig != user_id:
         return False
-    expected = hmac.new(_IDENTITY_HMAC_SECRET.encode(), user_id.encode(), hashlib.sha256).hexdigest()
+    expected = hmac.new(
+        _IDENTITY_HMAC_SECRET.encode(), user_id.encode(), hashlib.sha256
+    ).hexdigest()
     try:
         return hmac.compare_digest(sig_hex, expected)
     except Exception:

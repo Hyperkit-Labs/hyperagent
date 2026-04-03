@@ -439,7 +439,7 @@ agents_router = APIRouter(prefix="/api/v1/agents", tags=["agents"])
 @agents_router.get("")
 def agents_api() -> dict[str, Any]:
     """Return pipeline agents from workflow (spec, design, codegen, audit, simulation, deploy, ui_scaffold)."""
-    from nodes import STEP_ORDER
+    from node_common import STEP_ORDER
 
     return {
         "agents": [

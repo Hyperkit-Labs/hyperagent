@@ -1,37 +1,38 @@
 # HyperAgent Documentation
 
-Documentation for onboarding, users, and developers. Use this index to find the right guide.
+Index for onboarding, Studio usage, and contributor workflows.
 
 ---
 
-## For everyone
+## Overview
 
 | Doc | Description |
-|-----|--------------|
-| [Getting started](getting-started.md) | First-time setup: what you need, how to run the app, and how to get help. |
+|-----|-------------|
+| [Getting started](getting-started.md) | First-time setup, local run, environment, and where to find help. |
 
 ---
 
-## For users
+## Studio (product)
 
 | Doc | Description |
-|-----|--------------|
-| [User guide](user-guide.md) | How to use HyperAgent Studio: connect wallet, add LLM keys (BYOK), run workflows, and view results. |
+|-----|-------------|
+| [Studio guide](user-guide.md) | HyperAgent Studio: wallet connection, LLM keys (BYOK), workflows, and results. |
 
 ---
 
-## For developers
+## Contributors and technical reference
 
 | Doc | Description |
-|-----|--------------|
-| [Developer guide](developer-guide.md) | Local setup, repo structure, running the frontend and backend, and contributing. |
-| [Network architecture](architecture-networks.md) | Single source of truth (network/chains.yaml), per-chain x402, thirdweb for execution, Chainlink integration. |
-| [Control plane: runs and steps](control-plane-runs-steps.md) | Phase 1 step audit trail, run_steps table, and path to async control plane (Phase 2/3). |
-| [Deploy ownership](deploy-ownership.md) | Who owns deploy: Studio (wallet-signed via Thirdweb) vs orchestrator/deploy service (plans and config). |
-| [Storage policy](storage-policy.md) | Traces, artifacts to IPFS, indexes to Supabase; where blob_id/cid are stored. |
+|-----|-------------|
+| [Contributor guide](developer-guide.md) | Local setup, repository layout, running services, and contribution workflow. |
+| [Agent operating model](agent-operating-model/README.md) | Architecture map, glossary, high-risk paths, skills, permissions, verification, tasks, plugins, subagent handoff, recovery. |
+| [Network architecture](architecture-networks.md) | Single source of truth (`network/chains.yaml`), per-chain x402, thirdweb for execution, Chainlink integration. |
+| [Control plane: runs and steps](control-plane-runs-steps.md) | Phase 1 step audit trail, `run_steps` table, and path to async control plane (Phase 2/3). |
+| [Deploy ownership](deploy-ownership.md) | Deploy responsibilities: Studio (wallet-signed via Thirdweb) versus orchestrator and deploy service (plans and configuration). |
+| [Storage policy](storage-policy.md) | Traces, artifacts to IPFS, indexes to Supabase; where `blob_id` and CID are stored. |
 | [Payment and onboarding flow](payment-onboarding-flow.md) | Credits, USDC/USDT top-up, x402, and environment variables. |
 
-**Runbooks (ops / deployment):**
+**Runbooks (operations and deployment):**
 
 | Doc | Description |
 |-----|-------------|

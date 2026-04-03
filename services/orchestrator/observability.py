@@ -69,9 +69,11 @@ def format_prometheus_metrics() -> str:
     ]
     p95 = p95_latency_ms()
     if p95 is not None:
-        lines.extend([
-            "# HELP hyperagent_p95_latency_ms P95 request latency in milliseconds",
-            "# TYPE hyperagent_p95_latency_ms gauge",
-            f"hyperagent_p95_latency_ms {p95:.0f}",
-        ])
+        lines.extend(
+            [
+                "# HELP hyperagent_p95_latency_ms P95 request latency in milliseconds",
+                "# TYPE hyperagent_p95_latency_ms gauge",
+                f"hyperagent_p95_latency_ms {p95:.0f}",
+            ]
+        )
     return "\n".join(lines) + "\n"

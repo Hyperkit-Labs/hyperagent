@@ -1,26 +1,26 @@
-# Developer guide
+# Contributor guide
 
-Setup and workflow for anyone developing or contributing to HyperAgent.
+Setup and workflow for developing and contributing to HyperAgent.
 
 ---
 
 ## Repo structure
 
-The repo is a monorepo (pnpm workspaces). Main areas:
+The repository is a monorepo (pnpm workspaces). Main areas:
 
 | Path | Purpose |
 |------|---------|
-| `apps/studio` | Next.js frontend (HyperAgent Studio). Primary app for users. |
+| `apps/studio` | Next.js frontend (HyperAgent Studio). Primary application for Studio usage. |
 | `apps/api-gateway` | API gateway (auth, rate limit, proxy to orchestrator). Runs on port 4000. |
 | `services/orchestrator` | Python/FastAPI backend. Workflows, runs, networks, BYOK, deploy plans. |
 | `services/agent-runtime` | Agent runtime (simulation, deploy, storage). Used by orchestrator. |
 | `services/compile` | Solidity compilation service. |
 | `services/audit` | Security audit service (Slither, Mythril). |
-| `packages/*` | Shared packages (sdk-ts, config, ui, core-types, web3-utils, ai-tools). |
+| `packages/*` | Shared packages (sdk-ts, config, ui, core-types, web3-utils, ai-tools, **agent-os**). |
 | `infra/registries` | Chain registry (`network/chains.yaml`), x402 config. |
 | `infra/docker` | Docker Compose for backend stack. |
 | `platform/supabase` | Supabase migrations (runs, run_steps, wallet_users, etc.). |
-| `docs/` | Public documentation (onboarding, user guide, developer guide). |
+| `docs/` | Public documentation (onboarding, Studio guide, contributor guide). |
 
 ---
 
@@ -44,8 +44,8 @@ The repo is a monorepo (pnpm workspaces). Main areas:
 
 2. **Environment**
    - Copy `.env.example` to `.env` at repo root.
-   - For Studio: set `NEXT_PUBLIC_THIRDWEB_CLIENT_ID`, `NEXT_PUBLIC_API_URL` (e.g. `http://localhost:4000` when using gateway).
-   - For backend: set `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (gateway rate limits), and `REDIS_URL` (TCP for orchestrator queue/checkpointer when enabled).
+   - For Studio: set `NEXT_PUBLIC_THIRDWEB_CLIENT_ID`, `NEXT_PUBLIC_API_URL` (for example `http://localhost:4000` when using gateway).
+   - For backend: set `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (gateway rate limits), and `REDIS_URL` (TCP for orchestrator queue and checkpointer when enabled).
 
 3. **Run backend (Docker)**
    ```bash
@@ -98,7 +98,7 @@ make run-web    # Start Studio (after make up)
 
 1. Fork the repo and create a branch (`feature/...` or `fix/...`).
 2. Make changes. Follow existing code style and run lint/tests.
-3. Commit with clear messages (e.g. `feat: ...`, `fix: ...`).
+3. Commit with clear messages (for example `feat: ...`, `fix: ...`).
 4. Push and open a Pull Request. Fill in the PR template if present.
 5. Address review feedback. Merge when approved and checks pass.
 
@@ -106,9 +106,13 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) in the repo root for full guidelines.
 
 ---
 
-## Where to look
+## Agent OS (runtime primitives)
+
+Shared library **`@hyperagent/agent-os`** (`packages/agent-os`): command registry metadata, task lifecycle states, and permission resolution (`resolveToolExecution`). The **agent runtime** registers every HTTP command and exposes discovery at **`GET /registry/commands`** (same auth as other agent routes: `X-Agent-Session` or `X-Internal-Token`). Use that JSON from orchestration or internal tooling to enumerate paths and methods without scraping code.
+
+## Related docs
 
 - **Onboarding:** [Getting started](getting-started.md)
-- **End-user usage:** [User guide](user-guide.md)
+- **Studio usage:** [Studio guide](user-guide.md)
 - **Architecture:** [Network architecture](architecture-networks.md), [Control plane](control-plane-runs-steps.md), [Deploy ownership](deploy-ownership.md)
 - **Internal specs:** `external/docs/` for plans, runbooks, and detailed specs.

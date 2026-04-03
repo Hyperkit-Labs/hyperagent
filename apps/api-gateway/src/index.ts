@@ -7,35 +7,39 @@ import { config } from "dotenv";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 
-// Load .env from repo root when running locally (pnpm start from apps/api-gateway)
 const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: resolve(__dirname, "../../../.env") });
 
 import cors from "cors";
 import express from "express";
-import { createProxyMiddleware, responseInterceptor } from "http-proxy-middleware";
-import { requestIdMiddleware, RequestWithId } from "./requestId.js";
-import { otelRequestSpanMiddleware, getTraceparentHeader } from "@hyperagent/backend-middleware";
-import { authMiddleware, RequestWithUser } from "./auth.js";
+import { createProxyMiddleware } from "http-proxy-middleware";
+import { requestIdMiddleware } from "./requestId.js";
+import { otelRequestSpanMiddleware, validateRequiredSecrets } from "@hyperagent/backend-middleware";
+import { log } from "./logger.js";
+import { authMiddleware } from "./auth.js";
 import { rateLimitMiddleware, hasRestRateLimitEnv } from "./rateLimit.js";
-import { authBootstrapHandler, getSupabaseAdmin } from "./authBootstrap.js";
+import { authBootstrapHandler } from "./authBootstrap.js";
+import { byokRouter } from "./byok.js";
+import { createProxyOptions } from "./proxy.js";
+import { healthHandler } from "./health.js";
+
+validateRequiredSecrets(
+  ["AUTH_JWT_SECRET", "SUPABASE_URL", "SUPABASE_SERVICE_KEY"],
+  "api-gateway",
+);
 
 const ORCHESTRATOR_URL = process.env.ORCHESTRATOR_URL || "http://localhost:8000";
 const NODE_ENV = process.env.NODE_ENV || "development";
-/** Upstream timeout (ms). If orchestrator does not respond, gateway returns 502 instead of hanging.
- * Default 25s kills SSE during long builds. Set PROXY_TIMEOUT_MS=660000 for real-time terminal (10+ min). */
 const PROXY_TIMEOUT_MS = Number(process.env.PROXY_TIMEOUT_MS) || 25_000;
 
 if (NODE_ENV === "production" && !hasRestRateLimitEnv()) {
-  console.error(
-    "[API Gateway] Production requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN for rate limiting (Upstash REST). Copy them from the Upstash console."
-  );
+  log.fatal("Production requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN for rate limiting");
   process.exit(1);
 }
 
 const AUTH_JWT_SECRET = process.env.AUTH_JWT_SECRET;
 if (NODE_ENV === "production" && !AUTH_JWT_SECRET) {
-  console.error("[API Gateway] Production requires AUTH_JWT_SECRET. Unauthenticated access is not allowed. Set AUTH_JWT_SECRET.");
+  log.fatal("Production requires AUTH_JWT_SECRET");
   process.exit(1);
 }
 
@@ -44,7 +48,6 @@ const allowedOrigins = (process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || "
   .map((s) => s.trim())
   .filter(Boolean);
 
-/** In development, allow local network origins (192.168.x.x, 10.x.x.x) for Studio accessed via network URL. */
 function isAllowedOrigin(origin: string | undefined): boolean {
   if (!origin) return true;
   if (allowedOrigins.includes(origin)) return true;
@@ -63,8 +66,6 @@ function isAllowedOrigin(origin: string | undefined): boolean {
 
 const app = express();
 
-// Trust first proxy hop (Coolify/Traefik) so req.ip and X-Forwarded-For resolve to real client IP.
-// Without this, all requests appear as the proxy's internal Docker IP.
 app.set("trust proxy", 1);
 
 app.use(
@@ -77,182 +78,41 @@ app.use(
   })
 );
 
-// Body parsing is NOT applied globally. Proxy routes need the raw request stream intact.
-// Only non-proxied routes (auth bootstrap, health) use express.json() via per-route middleware.
 const jsonParser = express.json({ limit: "2mb" });
 
 app.use(requestIdMiddleware);
 app.use(otelRequestSpanMiddleware);
-/** Liveness before auth so probes never depend on PUBLIC_PATHS or JWT config. */
+
 app.get("/health/live", (_req, res) => {
   res.json({ status: "ok", gateway: true });
 });
+
 app.use(authMiddleware);
 app.use((req, res, next) => {
   (rateLimitMiddleware as (req: express.Request, res: express.Response, next: express.NextFunction) => Promise<void>)(req, res, next).catch(next);
 });
 
-function proxyOptions(): Record<string, unknown> {
-  return {
-    target: ORCHESTRATOR_URL,
-    changeOrigin: true,
-    selfHandleResponse: true,
-    logLevel: "silent",
-    onProxyReq(proxyReq: import("http").ClientRequest, req: express.Request) {
-      const r = req as express.Request & RequestWithId & RequestWithUser;
-      proxyReq.setTimeout(PROXY_TIMEOUT_MS, () => {
-        proxyReq.destroy();
-      });
-      if (r.requestId) proxyReq.setHeader("x-request-id", r.requestId);
-      const traceparent = getTraceparentHeader() || (r.headers.traceparent as string);
-      if (traceparent) proxyReq.setHeader("traceparent", traceparent);
-      if (r.headers.authorization) proxyReq.setHeader("authorization", r.headers.authorization);
-      if (r.headers["x-agent-session"]) proxyReq.setHeader("x-agent-session", r.headers["x-agent-session"] as string);
-      proxyReq.removeHeader("x-user-id");
-      proxyReq.removeHeader("X-User-Id");
-      if (r.userId) proxyReq.setHeader("x-user-id", r.userId);
-    },
-    onError(err: Error, req: express.Request, res: express.Response) {
-      const id = (req as RequestWithId).requestId;
-      console.error(`[gateway] proxy error path=${req.path} requestId=${id}`, err.message);
-      if (!res.headersSent) {
-        res.status(502).json({ error: "Bad Gateway", message: "Backend unavailable. Try again or check server logs.", requestId: id ?? undefined });
-      }
-    },
-    onProxyRes: responseInterceptor(async (responseBuffer, proxyRes, req, res) => {
-      const status = proxyRes.statusCode ?? 0;
-      const expressReq = req as express.Request & RequestWithId;
-      const id = expressReq.requestId;
-      const path = "path" in expressReq ? expressReq.path : (expressReq as { url?: string }).url ?? "";
-      if (status >= 500) {
-        console.error(`[gateway] upstream 5xx path=${path} status=${status} requestId=${id}`);
-        const body = JSON.stringify({
-          error: status === 504 ? "Gateway Timeout" : "Bad Gateway",
-          message: status === 504 ? "Backend timed out. Try again." : "Backend error. Try again or check server logs.",
-          requestId: id ?? undefined,
-        });
-        res.statusCode = status === 504 ? 504 : 502;
-        res.setHeader("Content-Type", "application/json");
-        return body;
-      }
-      return responseBuffer;
-    }),
-  };
-}
+// --- Routes ---
 
-// Single auth entrypoint: SIWE and thirdweb OAuth/in-app. Bootstrap rate limits: rateLimitMiddleware (Upstash) in production.
 app.post("/api/v1/auth/bootstrap", jsonParser, authBootstrapHandler);
+app.use("/api/v1/byok", jsonParser, byokRouter);
 
-// Primary: versioned API (proxied; raw body stream forwarded to orchestrator)
-app.use("/api/v1", createProxyMiddleware(proxyOptions()));
-// Legacy (deprecated)
-app.use("/run", createProxyMiddleware(proxyOptions()));
-app.use("/runs", createProxyMiddleware(proxyOptions()));
-// Catch-all /api for backward compatibility
-app.use("/api", createProxyMiddleware(proxyOptions()));
+const proxyOpts = () => createProxyOptions(ORCHESTRATOR_URL, PROXY_TIMEOUT_MS);
 
-// OpenAPI docs (Swagger UI) and schema
-app.use("/docs", createProxyMiddleware(proxyOptions()));
-app.use("/openapi.json", createProxyMiddleware(proxyOptions()));
+app.use("/api/v1", createProxyMiddleware(proxyOpts()));
+app.use("/run", createProxyMiddleware(proxyOpts()));
+app.use("/runs", createProxyMiddleware(proxyOpts()));
+app.use("/api", createProxyMiddleware(proxyOpts()));
+app.use("/docs", createProxyMiddleware(proxyOpts()));
+app.use("/openapi.json", createProxyMiddleware(proxyOpts()));
 
-/**
- * Dependency-aware health: HTTP 503 only when sign-in cannot work (same gates as auth bootstrap).
- * Orchestrator failures use JSON status "degraded" with HTTP 200 so probes and the login page
- * stay green when the gateway + DB + JWT are fine; orchestrator often returns 503 for its own
- * Redis/queue/Supabase while the process is still reachable (see GET /health vs /health/live there).
- */
-app.get("/health", async (_req, res) => {
-  const authJwtConfigured = Boolean(process.env.AUTH_JWT_SECRET);
-  /** OAuth / in-app wallet verification; SIWE-only sign-in can still work without this. */
-  const thirdwebSecretConfigured = Boolean(process.env.THIRDWEB_SECRET_KEY?.trim());
-  const supabase = getSupabaseAdmin();
-  let dbOk = false;
-  let dbError: string | null = null;
-  if (supabase) {
-    const dbCheck = await supabase.from("wallet_users").select("id").limit(1);
-    dbError = dbCheck.error ? (dbCheck.error as { message?: string }).message ?? String(dbCheck.error) : null;
-    dbOk = !dbCheck.error;
-  } else {
-    dbError = "Supabase not configured";
-  }
-
-  /** Same gates as authBootstrapHandler before issuing a session. */
-  const authSigninReady = authJwtConfigured && Boolean(supabase) && dbOk;
-
-  const orchBase = ORCHESTRATOR_URL.replace(/\/$/, "");
-
-  async function fetchOrch(path: string, ms: number): Promise<Response | null> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), ms);
-    try {
-      const r = await fetch(`${orchBase}${path}`, { signal: controller.signal });
-      clearTimeout(timeout);
-      return r;
-    } catch {
-      clearTimeout(timeout);
-      return null;
-    }
-  }
-
-  const [rLive, rHealth] = await Promise.all([
-    fetchOrch("/health/live", 2000),
-    fetchOrch("/health", 3000),
-  ]);
-
-  const orchestratorOk = rHealth !== null && rHealth.ok;
-  /** Any TCP/HTTP response from orchestrator (including 503 on /health) counts as reachable. */
-  const orchestratorReachable =
-    (rLive !== null && rLive.ok) || rHealth !== null;
-
-  const basePayload = {
-    gateway: true,
-    orchestrator_ok: orchestratorOk,
-    orchestrator_reachable: orchestratorReachable,
-    auth_jwt_configured: authJwtConfigured,
-    thirdweb_secret_configured: thirdwebSecretConfigured,
-    supabase_configured: Boolean(supabase),
-    db_connected: dbOk,
-    db_error: dbError,
-    auth_signin_ready: authSigninReady,
-  };
-
-  if (!authSigninReady) {
-    let msg: string;
-    if (!authJwtConfigured) {
-      msg = "Auth not configured (AUTH_JWT_SECRET missing). Sign-in unavailable.";
-    } else if (!supabase) {
-      msg = "Supabase not configured. Sign-in unavailable.";
-    } else if (!dbOk) {
-      msg = `Database unreachable. ${dbError ?? "Check Supabase credentials and migrations."}`;
-    } else {
-      msg = "Sign-in not ready.";
-    }
-    res.status(503).json({
-      status: "degraded",
-      ...basePayload,
-      message: msg,
-    });
-    return;
-  }
-
-  const overallStatus = orchestratorOk ? "ok" : "degraded";
-  let message: string | undefined;
-  if (!orchestratorReachable) {
-    message =
-      "Orchestrator unreachable (no response from /health or /health/live). Check ORCHESTRATOR_URL and that the orchestrator service is running. Workflows will fail until it is reachable.";
-  } else if (!orchestratorOk) {
-    message =
-      "Orchestrator is reachable but GET /health is not OK (often Redis, Supabase, or queue config on the orchestrator). Sign-in works; pipeline runs may fail until orchestrator /health is healthy.";
-  }
-
-  res.status(200).json({
-    status: overallStatus,
-    ...basePayload,
-    ...(message ? { message } : {}),
-  });
-});
+app.get("/health", healthHandler(ORCHESTRATOR_URL));
 
 const port = Number(process.env.PORT) || 4000;
 app.listen(port, "0.0.0.0", () => {
-  console.log(`[API Gateway] listening on ${port}, forwarding to ${ORCHESTRATOR_URL}`);
+  log.info({
+    msg: "api-gateway started",
+    port,
+    orchestrator: ORCHESTRATOR_URL,
+  });
 });

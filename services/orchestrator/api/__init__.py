@@ -53,6 +53,7 @@ from .metrics_health import (
     metrics_router,
 )
 from .pipeline import router as pipeline_router
+from .storage_webhooks import router as storage_webhooks_router
 from .ui_export import router as ui_export_router
 from .workflows import router as workflows_router
 from .workflows import streaming_router as workflows_streaming_router
@@ -78,6 +79,7 @@ __all__ = [
     "runs_router",
     "sandbox_router",
     "security_router",
+    "storage_webhooks_router",
     "ui_export_router",
     "workflows_router",
     "workflows_streaming_router",

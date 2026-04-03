@@ -40,6 +40,7 @@ from api import (
     payments_router,
     pipeline_router,
     pricing_router,
+    reconciliation_router,
     registry_router,
     runs_router,
     sandbox_router,
@@ -158,6 +159,38 @@ def _validate_critical_services() -> None:
         )
 
 
+@app.on_event("startup")
+def _start_reconciliation_schedule() -> None:
+    """Start a background thread for periodic billing reconciliation every 6 hours."""
+    import threading
+
+    interval_s = int(os.environ.get("RECONCILIATION_INTERVAL_SEC", str(6 * 3600)))
+    if interval_s <= 0:
+        return
+
+    def _reconcile_loop():
+        import time as _time
+        _time.sleep(60)
+        while True:
+            try:
+                from billing_reconciliation import find_drifted_users
+                drifted = find_drifted_users(threshold=0.01, limit=200)
+                if drifted:
+                    logger.warning(
+                        "[reconciliation] found %d drifted users in scheduled check",
+                        len(drifted),
+                    )
+                else:
+                    logger.info("[reconciliation] scheduled check: no drift detected")
+            except Exception as e:
+                logger.error("[reconciliation] scheduled check failed: %s", e)
+            _time.sleep(interval_s)
+
+    t = threading.Thread(target=_reconcile_loop, daemon=True, name="billing-reconciliation")
+    t.start()
+    logger.info("[orchestrator] billing reconciliation scheduled every %ds", interval_s)
+
+
 @app.middleware("http")
 async def log_request_id(request: Request, call_next):
     """Set and log x-request-id for trace correlation. Records latency for p95 SLO.
@@ -213,6 +246,7 @@ app.include_router(sandbox_router)
 app.include_router(credits_router)
 app.include_router(payments_router)
 app.include_router(pricing_router)
+app.include_router(reconciliation_router)
 app.include_router(health_router)
 app.include_router(api_health_router)
 app.include_router(config_router)

@@ -75,7 +75,7 @@
       "bn.js": ">=5.2.3",
       "jsondiffpatch": ">=0.7.2",
       "nanoid": ">=3.3.8",
-      "ajv": ">=8.18.0",
+      "ajv@>=8": ">=8.18.0",
       "@tootallnate/once": ">=3.0.1",
       "undici": ">=7.24.0",
       "follow-redirects": ">=1.15.6",

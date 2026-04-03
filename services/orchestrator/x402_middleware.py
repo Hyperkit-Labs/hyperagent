@@ -44,6 +44,7 @@ def _get_redis_client() -> Any | None:
         if not redis_url:
             return None
         import redis
+
         return redis.from_url(redis_url, decode_responses=True)
     except Exception:
         return None
@@ -71,6 +72,7 @@ def _is_x402_enabled() -> bool:
         return True
     try:
         from registries import get_x402_enabled
+
         return get_x402_enabled()
     except ImportError:
         return False
@@ -100,7 +102,9 @@ def _check_replay(nonce: str) -> bool:
             was_set = r.set(key, "1", nx=True, ex=REPLAY_WINDOW_SECONDS)
             return not was_set
         except Exception as exc:
-            logger.warning("[x402] Redis nonce check failed, falling back to memory: %s", exc)
+            logger.warning(
+                "[x402] Redis nonce check failed, falling back to memory: %s", exc
+            )
 
     if not _nonce_cache_warned and os.environ.get("NODE_ENV") == "production":
         _nonce_cache_warned = True
@@ -120,6 +124,7 @@ def _parse_payment_header(raw: str) -> dict[str, Any] | None:
     """Parse X-Payment header. Expected: base64-encoded JSON with proof fields."""
     try:
         import base64
+
         decoded = base64.b64decode(raw)
         data = json.loads(decoded)
         if not isinstance(data, dict):
@@ -133,7 +138,9 @@ def _parse_payment_header(raw: str) -> dict[str, Any] | None:
             return None
 
 
-def _validate_proof_structure(proof: dict[str, Any], path: str, price_usd: float) -> str | None:
+def _validate_proof_structure(
+    proof: dict[str, Any], path: str, price_usd: float
+) -> str | None:
     """Validate proof has required fields. Returns error string or None if valid."""
     required = ("nonce", "amount", "payer", "signature", "valid_before")
     for field in required:
@@ -196,16 +203,16 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         user_id = (
-            request.headers.get("X-User-Id")
-            or request.headers.get("x-user-id")
-            or ""
+            request.headers.get("X-User-Id") or request.headers.get("x-user-id") or ""
         ).strip() or None
 
         headers_dict = dict(request.headers)
         if billing.is_internal_caller(headers_dict, user_id):
             return await call_next(request)
 
-        payment_header = request.headers.get("X-Payment") or request.headers.get("x-payment")
+        payment_header = request.headers.get("X-Payment") or request.headers.get(
+            "x-payment"
+        )
         if not payment_header:
             _log_x402_event("challenge_issued", path, extra={"price_usd": price})
             challenge = billing.x402_challenge_response(path, price)
@@ -220,7 +227,12 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
         if proof is None:
             _log_x402_event("invalid_proof_format", path)
             return Response(
-                content=json.dumps({"error": "invalid_payment_proof", "message": "Could not parse X-Payment header"}),
+                content=json.dumps(
+                    {
+                        "error": "invalid_payment_proof",
+                        "message": "Could not parse X-Payment header",
+                    }
+                ),
                 status_code=402,
                 media_type="application/json",
             )
@@ -229,15 +241,22 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
         if validation_error:
             _log_x402_event("proof_rejected", path, extra={"reason": validation_error})
             return Response(
-                content=json.dumps({"error": "payment_rejected", "message": validation_error}),
+                content=json.dumps(
+                    {"error": "payment_rejected", "message": validation_error}
+                ),
                 status_code=402,
                 media_type="application/json",
             )
 
-        _log_x402_event("proof_accepted", path, user_id=proof.get("payer"), extra={
-            "amount": proof.get("amount"),
-            "nonce": proof.get("nonce"),
-        })
+        _log_x402_event(
+            "proof_accepted",
+            path,
+            user_id=proof.get("payer"),
+            extra={
+                "amount": proof.get("amount"),
+                "nonce": proof.get("nonce"),
+            },
+        )
 
         request.state.x402_proof = proof
         request.state.x402_price = price

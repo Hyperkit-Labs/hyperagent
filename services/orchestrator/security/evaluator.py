@@ -78,12 +78,12 @@ def _collect_findings_from_audit(audit_findings: list[dict]) -> list[dict]:
                 dict(
                     id=f"audit:{f.get('title','')[:40]}:{f.get('location','')}",
                     tool="slither",
-                    title=f.get("title","Unknown"),
-                    description=f.get("description",""),
+                    title=f.get("title", "Unknown"),
+                    description=f.get("description", ""),
                     severity=sev,
                     corroboratedBy=[],
-                    waivable=sev in ("low","info","medium"),
-                    blocking=sev in ("high","critical"),
+                    waivable=sev in ("low", "info", "medium"),
+                    blocking=sev in ("high", "critical"),
                 )
             )
     return out
@@ -134,12 +134,12 @@ def evaluate_security_policy(
                 NormalizedFinding(
                     id=f"audit:{f.get('title','')[:40]}",
                     tool="slither",
-                    title=f.get("title","Unknown"),
-                    description=f.get("description",""),
+                    title=f.get("title", "Unknown"),
+                    description=f.get("description", ""),
                     severity=sev,
                     corroboratedBy=[],
-                    waivable=sev in ("low","info","medium"),
-                    blocking=sev in ("high","critical"),
+                    waivable=sev in ("low", "info", "medium"),
+                    blocking=sev in ("high", "critical"),
                 )
             )
 
@@ -148,8 +148,12 @@ def evaluate_security_policy(
     all_findings.extend(mythril_findings)
     all_findings.extend(pashov_findings)
 
-    slither_status: GateStatus = "FAIL" if any(f.get("blocking") for f in slither_findings) else "PASS"
-    mythril_status: GateStatus = "FAIL" if any(f.get("blocking") for f in mythril_findings) else "PASS"
+    slither_status: GateStatus = (
+        "FAIL" if any(f.get("blocking") for f in slither_findings) else "PASS"
+    )
+    mythril_status: GateStatus = (
+        "FAIL" if any(f.get("blocking") for f in mythril_findings) else "PASS"
+    )
 
     tool_results.append(
         ToolResult(
@@ -186,13 +190,13 @@ def evaluate_security_policy(
         tool_results.append(normalize_echidna(echidna_raw))
     else:
         tool_results.append(
-            echidna_not_applicable(
-                "No generated invariants or assertion harness"
-            )
+            echidna_not_applicable("No generated invariants or assertion harness")
         )
 
     # Tenderly (simulation)
-    sim_raw = step_outputs.get("simulation") or step_outputs.get("simulation_results") or {}
+    sim_raw = (
+        step_outputs.get("simulation") or step_outputs.get("simulation_results") or {}
+    )
     if isinstance(sim_raw, dict):
         tool_results.append(normalize_tenderly(sim_raw))
     else:
@@ -244,10 +248,13 @@ def evaluate_security_policy(
         for tr in tool_results
         if tr.get("tool") in mandatory
     )
-    tenderly_ok = next(
-        (tr for tr in tool_results if tr.get("tool") == "tenderly"),
-        {},
-    ).get("status") == "PASS"
+    tenderly_ok = (
+        next(
+            (tr for tr in tool_results if tr.get("tool") == "tenderly"),
+            {},
+        ).get("status")
+        == "PASS"
+    )
 
     if mandatory_fail or not tenderly_ok or blocking:
         final_decision: FinalDecision = "REJECTED"
@@ -259,7 +266,9 @@ def evaluate_security_policy(
         final_decision = "APPROVED"
         overall_status = "PASS"
 
-    not_applicable = [tr["tool"] for tr in tool_results if tr.get("status") == "NOT_APPLICABLE"]
+    not_applicable = [
+        tr["tool"] for tr in tool_results if tr.get("status") == "NOT_APPLICABLE"
+    ]
 
     return SecurityVerdict(
         runId=run_id,

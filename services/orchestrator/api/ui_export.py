@@ -24,6 +24,8 @@ from registries import (
 from store import get_workflow
 from trace_context import get_trace_headers
 
+from ipfs_client import canonical_ipfs_gateway_url
+
 from .common import _sanitize_ident, _sanitize_label, _sanitize_name
 
 logger = logging.getLogger(__name__)
@@ -741,13 +743,14 @@ main().catch(console.error);
                 )
                 if cid:
                     ipfs_cid = cid
-                    from registries import get_chain
-
                     chain_entry = get_chain(chain_id)
-                    gateway = (chain_entry or {}).get(
-                        "ipfs_gateway"
-                    ) or "https://gateway.pinata.cloud"
-                    ipfs_gateway_url = f"{gateway.rstrip('/')}/ipfs/{cid}"
+                    gw = (
+                        (chain_entry or {}).get("ipfs_gateway") if chain_entry else None
+                    )
+                    if gw:
+                        ipfs_gateway_url = f"{gw.rstrip('/')}/ipfs/{cid}"
+                    else:
+                        ipfs_gateway_url = canonical_ipfs_gateway_url(cid)
         except Exception as e:
             logger.warning("[export] IPFS pin failed: %s", e)
     out = {
@@ -757,12 +760,18 @@ main().catch(console.error);
         "zip_base64": zip_b64,
         "filename": filename,
         "files": files_list,
-        "message": "React/Next.js scaffold exported; download zip and run npm install && npm run dev",
+        "message": (
+            "React/Next.js scaffold exported as a downloadable zip only "
+            "(run npm install && npm run dev locally). This export does not by itself "
+            "persist to decentralized storage unless you use deploy_target=ipfs."
+        ),
     }
     if ipfs_cid:
         out["ipfs_cid"] = ipfs_cid
         out["ipfs_gateway_url"] = ipfs_gateway_url
-        out["message"] = f"Bundle pinned to IPFS: {ipfs_gateway_url}"
+        out["message"] = (
+            f"Bundle content-addressed on IPFS (pinning provider; not Filecoin archival proof): {ipfs_gateway_url}"
+        )
     if vercel_url:
         out["vercel_url"] = vercel_url
         out["vercel_deployment_id"] = vercel_deployment_id

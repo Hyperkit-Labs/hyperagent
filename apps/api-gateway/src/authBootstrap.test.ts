@@ -4,7 +4,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import express, { json } from "express";
 import request from "supertest";
-import { isMissingTableError } from "./authBootstrap.js";
+import { isMissingTableError, isValidEip191SignatureHex } from "./authBootstrap.js";
 
 beforeAll(() => {
   process.env.AUTH_JWT_SECRET = "";
@@ -19,6 +19,27 @@ async function getApp() {
   app.all("/api/v1/auth/bootstrap", authBootstrapHandler);
   return app;
 }
+
+describe("isValidEip191SignatureHex", () => {
+  const valid65 =
+    "0x" +
+    "43".repeat(32) +
+    "43".repeat(32) +
+    "1b";
+
+  it("accepts 0x + 130 hex chars", () => {
+    expect(isValidEip191SignatureHex(valid65)).toBe(true);
+  });
+
+  it("rejects short test signatures like 0xdeadbeef", () => {
+    expect(isValidEip191SignatureHex("0xdeadbeef")).toBe(false);
+  });
+
+  it("rejects empty or wrong length", () => {
+    expect(isValidEip191SignatureHex("0x")).toBe(false);
+    expect(isValidEip191SignatureHex("0x" + "ab".repeat(64))).toBe(false);
+  });
+});
 
 describe("isMissingTableError", () => {
   it("is true for undefined relation (missing migration)", () => {
@@ -59,6 +80,7 @@ describe("authBootstrapHandler", () => {
       .send({ authMethod: "invalid" });
     expect(res.status).toBe(400);
     expect(res.body.message).toContain("siwe");
+    expect(res.body.code).toBe("INVALID_AUTH_METHOD");
   });
 
   it("returns 503 when AUTH_JWT_SECRET not configured", async () => {
@@ -68,5 +90,6 @@ describe("authBootstrapHandler", () => {
       .send({ authMethod: "siwe", siwePayload: { message: "x", signature: "0x" } });
     expect(res.status).toBe(503);
     expect(res.body.message).toMatch(/Auth not configured|Supabase not configured/);
+    expect(["AUTH_NOT_CONFIGURED", "SUPABASE_NOT_CONFIGURED"]).toContain(res.body.code);
   });
 });

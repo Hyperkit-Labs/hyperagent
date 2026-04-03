@@ -50,7 +50,7 @@ def _run_workflow_pipeline_job(
     """Background job: run LangGraph pipeline and persist workflow + run status."""
     set_request_id(request_id)
     logger.info(
-        "[pipeline] job start workflow_id=%s api_keys_providers=%s agent_session_jwt=%s",
+        "[pipeline] job start workflow_id=%s providers=%s agent_session_jwt=%s",
         workflow_id,
         list(api_keys.keys()) if api_keys else [],
         "yes" if agent_session_jwt else "no",
@@ -216,6 +216,7 @@ def _run_workflow_pipeline_job(
                         "workflow_id": workflow_id,
                         "current_stage": current_stage,
                     },
+                    idempotency_key=f"pipeline_run_{workflow_id}",
                 )
             except Exception as pay_err:
                 logger.warning(
@@ -290,7 +291,7 @@ def workflows_generate(
             )
     api_keys = body.api_keys or _get_keys_for_run(user_id, DEFAULT_WORKSPACE)
     logger.info(
-        "[generate] user_id=%s body_keys=%s supabase_keys=%s resolved=%s",
+        "[generate] user_id=%s body_providers=%s supabase_resolved=%s resolved_providers=%s",
         user_id,
         list(body.api_keys.keys()) if body.api_keys else "none",
         "yes" if (not body.api_keys and api_keys) else "skipped",
@@ -333,7 +334,7 @@ def workflows_generate(
         request.headers.get("x-request-id") or request.headers.get("X-Request-Id") or ""
     ).strip() or None
     logger.info(
-        "[generate] pipeline job queued workflow_id=%s api_keys_providers=%s agent_session_jwt=%s",
+        "[generate] pipeline job queued workflow_id=%s providers=%s has_jwt=%s",
         workflow_id,
         list(api_keys.keys()) if api_keys else [],
         "yes" if agent_session_jwt else "no",
@@ -353,14 +354,27 @@ def workflows_generate(
     }
     queued = _queue.enqueue(job_payload)
     if not queued:
+        if credits_supabase.is_configured() and user_id and db._is_uuid(user_id):
+            refund_ok, refund_bal = credits_supabase.refund(
+                user_id,
+                CREDITS_PER_RUN,
+                original_reference_id=workflow_id,
+                reason="queue_failure_compensation",
+            )
+            logger.warning(
+                "[generate] queue failed, credit refund user_id=%s ok=%s balance=%s",
+                user_id,
+                refund_ok,
+                refund_bal,
+            )
         if _queue.QUEUE_ENABLED:
             raise HTTPException(
                 status_code=503,
-                detail="Pipeline queue unavailable. Set REDIS_URL and ensure the worker is consuming jobs.",
+                detail="Pipeline queue unavailable. Credits have been refunded. Set REDIS_URL and ensure the worker is consuming jobs.",
             )
         raise HTTPException(
             status_code=501,
-            detail="Pipeline queue not configured. Set QUEUE_ENABLED=1 and REDIS_URL. Run worker: python -m worker",
+            detail="Pipeline queue not configured. Credits have been refunded. Set QUEUE_ENABLED=1 and REDIS_URL. Run worker: python -m worker",
         )
     logger.info("[generate] queued pipeline job workflow_id=%s", workflow_id)
     return {"workflow_id": workflow_id, "status": "running"}

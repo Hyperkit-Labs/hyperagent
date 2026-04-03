@@ -32,15 +32,12 @@ jobs:
       
       - name: Run ruff
         run: ruff check services/orchestrator/ --output-format=concise
-        continue-on-error: true
       
       - name: Check black formatting
         run: black --check services/orchestrator/
-        continue-on-error: true
       
       - name: Check import sorting
         run: isort --check-only services/orchestrator/
-        continue-on-error: true
 
   lint-typescript:
     name: Lint TypeScript/JavaScript
@@ -64,11 +61,9 @@ jobs:
       
       - name: Run ESLint (hyperagent-studio)
         run: pnpm --filter hyperagent-studio run lint
-        continue-on-error: true
       
       - name: Check TypeScript types (hyperagent-studio)
         run: pnpm --filter hyperagent-studio run typecheck
-        continue-on-error: true
 
   test-backend:
     name: Backend Tests
@@ -99,8 +94,12 @@ jobs:
       
       - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip build
+          pip install -e packages/execution-backend
           pip install -r services/orchestrator/requirements.txt
           pip install pytest pytest-asyncio
+        env:
+          ENVIRONMENT: test
       
       - name: Run pytest
         run: |
@@ -109,7 +108,6 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hyperagent_test
           ENVIRONMENT: test
-        continue-on-error: true
 
   test-frontend:
     name: Frontend Tests
@@ -133,7 +131,6 @@ jobs:
       
       - name: Run tests (hyperagent-studio)
         run: pnpm --filter hyperagent-studio run test -- --watchAll=false
-        continue-on-error: true
 
   # Path-gated: same contract as ci.yml — catches type drift that breaks agent-runtime / simulation images.
   ai-tools-tenderly-contract:
@@ -206,8 +203,7 @@ jobs:
         if: steps.foundry.outputs.found == 'true'
         run: |
           cd contracts/evm 2>/dev/null || cd contracts
-          forge test -vvv --gas-report 2>/dev/null || echo "No Foundry project, skipping"
-        continue-on-error: true
+          forge test -vvv --gas-report
 
   security-scan:
     name: Security Scan
@@ -235,8 +231,7 @@ jobs:
           severity: 'CRITICAL,HIGH'
           format: 'sarif'
           output: 'trivy-results.sarif'
-          exit-code: '0'
-        continue-on-error: true
+          exit-code: '1'
       
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v4

@@ -8,8 +8,8 @@ import { Request, Response } from "express";
 import { SiweMessage } from "siwe";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import jwt from "jsonwebtoken";
-import fs from "fs";
-import path from "path";
+import { log } from "./logger.js";
+import { emitAuditEvent } from "./audit.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -18,13 +18,26 @@ const THIRDWEB_SECRET_KEY = process.env.THIRDWEB_SECRET_KEY;
 const JWT_EXPIRES_IN_SEC = Number(process.env.AUTH_JWT_EXPIRES_IN) || 86400;
 const FREEMIUM_INITIAL_CREDITS = Number(process.env.FREEMIUM_INITIAL_CREDITS) || 100;
 
-const DEBUG_LOG_PATH = path.join(process.cwd(), ".cursor", "debug.log");
+const ENABLE_BOOTSTRAP_DEBUG_LOG =
+  process.env.NODE_ENV !== "production" && process.env.ENABLE_BOOTSTRAP_DEBUG_LOG === "1";
+
+function redactDebugData(data: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(data)) {
+    if (typeof v === "string") {
+      if (v.startsWith("eyJ")) out[k] = "[jwt-redacted]";
+      else if (/^0x[0-9a-f]{20,}$/i.test(v)) out[k] = `${v.slice(0, 10)}…[redacted]`;
+      else if (v.length > 120) out[k] = `${v.slice(0, 40)}…[len=${v.length}]`;
+      else out[k] = v;
+    } else out[k] = v;
+  }
+  return out;
+}
 
 function debugLog(location: string, message: string, data: Record<string, unknown>): void {
+  if (!ENABLE_BOOTSTRAP_DEBUG_LOG) return;
   try {
-    const dir = path.dirname(DEBUG_LOG_PATH);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.appendFileSync(DEBUG_LOG_PATH, JSON.stringify({ location, message, data, timestamp: Date.now() }) + "\n");
+    log.debug({ location, data: redactDebugData(data) }, message);
   } catch {
     /* ignore */
   }
@@ -54,6 +67,13 @@ export type AuthBootstrapBody = {
   siwePayload?: { message: string; signature: string };
   authToken?: string;
 };
+
+/** EIP-191 personal_sign output: 65 bytes (r+s+v) = 130 hex digits, optional 0x prefix. */
+export function isValidEip191SignatureHex(signature: string): boolean {
+  const t = signature.trim();
+  const hex = t.startsWith("0x") || t.startsWith("0X") ? t.slice(2) : t;
+  return /^[0-9a-fA-F]{130}$/.test(hex);
+}
 
 async function verifyThirdwebAuthToken(authToken: string): Promise<string | null> {
   if (!THIRDWEB_SECRET_KEY) return null;
@@ -103,10 +123,7 @@ async function bootstrapUser(
       msg: error.message,
       code: pgCode,
     });
-    console.error(
-      "[auth-bootstrap] wallet_users upsert failed:",
-      JSON.stringify({ message: error.message, code: pgCode, hint: (error as { hint?: string }).hint })
-    );
+    log.error({ msg: error.message, code: pgCode, hint: (error as { hint?: string }).hint }, "wallet_users upsert failed");
     if (isMissingTableError(error.message, pgCode)) {
       return {
         error: "Database schema missing. Run Supabase migrations for wallet_users.",
@@ -122,7 +139,7 @@ async function bootstrapUser(
   }
 
   if (!data?.id) {
-    console.error("[auth-bootstrap] wallet_users upsert returned no id (empty row)");
+    log.error("wallet_users upsert returned no id (empty row)");
     return {
       error: "Sign-in could not be completed. Check gateway logs for database errors.",
       status: 500,
@@ -178,8 +195,11 @@ async function ensureWalletUserProvisioned(supabase: SupabaseClient, userId: str
 }
 
 export async function authBootstrapHandler(req: Request, res: Response): Promise<void> {
+  // #region agent log
+  debugLog("authBootstrap.ts:handler-entry", "bootstrap handler entered", { method: req.method, path: req.path, hasBody: !!req.body, bodyKeys: req.body ? Object.keys(req.body) : [], hypothesisId: "H1" });
+  // #endregion
   if (req.method !== "POST") {
-    res.status(405).json({ error: "Method Not Allowed" });
+    res.status(405).json({ error: "Method Not Allowed", code: "METHOD_NOT_ALLOWED" });
     return;
   }
 
@@ -187,18 +207,43 @@ export async function authBootstrapHandler(req: Request, res: Response): Promise
   const authMethod = body?.authMethod;
 
   if (authMethod !== "siwe" && authMethod !== "thirdweb_inapp") {
-    res.status(400).json({ error: "Bad Request", message: "authMethod must be 'siwe' or 'thirdweb_inapp'" });
+    // #region agent log
+    debugLog("authBootstrap.ts:bad-auth-method", "rejected: bad authMethod", { authMethod, hypothesisId: "H1" });
+    // #endregion
+    res.status(400).json({
+      error: "Bad Request",
+      code: "INVALID_AUTH_METHOD",
+      message: "authMethod must be 'siwe' or 'thirdweb_inapp'",
+    });
     return;
   }
 
+  // #region agent log
+  const envJwtSecret = process.env.AUTH_JWT_SECRET;
+  debugLog("authBootstrap.ts:jwt-secret-check", "AUTH_JWT_SECRET availability", { topLevelConst: typeof AUTH_JWT_SECRET === "string" ? "SET(" + AUTH_JWT_SECRET.length + "chars)" : "UNSET", envDynamic: typeof envJwtSecret === "string" ? "SET(" + envJwtSecret.length + "chars)" : "UNSET", hypothesisId: "H1" });
+  // #endregion
   if (!AUTH_JWT_SECRET) {
-    res.status(503).json({ error: "Service Unavailable", message: "Auth not configured" });
+    // #region agent log
+    debugLog("authBootstrap.ts:503-auth-not-configured", "EXIT 503: Auth not configured", { topLevelConst: typeof AUTH_JWT_SECRET, envDynamic: typeof envJwtSecret, hypothesisId: "H1" });
+    // #endregion
+    res.status(503).json({
+      error: "Service Unavailable",
+      code: "AUTH_NOT_CONFIGURED",
+      message: "Auth not configured",
+    });
     return;
   }
 
   const supabase = getSupabaseAdmin();
   if (!supabase) {
-    res.status(503).json({ error: "Service Unavailable", message: "Supabase not configured" });
+    // #region agent log
+    debugLog("authBootstrap.ts:503-supabase-not-configured", "EXIT 503: Supabase not configured", { SUPABASE_URL: typeof SUPABASE_URL === "string" ? "SET" : "UNSET", SUPABASE_SERVICE_KEY: typeof SUPABASE_SERVICE_KEY === "string" ? "SET(" + SUPABASE_SERVICE_KEY.length + "chars)" : "UNSET", hypothesisId: "H3" });
+    // #endregion
+    res.status(503).json({
+      error: "Service Unavailable",
+      code: "SUPABASE_NOT_CONFIGURED",
+      message: "Supabase not configured",
+    });
     return;
   }
 
@@ -208,20 +253,46 @@ export async function authBootstrapHandler(req: Request, res: Response): Promise
   if (authMethod === "siwe") {
     const { message, signature } = body.siwePayload ?? {};
     if (typeof message !== "string" || typeof signature !== "string" || !message.trim() || !signature.trim()) {
-      res.status(400).json({ error: "Bad Request", message: "siwePayload.message and siwePayload.signature are required" });
+      res.status(400).json({
+        error: "Bad Request",
+        code: "SIWE_PAYLOAD_REQUIRED",
+        message: "siwePayload.message and siwePayload.signature are required",
+      });
+      return;
+    }
+    const sigTrim = signature.trim();
+    if (!isValidEip191SignatureHex(sigTrim)) {
+      debugLog("authBootstrap.ts:siwe-invalid-sig-format", "rejected: signature not 65-byte hex", { hexLen: sigTrim.length, hypothesisId: "H2" });
+      res.status(400).json({
+        error: "Bad Request",
+        code: "SIWE_SIGNATURE_INVALID_FORMAT",
+        message:
+          "Invalid signature format. Expected EIP-191 personal_sign output: 0x plus 130 hexadecimal characters (65 bytes).",
+      });
       return;
     }
     try {
       const siweMessage = new SiweMessage(message);
-      const result = await siweMessage.verify({ signature });
+      // #region agent log
+      debugLog("authBootstrap.ts:siwe-pre-verify", "SIWE verify about to run", { domain: siweMessage.domain, chainId: siweMessage.chainId, address: siweMessage.address, nonce: siweMessage.nonce, issuedAt: siweMessage.issuedAt, uri: siweMessage.uri, hypothesisId: "H2" });
+      // #endregion
+      const result = await siweMessage.verify({ signature: sigTrim });
+      // #region agent log
+      debugLog("authBootstrap.ts:siwe-post-verify", "SIWE verify completed", { success: result.success, address: result.data?.address, error: result.error ? { type: String(result.error.type), expected: String((result.error as unknown as Record<string, unknown>).expected ?? ""), received: String((result.error as unknown as Record<string, unknown>).received ?? "") } : null, hypothesisId: "H2" });
+      // #endregion
       if (!result.success) {
-        res.status(401).json({ error: "Unauthorized", message: "Invalid signature" });
+        emitAuditEvent(req, "auth_bootstrap_failure", { reason: "invalid_signature" });
+        res.status(401).json({ error: "Unauthorized", code: "INVALID_SIGNATURE", message: "Invalid signature" });
         return;
       }
       walletAddress = result.data.address;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Verification failed";
-      res.status(401).json({ error: "Unauthorized", message: msg });
+      // #region agent log
+      debugLog("authBootstrap.ts:siwe-verify-exception", "SIWE verify threw exception", { errorMessage: msg, errorName: err instanceof Error ? err.name : "unknown", errorStack: err instanceof Error ? err.stack?.slice(0, 300) ?? "" : "", hypothesisId: "H2" });
+      // #endregion
+      emitAuditEvent(req, "auth_bootstrap_failure", { reason: "verify_exception", message: msg });
+      res.status(401).json({ error: "Unauthorized", code: "INVALID_SIGNATURE", message: msg });
       return;
     }
     authProvider = "siwe_eoa";
@@ -230,18 +301,30 @@ export async function authBootstrapHandler(req: Request, res: Response): Promise
     const walletAddressFromClient = typeof body.walletAddress === "string" ? body.walletAddress.trim() : "";
 
     if (!authToken) {
-      res.status(400).json({ error: "Bad Request", message: "authToken is required for thirdweb_inapp" });
+      res.status(400).json({
+        error: "Bad Request",
+        code: "THIRDWEB_TOKEN_REQUIRED",
+        message: "authToken is required for thirdweb_inapp",
+      });
       return;
     }
 
     const verifiedAddress = await verifyThirdwebAuthToken(authToken);
     if (!verifiedAddress) {
-      res.status(401).json({ error: "Unauthorized", message: "Invalid or expired thirdweb auth token" });
+      res.status(401).json({
+        error: "Unauthorized",
+        code: "THIRDWEB_TOKEN_INVALID",
+        message: "Invalid or expired thirdweb auth token",
+      });
       return;
     }
 
     if (walletAddressFromClient && walletAddressFromClient.toLowerCase() !== verifiedAddress) {
-      res.status(401).json({ error: "Unauthorized", message: "Wallet address mismatch" });
+      res.status(401).json({
+        error: "Unauthorized",
+        code: "WALLET_ADDRESS_MISMATCH",
+        message: "Wallet address mismatch",
+      });
       return;
     }
 
@@ -249,12 +332,18 @@ export async function authBootstrapHandler(req: Request, res: Response): Promise
     authProvider = "thirdweb_inapp";
   }
 
+  // #region agent log
+  debugLog("authBootstrap.ts:pre-bootstrapUser", "calling bootstrapUser", { walletAddress, authProvider, hypothesisId: "H3" });
+  // #endregion
   const result = await bootstrapUser(supabase, walletAddress, authProvider);
 
   if ("error" in result) {
     const status = result.status;
     const errorTitle =
       status === 503 ? "Service Unavailable" : status >= 400 && status < 500 ? "Bad Request" : "Internal Server Error";
+    // #region agent log
+    debugLog("authBootstrap.ts:bootstrapUser-error", "bootstrapUser returned error", { status, errorTitle, error: result.error, code: result.code, hypothesisId: "H3" });
+    // #endregion
     res.status(status).json({
       error: errorTitle,
       message: result.error,
@@ -264,15 +353,36 @@ export async function authBootstrapHandler(req: Request, res: Response): Promise
   }
 
   if (!result.userId) {
-    res.status(500).json({ error: "Service Unavailable", message: "Critical: Failed to record wallet user in DB" });
+    res.status(500).json({
+      error: "Internal Server Error",
+      code: "WALLET_RECORD_FAILED",
+      message: "Critical: Failed to record wallet user in DB",
+    });
     return;
   }
 
+  // #region agent log
+  debugLog("authBootstrap.ts:jwt-sign-success", "issuing JWT, bootstrap success", { userId: result.userId, walletAddress: walletAddress.toLowerCase(), expiresIn: JWT_EXPIRES_IN_SEC, hypothesisId: "H1" });
+  // #endregion
+  const jti = `${result.userId}-${Date.now().toString(36)}`;
   const token = jwt.sign(
-    { sub: result.userId, wallet_address: walletAddress.toLowerCase() },
+    { sub: result.userId, wallet_address: walletAddress.toLowerCase(), jti },
     AUTH_JWT_SECRET,
     { expiresIn: JWT_EXPIRES_IN_SEC }
   );
+
+  const isSecure = req.protocol === "https" || req.headers["x-forwarded-proto"] === "https";
+  const cookieFlags = [
+    `rt=${token}`,
+    "Path=/",
+    "HttpOnly",
+    isSecure ? "Secure" : "",
+    "SameSite=Strict",
+    `Max-Age=${JWT_EXPIRES_IN_SEC}`,
+  ].filter(Boolean).join("; ");
+  res.setHeader("Set-Cookie", cookieFlags);
+
+  emitAuditEvent(req, "auth_bootstrap_success", { wallet: walletAddress.toLowerCase() });
 
   res.status(200).json({
     access_token: token,

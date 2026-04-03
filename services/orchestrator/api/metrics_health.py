@@ -32,11 +32,21 @@ from redis_util import effective_redis_url
 
 logger = logging.getLogger(__name__)
 
-COMPILE_SERVICE_URL = os.environ.get("COMPILE_SERVICE_URL", "http://localhost:8004").rstrip("/")
-AUDIT_SERVICE_URL = os.environ.get("AUDIT_SERVICE_URL", "http://localhost:8001").rstrip("/")
-AGENT_RUNTIME_URL = os.environ.get("AGENT_RUNTIME_URL", "http://localhost:8011").rstrip("/")
-SIMULATION_SERVICE_URL = os.environ.get("SIMULATION_SERVICE_URL", "http://localhost:8002").rstrip("/")
-STORAGE_SERVICE_URL = os.environ.get("STORAGE_SERVICE_URL", "http://localhost:4005").rstrip("/")
+COMPILE_SERVICE_URL = os.environ.get(
+    "COMPILE_SERVICE_URL", "http://localhost:8004"
+).rstrip("/")
+AUDIT_SERVICE_URL = os.environ.get("AUDIT_SERVICE_URL", "http://localhost:8001").rstrip(
+    "/"
+)
+AGENT_RUNTIME_URL = os.environ.get("AGENT_RUNTIME_URL", "http://localhost:8011").rstrip(
+    "/"
+)
+SIMULATION_SERVICE_URL = os.environ.get(
+    "SIMULATION_SERVICE_URL", "http://localhost:8002"
+).rstrip("/")
+STORAGE_SERVICE_URL = os.environ.get(
+    "STORAGE_SERVICE_URL", "http://localhost:4005"
+).rstrip("/")
 VECTORDB_URL = os.environ.get("VECTORDB_URL", "http://localhost:8010").rstrip("/")
 INTEGRATIONS_TIMEOUT = float(os.environ.get("INTEGRATIONS_TIMEOUT", "15.0"))
 CREDITS_PER_RUN = float(os.environ.get("CREDITS_PER_RUN", "7"))
@@ -63,17 +73,24 @@ _redis_consecutive_failures: int = 0
 
 def _check_redis_health() -> dict[str, Any]:
     """Ping Redis TCP (e.g. Upstash) when REDIS_URL is set.
-    Emits structured alert log on consecutive failures (x402 replay protection depends on Redis)."""
+    Emits structured alert log on consecutive failures (x402 replay protection depends on Redis).
+    """
     global _redis_consecutive_failures
-    url = (os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or "").strip()
+    url = (
+        os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or ""
+    ).strip()
     if not url or url.startswith("#"):
         return {"status": "not_configured"}
     try:
         from redis import Redis
+
         r = Redis.from_url(effective_redis_url(url))
         r.ping()
         if _redis_consecutive_failures > 0:
-            logger.info("[redis] connection restored after %d consecutive failures", _redis_consecutive_failures)
+            logger.info(
+                "[redis] connection restored after %d consecutive failures",
+                _redis_consecutive_failures,
+            )
         _redis_consecutive_failures = 0
         return {"status": "ok"}
     except ImportError:
@@ -87,7 +104,11 @@ def _check_redis_health() -> dict[str, Any]:
             _redis_consecutive_failures,
             err_msg,
         )
-        return {"status": "error", "error": err_msg, "consecutive_failures": _redis_consecutive_failures}
+        return {
+            "status": "error",
+            "error": err_msg,
+            "consecutive_failures": _redis_consecutive_failures,
+        }
 
 
 def _check_service_health(name: str, url: str, timeout: float = 2.0) -> dict[str, Any]:
@@ -130,22 +151,34 @@ async def _fetch_integrations() -> dict[str, bool]:
                 data = r.json()
                 tenderly = data.get("tenderly_configured", False)
         except Exception as e:
-            logger.warning("[integrations] simulation unreachable url=%s: %s", SIMULATION_SERVICE_URL, e)
+            logger.warning(
+                "[integrations] simulation unreachable url=%s: %s",
+                SIMULATION_SERVICE_URL,
+                e,
+            )
         try:
             r = await client.get(f"{STORAGE_SERVICE_URL}/health")
             if r.status_code == 200:
                 data = r.json()
                 pinata = data.get("pinata_configured", False)
         except Exception as e:
-            logger.warning("[integrations] storage unreachable url=%s: %s", STORAGE_SERVICE_URL, e)
+            logger.warning(
+                "[integrations] storage unreachable url=%s: %s", STORAGE_SERVICE_URL, e
+            )
         try:
             r = await client.get(f"{VECTORDB_URL}/health")
             if r.status_code == 200:
                 data = r.json()
                 qdrant = data.get("qdrant_configured", False)
         except Exception as e:
-            logger.warning("[integrations] vectordb unreachable url=%s: %s", VECTORDB_URL, e)
-    return {"tenderly_configured": tenderly, "pinata_configured": pinata, "qdrant_configured": qdrant}
+            logger.warning(
+                "[integrations] vectordb unreachable url=%s: %s", VECTORDB_URL, e
+            )
+    return {
+        "tenderly_configured": tenderly,
+        "pinata_configured": pinata,
+        "qdrant_configured": qdrant,
+    }
 
 
 def _metrics_since_from_time_range(time_range: str) -> str | None:
@@ -170,11 +203,14 @@ health_router = APIRouter(tags=["health"])
 
 def _check_dead_letter_queue() -> dict[str, Any]:
     """Check dead letter queue depth. High depth indicates failed jobs that need investigation."""
-    url = (os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or "").strip()
+    url = (
+        os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or ""
+    ).strip()
     if not url or url.startswith("#"):
         return {"status": "not_configured", "depth": 0}
     try:
         from redis import Redis
+
         r = Redis.from_url(effective_redis_url(url))
         depth = r.llen("queue:hyperagent:dead")
         result: dict[str, Any] = {"status": "ok", "depth": depth}
@@ -197,10 +233,14 @@ def _root_health_critical_ok() -> tuple[bool, dict[str, Any]]:
     supabase = _check_supabase_health()
     redis = _check_redis_health()
     queue_enabled = os.environ.get("QUEUE_ENABLED", "").strip() in ("1", "true", "yes")
-    redis_url = (os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or "").strip()
+    redis_url = (
+        os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or ""
+    ).strip()
     redis_configured = bool(redis_url and not redis_url.startswith("#"))
     db_ok = supabase.get("status") in ("ok", "not_configured")
-    redis_ok = redis.get("status") == "ok" if (queue_enabled and redis_configured) else True
+    redis_ok = (
+        redis.get("status") == "ok" if (queue_enabled and redis_configured) else True
+    )
     critical_ok = db_ok and redis_ok
     payload["supabase"] = supabase
     payload["redis"] = redis
@@ -228,14 +268,20 @@ def health_ready():
     startup_bad, startup_missing = is_startup_degraded()
     if startup_bad:
         from fastapi.responses import JSONResponse
+
         return JSONResponse(
             status_code=503,
-            content={"status": "not_ready", "reason": "startup_degraded", "missing": startup_missing},
+            content={
+                "status": "not_ready",
+                "reason": "startup_degraded",
+                "missing": startup_missing,
+            },
         )
 
     critical_ok, payload = _root_health_critical_ok()
     if not critical_ok:
         from fastapi.responses import JSONResponse
+
         return JSONResponse(
             status_code=503,
             content={"status": "not_ready", "reason": "dependency_failure", **payload},
@@ -281,7 +327,10 @@ def metrics():
     """Prometheus-format metrics for pipeline runs and p95 latency."""
     from fastapi.responses import PlainTextResponse
     from observability import format_prometheus_metrics
-    return PlainTextResponse(format_prometheus_metrics(), media_type="text/plain; charset=utf-8")
+
+    return PlainTextResponse(
+        format_prometheus_metrics(), media_type="text/plain; charset=utf-8"
+    )
 
 
 # API v1 health and metrics router
@@ -308,21 +357,45 @@ def health_detailed() -> dict[str, Any]:
     services["deploy"] = _check_service_health("deploy", deploy_url)
     try:
         from rag_client import is_configured as rag_configured
+
         if not rag_configured():
-            services["rag"] = {"status": "NOT_APPLICABLE", "message": "RAG/vectordb not configured for MVP"}
+            services["rag"] = {
+                "status": "NOT_APPLICABLE",
+                "message": "RAG/vectordb not configured for MVP",
+            }
         else:
             services["rag"] = _check_service_health("rag", VECTORDB_URL)
     except ImportError:
-        services["rag"] = {"status": "NOT_APPLICABLE", "message": "RAG client not available"}
-    exploit_enabled = os.environ.get("EXPLOIT_SIM_ENABLED", "false").lower() in ("true", "1", "yes")
-    services["exploit_sim"] = {"status": "NOT_APPLICABLE", "message": "Exploit simulation disabled"} if not exploit_enabled else {"status": "ok", "message": "Enabled"}
+        services["rag"] = {
+            "status": "NOT_APPLICABLE",
+            "message": "RAG client not available",
+        }
+    exploit_enabled = os.environ.get("EXPLOIT_SIM_ENABLED", "false").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+    services["exploit_sim"] = (
+        {"status": "NOT_APPLICABLE", "message": "Exploit simulation disabled"}
+        if not exploit_enabled
+        else {"status": "ok", "message": "Enabled"}
+    )
     pinata_ok = bool(os.environ.get("PINATA_API_KEY") or os.environ.get("PINATA_JWT"))
-    services["trace_writer"] = {"status": "NOT_APPLICABLE", "message": "IPFS not configured; traces use stub IDs"} if not pinata_ok else {"status": "ok", "message": "IPFS configured"}
+    services["trace_writer"] = (
+        {
+            "status": "NOT_APPLICABLE",
+            "message": "IPFS not configured; traces use stub IDs",
+        }
+        if not pinata_ok
+        else {"status": "ok", "message": "IPFS configured"}
+    )
     if TOOLS_BASE_URL:
         tools_status = _check_tools_health()
         services["tools"] = tools_status
         if tools_status.get("status") == "offline":
-            services["tools"]["message"] = "Toolchain offline; compile/audit may fail when using remote tools"
+            services["tools"][
+                "message"
+            ] = "Toolchain offline; compile/audit may fail when using remote tools"
     queue_enabled = os.environ.get("QUEUE_ENABLED", "").strip() in ("1", "true", "yes")
     if queue_enabled:
         services["dead_letter_queue"] = _check_dead_letter_queue()
@@ -392,8 +465,11 @@ def get_agent_identity() -> dict[str, Any]:
     if chain_id is not None:
         try:
             from registries import _ERC8004, _ensure_loaded  # type: ignore[attr-defined]
+
             _ensure_loaded()
-            for entry in ((_ERC8004 or {}).get("spec", {}).get("hyperagent", {}).get("agentIds") or []):
+            for entry in (_ERC8004 or {}).get("spec", {}).get("hyperagent", {}).get(
+                "agentIds"
+            ) or []:
                 if entry.get("chainId") == chain_id:
                     reg_proof = {
                         "agentId": str(entry.get("agentId", "")),
@@ -416,24 +492,37 @@ def get_agent_identity() -> dict[str, Any]:
 
 
 class RegisterIdentityBody(BaseModel):
-    chain_id: int | None = Field(None, description="Chain ID. Defaults to A2A_DEFAULT_CHAIN_ID.")
-    agent_uri: str | None = Field(None, description="Agent metadata URI. Defaults to ERC8004_AGENT_URI or https://hyperkitlabs.com/agent.json")
+    chain_id: int | None = Field(
+        None, description="Chain ID. Defaults to A2A_DEFAULT_CHAIN_ID."
+    )
+    agent_uri: str | None = Field(
+        None,
+        description="Agent metadata URI. Defaults to ERC8004_AGENT_URI or https://hyperkitlabs.com/agent.json",
+    )
 
 
 @identity_router.post("/register")
 def register_agent_identity(body: RegisterIdentityBody | None = None) -> dict[str, Any]:
     """Register this HyperAgent instance on ERC-8004 IdentityRegistry for the given chain.
-    Requires ERC8004_REGISTER_PRIVATE_KEY. Persists proof to agent_registrations. Returns agentId, txHash, persistedProof."""
+    Requires ERC8004_REGISTER_PRIVATE_KEY. Persists proof to agent_registrations. Returns agentId, txHash, persistedProof.
+    """
     from erc8004_register import is_configured, register_on_chain
     import db
+
     if not is_configured():
-        raise HTTPException(status_code=503, detail="ERC8004_REGISTER_PRIVATE_KEY not set")
+        raise HTTPException(
+            status_code=503, detail="ERC8004_REGISTER_PRIVATE_KEY not set"
+        )
     cid = (body.chain_id if body else None) or get_a2a_default_chain_id()
     if cid is None:
-        raise HTTPException(status_code=400, detail="chain_id required or set A2A_DEFAULT_CHAIN_ID")
+        raise HTTPException(
+            status_code=400, detail="chain_id required or set A2A_DEFAULT_CHAIN_ID"
+        )
     result = register_on_chain(cid, body.agent_uri if body else None)
     if not result.get("success"):
-        raise HTTPException(status_code=502, detail=result.get("error", "Registration failed"))
+        raise HTTPException(
+            status_code=502, detail=result.get("error", "Registration failed")
+        )
     persisted = None
     if db.is_configured():
         persisted = db.insert_agent_registration(
@@ -484,7 +573,11 @@ def get_metrics_api(time_range: str = "all") -> dict[str, Any]:
                     ("success", "completed"),
                     ("failed", "failed"),
                 ]:
-                    q = client.table("runs").select("id", count="exact").eq("status", status_val)
+                    q = (
+                        client.table("runs")
+                        .select("id", count="exact")
+                        .eq("status", status_val)
+                    )
                     if since:
                         q = q.gte("created_at", since)
                     r = q.execute()
@@ -503,6 +596,11 @@ def get_metrics_api(time_range: str = "all") -> dict[str, Any]:
     if since:
         total = active + completed + failed
     return {
-        "workflows": {"total": total, "active": active, "completed": completed, "failed": failed},
+        "workflows": {
+            "total": total,
+            "active": active,
+            "completed": completed,
+            "failed": failed,
+        },
         "total_workflows": total,
     }

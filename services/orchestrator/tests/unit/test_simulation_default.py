@@ -11,7 +11,9 @@ def test_tenderly_simulation_required_defaults_true():
     env_backup = os.environ.pop("TENDERLY_SIMULATION_REQUIRED", None)
     try:
         # Re-evaluate the default
-        val = os.environ.get("TENDERLY_SIMULATION_REQUIRED", "true").strip().lower() in (
+        val = os.environ.get(
+            "TENDERLY_SIMULATION_REQUIRED", "true"
+        ).strip().lower() in (
             "1",
             "true",
             "yes",
@@ -26,7 +28,9 @@ def test_tenderly_simulation_required_explicit_false():
     """Explicit false must disable the gate."""
     os.environ["TENDERLY_SIMULATION_REQUIRED"] = "false"
     try:
-        val = os.environ.get("TENDERLY_SIMULATION_REQUIRED", "true").strip().lower() in (
+        val = os.environ.get(
+            "TENDERLY_SIMULATION_REQUIRED", "true"
+        ).strip().lower() in (
             "1",
             "true",
             "yes",

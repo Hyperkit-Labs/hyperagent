@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { getSupabaseAdmin } from "./authBootstrap.js";
+import { log } from "./logger.js";
 
 export function healthHandler(orchestratorUrl: string) {
   return async (_req: Request, res: Response): Promise<void> => {
@@ -67,7 +68,14 @@ export function healthHandler(orchestratorUrl: string) {
       } else {
         msg = "Sign-in not ready.";
       }
-      res.status(503).json({ status: "degraded", ...basePayload, message: msg });
+      log.warn({
+        msg: "health degraded: auth not ready",
+        auth_jwt_configured: authJwtConfigured,
+        supabase_configured: Boolean(supabase),
+        db_connected: dbOk,
+        db_error: dbError,
+      });
+      res.status(200).json({ status: "degraded", ...basePayload, message: msg });
       return;
     }
 

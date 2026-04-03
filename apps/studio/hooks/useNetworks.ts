@@ -7,7 +7,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getNetworks, getMetrics, getErrorMessage, isAbortError, type NetworkConfig } from '@/lib/api';
+import { getNetworks, getMetrics, isAbortError, type NetworkConfig } from '@/lib/api';
+import { networkRegistryFailureMessage } from '@/lib/sadPathCopy';
 import { POLLING } from '@/constants/defaults';
 import { useNetworksContext } from '@/components/providers/NetworksProvider';
 
@@ -93,7 +94,7 @@ export function useNetworks(options: UseNetworksOptions = {}): UseNetworksReturn
       }
     } catch (err: unknown) {
       if (isMounted.current && !isAbortError(err)) {
-        setError(getErrorMessage(err, 'Failed to fetch networks'));
+        setError(networkRegistryFailureMessage(err));
       }
     } finally {
       if (isMounted.current) {

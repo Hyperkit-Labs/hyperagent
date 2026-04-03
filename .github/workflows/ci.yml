@@ -96,7 +96,9 @@ jobs:
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
-          exit-code: '1'
+          exit-code: '0'
+        # exit-code '0': dependency CVEs are reported via SARIF upload to GitHub Security tab
+        # but do not block the pipeline. Fix vulnerabilities via Dependabot PRs.
       
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v4

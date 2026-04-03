@@ -49,9 +49,12 @@ const SESSION_LLM_CRYPTO_ALGO = "AES-GCM";
  * Returns a proper ArrayBuffer from a Uint8Array.
  * Needed because Uint8Array.buffer may be a slice of a larger backing buffer,
  * which Node.js webcrypto rejects for PBKDF2 salt, IV, etc.
+ * Copies bytes so the result is always a standalone ArrayBuffer (TS strict + SharedArrayBuffer-safe).
  */
 function toAB(arr: Uint8Array): ArrayBuffer {
-  return arr.buffer.slice(arr.byteOffset, arr.byteOffset + arr.byteLength);
+  const copy = new Uint8Array(arr.byteLength);
+  copy.set(arr);
+  return copy.buffer;
 }
 
 /**

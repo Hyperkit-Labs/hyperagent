@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
 export default function DashboardError({
   error,
@@ -10,7 +10,7 @@ export default function DashboardError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('[DashboardError]', error);
+    console.error("[DashboardError]", error);
   }, [error]);
 
   return (
@@ -19,7 +19,8 @@ export default function DashboardError({
         Dashboard failed to load
       </h2>
       <p className="max-w-md text-sm text-[var(--color-text-secondary)]">
-        An error occurred loading the dashboard. Try refreshing or check server status.
+        An error occurred loading the dashboard. Try refreshing or check server
+        status.
         {error.digest && (
           <span className="block mt-1 font-mono text-xs opacity-60">
             Error ID: {error.digest}

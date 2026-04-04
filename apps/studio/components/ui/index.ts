@@ -14,5 +14,3 @@ export { RadialProgress } from "./RadialProgress";
 export { PipelineDemo } from "./PipelineDemo";
 export { FlickeringGrid } from "./react-bits/FlickeringGrid";
 export { ShinyText } from "./react-bits/ShinyText";
-
-

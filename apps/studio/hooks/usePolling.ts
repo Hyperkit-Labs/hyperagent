@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from "react";
 
 export function usePolling<T>(
   fetchFn: () => Promise<T>,
   interval: number,
-  condition: (data: T) => boolean = () => true
+  condition: (data: T) => boolean = () => true,
 ) {
   const [data, setData] = useState<T | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -15,7 +15,7 @@ export function usePolling<T>(
       try {
         const result = await fetchFn();
         setData(result);
-        
+
         if (!condition(result)) {
           if (intervalRef.current) {
             clearInterval(intervalRef.current);
@@ -23,7 +23,7 @@ export function usePolling<T>(
           }
         }
       } catch (error) {
-        console.error('Polling error:', error);
+        console.error("Polling error:", error);
       }
     };
 
@@ -39,4 +39,3 @@ export function usePolling<T>(
 
   return data;
 }
-

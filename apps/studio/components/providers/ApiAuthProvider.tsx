@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useEffect, useCallback, useRef } from 'react';
-import { toast } from 'sonner';
-import { useActiveAccount } from 'thirdweb/react';
-import { setAuthHeaderProvider, setOn401Callback } from '@/lib/api';
+import { useEffect, useCallback, useRef } from "react";
+import { toast } from "sonner";
+import { useActiveAccount } from "thirdweb/react";
+import { setAuthHeaderProvider, setOn401Callback } from "@/lib/api";
 import {
   getStoredSession,
   clearStoredSession,
@@ -11,14 +11,14 @@ import {
   clearExpiredSessionIfNeeded,
   getSessionTimeToExpiry,
   SESSION_CHANGE_EVENT,
-} from '@/lib/session-store';
-import { redirectToLoginWithNext } from '@/lib/authRedirect';
+} from "@/lib/session-store";
+import { redirectToLoginWithNext } from "@/lib/authRedirect";
 import {
   SESSION_EXPIRED_SOON_TOAST,
   SESSION_EXPIRED_TOAST,
   SESSION_INVALIDATED_TOAST,
-} from '@/lib/sadPathCopy';
-import { bootstrapWithThirdwebInApp } from '@/lib/authBootstrap';
+} from "@/lib/sadPathCopy";
+import { bootstrapWithThirdwebInApp } from "@/lib/authBootstrap";
 
 const SILENT_REFRESH_BUFFER_SEC = 120;
 const REDIRECT_BUFFER_SEC = 300;
@@ -39,8 +39,9 @@ export function ApiAuthProvider({ children }: { children: React.ReactNode }) {
 
     if (!account?.address) return false;
 
-    const getAuthToken = (account as { getAuthToken?: () => Promise<string> }).getAuthToken;
-    if (typeof getAuthToken !== 'function') return false;
+    const getAuthToken = (account as { getAuthToken?: () => Promise<string> })
+      .getAuthToken;
+    if (typeof getAuthToken !== "function") return false;
 
     try {
       const session = await bootstrapWithThirdwebInApp({
@@ -93,7 +94,10 @@ export function ApiAuthProvider({ children }: { children: React.ReactNode }) {
       const ttl = getSessionTimeToExpiry();
       if (ttl <= 0) return;
 
-      const refreshDelay = Math.max((ttl - SILENT_REFRESH_BUFFER_SEC) * 1000, 0);
+      const refreshDelay = Math.max(
+        (ttl - SILENT_REFRESH_BUFFER_SEC) * 1000,
+        0,
+      );
       refreshTimerId = window.setTimeout(async () => {
         const ok = await attemptSilentRefresh();
         if (ok) {

@@ -1,16 +1,21 @@
-'use client';
+"use client";
 
-import { getExplorerUrl } from '@/lib/utils';
-import { ExternalLink } from 'lucide-react'
+import { getExplorerUrl } from "@/lib/utils";
+import { ExternalLink } from "lucide-react";
 
 interface ExplorerLinkProps {
   network: string;
-  type: 'tx' | 'address';
+  type: "tx" | "address";
   value: string;
   label?: string;
 }
 
-export function ExplorerLink({ network, type, value, label }: ExplorerLinkProps) {
+export function ExplorerLink({
+  network,
+  type,
+  value,
+  label,
+}: ExplorerLinkProps) {
   const url = getExplorerUrl(network, type, value);
 
   if (!url) {
@@ -29,4 +34,3 @@ export function ExplorerLink({ network, type, value, label }: ExplorerLinkProps)
     </a>
   );
 }
-

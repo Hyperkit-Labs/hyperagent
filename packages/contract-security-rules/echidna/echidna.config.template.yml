@@ -1,0 +1,12 @@
+# Copy to project root as echidna.config.yml and adjust contract / cryticArgs.
+testMode: property
+testLimit: 50000
+seqLen: 100
+contract: "FuzzHarness"
+coverage: true
+solcArgs: "--optimize --optimize-runs 200"
+cryticArgs:
+  - "--compile-force-framework"
+  - "foundry"
+  - "--foundry-out-directory"
+  - "out"

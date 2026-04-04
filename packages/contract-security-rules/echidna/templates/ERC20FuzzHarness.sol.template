@@ -1,0 +1,13 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+// Wizard/codegen: import your ERC20 contract and alias it as Target.
+// import {MyToken as Target} from "../../src/MyToken.sol";
+
+contract FuzzHarness {
+    // Target internal target;
+    // constructor() { target = new Target(); }
+    // function echidna_supply_non_negative() public view returns (bool) {
+    //     return target.totalSupply() >= 0;
+    // }
+}

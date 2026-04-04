@@ -1,0 +1,8 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+// Wizard/codegen: import AccessControl or Ownable contract; add role invariants.
+
+contract FuzzHarness {
+    // Add state and constructor wiring to your Target contract.
+}

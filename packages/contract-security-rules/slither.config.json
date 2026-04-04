@@ -1,0 +1,5 @@
+{
+  "detectors_to_exclude": "naming-convention,similar-names",
+  "filter_paths": "lib/|test/foundry/|test/hardhat/",
+  "exclude_dependencies": true
+}

@@ -16,13 +16,17 @@ export function PageTitle({ title, subtitle, breadcrumb }: PageTitleProps) {
       transition={{ duration: 0.3 }}
     >
       {breadcrumb && (
-        <div className="text-sm text-[var(--color-text-tertiary)] mb-1">{breadcrumb}</div>
+        <div className="text-sm text-[var(--color-text-tertiary)] mb-1">
+          {breadcrumb}
+        </div>
       )}
       <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-text-primary)]">
         {title}
       </h1>
       {subtitle && (
-        <p className="text-sm text-[var(--color-text-tertiary)] mt-1">{subtitle}</p>
+        <p className="text-sm text-[var(--color-text-tertiary)] mt-1">
+          {subtitle}
+        </p>
       )}
     </motion.div>
   );

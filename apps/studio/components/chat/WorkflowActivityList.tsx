@@ -4,7 +4,11 @@ import { useState } from "react";
 import { ChevronDown, ChevronRight, Clock } from "lucide-react";
 import { StatusBadge } from "@/components/ui";
 import type { Workflow } from "@/lib/types";
-import { needsSpecApproval, needsDeployApproval, hasAuditOrSimFailure } from "@/lib/types";
+import {
+  needsSpecApproval,
+  needsDeployApproval,
+  hasAuditOrSimFailure,
+} from "@/lib/types";
 
 export interface WorkflowActivityListProps {
   workflows: Workflow[];
@@ -22,7 +26,9 @@ export function WorkflowActivityList({
   const [historyExpanded, setHistoryExpanded] = useState(false);
 
   const currentOrLast = workflows[0] ?? null;
-  const historyItems = workflows.filter((w) => w.workflow_id !== currentOrLast?.workflow_id);
+  const historyItems = workflows.filter(
+    (w) => w.workflow_id !== currentOrLast?.workflow_id,
+  );
   const hasHistory = historyItems.length > 0;
 
   function renderWorkflowItem(w: Workflow) {
@@ -38,12 +44,28 @@ export function WorkflowActivityList({
         }`}
         title={w.intent || w.workflow_id}
       >
-        <span className="font-medium truncate block">{w.name || w.intent || w.workflow_id}</span>
+        <span className="font-medium truncate block">
+          {w.name || w.intent || w.workflow_id}
+        </span>
         <span className="flex flex-wrap items-center gap-1 mt-0.5">
           <StatusBadge status={w.status} />
-          {needsSpecApproval(w) && <StatusBadge status="Spec" variant="spec" title="Spec ready for approval" />}
-          {needsDeployApproval(w) && <StatusBadge status="Deploy" variant="spec" title="Deploy ready for approval" />}
-          {hasAuditOrSimFailure(w) && <StatusBadge status="Audit/Sim failed" variant="audit-failed" />}
+          {needsSpecApproval(w) && (
+            <StatusBadge
+              status="Spec"
+              variant="spec"
+              title="Spec ready for approval"
+            />
+          )}
+          {needsDeployApproval(w) && (
+            <StatusBadge
+              status="Deploy"
+              variant="spec"
+              title="Deploy ready for approval"
+            />
+          )}
+          {hasAuditOrSimFailure(w) && (
+            <StatusBadge status="Audit/Sim failed" variant="audit-failed" />
+          )}
         </span>
       </button>
     );
@@ -51,13 +73,17 @@ export function WorkflowActivityList({
 
   if (loading && !workflows.length) {
     return (
-      <div className="text-[11px] text-[var(--color-text-muted)] py-2 px-2">Loading...</div>
+      <div className="text-[11px] text-[var(--color-text-muted)] py-2 px-2">
+        Loading...
+      </div>
     );
   }
 
   if (!workflows.length) {
     return (
-      <div className="text-[11px] text-[var(--color-text-muted)] py-2 px-2">No workflows yet.</div>
+      <div className="text-[11px] text-[var(--color-text-muted)] py-2 px-2">
+        No workflows yet.
+      </div>
     );
   }
 

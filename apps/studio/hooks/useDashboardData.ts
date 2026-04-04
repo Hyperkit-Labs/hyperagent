@@ -6,14 +6,14 @@
  * Reduces API calls from 3 to 2 (metrics + workflows; deployments derived from workflows).
  */
 
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { getMetrics, getWorkflows, getErrorMessage } from '@/lib/api';
-import { transformWorkflowToDeployment } from '@/lib/transformers';
-import type { Workflow } from '@/lib/types';
-import type { Deployment } from '@/lib/transformers';
-import type { SystemMetrics } from './useMetrics';
+import { useState, useEffect, useCallback } from "react";
+import { getMetrics, getWorkflows, getErrorMessage } from "@/lib/api";
+import { transformWorkflowToDeployment } from "@/lib/transformers";
+import type { Workflow } from "@/lib/types";
+import type { Deployment } from "@/lib/transformers";
+import type { SystemMetrics } from "./useMetrics";
 
 interface WorkflowApiResponse {
   workflows?: Workflow[];
@@ -34,12 +34,21 @@ const DEFAULT_METRICS: SystemMetrics = {
   workflows: { total: 0, active: 0, completed: 0, failed: 0 },
   contracts: { total: 0, deployed: 0, verified: 0 },
   deployments: { total: 0, successful: 0, successRate: 0 },
-  security: { score: 0, openRisks: { critical: 0, high: 0, medium: 0, low: 0 }, auditCoverage: 0 },
-  performance: { avgLatency: 0, totalInvocations: 0, successRate: 0, gasConsumption: 0 },
+  security: {
+    score: 0,
+    openRisks: { critical: 0, high: 0, medium: 0, low: 0 },
+    auditCoverage: 0,
+  },
+  performance: {
+    avgLatency: 0,
+    totalInvocations: 0,
+    successRate: 0,
+    gasConsumption: 0,
+  },
 };
 
 function normalizeMetrics(raw: unknown): SystemMetrics {
-  if (!raw || typeof raw !== 'object') return DEFAULT_METRICS;
+  if (!raw || typeof raw !== "object") return DEFAULT_METRICS;
   const m = raw as Record<string, unknown>;
   const w = (m.workflows as Record<string, number>) ?? {};
   const c = (m.contracts as Record<string, number>) ?? {};
@@ -74,7 +83,9 @@ function workflowsToDeployments(workflows: Workflow[]): Deployment[] {
   });
 }
 
-export function useDashboardData(options?: { workflowsLimit?: number }): UseDashboardDataReturn {
+export function useDashboardData(options?: {
+  workflowsLimit?: number;
+}): UseDashboardDataReturn {
   const limit = options?.workflowsLimit ?? 10;
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
@@ -92,16 +103,20 @@ export function useDashboardData(options?: { workflowsLimit?: number }): UseDash
         getWorkflows({ limit }),
       ]);
       const wData = workflowsRes as WorkflowApiResponse;
-      const list = Array.isArray(workflowsRes) ? workflowsRes : (wData?.workflows ?? []);
-      const total = typeof (workflowsRes as unknown as { total?: number }).total === 'number'
-        ? (workflowsRes as unknown as { total: number }).total
-        : list.length;
+      const list = Array.isArray(workflowsRes)
+        ? workflowsRes
+        : (wData?.workflows ?? []);
+      const total =
+        typeof (workflowsRes as unknown as { total?: number }).total ===
+        "number"
+          ? (workflowsRes as unknown as { total: number }).total
+          : list.length;
       setMetrics(normalizeMetrics(metricsRes));
       setWorkflows(list);
       setWorkflowsTotal(total);
       setDeployments(workflowsToDeployments(list));
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to load dashboard'));
+      setError(getErrorMessage(err, "Failed to load dashboard"));
     } finally {
       setLoading(false);
     }

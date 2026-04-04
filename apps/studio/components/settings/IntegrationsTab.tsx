@@ -22,7 +22,8 @@ const CORE_SERVICES: ServiceDef[] = [
     desc: "Simulation and monitoring",
     env: "TENDERLY_API_KEY",
     core: true,
-    getStatus: (c) => c?.integrations?.tenderly_configured ?? c?.monitoring_enabled ?? false,
+    getStatus: (c) =>
+      c?.integrations?.tenderly_configured ?? c?.monitoring_enabled ?? false,
   },
   {
     name: "Blockchain RPC",
@@ -54,7 +55,10 @@ const CORE_SERVICES: ServiceDef[] = [
   },
 ];
 
-export function IntegrationsTab({ config, networksCount }: IntegrationsTabProps) {
+export function IntegrationsTab({
+  config,
+  networksCount,
+}: IntegrationsTabProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [successId, setSuccessId] = useState<string | null>(null);
 
@@ -84,12 +88,18 @@ export function IntegrationsTab({ config, networksCount }: IntegrationsTabProps)
           }`}
         >
           <div>
-            <span className="text-sm font-medium text-[var(--color-text-primary)]">{svc.name}</span>
+            <span className="text-sm font-medium text-[var(--color-text-primary)]">
+              {svc.name}
+            </span>
             <p className="text-xs text-[var(--color-text-muted)]">{svc.desc}</p>
           </div>
           <div className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full shrink-0 ${status ? "bg-emerald-400" : "bg-[var(--color-text-muted)]"}`} />
-            <span className="text-xs text-[var(--color-text-tertiary)]">{status ? "Connected" : "Not configured"}</span>
+            <span
+              className={`w-2 h-2 rounded-full shrink-0 ${status ? "bg-emerald-400" : "bg-[var(--color-text-muted)]"}`}
+            />
+            <span className="text-xs text-[var(--color-text-tertiary)]">
+              {status ? "Connected" : "Not configured"}
+            </span>
             <button
               type="button"
               onClick={() => handleConfigure(svc.name)}
@@ -102,10 +112,14 @@ export function IntegrationsTab({ config, networksCount }: IntegrationsTabProps)
         {isExpanded && (
           <div className="mt-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] px-4 py-3 text-xs">
             <p className="text-[var(--color-text-muted)] mb-2">
-              Configure via environment variable: <code className="font-mono text-[var(--color-text-secondary)]">{svc.env}</code>
+              Configure via environment variable:{" "}
+              <code className="font-mono text-[var(--color-text-secondary)]">
+                {svc.env}
+              </code>
             </p>
             <p className="text-[var(--color-text-muted)] mb-3">
-              Service connections are managed via environment variables. Contact your admin to configure.
+              Service connections are managed via environment variables. Contact
+              your admin to configure.
             </p>
             <button
               type="button"
@@ -122,7 +136,9 @@ export function IntegrationsTab({ config, networksCount }: IntegrationsTabProps)
 
   return (
     <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] backdrop-blur-md p-4 space-y-4">
-      <h3 className="text-sm font-medium text-[var(--color-text-primary)]">Connected services</h3>
+      <h3 className="text-sm font-medium text-[var(--color-text-primary)]">
+        Connected services
+      </h3>
 
       <div>
         <h4 className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
@@ -134,7 +150,8 @@ export function IntegrationsTab({ config, networksCount }: IntegrationsTabProps)
       </div>
 
       <p className="text-xs text-[var(--color-text-muted)]">
-        Service connections are managed via environment variables. Contact your admin to configure integrations.
+        Service connections are managed via environment variables. Contact your
+        admin to configure integrations.
       </p>
     </div>
   );

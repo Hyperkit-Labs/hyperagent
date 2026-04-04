@@ -32,7 +32,7 @@ export const REQUEST_TIMEOUT_MS = 10_000;
 
 /** Default network for workflow creation: use first testnet from list, else fallback. */
 export function getDefaultNetworkIdFromList(
-  networks: Array<{ id: string; is_mainnet?: boolean }>
+  networks: Array<{ id: string; is_mainnet?: boolean }>,
 ): string {
   const testnet = networks.find((n) => n.is_mainnet === false);
   return testnet?.id ?? FALLBACK_DEFAULT_NETWORK_ID;
@@ -40,7 +40,7 @@ export function getDefaultNetworkIdFromList(
 
 /** Default chain ID: use first testnet from list, else fallback. */
 export function getDefaultChainIdFromList(
-  networks: Array<{ chain_id?: number; is_mainnet?: boolean }>
+  networks: Array<{ chain_id?: number; is_mainnet?: boolean }>,
 ): number {
   const testnet = networks.find((n) => n.is_mainnet === false);
   return testnet?.chain_id ?? FALLBACK_DEFAULT_CHAIN_ID;

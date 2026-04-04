@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
 export default function DeploymentsError({
   error,
@@ -10,7 +10,7 @@ export default function DeploymentsError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('[DeploymentsError]', error);
+    console.error("[DeploymentsError]", error);
   }, [error]);
 
   return (
@@ -19,7 +19,8 @@ export default function DeploymentsError({
         Deployments failed to load
       </h2>
       <p className="max-w-md text-sm text-[var(--color-text-secondary)]">
-        An error occurred loading deployment data. Your deployments are unaffected.
+        An error occurred loading deployment data. Your deployments are
+        unaffected.
         {error.digest && (
           <span className="block mt-1 font-mono text-xs opacity-60">
             Error ID: {error.digest}

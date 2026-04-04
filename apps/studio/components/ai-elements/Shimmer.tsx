@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 export interface ShimmerProps {
   className?: string;
@@ -7,23 +7,23 @@ export interface ShimmerProps {
   /** Width in Tailwind class or "full". */
   width?: string;
   /** Rounded variant. */
-  rounded?: 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  rounded?: "none" | "sm" | "md" | "lg" | "xl" | "full";
 }
 
 const roundedMap = {
-  none: 'rounded-none',
-  sm: 'rounded-sm',
-  md: 'rounded-md',
-  lg: 'rounded-lg',
-  xl: 'rounded-xl',
-  full: 'rounded-full',
+  none: "rounded-none",
+  sm: "rounded-sm",
+  md: "rounded-md",
+  lg: "rounded-lg",
+  xl: "rounded-xl",
+  full: "rounded-full",
 };
 
 export function Shimmer({
-  className = '',
-  height = 'h-4',
-  width = 'w-full',
-  rounded = 'md',
+  className = "",
+  height = "h-4",
+  width = "w-full",
+  rounded = "md",
 }: ShimmerProps) {
   return (
     <div
@@ -38,7 +38,7 @@ export interface ShimmerCardProps {
 }
 
 /** Skeleton for a KPI / glass card. */
-export function ShimmerCard({ className = '' }: ShimmerCardProps) {
+export function ShimmerCard({ className = "" }: ShimmerCardProps) {
   return (
     <div
       className={`glass-panel p-5 rounded-xl flex flex-col justify-between h-32 ${className}`}
@@ -65,7 +65,7 @@ export interface ShimmerTableRowsProps {
 export function ShimmerTableRows({
   rows = 5,
   cols = 4,
-  className = '',
+  className = "",
 }: ShimmerTableRowsProps) {
   return (
     <>
@@ -88,9 +88,11 @@ export interface ShimmerGridProps {
 }
 
 /** Skeleton grid for card grids (e.g. agents, templates, contracts). */
-export function ShimmerGrid({ count = 6, className = '' }: ShimmerGridProps) {
+export function ShimmerGrid({ count = 6, className = "" }: ShimmerGridProps) {
   return (
-    <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${className}`}>
+    <div
+      className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${className}`}
+    >
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="glass-panel rounded-xl p-5">
           <div className="flex items-center gap-3">
@@ -107,7 +109,7 @@ export function ShimmerGrid({ count = 6, className = '' }: ShimmerGridProps) {
 }
 
 /** Skeleton for code block during codegen. Shows "thinking" state. */
-export function CodeBlockShimmer({ className = '' }: { className?: string }) {
+export function CodeBlockShimmer({ className = "" }: { className?: string }) {
   return (
     <div
       className={`rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] overflow-hidden ${className}`}
@@ -118,9 +120,17 @@ export function CodeBlockShimmer({ className = '' }: { className?: string }) {
         <Shimmer height="h-2" width="w-2" rounded="full" />
       </div>
       <div className="p-4 space-y-2">
-        {['w-2/3', 'w-full', 'w-1/2', 'w-1/3', 'w-5/6', 'w-4/5', 'w-1/2'].map((width, i) => (
-          <Shimmer key={i} height="h-3" width={width} rounded="sm" className="max-w-full" />
-        ))}
+        {["w-2/3", "w-full", "w-1/2", "w-1/3", "w-5/6", "w-4/5", "w-1/2"].map(
+          (width, i) => (
+            <Shimmer
+              key={i}
+              height="h-3"
+              width={width}
+              rounded="sm"
+              className="max-w-full"
+            />
+          ),
+        )}
       </div>
     </div>
   );

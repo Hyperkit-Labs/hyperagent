@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { getErrorMessage, isAbortError } from '@/lib/api';
-import { POLLING } from '@/constants/defaults';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { getErrorMessage, isAbortError } from "@/lib/api";
+import { POLLING } from "@/constants/defaults";
 
 export interface UseDataFetchOptions<T, R> {
   fetcher: (signal?: AbortSignal) => Promise<T>;
@@ -22,7 +22,7 @@ export interface UseDataFetchReturn<R> {
 }
 
 export function useDataFetch<T, R>(
-  options: UseDataFetchOptions<T, R>
+  options: UseDataFetchOptions<T, R>,
 ): UseDataFetchReturn<R> {
   const {
     fetcher,
@@ -35,48 +35,53 @@ export function useDataFetch<T, R>(
   const [data, setData] = useState<R>(initialData as R);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const isMounted = useRef(true);
   const fetchController = useRef<AbortController | null>(null);
 
-  const fetchData = useCallback(async (signal?: AbortSignal) => {
-    try {
-      setError(null);
-      setLoading(true);
-      
-      const result = await fetcher(signal);
-      const transformed = transformer ? transformer(result) : (result as unknown as R);
-      
-      if (isMounted.current) {
-        setData(transformed);
+  const fetchData = useCallback(
+    async (signal?: AbortSignal) => {
+      try {
+        setError(null);
+        setLoading(true);
+
+        const result = await fetcher(signal);
+        const transformed = transformer
+          ? transformer(result)
+          : (result as unknown as R);
+
+        if (isMounted.current) {
+          setData(transformed);
+        }
+      } catch (err: unknown) {
+        if (isMounted.current && !isAbortError(err)) {
+          setError(getErrorMessage(err, "Failed to fetch data"));
+        }
+      } finally {
+        if (isMounted.current) {
+          setLoading(false);
+        }
       }
-    } catch (err: unknown) {
-      if (isMounted.current && !isAbortError(err)) {
-        setError(getErrorMessage(err, 'Failed to fetch data'));
-      }
-    } finally {
-      if (isMounted.current) {
-        setLoading(false);
-      }
-    }
-  }, [fetcher, transformer]);
+    },
+    [fetcher, transformer],
+  );
 
   const refetch = useCallback(async () => {
     if (fetchController.current) {
       fetchController.current.abort();
     }
-    
+
     fetchController.current = new AbortController();
     await fetchData(fetchController.current.signal);
   }, [fetchData]);
 
   useEffect(() => {
     isMounted.current = true;
-    
+
     const controller = new AbortController();
     fetchController.current = controller;
     fetchData(controller.signal);
-    
+
     let intervalId: NodeJS.Timeout | null = null;
     if (autoRefresh && refreshInterval > 0) {
       intervalId = setInterval(() => {
@@ -87,7 +92,7 @@ export function useDataFetch<T, R>(
         }
       }, refreshInterval);
     }
-    
+
     return () => {
       isMounted.current = false;
       controller.abort();
@@ -107,4 +112,3 @@ export function useDataFetch<T, R>(
     isEmpty,
   };
 }
-

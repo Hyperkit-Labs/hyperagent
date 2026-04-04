@@ -13,7 +13,14 @@ export interface EmptyStateProps {
   className?: string;
 }
 
-export function EmptyState({ icon, title, description, action, suggestions, className = "" }: EmptyStateProps) {
+export function EmptyState({
+  icon,
+  title,
+  description,
+  action,
+  suggestions,
+  className = "",
+}: EmptyStateProps) {
   return (
     <div
       className={`flex flex-col items-center justify-center text-center max-w-sm mx-auto ${className}`.trim()}
@@ -27,11 +34,16 @@ export function EmptyState({ icon, title, description, action, suggestions, clas
       >
         {icon}
       </motion.div>
-      <p className="text-[var(--color-text-secondary)] text-sm font-medium mb-1">{title}</p>
-      <p className="text-[var(--color-text-tertiary)] text-xs mb-3">{description}</p>
+      <p className="text-[var(--color-text-secondary)] text-sm font-medium mb-1">
+        {title}
+      </p>
+      <p className="text-[var(--color-text-tertiary)] text-xs mb-3">
+        {description}
+      </p>
       {suggestions && suggestions.length > 0 && (
         <p className="text-xs text-[var(--color-text-muted)] mb-4">
-          Try: &quot;{suggestions[0]}&quot;{suggestions.length > 1 ? ` or &quot;${suggestions[1]}&quot;` : ""}
+          Try: &quot;{suggestions[0]}&quot;
+          {suggestions.length > 1 ? ` or &quot;${suggestions[1]}&quot;` : ""}
         </p>
       )}
       {action ?? null}

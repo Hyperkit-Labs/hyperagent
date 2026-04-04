@@ -48,7 +48,7 @@ describe("authBootstrap", () => {
           address: "0x1234567890123456789012345678901234567890",
           chainId: 1,
           signMessage: async () => "0xsig",
-        })
+        }),
       ).rejects.toThrow(/Auth not configured|503/);
     });
 
@@ -67,7 +67,7 @@ describe("authBootstrap", () => {
           address: "0x1234567890123456789012345678901234567890",
           chainId: 1,
           signMessage: async () => "0xbad",
-        })
+        }),
       ).rejects.toThrow();
     });
   });

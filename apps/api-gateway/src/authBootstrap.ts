@@ -285,7 +285,17 @@ export async function authBootstrapHandler(req: Request, res: Response): Promise
         res.status(401).json({ error: "Unauthorized", code: "INVALID_SIGNATURE", message: "Invalid signature" });
         return;
       }
-      walletAddress = result.data.address;
+      const verified = result.data?.address;
+      if (typeof verified !== "string" || !verified.trim()) {
+        emitAuditEvent(req, "auth_bootstrap_failure", { reason: "missing_address_after_verify" });
+        res.status(401).json({
+          error: "Unauthorized",
+          code: "INVALID_SIGNATURE",
+          message: "SIWE verification did not return a wallet address",
+        });
+        return;
+      }
+      walletAddress = verified;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Verification failed";
       // #region agent log

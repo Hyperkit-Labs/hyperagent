@@ -16,12 +16,13 @@ const eslintConfig = defineConfig([
     ".playwright-cache/**",
     "e2e/**",
   ]),
-  // Downgrade strict react-hooks rules to warnings so CI passes while we address them
+  // Severity overrides: must use `files` so ESLint merges these with Next's plugin blocks for the same paths.
   {
+    files: ["**/*.{js,jsx,mjs,ts,tsx,mts,cts}"],
     rules: {
-      "react-hooks/set-state-in-effect": "off",
-      "react-hooks/refs": "off",
-      "react-hooks/immutability": "off",
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/refs": "warn",
+      "react-hooks/immutability": "warn",
       "@typescript-eslint/no-unused-vars": "warn",
       "react-hooks/exhaustive-deps": "warn",
     },

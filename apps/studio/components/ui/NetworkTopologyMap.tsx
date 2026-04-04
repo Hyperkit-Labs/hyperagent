@@ -44,19 +44,19 @@ export function NetworkTopologyMap({
 
   useEffect(() => {
     if (!containerRef.current) return;
-    
+
     // Animate data packets (circles) along the paths
-    const elements = containerRef.current.querySelectorAll('.data-packet');
+    const elements = containerRef.current.querySelectorAll(".data-packet");
     if (elements.length === 0) return;
 
     const animation = anime({
-      targets: '.data-packet',
+      targets: ".data-packet",
       strokeDashoffset: [anime.setDashoffset, 0],
-      easing: 'linear',
-      duration: (el: Element, i: number) => 2000 + (i * 200),
+      easing: "linear",
+      duration: (el: Element, i: number) => 2000 + i * 200,
       delay: (el: Element, i: number) => i * 400,
       loop: true,
-      direction: 'normal'
+      direction: "normal",
     });
 
     return () => animation.pause();
@@ -94,7 +94,9 @@ export function NetworkTopologyMap({
 
         {positions.map((pos) => {
           const isVulnerable = vulnerableNetworkIds.includes(pos.id);
-          const stroke = isVulnerable ? "var(--color-semantic-error)" : "var(--color-border-default)";
+          const stroke = isVulnerable
+            ? "var(--color-semantic-error)"
+            : "var(--color-border-default)";
           const marker = isVulnerable ? "url(#arrow-red)" : "url(#arrow-green)";
 
           return (
@@ -112,7 +114,11 @@ export function NetworkTopologyMap({
               <path
                 className="data-packet opacity-50"
                 d={`M ${CENTER} ${CENTER} L ${pos.x} ${pos.y}`}
-                stroke={isVulnerable ? "var(--color-semantic-error)" : "var(--color-primary)"}
+                stroke={
+                  isVulnerable
+                    ? "var(--color-semantic-error)"
+                    : "var(--color-primary)"
+                }
                 strokeWidth="4"
                 strokeDasharray="4 200"
                 fill="none"

@@ -30,7 +30,9 @@ function LoginContent() {
     if (postLoginRedirectDone.current) return;
     postLoginRedirectDone.current = true;
     const destination =
-      nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : ROUTES.HOME;
+      nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
+        ? nextParam
+        : ROUTES.HOME;
     router.replace(destination);
   }, [isReady, hasSession, walletAddress, router, nextParam]);
 
@@ -70,11 +72,15 @@ function LoginContent() {
       </div>
 
       <div className="absolute inset-0 grid-pattern bg-grid" aria-hidden />
-      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[50vw] h-[60vh] max-w-[600px] pointer-events-none hidden lg:block" aria-hidden>
+      <div
+        className="absolute left-0 top-1/2 -translate-y-1/2 w-[50vw] h-[60vh] max-w-[600px] pointer-events-none hidden lg:block"
+        aria-hidden
+      >
         <div
           className="absolute inset-0 opacity-40"
           style={{
-            background: "radial-gradient(ellipse 80% 80% at 20% 50%, rgba(124, 58, 237, 0.25) 0%, transparent 60%)",
+            background:
+              "radial-gradient(ellipse 80% 80% at 20% 50%, rgba(124, 58, 237, 0.25) 0%, transparent 60%)",
           }}
         />
       </div>
@@ -89,7 +95,11 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-[var(--color-bg-base)]" />}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[var(--color-bg-base)]" />
+      }
+    >
       <LoginContent />
     </Suspense>
   );

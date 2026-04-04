@@ -15,27 +15,43 @@ export interface OnboardingChecklistProps {
   className?: string;
 }
 
-export function OnboardingChecklist({ onConnectClick, onByokClick, onPaymentClick, onTryItNowClick, className = "" }: OnboardingChecklistProps) {
+export function OnboardingChecklist({
+  onConnectClick,
+  onByokClick,
+  onPaymentClick,
+  onTryItNowClick,
+  className = "",
+}: OnboardingChecklistProps) {
   const { steps, nextStep, completed } = useOnboarding();
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && sessionStorage.getItem(DISMISS_KEY) === "1") {
+    if (
+      typeof window !== "undefined" &&
+      sessionStorage.getItem(DISMISS_KEY) === "1"
+    ) {
       setDismissed(true);
     }
   }, []);
 
   if (completed) {
     return (
-      <div className={`glass-panel rounded-xl p-4 border border-emerald-500/20 ${className}`.trim()}>
+      <div
+        className={`glass-panel rounded-xl p-4 border border-emerald-500/20 ${className}`.trim()}
+      >
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
               <Check className="w-4 h-4" />
             </span>
             <div>
-              <p className="text-sm font-medium text-[var(--color-text-primary)]">Setup complete</p>
-              <p className="text-xs text-[var(--color-text-tertiary)]">You are ready to build. Create a workflow to generate your first contract.</p>
+              <p className="text-sm font-medium text-[var(--color-text-primary)]">
+                Setup complete
+              </p>
+              <p className="text-xs text-[var(--color-text-tertiary)]">
+                You are ready to build. Create a workflow to generate your first
+                contract.
+              </p>
             </div>
           </div>
           {onTryItNowClick && (
@@ -63,8 +79,9 @@ export function OnboardingChecklist({ onConnectClick, onByokClick, onPaymentClic
   const useByokButton = isByokStep && onByokClick;
   const usePaymentButton = isPaymentStep && onPaymentClick;
 
-  const ctaButton = nextStep && (
-    useConnectButton ? (
+  const ctaButton =
+    nextStep &&
+    (useConnectButton ? (
       <button
         type="button"
         onClick={onConnectClick}
@@ -99,8 +116,7 @@ export function OnboardingChecklist({ onConnectClick, onByokClick, onPaymentClic
         {nextStep.cta}
         <ArrowRight className="w-3 h-3" />
       </Link>
-    )
-  );
+    ));
 
   function handleDismiss() {
     setDismissed(true);
@@ -108,7 +124,9 @@ export function OnboardingChecklist({ onConnectClick, onByokClick, onPaymentClic
   }
 
   return (
-    <div className={`glass-panel rounded-xl p-4 border border-[var(--color-border-subtle)] ${className}`.trim()}>
+    <div
+      className={`glass-panel rounded-xl p-4 border border-[var(--color-border-subtle)] ${className}`.trim()}
+    >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-[var(--color-text-secondary)]">
@@ -141,12 +159,16 @@ export function OnboardingChecklist({ onConnectClick, onByokClick, onPaymentClic
             <div key={step.id} className="flex items-center gap-2">
               <span
                 className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${
-                  step.done ? "bg-emerald-500/20 text-emerald-400" : "bg-[var(--color-bg-panel)] text-[var(--color-text-muted)]"
+                  step.done
+                    ? "bg-emerald-500/20 text-emerald-400"
+                    : "bg-[var(--color-bg-panel)] text-[var(--color-text-muted)]"
                 }`}
               >
                 {step.done ? <Check className="w-3.5 h-3.5" /> : idx + 1}
               </span>
-              <span className={`text-xs ${step.done ? "text-[var(--color-text-tertiary)] line-through" : "text-[var(--color-text-secondary)]"}`}>
+              <span
+                className={`text-xs ${step.done ? "text-[var(--color-text-tertiary)] line-through" : "text-[var(--color-text-secondary)]"}`}
+              >
                 {step.label}
               </span>
             </div>
@@ -158,9 +180,30 @@ export function OnboardingChecklist({ onConnectClick, onByokClick, onPaymentClic
       {isByokStep && (
         <div className="mt-2 flex gap-3 text-[10px] text-[var(--color-text-muted)]">
           <span>Get keys:</span>
-          <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--color-primary-light)] underline">OpenAI</a>
-          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--color-primary-light)] underline">Google</a>
-          <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--color-primary-light)] underline">Anthropic</a>
+          <a
+            href="https://platform.openai.com/api-keys"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-[var(--color-primary-light)] underline"
+          >
+            OpenAI
+          </a>
+          <a
+            href="https://aistudio.google.com/apikey"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-[var(--color-primary-light)] underline"
+          >
+            Google
+          </a>
+          <a
+            href="https://console.anthropic.com/settings/keys"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-[var(--color-primary-light)] underline"
+          >
+            Anthropic
+          </a>
         </div>
       )}
     </div>

@@ -30,15 +30,19 @@ export function X402SpendingTab({
   config,
   refetchX402,
 }: X402SpendingTabProps) {
-  const [liveBudget, setLiveBudget] = useState<string>(x402Control?.budget ?? "0");
+  const [liveBudget, setLiveBudget] = useState<string>(
+    x402Control?.budget ?? "0",
+  );
   const [livePeriod, setLivePeriod] = useState<"daily" | "weekly" | "monthly">(
-    (x402Control?.period as "daily" | "weekly" | "monthly") ?? "monthly"
+    (x402Control?.period as "daily" | "weekly" | "monthly") ?? "monthly",
   );
   const creditsPerRun = config?.credits_per_run ?? CREDITS_PER_RUN;
 
   useEffect(() => {
     setLiveBudget(x402Control?.budget ?? "0");
-    setLivePeriod((x402Control?.period as "daily" | "weekly" | "monthly") ?? "monthly");
+    setLivePeriod(
+      (x402Control?.period as "daily" | "weekly" | "monthly") ?? "monthly",
+    );
   }, [x402Control?.budget, x402Control?.period]);
 
   const projectedRuns = useMemo(() => {
@@ -60,7 +64,11 @@ export function X402SpendingTab({
       {x402Error && !x402Loading && (
         <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 flex items-center justify-between">
           <p className="text-xs text-red-400">{x402Error}</p>
-          <button type="button" onClick={() => void refetchX402()} className="text-xs text-red-400 underline">
+          <button
+            type="button"
+            onClick={() => void refetchX402()}
+            className="text-xs text-red-400 underline"
+          >
             Retry
           </button>
         </div>
@@ -71,7 +79,9 @@ export function X402SpendingTab({
             <div className="flex items-center gap-2">
               <span
                 className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                  x402Enabled ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
+                  x402Enabled
+                    ? "bg-emerald-500/10 text-emerald-400"
+                    : "bg-rose-500/10 text-rose-400"
                 }`}
               >
                 x402 {x402Enabled ? "enabled" : "disabled"}
@@ -105,9 +115,12 @@ export function X402SpendingTab({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <h3 className="text-sm font-medium text-[var(--color-text-primary)] mb-2">Credits balance</h3>
+              <h3 className="text-sm font-medium text-[var(--color-text-primary)] mb-2">
+                Credits balance
+              </h3>
               <p className="text-xs text-[var(--color-text-muted)] mb-2">
-                Top up with fiat or stablecoins. Each run costs {creditsPerRun} credits.
+                Top up with fiat or stablecoins. Each run costs {creditsPerRun}{" "}
+                credits.
               </p>
               <CreditsCard
                 balanceFromParent={x402Balance}
@@ -116,7 +129,9 @@ export function X402SpendingTab({
               />
             </div>
             <div>
-              <h3 className="text-sm font-medium text-[var(--color-text-primary)] mb-2">Spending controls</h3>
+              <h3 className="text-sm font-medium text-[var(--color-text-primary)] mb-2">
+                Spending controls
+              </h3>
               <SpendingControlCard
                 controlFromParent={x402Control}
                 onRefetch={refetchX402}

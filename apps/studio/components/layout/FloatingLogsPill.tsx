@@ -10,13 +10,18 @@ import { ROUTES } from "@/constants/routes";
 
 export function FloatingLogsPill() {
   const [expanded, setExpanded] = useState(false);
-  const { logs, loading } = useLogs({ autoRefresh: true, filters: { page_size: 5 } });
+  const { logs, loading } = useLogs({
+    autoRefresh: true,
+    filters: { page_size: 5 },
+  });
   const hasNewLogs = logs.length > 0;
-  const terminalLines = logs.slice(0, 5).map((entry: { message?: string; level?: string; timestamp?: string }) => ({
-    timestamp: entry.timestamp ?? "",
-    level: entry.level ?? "info",
-    message: entry.message ?? "",
-  }));
+  const terminalLines = logs
+    .slice(0, 5)
+    .map((entry: { message?: string; level?: string; timestamp?: string }) => ({
+      timestamp: entry.timestamp ?? "",
+      level: entry.level ?? "info",
+      message: entry.message ?? "",
+    }));
 
   return (
     <>
@@ -29,7 +34,9 @@ export function FloatingLogsPill() {
       >
         <span
           className={`w-2 h-2 rounded-full shrink-0 ${
-            hasNewLogs ? "bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]" : "bg-[var(--color-text-muted)]"
+            hasNewLogs
+              ? "bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]"
+              : "bg-[var(--color-text-muted)]"
           }`}
         />
         <span className="text-xs font-medium text-[var(--color-text-primary)]">
@@ -52,7 +59,9 @@ export function FloatingLogsPill() {
             <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)]">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-[var(--color-text-muted)]" />
-                <span className="text-xs font-medium text-[var(--color-text-primary)]">Recent logs</span>
+                <span className="text-xs font-medium text-[var(--color-text-primary)]">
+                  Recent logs
+                </span>
                 {hasNewLogs && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-medium">
                     Live
@@ -72,7 +81,11 @@ export function FloatingLogsPill() {
                   Loading...
                 </div>
               ) : (
-                <Terminal lines={terminalLines} noScroll className="rounded-none border-0 max-h-[260px] overflow-y-auto" />
+                <Terminal
+                  lines={terminalLines}
+                  noScroll
+                  className="rounded-none border-0 max-h-[260px] overflow-y-auto"
+                />
               )}
             </div>
           </motion.div>

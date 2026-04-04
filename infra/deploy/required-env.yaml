@@ -1,0 +1,56 @@
+# Required environment keys per profile for scripts/deploy/validate_env.py
+#
+# example-keys: every listed key must appear in .env.example (documentation gate for PRs).
+# strict: every listed key must have a non-empty value in the process environment and/or --env-file.
+#
+# Adjust lists as services evolve; keep profiles aligned with docs/storage-policy and production.mdc.
+
+profiles:
+  ci:
+    required:
+      - SUPABASE_URL
+      - DATABASE_URL
+      - REDIS_URL
+      - UPSTASH_REDIS_REST_URL
+      - UPSTASH_REDIS_REST_TOKEN
+      - ORCHESTRATOR_URL
+      - NEXT_PUBLIC_API_URL
+      - JWT_SECRET_KEY
+      - INTERNAL_SERVICE_TOKEN
+      - LLM_KEY_ENCRYPTION_KEY
+
+  staging:
+    required:
+      - SUPABASE_URL
+      - DATABASE_URL
+      - REDIS_URL
+      - UPSTASH_REDIS_REST_URL
+      - UPSTASH_REDIS_REST_TOKEN
+      - ORCHESTRATOR_URL
+      - AGENT_RUNTIME_URL
+      - NEXT_PUBLIC_API_URL
+      - NEXT_PUBLIC_SUPABASE_URL
+      - JWT_SECRET_KEY
+      - INTERNAL_SERVICE_TOKEN
+      - LLM_KEY_ENCRYPTION_KEY
+      - PINATA_JWT
+      - THIRDWEB_SECRET_KEY
+
+  production:
+    required:
+      - SUPABASE_URL
+      - DATABASE_URL
+      - REDIS_URL
+      - UPSTASH_REDIS_REST_URL
+      - UPSTASH_REDIS_REST_TOKEN
+      - ORCHESTRATOR_URL
+      - AGENT_RUNTIME_URL
+      - NEXT_PUBLIC_API_URL
+      - NEXT_PUBLIC_SUPABASE_URL
+      - JWT_SECRET_KEY
+      - INTERNAL_SERVICE_TOKEN
+      - LLM_KEY_ENCRYPTION_KEY
+      - PINATA_JWT
+      - LIGHTHOUSE_API_KEY
+      - THIRDWEB_SECRET_KEY
+      - IDENTITY_HMAC_SECRET

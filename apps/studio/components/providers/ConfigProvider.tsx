@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import { createContext, useContext, useEffect, useMemo } from 'react';
-import { usePathname } from 'next/navigation';
-import useSWR from 'swr';
-import { getConfig } from '@/lib/api';
-import { setRuntimeFeatures, setRuntimeConfig } from '@/config/environment';
-import { ROUTES } from '@/constants/routes';
-import type { RuntimeConfig } from '@/lib/api';
+import { createContext, useContext, useEffect, useMemo } from "react";
+import { usePathname } from "next/navigation";
+import useSWR from "swr";
+import { getConfig } from "@/lib/api";
+import { setRuntimeFeatures, setRuntimeConfig } from "@/config/environment";
+import { ROUTES } from "@/constants/routes";
+import type { RuntimeConfig } from "@/lib/api";
 
-const CONFIG_SWR_KEY = 'config';
+const CONFIG_SWR_KEY = "config";
 /** Cache config for 24h. Feature flags and defaults rarely change. */
 const CONFIG_STALE_TIME_MS = 24 * 60 * 60 * 1000;
 
@@ -48,7 +48,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
       dedupingInterval: CONFIG_STALE_TIME_MS,
       errorRetryCount: 1,
       keepPreviousData: true,
-    }
+    },
   );
 
   useEffect(() => {
@@ -85,8 +85,10 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
       defaultNetworkId: config?.default_network_id,
       defaultChainId: config?.default_chain_id,
     }),
-    [config, loading]
+    [config, loading],
   );
 
-  return <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>;
+  return (
+    <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>
+  );
 }

@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getSpendingControlWithBudget, patchSpendingControl, type SpendingControlWithBudget } from "@/lib/api";
+import {
+  getSpendingControlWithBudget,
+  patchSpendingControl,
+  type SpendingControlWithBudget,
+} from "@/lib/api";
 import { useSession } from "@/hooks/useSession";
 
 export interface SpendingControlCardProps {
@@ -10,25 +14,40 @@ export interface SpendingControlCardProps {
   /** Called after save so parent can refetch. */
   onRefetch?: () => void;
   /** Called when budget or period changes for live projection. */
-  onValuesChange?: (budget: string, period: "daily" | "weekly" | "monthly") => void;
+  onValuesChange?: (
+    budget: string,
+    period: "daily" | "weekly" | "monthly",
+  ) => void;
 }
 
 function initFromControl(data: SpendingControlWithBudget | null) {
   return {
     budgetAmount: data?.budget ?? "0",
-    period: (data?.period as "daily" | "weekly" | "monthly") ?? "monthly" as const,
-    alertPercent: typeof data?.alert_threshold_percent === "number" ? data.alert_threshold_percent : 80,
+    period:
+      (data?.period as "daily" | "weekly" | "monthly") ?? ("monthly" as const),
+    alertPercent:
+      typeof data?.alert_threshold_percent === "number"
+        ? data.alert_threshold_percent
+        : 80,
   };
 }
 
-export function SpendingControlCard({ controlFromParent, onRefetch, onValuesChange }: SpendingControlCardProps) {
+export function SpendingControlCard({
+  controlFromParent,
+  onRefetch,
+  onValuesChange,
+}: SpendingControlCardProps) {
   const { hasSession } = useSession();
-  const [control, setControl] = useState<SpendingControlWithBudget | null>(null);
+  const [control, setControl] = useState<SpendingControlWithBudget | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [budgetAmount, setBudgetAmount] = useState("");
-  const [period, setPeriod] = useState<"daily" | "weekly" | "monthly">("monthly");
+  const [period, setPeriod] = useState<"daily" | "weekly" | "monthly">(
+    "monthly",
+  );
   const [alertPercent, setAlertPercent] = useState(80);
 
   useEffect(() => {
@@ -93,14 +112,21 @@ export function SpendingControlCard({ controlFromParent, onRefetch, onValuesChan
   }
 
   if (loading) {
-    return <p className="text-sm text-[var(--color-text-muted)]">Loading spending controls...</p>;
+    return (
+      <p className="text-sm text-[var(--color-text-muted)]">
+        Loading spending controls...
+      </p>
+    );
   }
 
   return (
     <div className="space-y-4">
       <form onSubmit={handleSave} className="space-y-4">
         <div>
-          <label htmlFor="budget" className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">
+          <label
+            htmlFor="budget"
+            className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1"
+          >
             Budget per period
           </label>
           <input
@@ -116,10 +142,15 @@ export function SpendingControlCard({ controlFromParent, onRefetch, onValuesChan
             }}
             className="w-full max-w-[200px] px-3 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] text-[var(--color-text-primary)] text-sm"
           />
-          <span className="ml-2 text-xs text-[var(--color-text-muted)]">USD</span>
+          <span className="ml-2 text-xs text-[var(--color-text-muted)]">
+            USD
+          </span>
         </div>
         <div>
-          <label htmlFor="period" className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">
+          <label
+            htmlFor="period"
+            className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1"
+          >
             Period
           </label>
           <select
@@ -138,7 +169,10 @@ export function SpendingControlCard({ controlFromParent, onRefetch, onValuesChan
           </select>
         </div>
         <div>
-          <label htmlFor="alert" className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">
+          <label
+            htmlFor="alert"
+            className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1"
+          >
             Alert when spending reaches (%)
           </label>
           <input
@@ -156,7 +190,9 @@ export function SpendingControlCard({ controlFromParent, onRefetch, onValuesChan
             Spent so far: {control.spent} {control.currency ?? "USD"}
           </p>
         )}
-        {error && <p className="text-sm text-[var(--color-semantic-error)]">{error}</p>}
+        {error && (
+          <p className="text-sm text-[var(--color-semantic-error)]">{error}</p>
+        )}
         <button
           type="submit"
           disabled={saving}

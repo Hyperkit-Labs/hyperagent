@@ -29,10 +29,17 @@ const DANGEROUS_SHELL = /[;&|`$(){}[\]<>!\\]/;
 const DANGEROUS_GLOB = /[;&|`$!\\<>]/;
 
 function isGlobSafe(g: string): boolean {
-  return typeof g === "string" && g.length <= 200 && !DANGEROUS_GLOB.test(g) && !g.includes("..");
+  return (
+    typeof g === "string" &&
+    g.length <= 200 &&
+    !DANGEROUS_GLOB.test(g) &&
+    !g.includes("..")
+  );
 }
 
-function validateRequest(body: unknown): { ok: true; req: SearchRequest } | { ok: false; error: string } {
+function validateRequest(
+  body: unknown,
+): { ok: true; req: SearchRequest } | { ok: false; error: string } {
   if (!body || typeof body !== "object") {
     return { ok: false, error: "Request body must be a JSON object" };
   }
@@ -41,12 +48,18 @@ function validateRequest(body: unknown): { ok: true; req: SearchRequest } | { ok
 
   const mode = raw.mode as string | undefined;
   if (!mode || !SEARCH_MODES.includes(mode as SearchMode)) {
-    return { ok: false, error: `Invalid mode. Must be one of: ${SEARCH_MODES.join(", ")}` };
+    return {
+      ok: false,
+      error: `Invalid mode. Must be one of: ${SEARCH_MODES.join(", ")}`,
+    };
   }
 
   if (raw.query !== undefined) {
     if (typeof raw.query !== "string" || raw.query.length > MAX_QUERY_LENGTH) {
-      return { ok: false, error: `query must be a string under ${MAX_QUERY_LENGTH} chars` };
+      return {
+        ok: false,
+        error: `query must be a string under ${MAX_QUERY_LENGTH} chars`,
+      };
     }
     if (DANGEROUS_SHELL.test(raw.query)) {
       return { ok: false, error: "query contains disallowed characters" };
@@ -55,7 +68,10 @@ function validateRequest(body: unknown): { ok: true; req: SearchRequest } | { ok
 
   if (raw.regex !== undefined) {
     if (typeof raw.regex !== "string" || raw.regex.length > MAX_REGEX_LENGTH) {
-      return { ok: false, error: `regex must be a string under ${MAX_REGEX_LENGTH} chars` };
+      return {
+        ok: false,
+        error: `regex must be a string under ${MAX_REGEX_LENGTH} chars`,
+      };
     }
     try {
       new RegExp(raw.regex);
@@ -64,8 +80,17 @@ function validateRequest(body: unknown): { ok: true; req: SearchRequest } | { ok
     }
   }
 
-  if (!raw.query && !raw.regex && mode !== "scaffold" && mode !== "risk" && mode !== "todo") {
-    return { ok: false, error: "Either query or regex is required for this mode" };
+  if (
+    !raw.query &&
+    !raw.regex &&
+    mode !== "scaffold" &&
+    mode !== "risk" &&
+    mode !== "todo"
+  ) {
+    return {
+      ok: false,
+      error: "Either query or regex is required for this mode",
+    };
   }
 
   const includeGlobs = Array.isArray(raw.includeGlobs)
@@ -81,9 +106,10 @@ function validateRequest(body: unknown): { ok: true; req: SearchRequest } | { ok
       )
     : undefined;
 
-  const maxResults = typeof raw.maxResults === "number"
-    ? Math.min(Math.max(1, Math.floor(raw.maxResults)), 1000)
-    : DEFAULT_MAX_RESULTS;
+  const maxResults =
+    typeof raw.maxResults === "number"
+      ? Math.min(Math.max(1, Math.floor(raw.maxResults)), 1000)
+      : DEFAULT_MAX_RESULTS;
 
   const req: SearchRequest = {
     mode: mode as SearchMode,
@@ -94,12 +120,17 @@ function validateRequest(body: unknown): { ok: true; req: SearchRequest } | { ok
     includeGlobs,
     excludeGlobs,
     maxResults,
-    contextLines: typeof raw.contextLines === "number" ? Math.min(Math.max(0, raw.contextLines), 10) : undefined,
+    contextLines:
+      typeof raw.contextLines === "number"
+        ? Math.min(Math.max(0, raw.contextLines), 10)
+        : undefined,
     workspaceRoot: WORKSPACE_ROOT,
     includeHidden: raw.includeHidden === true,
     includeIgnored: raw.includeIgnored === true,
     paths,
-    rules: Array.isArray(raw.rules) ? (raw.rules as string[]).filter(r => typeof r === "string") : undefined,
+    rules: Array.isArray(raw.rules)
+      ? (raw.rules as string[]).filter((r) => typeof r === "string")
+      : undefined,
   };
 
   return { ok: true, req };
@@ -122,7 +153,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Internal search error";
+    const message =
+      err instanceof Error ? err.message : "Internal search error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

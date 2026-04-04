@@ -22,10 +22,34 @@ export function useTrackRecord() {
   }, []);
 
   const trackRecord = [
-    { label: "Audits", value: record.audits_completed, prefix: "", suffix: "", desc: "Audits Completed" },
-    { label: "Vulnerabilities", value: record.vulnerabilities_found, prefix: "", suffix: "", desc: "Vulnerabilities Found" },
-    { label: "Team", value: record.security_researchers, prefix: "", suffix: record.security_researchers > 0 ? "+" : "", desc: "Security Researchers" },
-    { label: "Deployments", value: record.contracts_deployed, prefix: "", suffix: "", desc: "Contracts Deployed" },
+    {
+      label: "Audits",
+      value: record.audits_completed,
+      prefix: "",
+      suffix: "",
+      desc: "Audits Completed",
+    },
+    {
+      label: "Vulnerabilities",
+      value: record.vulnerabilities_found,
+      prefix: "",
+      suffix: "",
+      desc: "Vulnerabilities Found",
+    },
+    {
+      label: "Team",
+      value: record.security_researchers,
+      prefix: "",
+      suffix: record.security_researchers > 0 ? "+" : "",
+      desc: "Security Researchers",
+    },
+    {
+      label: "Deployments",
+      value: record.contracts_deployed,
+      prefix: "",
+      suffix: "",
+      desc: "Contracts Deployed",
+    },
   ];
 
   return { trackRecord };

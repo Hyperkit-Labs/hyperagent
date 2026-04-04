@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { Check, X } from 'lucide-react';
+import { Check, X } from "lucide-react";
 
-export type ConfirmationStatus = 'pending' | 'approved' | 'rejected';
+export type ConfirmationStatus = "pending" | "approved" | "rejected";
 
 export interface ConfirmationProps {
   /** Title or question (e.g. "Run this?"). */
@@ -27,31 +27,35 @@ export interface ConfirmationProps {
 export function Confirmation({
   title,
   description,
-  status = 'pending',
+  status = "pending",
   onApprove,
   onReject,
-  approveLabel = 'Approve',
-  rejectLabel = 'Reject',
+  approveLabel = "Approve",
+  rejectLabel = "Reject",
   disabled = false,
-  className = '',
+  className = "",
 }: ConfirmationProps) {
-  const isPending = status === 'pending';
+  const isPending = status === "pending";
 
   return (
     <div
       className={`rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] p-4 ${className}`}
     >
-      <div className="font-medium text-[var(--color-text-primary)] text-[13px]">{title}</div>
+      <div className="font-medium text-[var(--color-text-primary)] text-[13px]">
+        {title}
+      </div>
       {description && (
-        <div className="text-[12px] text-[var(--color-text-tertiary)] mt-1">{description}</div>
+        <div className="text-[12px] text-[var(--color-text-tertiary)] mt-1">
+          {description}
+        </div>
       )}
-      {status === 'approved' && (
+      {status === "approved" && (
         <div className="mt-2 flex items-center gap-2 text-[12px] text-[var(--color-semantic-success)]">
           <Check className="w-4 h-4" />
           Approved
         </div>
       )}
-      {status === 'rejected' && (
+      {status === "rejected" && (
         <div className="mt-2 flex items-center gap-2 text-[12px] text-[var(--color-semantic-error)]">
           <X className="w-4 h-4" />
           Rejected

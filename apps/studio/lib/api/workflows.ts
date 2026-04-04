@@ -2,15 +2,15 @@
  * Workflow, run, network, template, and platform API functions.
  */
 
-import { FALLBACK_DEFAULT_NETWORK_ID } from '@/constants/defaults';
-import type { Workflow } from '@/lib/types';
+import { FALLBACK_DEFAULT_NETWORK_ID } from "@/constants/defaults";
+import type { Workflow } from "@/lib/types";
 import {
   fetchJson,
   fetchJsonAuthed,
   reportApiError,
   getApiBase,
   type FetchJsonOptions,
-} from './core';
+} from "./core";
 
 export const DEFAULT_NETWORK = FALLBACK_DEFAULT_NETWORK_ID;
 
@@ -41,13 +41,13 @@ interface NetworkApiItem {
 
 export async function getWorkflows(
   params?: { limit?: number; status?: string },
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<WorkflowResponse> {
   const q = new URLSearchParams();
-  if (params?.limit != null) q.set('limit', String(params.limit));
-  if (params?.status) q.set('status', params.status);
+  if (params?.limit != null) q.set("limit", String(params.limit));
+  if (params?.status) q.set("status", params.status);
   const query = q.toString();
-  return fetchJsonAuthed(`/workflows${query ? `?${query}` : ''}`, { signal });
+  return fetchJsonAuthed(`/workflows${query ? `?${query}` : ""}`, { signal });
 }
 
 export async function getWorkflow(workflowId: string): Promise<Workflow> {
@@ -63,8 +63,8 @@ export interface PresetItem {
 }
 
 export async function getPresets(): Promise<PresetItem[]> {
-  return fetchJsonAuthed<PresetItem[]>('/presets').catch((e) => {
-    reportApiError(e, { path: '/presets' });
+  return fetchJsonAuthed<PresetItem[]>("/presets").catch((e) => {
+    reportApiError(e, { path: "/presets" });
     return [];
   });
 }
@@ -74,7 +74,7 @@ export interface PlatformTrackRecord {
   vulnerabilities_found: number;
   security_researchers: number;
   contracts_deployed: number;
-  source?: 'database' | 'env_defaults';
+  source?: "database" | "env_defaults";
 }
 
 const TRACK_RECORD_DEFAULTS: PlatformTrackRecord = {
@@ -82,13 +82,17 @@ const TRACK_RECORD_DEFAULTS: PlatformTrackRecord = {
   vulnerabilities_found: 0,
   security_researchers: 0,
   contracts_deployed: 0,
-  source: 'env_defaults',
+  source: "env_defaults",
 };
 
-export async function getPlatformTrackRecord(signal?: AbortSignal): Promise<PlatformTrackRecord> {
+export async function getPlatformTrackRecord(
+  signal?: AbortSignal,
+): Promise<PlatformTrackRecord> {
   // Public endpoint: use unauthenticated fetch so missing session never forces zeros on the login page.
-  return fetchJson<PlatformTrackRecord>('/platform/track-record', { signal }).catch((e) => {
-    reportApiError(e, { path: '/platform/track-record' });
+  return fetchJson<PlatformTrackRecord>("/platform/track-record", {
+    signal,
+  }).catch((e) => {
+    reportApiError(e, { path: "/platform/track-record" });
     return TRACK_RECORD_DEFAULTS;
   });
 }
@@ -102,8 +106,8 @@ export interface BlueprintItem {
 }
 
 export async function getBlueprints(): Promise<BlueprintItem[]> {
-  return fetchJsonAuthed<BlueprintItem[]>('/blueprints').catch((e) => {
-    reportApiError(e, { path: '/blueprints' });
+  return fetchJsonAuthed<BlueprintItem[]>("/blueprints").catch((e) => {
+    reportApiError(e, { path: "/blueprints" });
     return [];
   });
 }
@@ -137,18 +141,21 @@ export async function getRunSteps(runId: string): Promise<RunStepsResponse> {
   return fetchJsonAuthed<RunStepsResponse>(`/runs/${runId}/steps`);
 }
 
-export async function approveSpec(
-  runId: string
-): Promise<{ run_id: string; status: string; current_stage: string; message?: string }> {
-  return fetchJsonAuthed(`/runs/${runId}/approve_spec`, { method: 'PATCH' });
+export async function approveSpec(runId: string): Promise<{
+  run_id: string;
+  status: string;
+  current_stage: string;
+  message?: string;
+}> {
+  return fetchJsonAuthed(`/runs/${runId}/approve_spec`, { method: "PATCH" });
 }
 
 export async function approveDeploy(
   workflowId: string,
-  apiKeys?: Record<string, string>
+  apiKeys?: Record<string, string>,
 ): Promise<{ workflow_id: string; status: string; message?: string }> {
   return fetchJsonAuthed(`/workflows/${workflowId}/deploy/approve`, {
-    method: 'POST',
+    method: "POST",
     body: JSON.stringify(apiKeys ? { api_keys: apiKeys } : {}),
   });
 }
@@ -173,52 +180,64 @@ export interface CreateWorkflowBody {
 
 export async function createWorkflow(
   body: CreateWorkflowBody,
-  options?: FetchJsonOptions
+  options?: FetchJsonOptions,
 ): Promise<{ workflow_id: string }> {
-  return fetchJsonAuthed<{ workflow_id: string }>('/workflows/generate', {
-    method: 'POST',
+  return fetchJsonAuthed<{ workflow_id: string }>("/workflows/generate", {
+    method: "POST",
     body: JSON.stringify(body),
     ...options,
   });
 }
 
-export async function getWorkflowStatus(workflowId: string): Promise<{ status: string }> {
+export async function getWorkflowStatus(
+  workflowId: string,
+): Promise<{ status: string }> {
   return fetchJsonAuthed(`/workflows/${workflowId}/status`);
 }
 
-export async function getStablecoins(): Promise<Record<string, { USDC?: string; USDT?: string }>> {
-  return fetchJsonAuthed<Record<string, { USDC?: string; USDT?: string }>>('/tokens/stablecoins').catch((e) => {
-    reportApiError(e, { path: '/tokens/stablecoins' });
+export async function getStablecoins(): Promise<
+  Record<string, { USDC?: string; USDT?: string }>
+> {
+  return fetchJsonAuthed<Record<string, { USDC?: string; USDT?: string }>>(
+    "/tokens/stablecoins",
+  ).catch((e) => {
+    reportApiError(e, { path: "/tokens/stablecoins" });
     return {};
   });
 }
 
 export async function testNetworkRpc(
   networkId: string,
-  signal?: AbortSignal
-): Promise<{ ok: boolean; block?: string; error?: string; latency_ms?: number }> {
+  signal?: AbortSignal,
+): Promise<{
+  ok: boolean;
+  block?: string;
+  error?: string;
+  latency_ms?: number;
+}> {
   return fetchJsonAuthed(
     `/networks/rpc-test?network_id=${encodeURIComponent(networkId)}`,
-    signal ? { signal } : undefined
+    signal ? { signal } : undefined,
   );
 }
 
 export async function getNetworks(
   opts?: { skale?: boolean },
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<NetworkConfig[]> {
   const params = new URLSearchParams();
-  if (opts?.skale) params.set('skale', 'true');
-  const path = params.toString() ? `/networks?${params}` : '/networks';
-  const data = await fetchJsonAuthed<{ networks?: NetworkApiItem[] } | NetworkApiItem[]>(
-    path,
-    signal ? { signal } : undefined
-  );
+  if (opts?.skale) params.set("skale", "true");
+  const path = params.toString() ? `/networks?${params}` : "/networks";
+  const data = await fetchJsonAuthed<
+    { networks?: NetworkApiItem[] } | NetworkApiItem[]
+  >(path, signal ? { signal } : undefined);
   const raw = Array.isArray(data) ? data : (data?.networks ?? []);
   return raw.map((n: NetworkApiItem) => ({
     id: n.network,
     network_id: n.network,
-    name: n.name ?? n.network.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+    name:
+      n.name ??
+      n.network.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
     chain_id: n.chain_id,
     currency: n.currency,
     tier: n.tier,
@@ -233,9 +252,11 @@ export interface QuickDemoResponse {
   status?: string;
 }
 
-export async function createQuickDemo(workflowId: string): Promise<QuickDemoResponse> {
-  return fetchJsonAuthed('/quick-demo', {
-    method: 'POST',
+export async function createQuickDemo(
+  workflowId: string,
+): Promise<QuickDemoResponse> {
+  return fetchJsonAuthed("/quick-demo", {
+    method: "POST",
     body: JSON.stringify({ workflow_id: workflowId }),
   });
 }
@@ -247,8 +268,12 @@ export interface DebugSandboxResponse {
   workflow_id?: string;
 }
 
-export async function createDebugSandbox(workflowId: string): Promise<DebugSandboxResponse> {
-  return fetchJsonAuthed(`/workflows/${workflowId}/debug-sandbox`, { method: 'POST' });
+export async function createDebugSandbox(
+  workflowId: string,
+): Promise<DebugSandboxResponse> {
+  return fetchJsonAuthed(`/workflows/${workflowId}/debug-sandbox`, {
+    method: "POST",
+  });
 }
 
 export interface Metrics {
@@ -257,9 +282,11 @@ export interface Metrics {
 
 export async function getMetrics(
   params?: { time_range?: string },
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<Metrics> {
-  const qs = params?.time_range ? `?time_range=${encodeURIComponent(params.time_range)}` : '';
+  const qs = params?.time_range
+    ? `?time_range=${encodeURIComponent(params.time_range)}`
+    : "";
   return fetchJsonAuthed(`/metrics${qs}`, signal ? { signal } : undefined);
 }
 
@@ -283,10 +310,13 @@ export async function getSecurityFindings(params?: {
   signal?: AbortSignal;
 }): Promise<{ findings: SecurityFinding[] }> {
   const qs = new URLSearchParams();
-  if (params?.run_id) qs.set('run_id', params.run_id);
-  if (params?.limit != null) qs.set('limit', String(params.limit));
-  const path = `/security/findings${qs.toString() ? `?${qs}` : ''}`;
-  return fetchJsonAuthed<{ findings: SecurityFinding[] }>(path, params?.signal ? { signal: params.signal } : undefined).catch((e) => {
+  if (params?.run_id) qs.set("run_id", params.run_id);
+  if (params?.limit != null) qs.set("limit", String(params.limit));
+  const path = `/security/findings${qs.toString() ? `?${qs}` : ""}`;
+  return fetchJsonAuthed<{ findings: SecurityFinding[] }>(
+    path,
+    params?.signal ? { signal: params.signal } : undefined,
+  ).catch((e) => {
     reportApiError(e, { path });
     return { findings: [] } as { findings: SecurityFinding[] };
   });
@@ -296,25 +326,25 @@ export async function getDetailedHealth(): Promise<{
   status: string;
   services?: Record<string, { status: string }>;
 }> {
-  return fetchJsonAuthed('/health/detailed');
+  return fetchJsonAuthed("/health/detailed");
 }
 
 export interface DomainRecord {
   id: string;
   domain: string;
-  status: 'pending' | 'verified' | 'failed';
+  status: "pending" | "verified" | "failed";
 }
 
 export async function listDomains(): Promise<DomainRecord[]> {
-  return fetchJsonAuthed<DomainRecord[]>('/infra/domains').catch((e) => {
-    reportApiError(e, { path: '/infra/domains' });
+  return fetchJsonAuthed<DomainRecord[]>("/infra/domains").catch((e) => {
+    reportApiError(e, { path: "/infra/domains" });
     return [];
   });
 }
 
 export async function addDomain(domain: string): Promise<DomainRecord> {
-  return fetchJsonAuthed('/infra/domains', {
-    method: 'POST',
+  return fetchJsonAuthed("/infra/domains", {
+    method: "POST",
     body: JSON.stringify({ domain }),
   });
 }
@@ -343,10 +373,11 @@ export interface LogsResponse {
 
 export async function getLogs(filters?: LogsFilters): Promise<LogsResponse> {
   const params = new URLSearchParams();
-  if (filters?.page != null) params.set('page', String(filters.page));
-  if (filters?.page_size != null) params.set('page_size', String(filters.page_size));
+  if (filters?.page != null) params.set("page", String(filters.page));
+  if (filters?.page_size != null)
+    params.set("page_size", String(filters.page_size));
   const query = params.toString();
-  const path = query ? `/logs?${query}` : '/logs';
+  const path = query ? `/logs?${query}` : "/logs";
   return fetchJsonAuthed<LogsResponse>(path).catch((e) => {
     reportApiError(e, { path });
     return { logs: [], total: 0, page: 1, page_size: 50 } as LogsResponse;
@@ -354,15 +385,15 @@ export async function getLogs(filters?: LogsFilters): Promise<LogsResponse> {
 }
 
 export async function getLogServices(): Promise<string[]> {
-  return fetchJsonAuthed<string[]>('/logs/services').catch((e) => {
-    reportApiError(e, { path: '/logs/services' });
+  return fetchJsonAuthed<string[]>("/logs/services").catch((e) => {
+    reportApiError(e, { path: "/logs/services" });
     return [];
   });
 }
 
 export async function getLogHosts(): Promise<string[]> {
-  return fetchJsonAuthed<string[]>('/logs/hosts').catch((e) => {
-    reportApiError(e, { path: '/logs/hosts' });
+  return fetchJsonAuthed<string[]>("/logs/hosts").catch((e) => {
+    reportApiError(e, { path: "/logs/hosts" });
     return [];
   });
 }
@@ -379,8 +410,8 @@ export interface AgentsResponse {
 }
 
 export async function getAgents(): Promise<AgentsResponse> {
-  return fetchJsonAuthed<AgentsResponse>('/agents').catch((e) => {
-    reportApiError(e, { path: '/agents' });
+  return fetchJsonAuthed<AgentsResponse>("/agents").catch((e) => {
+    reportApiError(e, { path: "/agents" });
     return { agents: [] } as AgentsResponse;
   });
 }
@@ -399,8 +430,8 @@ export interface TemplateItem {
 }
 
 export async function getTemplates(): Promise<TemplateItem[]> {
-  return fetchJsonAuthed<TemplateItem[]>('/templates').catch((e) => {
-    reportApiError(e, { path: '/templates' });
+  return fetchJsonAuthed<TemplateItem[]>("/templates").catch((e) => {
+    reportApiError(e, { path: "/templates" });
     return [] as TemplateItem[];
   });
 }
@@ -408,23 +439,33 @@ export async function getTemplates(): Promise<TemplateItem[]> {
 export async function searchTemplates(query: string): Promise<TemplateItem[]> {
   if (!query || !String(query).trim()) return getTemplates();
   const qs = new URLSearchParams({ q: String(query).trim() });
-  return fetchJsonAuthed<TemplateItem[]>(`/templates/search?${qs}`).catch((e) => {
-    reportApiError(e, { path: '/templates/search' });
-    return [] as TemplateItem[];
-  });
+  return fetchJsonAuthed<TemplateItem[]>(`/templates/search?${qs}`).catch(
+    (e) => {
+      reportApiError(e, { path: "/templates/search" });
+      return [] as TemplateItem[];
+    },
+  );
 }
 
 export async function getWorkflowContracts(
-  workflowId: string
+  workflowId: string,
 ): Promise<{ bytecode?: string; abi?: unknown; [key: string]: unknown }[]> {
   return fetchJsonAuthed(`/workflows/${workflowId}/contracts`);
 }
 
-export async function getWorkflowDeployments(
-  workflowId: string
-): Promise<{ deployments?: { contract_address?: string; network?: string; [key: string]: unknown }[] }> {
+export async function getWorkflowDeployments(workflowId: string): Promise<{
+  deployments?: {
+    contract_address?: string;
+    network?: string;
+    [key: string]: unknown;
+  }[];
+}> {
   return fetchJsonAuthed<{
-    deployments?: { contract_address?: string; network?: string; [key: string]: unknown }[];
+    deployments?: {
+      contract_address?: string;
+      network?: string;
+      [key: string]: unknown;
+    }[];
   }>(`/workflows/${workflowId}/deployments`).catch((e) => {
     reportApiError(e, { path: `/workflows/${workflowId}/deployments` });
     return { deployments: [] };
@@ -444,16 +485,16 @@ export interface ClarifyResponse {
 
 export async function submitClarification(
   workflowId: string,
-  body: { message: string }
+  body: { message: string },
 ): Promise<ClarifyResponse> {
   return fetchJsonAuthed(`/workflows/${workflowId}/clarify`, {
-    method: 'POST',
+    method: "POST",
     body: JSON.stringify(body),
   });
 }
 
 export async function cancelWorkflow(workflowId: string): Promise<unknown> {
-  return fetchJsonAuthed(`/workflows/${workflowId}/cancel`, { method: 'POST' });
+  return fetchJsonAuthed(`/workflows/${workflowId}/cancel`, { method: "POST" });
 }
 
 export function getAgentDiscussionStreamUrl(workflowId: string): string {
@@ -461,15 +502,17 @@ export function getAgentDiscussionStreamUrl(workflowId: string): string {
 }
 
 export async function getWorkflowUiSchema(
-  workflowId: string
+  workflowId: string,
 ): Promise<{ workflow_id: string; ui_schema: unknown }> {
   return fetchJsonAuthed(`/workflows/${workflowId}/ui-schema`);
 }
 
 export async function generateWorkflowUiSchema(
-  workflowId: string
+  workflowId: string,
 ): Promise<{ workflow_id: string; ui_schema: unknown }> {
-  return fetchJsonAuthed(`/workflows/${workflowId}/ui-schema/generate`, { method: 'POST' });
+  return fetchJsonAuthed(`/workflows/${workflowId}/ui-schema/generate`, {
+    method: "POST",
+  });
 }
 
 export interface ExportUiAppResponse {
@@ -483,23 +526,23 @@ export interface ExportUiAppResponse {
 
 export async function exportUiApp(
   workflowId: string,
-  template?: string
+  template?: string,
 ): Promise<ExportUiAppResponse> {
   return fetchJsonAuthed(`/workflows/${workflowId}/ui-apps/export`, {
-    method: 'POST',
-    body: JSON.stringify({ template: template || 'hyperagent-default' }),
+    method: "POST",
+    body: JSON.stringify({ template: template || "hyperagent-default" }),
   });
 }
 
 export function downloadExportedZip(res: ExportUiAppResponse): void {
-  if (!res.zip_base64 || !res.filename || typeof window === 'undefined') return;
+  if (!res.zip_base64 || !res.filename || typeof window === "undefined") return;
   try {
     const bin = atob(res.zip_base64);
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    const blob = new Blob([bytes], { type: 'application/zip' });
+    const blob = new Blob([bytes], { type: "application/zip" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = res.filename;
     a.click();
@@ -517,8 +560,8 @@ export async function contractRead(body: {
   function_args?: unknown[];
   abi: unknown[];
 }): Promise<{ success: boolean; result?: unknown; error?: string }> {
-  return fetchJsonAuthed('/contracts/read', {
-    method: 'POST',
+  return fetchJsonAuthed("/contracts/read", {
+    method: "POST",
     body: JSON.stringify(body),
   });
 }
@@ -539,8 +582,8 @@ export async function contractCall(body: {
   message?: string;
   error?: string;
 }> {
-  return fetchJsonAuthed('/contracts/call', {
-    method: 'POST',
+  return fetchJsonAuthed("/contracts/call", {
+    method: "POST",
     body: JSON.stringify(body),
   });
 }

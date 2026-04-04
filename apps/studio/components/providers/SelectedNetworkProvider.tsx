@@ -1,14 +1,21 @@
-'use client';
+"use client";
 
-import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
-import { useConfig } from '@/components/providers/ConfigProvider';
-import { useNetworks } from '@/hooks/useNetworks';
-import { FALLBACK_DEFAULT_NETWORK_ID } from '@/constants/defaults';
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
+import { useConfig } from "@/components/providers/ConfigProvider";
+import { useNetworks } from "@/hooks/useNetworks";
+import { FALLBACK_DEFAULT_NETWORK_ID } from "@/constants/defaults";
 
-const STORAGE_KEY = 'hyperkit_selected_network_id';
+const STORAGE_KEY = "hyperkit_selected_network_id";
 
 function getStored(): string | null {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === "undefined") return null;
   try {
     return window.localStorage.getItem(STORAGE_KEY);
   } catch {
@@ -30,31 +37,44 @@ interface SelectedNetworkContextValue {
   setSelectedNetworkId: (id: string) => void;
 }
 
-const SelectedNetworkContext = createContext<SelectedNetworkContextValue | null>(null);
+const SelectedNetworkContext =
+  createContext<SelectedNetworkContextValue | null>(null);
 
 export function useSelectedNetwork(): SelectedNetworkContextValue {
   const ctx = useContext(SelectedNetworkContext);
   if (!ctx) {
-    throw new Error('useSelectedNetwork must be used within SelectedNetworkProvider');
+    throw new Error(
+      "useSelectedNetwork must be used within SelectedNetworkProvider",
+    );
   }
   return ctx;
 }
 
-export function SelectedNetworkProvider({ children }: { children: React.ReactNode }) {
+export function SelectedNetworkProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { defaultNetworkId: configDefault } = useConfig();
   const { networks } = useNetworks();
   const testnets = (networks ?? []).filter((n) => n.is_mainnet === false);
-  const [selectedNetworkId, setSelectedNetworkIdState] = useState<string>(FALLBACK_DEFAULT_NETWORK_ID);
+  const [selectedNetworkId, setSelectedNetworkIdState] = useState<string>(
+    FALLBACK_DEFAULT_NETWORK_ID,
+  );
   const initialisedRef = useRef(false);
 
   const resolveInitial = useCallback((): string => {
     const stored = getStored();
     if (stored) {
-      const found = networks.find((n) => n.id === stored || n.network_id === stored);
+      const found = networks.find(
+        (n) => n.id === stored || n.network_id === stored,
+      );
       if (found) return found.id;
     }
     if (configDefault) {
-      const found = networks.find((n) => n.id === configDefault || n.network_id === configDefault);
+      const found = networks.find(
+        (n) => n.id === configDefault || n.network_id === configDefault,
+      );
       if (found) return found.id;
     }
     const first = testnets[0];

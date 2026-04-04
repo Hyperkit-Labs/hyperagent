@@ -1,10 +1,15 @@
-'use client';
+"use client";
 
-import { createThirdwebClient } from 'thirdweb';
+import { createThirdwebClient } from "thirdweb";
 
-const clientId = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID : undefined;
+const clientId =
+  typeof process !== "undefined"
+    ? process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID
+    : undefined;
 
-export const thirdwebClient = clientId ? createThirdwebClient({ clientId }) : null;
+export const thirdwebClient = clientId
+  ? createThirdwebClient({ clientId })
+  : null;
 
 export function isThirdwebConfigured(): boolean {
   return !!clientId;
@@ -21,8 +26,11 @@ export function getThirdwebClient() {
  * payment receipt. Falls back to plain fetch when no wallet is provided.
  */
 export function createFetchWithPayment(
-  wallet: { address?: string; signMessage?: (msg: string) => Promise<string> } | null | undefined,
-  maxPaymentUsd?: number
+  wallet:
+    | { address?: string; signMessage?: (msg: string) => Promise<string> }
+    | null
+    | undefined,
+  maxPaymentUsd?: number,
 ): (url: string, init?: RequestInit) => Promise<Response> {
   const maxCents = (maxPaymentUsd ?? 1) * 100;
 
@@ -42,17 +50,21 @@ export function createFetchWithPayment(
       description?: string;
     } | null = null;
 
-    const headerPayload = res.headers.get('x-payment') || res.headers.get('payment-required');
+    const headerPayload =
+      res.headers.get("x-payment") || res.headers.get("payment-required");
     if (headerPayload) {
       try {
         paymentRequirements = JSON.parse(headerPayload);
-      } catch { /* fall through to body parse */ }
+      } catch {
+        /* fall through to body parse */
+      }
     }
 
     if (!paymentRequirements) {
       try {
         const body = await res.clone().json();
-        paymentRequirements = body?.paymentRequirements ?? body?.requirements ?? body;
+        paymentRequirements =
+          body?.paymentRequirements ?? body?.requirements ?? body;
       } catch {
         return res;
       }
@@ -62,10 +74,10 @@ export function createFetchWithPayment(
       return res;
     }
 
-    const amount = parseInt(paymentRequirements.maxAmountRequired || '0', 10);
+    const amount = parseInt(paymentRequirements.maxAmountRequired || "0", 10);
     if (amount > maxCents) {
       throw new Error(
-        `x402 payment of ${amount} exceeds max allowed (${maxCents}). Increase maxPaymentUsd or reject.`
+        `x402 payment of ${amount} exceeds max allowed (${maxCents}). Increase maxPaymentUsd or reject.`,
       );
     }
 
@@ -79,7 +91,10 @@ export function createFetchWithPayment(
     const signature = await wallet.signMessage(receipt);
 
     const retryHeaders = new Headers(init?.headers);
-    retryHeaders.set('x-payment-response', JSON.stringify({ receipt, signature }));
+    retryHeaders.set(
+      "x-payment-response",
+      JSON.stringify({ receipt, signature }),
+    );
 
     return fetch(url, { ...init, headers: retryHeaders });
   };

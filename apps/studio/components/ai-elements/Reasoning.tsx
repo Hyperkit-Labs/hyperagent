@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Brain, ChevronDown, ChevronRight } from 'lucide-react';
+import { useState } from "react";
+import { Brain, ChevronDown, ChevronRight } from "lucide-react";
 
 export interface ReasoningProps {
   /** Duration in seconds (e.g. "thought for N seconds"). */
@@ -17,7 +17,7 @@ export function Reasoning({
   durationSeconds,
   children,
   defaultOpen = false,
-  className = '',
+  className = "",
 }: ReasoningProps) {
   const [open, setOpen] = useState(defaultOpen);
 
@@ -37,7 +37,9 @@ export function Reasoning({
         )}
         <Brain className="w-4 h-4 shrink-0 text-[var(--color-semantic-violet)]" />
         <span className="text-[11px] font-medium">
-          {durationSeconds != null ? `Thought for ${durationSeconds}s` : 'Reasoning'}
+          {durationSeconds != null
+            ? `Thought for ${durationSeconds}s`
+            : "Reasoning"}
         </span>
       </button>
       {open && (

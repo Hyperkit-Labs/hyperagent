@@ -30,12 +30,23 @@ export function buildSiweMessage(params: {
   uri?: string;
   statement?: string;
 }): string {
-  const { address, domain, chainId, nonce = randomNonce(), uri, statement } = params;
+  const {
+    address,
+    domain,
+    chainId,
+    nonce = randomNonce(),
+    uri,
+    statement,
+  } = params;
   const message = new SiweMessage({
     domain,
     address,
     statement: statement ?? "Sign in to HyperAgent Studio.",
-    uri: uri ?? (typeof window !== "undefined" ? window.location.origin : "https://localhost"),
+    uri:
+      uri ??
+      (typeof window !== "undefined"
+        ? window.location.origin
+        : "https://localhost"),
     version: "1",
     chainId,
     nonce,
@@ -81,7 +92,12 @@ async function callBootstrap(body: {
     let detail: string;
     let responseCode: string | undefined;
     try {
-      const j = JSON.parse(text) as { message?: string; error?: string; requestId?: string; code?: string };
+      const j = JSON.parse(text) as {
+        message?: string;
+        error?: string;
+        requestId?: string;
+        code?: string;
+      };
       detail = (j.message ?? j.error ?? text).trim() || text;
       const c = typeof j.code === "string" ? j.code.trim() : "";
       if (c) {
@@ -105,7 +121,9 @@ async function callBootstrap(body: {
         }
       })();
     const suffix = requestId ? ` (requestId=${requestId})` : "";
-    const err = new Error((detail || `Bootstrap failed: ${res.status}`) + suffix) as Error & {
+    const err = new Error(
+      (detail || `Bootstrap failed: ${res.status}`) + suffix,
+    ) as Error & {
       status?: number;
       requestId?: string;
       code?: string;
@@ -114,7 +132,10 @@ async function callBootstrap(body: {
     if (requestId) err.requestId = requestId;
     if (responseCode) err.code = responseCode;
 
-    if (TRANSIENT_BOOTSTRAP_HTTP.has(res.status) && attempt < BOOTSTRAP_MAX_ATTEMPTS - 1) {
+    if (
+      TRANSIENT_BOOTSTRAP_HTTP.has(res.status) &&
+      attempt < BOOTSTRAP_MAX_ATTEMPTS - 1
+    ) {
       lastError = err;
       await sleep(BOOTSTRAP_RETRY_BASE_MS * (attempt + 1));
       continue;
@@ -144,12 +165,21 @@ export async function bootstrapWithSiwe(params: {
   signMessage: (message: string) => Promise<string>;
 }): Promise<BootstrapSession> {
   const fixed = studioPublicOriginUrl();
-  const domain = fixed?.host ?? (typeof window !== "undefined" ? window.location.host : "localhost");
+  const domain =
+    fixed?.host ??
+    (typeof window !== "undefined" ? window.location.host : "localhost");
   const uri =
     fixed?.origin ??
-    (typeof window !== "undefined" ? window.location.origin : "https://localhost");
+    (typeof window !== "undefined"
+      ? window.location.origin
+      : "https://localhost");
   const chainId = params.chainId ?? 1;
-  const messageBody = buildSiweMessage({ address: params.address, domain, chainId, uri });
+  const messageBody = buildSiweMessage({
+    address: params.address,
+    domain,
+    chainId,
+    uri,
+  });
   const signature = await params.signMessage(messageBody);
   return callBootstrap({
     authMethod: "siwe",

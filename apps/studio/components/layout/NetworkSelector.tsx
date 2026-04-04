@@ -19,7 +19,10 @@ export function NetworkSelector() {
   const ref = useRef<HTMLDivElement>(null);
 
   const testnets = networks.filter((n) => n.is_mainnet === false);
-  const selected = networks.find((n) => n.id === selectedNetworkId || n.network_id === selectedNetworkId) ?? null;
+  const selected =
+    networks.find(
+      (n) => n.id === selectedNetworkId || n.network_id === selectedNetworkId,
+    ) ?? null;
 
   const handleSelect = (net: NetworkConfig) => {
     setSelectedNetworkId(net.id ?? net.network_id ?? "");
@@ -30,7 +33,8 @@ export function NetworkSelector() {
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -57,7 +61,9 @@ export function NetworkSelector() {
             {loading ? "Loading…" : error ? "Networks unavailable" : label}
           </span>
         </span>
-        <ChevronDown className={`w-3 h-3 text-[var(--color-text-dim)] shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown
+          className={`w-3 h-3 text-[var(--color-text-dim)] shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+        />
       </button>
 
       {open && !loading && !error && (
@@ -123,8 +129,7 @@ export function NetworkSelector() {
               </div>
             </>
           )}
-          <div className="border-t border-[var(--color-border-subtle)] mt-2 pt-2 px-3">
-          </div>
+          <div className="border-t border-[var(--color-border-subtle)] mt-2 pt-2 px-3"></div>
         </div>
       )}
     </div>

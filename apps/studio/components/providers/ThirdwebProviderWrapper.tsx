@@ -1,9 +1,12 @@
-'use client';
+"use client";
 
-import { ThirdwebProvider, AutoConnect } from 'thirdweb/react';
-import { getThirdwebClient } from '@/lib/thirdwebClient';
-import { CONNECT_WALLETS, ACCOUNT_ABSTRACTION_CONFIG } from '@/lib/connectWallets';
-import { useAutoBootstrap } from '@/hooks/useAutoBootstrap';
+import { ThirdwebProvider, AutoConnect } from "thirdweb/react";
+import { getThirdwebClient } from "@/lib/thirdwebClient";
+import {
+  CONNECT_WALLETS,
+  ACCOUNT_ABSTRACTION_CONFIG,
+} from "@/lib/connectWallets";
+import { useAutoBootstrap } from "@/hooks/useAutoBootstrap";
 
 function AutoBootstrapGate({ children }: { children: React.ReactNode }) {
   useAutoBootstrap();
@@ -46,4 +49,3 @@ export function ThirdwebProviderWrapper({
     </ThirdwebProvider>
   );
 }
-

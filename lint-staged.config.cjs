@@ -16,7 +16,7 @@ function quoteArg(p) {
 }
 
 module.exports = {
-  "*.{ts,tsx,js,jsx,mjs,cjs,json,yml,yaml}": (filenames) => {
+  "*.{ts,tsx,js,jsx,mjs,cjs,json,yml,yaml,md,css,scss}": (filenames) => {
     if (filenames.length === 0) return [];
 
     const studioRel = [];
@@ -33,12 +33,16 @@ module.exports = {
     const cmds = [];
 
     if (studioRel.length > 0) {
-      const args = studioRel.map(quoteArg).join(" ");
-      cmds.push(
-        `pnpm --filter hyperagent-studio exec eslint --max-warnings 999 --fix ${args}`,
+      const eslintFiles = studioRel.filter((r) =>
+        /\.(ts|tsx|js|jsx|mjs|cjs)$/i.test(r),
       );
+      if (eslintFiles.length > 0) {
+        cmds.push(
+          `pnpm --filter hyperagent-studio exec eslint --max-warnings 999 --fix ${eslintFiles.map(quoteArg).join(" ")}`,
+        );
+      }
       const prettiMatch = studioRel.filter((r) =>
-        /\.(ts|tsx|js|jsx|json|css|md)$/i.test(r),
+        /\.(ts|tsx|js|jsx|json|css|md|scss)$/i.test(r),
       );
       if (prettiMatch.length > 0) {
         cmds.push(

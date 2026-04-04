@@ -13,7 +13,11 @@ export interface NumberTickerProps {
  * Animated number counter. Animates from 0 to value when value is numeric.
  * For non-numeric values, renders as-is without animation.
  */
-export function NumberTicker({ value, className = "", duration = 0.8 }: NumberTickerProps) {
+export function NumberTicker({
+  value,
+  className = "",
+  duration = 0.8,
+}: NumberTickerProps) {
   const numeric = typeof value === "number" && !Number.isNaN(value);
   const target = numeric ? value : 0;
 

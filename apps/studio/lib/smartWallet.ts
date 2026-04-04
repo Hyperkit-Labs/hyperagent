@@ -7,7 +7,10 @@
 import { skaleBaseSepolia, skaleBaseMainnet } from "@/lib/chains";
 import { baseSepolia } from "thirdweb/chains";
 
-export type AAChainKey = "skale-base-sepolia" | "skale-base-mainnet" | "base-sepolia";
+export type AAChainKey =
+  | "skale-base-sepolia"
+  | "skale-base-mainnet"
+  | "base-sepolia";
 
 export const CHAIN_CAPABILITIES: Record<
   AAChainKey,
@@ -47,7 +50,8 @@ export const CHAIN_CAPABILITIES: Record<
 };
 
 /** Canonical ERC-4337 v0.6 EntryPoint. Deploy on SKALE if not present. */
-export const ENTRYPOINT_V06 = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789" as const;
+export const ENTRYPOINT_V06 =
+  "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789" as const;
 
 /** thirdweb bundler URL format: https://{chainId}.bundler.thirdweb.com */
 function getBundlerUrl(chainId: number): string {
@@ -72,23 +76,31 @@ export interface AccountAbstractionConfig {
  * Resolves AA config for connect/AutoConnect.
  * Priority: SKALE Sepolia factory → SKALE Mainnet factory → Base Sepolia (thirdweb shared).
  */
-export function getAccountAbstractionConfig(): AccountAbstractionConfig | undefined {
+export function getAccountAbstractionConfig():
+  | AccountAbstractionConfig
+  | undefined {
   const sponsorGas = getEnv("NEXT_PUBLIC_SPONSOR_GAS") === "true";
   if (!sponsorGas) return undefined;
 
-  const skaleSepoliaFactory = getEnv("NEXT_PUBLIC_SKALE_BASE_SEPOLIA_FACTORY_ADDRESS");
-  const skaleMainnetFactory = getEnv("NEXT_PUBLIC_SKALE_BASE_MAINNET_FACTORY_ADDRESS");
+  const skaleSepoliaFactory = getEnv(
+    "NEXT_PUBLIC_SKALE_BASE_SEPOLIA_FACTORY_ADDRESS",
+  );
+  const skaleMainnetFactory = getEnv(
+    "NEXT_PUBLIC_SKALE_BASE_MAINNET_FACTORY_ADDRESS",
+  );
 
   if (skaleSepoliaFactory) {
     const bundlerUrl =
       getEnv("NEXT_PUBLIC_SKALE_BASE_SEPOLIA_BUNDLER_URL") ??
       getBundlerUrl(324705682);
     const entrypoint =
-      getEnv("NEXT_PUBLIC_SKALE_BASE_SEPOLIA_ENTRYPOINT_ADDRESS") ?? ENTRYPOINT_V06;
+      getEnv("NEXT_PUBLIC_SKALE_BASE_SEPOLIA_ENTRYPOINT_ADDRESS") ??
+      ENTRYPOINT_V06;
     return {
       chain: skaleBaseSepolia,
       factoryAddress: skaleSepoliaFactory,
-      sponsorGas: getEnv("NEXT_PUBLIC_SKALE_BASE_SEPOLIA_SPONSOR_GAS") !== "false",
+      sponsorGas:
+        getEnv("NEXT_PUBLIC_SKALE_BASE_SEPOLIA_SPONSOR_GAS") !== "false",
       overrides: { bundlerUrl, entrypointAddress: entrypoint },
     };
   }
@@ -98,11 +110,13 @@ export function getAccountAbstractionConfig(): AccountAbstractionConfig | undefi
       getEnv("NEXT_PUBLIC_SKALE_BASE_MAINNET_BUNDLER_URL") ??
       getBundlerUrl(1187947933);
     const entrypoint =
-      getEnv("NEXT_PUBLIC_SKALE_BASE_MAINNET_ENTRYPOINT_ADDRESS") ?? ENTRYPOINT_V06;
+      getEnv("NEXT_PUBLIC_SKALE_BASE_MAINNET_ENTRYPOINT_ADDRESS") ??
+      ENTRYPOINT_V06;
     return {
       chain: skaleBaseMainnet,
       factoryAddress: skaleMainnetFactory,
-      sponsorGas: getEnv("NEXT_PUBLIC_SKALE_BASE_MAINNET_SPONSOR_GAS") !== "false",
+      sponsorGas:
+        getEnv("NEXT_PUBLIC_SKALE_BASE_MAINNET_SPONSOR_GAS") !== "false",
       overrides: { bundlerUrl, entrypointAddress: entrypoint },
     };
   }

@@ -14,7 +14,7 @@ interface PaymentChartProps {
 export function PaymentChart({ history }: PaymentChartProps) {
   const chartData = useMemo(() => {
     const dailyTotals: { [key: string]: number } = {};
-    
+
     history.forEach((item) => {
       const date = new Date(item.timestamp).toISOString().split("T")[0];
       dailyTotals[date] = (dailyTotals[date] || 0) + item.amount;
@@ -49,7 +49,10 @@ export function PaymentChart({ history }: PaymentChartProps) {
               title={`${item.date}: $${item.amount.toFixed(2)}`}
             />
             <span className="text-xs text-gray-500 mt-2 transform -rotate-45 origin-top-left whitespace-nowrap">
-              {new Date(item.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              {new Date(item.date).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+              })}
             </span>
           </div>
         ))}
@@ -60,4 +63,3 @@ export function PaymentChart({ history }: PaymentChartProps) {
     </div>
   );
 }
-

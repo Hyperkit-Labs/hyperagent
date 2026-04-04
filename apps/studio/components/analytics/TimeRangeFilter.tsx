@@ -28,7 +28,7 @@ export function TimeRangeFilter({ value, onChange }: TimeRangeFilterProps) {
             "px-3 py-1 text-[11px] font-medium rounded-md transition-all",
             value === tr.key
               ? "bg-[var(--color-bg-surface)] text-[var(--color-text-primary)] shadow-sm"
-              : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
+              : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
           )}
         >
           {tr.label}

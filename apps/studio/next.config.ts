@@ -34,6 +34,9 @@ if (isProduction || isStaging) {
 }
 
 const nextConfig: NextConfig = {
+  // MSW (tests) pulls in pure-ESM packages; Next/Jest only transpiles listed packages.
+  transpilePackages: ["msw", "until-async"],
+
   // Configure server external packages for Turbopack compatibility
   serverExternalPackages: [
     "pino",

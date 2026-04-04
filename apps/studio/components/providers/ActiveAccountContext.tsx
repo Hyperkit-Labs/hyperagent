@@ -1,9 +1,12 @@
-'use client';
+"use client";
 
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from "react";
 
 /** Account from thirdweb useActiveAccount - typed loosely for cross-package compatibility */
-type ActiveAccount = { address: string; [key: string]: unknown } | null | undefined;
+type ActiveAccount =
+  | { address: string; [key: string]: unknown }
+  | null
+  | undefined;
 
 const ActiveAccountContext = createContext<ActiveAccount | null>(null);
 

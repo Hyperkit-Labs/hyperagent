@@ -1,7 +1,12 @@
-'use client';
+"use client";
 
-import { useState, useCallback } from 'react';
-import { createWorkflow, DEFAULT_NETWORK, requireLLMKeys, LLM_KEYS_REQUIRED_MESSAGE } from '@/lib/api';
+import { useState, useCallback } from "react";
+import {
+  createWorkflow,
+  DEFAULT_NETWORK,
+  requireLLMKeys,
+  LLM_KEYS_REQUIRED_MESSAGE,
+} from "@/lib/api";
 
 interface UseStreamingWorkflowOptions {
   onComplete?: (workflowId: string) => void;
@@ -19,22 +24,24 @@ interface StreamingState {
  * and calls onComplete with the workflow_id. For streaming on the workflow detail
  * page use useWorkflowStreaming instead.
  */
-export function useStreamingWorkflow(options: UseStreamingWorkflowOptions = {}) {
+export function useStreamingWorkflow(
+  options: UseStreamingWorkflowOptions = {},
+) {
   const [state, setState] = useState<StreamingState>({
     isStreaming: false,
-    text: '',
+    text: "",
     error: null,
   });
 
   const streamWorkflow = useCallback(
     async (prompt: string, network?: string, templateId?: string) => {
-      setState({ isStreaming: true, text: '', error: null });
+      setState({ isStreaming: true, text: "", error: null });
 
       try {
         const { ok } = await requireLLMKeys();
         if (!ok) {
           const err = new Error(LLM_KEYS_REQUIRED_MESSAGE);
-          setState({ isStreaming: false, text: '', error: err });
+          setState({ isStreaming: false, text: "", error: err });
           if (options.onError) options.onError(err);
           throw err;
         }
@@ -45,7 +52,7 @@ export function useStreamingWorkflow(options: UseStreamingWorkflowOptions = {}) 
         if (templateId) body.template_id = templateId;
         const result = await createWorkflow(body);
 
-        setState({ isStreaming: false, text: '', error: null });
+        setState({ isStreaming: false, text: "", error: null });
 
         if (options.onComplete && result.workflow_id) {
           options.onComplete(result.workflow_id);
@@ -53,8 +60,8 @@ export function useStreamingWorkflow(options: UseStreamingWorkflowOptions = {}) 
 
         return result;
       } catch (error) {
-        const err = error instanceof Error ? error : new Error('Unknown error');
-        setState({ isStreaming: false, text: '', error: err });
+        const err = error instanceof Error ? error : new Error("Unknown error");
+        setState({ isStreaming: false, text: "", error: err });
 
         if (options.onError) {
           options.onError(err);
@@ -63,7 +70,7 @@ export function useStreamingWorkflow(options: UseStreamingWorkflowOptions = {}) 
         throw err;
       }
     },
-    [options.onComplete, options.onError]
+    [options.onComplete, options.onError],
   );
 
   return {

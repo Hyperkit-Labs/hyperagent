@@ -25,13 +25,16 @@ export function TransactionHistory({ workflowId }: { workflowId: string }) {
         const list = res.deployments ?? [];
         if (!cancelled) setDeployments(Array.isArray(list) ? list : []);
       } catch (err) {
-        if (!cancelled) reportApiError(err, { path: `TransactionHistory/${workflowId}` });
+        if (!cancelled)
+          reportApiError(err, { path: `TransactionHistory/${workflowId}` });
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [workflowId]);
 
   if (loading) {
@@ -63,12 +66,21 @@ export function TransactionHistory({ workflowId }: { workflowId: string }) {
             const network = (d.network as string) ?? "";
             const txHash = (d.transaction_hash as string) ?? "";
             const addr = (d.contract_address as string) ?? "";
-            const explorerUrl = network && txHash ? getExplorerUrl(network, "tx", txHash) : null;
+            const explorerUrl =
+              network && txHash ? getExplorerUrl(network, "tx", txHash) : null;
 
             return (
-              <tr key={i} className="border-t border-[var(--color-border-subtle)]">
-                <td className="py-2 text-[var(--color-text-secondary)]">{network || "—"}</td>
-                <td className="py-2 font-mono text-[var(--color-text-secondary)] truncate max-w-[120px]" title={addr}>
+              <tr
+                key={i}
+                className="border-t border-[var(--color-border-subtle)]"
+              >
+                <td className="py-2 text-[var(--color-text-secondary)]">
+                  {network || "—"}
+                </td>
+                <td
+                  className="py-2 font-mono text-[var(--color-text-secondary)] truncate max-w-[120px]"
+                  title={addr}
+                >
                   {addr ? `${addr.slice(0, 10)}...` : "—"}
                 </td>
                 <td className="py-2 font-mono">
@@ -83,7 +95,9 @@ export function TransactionHistory({ workflowId }: { workflowId: string }) {
                       <ExternalLink className="w-3 h-3 shrink-0" />
                     </a>
                   ) : (
-                    <span className="text-[var(--color-text-muted)]">{txHash ? `${txHash.slice(0, 8)}...` : "—"}</span>
+                    <span className="text-[var(--color-text-muted)]">
+                      {txHash ? `${txHash.slice(0, 8)}...` : "—"}
+                    </span>
                   )}
                 </td>
               </tr>

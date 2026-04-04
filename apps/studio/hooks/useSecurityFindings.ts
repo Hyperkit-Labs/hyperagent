@@ -4,10 +4,10 @@
  * Scoped by wallet_user_id via X-User-Id from session.
  */
 
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { getSecurityFindings, type SecurityFinding } from '@/lib/api';
+import { useState, useEffect, useCallback } from "react";
+import { getSecurityFindings, type SecurityFinding } from "@/lib/api";
 
 export interface UseSecurityFindingsOptions {
   runId?: string;
@@ -21,7 +21,9 @@ export interface UseSecurityFindingsReturn {
   refetch: () => Promise<void>;
 }
 
-export function useSecurityFindings(options?: UseSecurityFindingsOptions): UseSecurityFindingsReturn {
+export function useSecurityFindings(
+  options?: UseSecurityFindingsOptions,
+): UseSecurityFindingsReturn {
   const [findings, setFindings] = useState<SecurityFinding[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +39,9 @@ export function useSecurityFindings(options?: UseSecurityFindingsOptions): UseSe
       setFindings(data ?? []);
     } catch (e) {
       setFindings([]);
-      setError(e instanceof Error ? e.message : 'Failed to load security findings');
+      setError(
+        e instanceof Error ? e.message : "Failed to load security findings",
+      );
     } finally {
       setLoading(false);
     }

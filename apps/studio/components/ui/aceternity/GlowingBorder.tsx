@@ -28,15 +28,18 @@ export function GlowingBorder({
       <div
         className="absolute inset-0 z-0 bg-transparent transition-all duration-300 pointer-events-none"
         style={{
-          boxShadow: isActive ? "inset 0 0 20px rgba(124, 58, 237, 0.2)" : "inset 0 0 0px transparent",
+          boxShadow: isActive
+            ? "inset 0 0 20px rgba(124, 58, 237, 0.2)"
+            : "inset 0 0 0px transparent",
         }}
       />
-      
+
       {/* Animated gradient border on hover */}
       <motion.div
         className="absolute inset-0 z-0 transition-opacity duration-300"
         style={{
-          background: "linear-gradient(90deg, transparent, rgba(124, 58, 237, 0.5), transparent)",
+          background:
+            "linear-gradient(90deg, transparent, rgba(124, 58, 237, 0.5), transparent)",
           height: "2px",
           top: 0,
           left: "-100%",
@@ -52,10 +55,8 @@ export function GlowingBorder({
           repeat: Infinity,
         }}
       />
-      
-      <div className={`relative z-10 ${className}`}>
-        {children}
-      </div>
+
+      <div className={`relative z-10 ${className}`}>{children}</div>
     </Tag>
   );
 }

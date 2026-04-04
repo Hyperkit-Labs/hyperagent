@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
 export default function GlobalError({
   error,
@@ -10,8 +10,8 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    if (typeof console !== 'undefined' && console.error) {
-      console.error('[GlobalError]', error);
+    if (typeof console !== "undefined" && console.error) {
+      console.error("[GlobalError]", error);
     }
   }, [error]);
 

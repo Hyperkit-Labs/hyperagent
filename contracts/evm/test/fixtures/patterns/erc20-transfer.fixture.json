@@ -1,0 +1,20 @@
+{
+  "description": "Example state for simulation or fork tests (Tenderly, Anvil). Not a live deployment.",
+  "token": {
+    "name": "Example",
+    "symbol": "EX",
+    "decimals": 18,
+    "initialSupplyWei": "1000000000000000000000"
+  },
+  "accounts": [
+    {
+      "label": "deployer",
+      "balanceWei": "10000000000000000000000"
+    },
+    {
+      "label": "user1",
+      "balanceWei": "1000000000000000000000"
+    }
+  ],
+  "scenario": "transfer_round_trip"
+}

@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
-import { copyToClipboard } from '@/lib/utils';
-import { Copy, Check } from 'lucide-react';
+import { useState } from "react";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
+import { copyToClipboard } from "@/lib/utils";
+import { Copy, Check } from "lucide-react";
 
 export interface CodeBlockProps {
   code: string;
@@ -15,9 +15,9 @@ export interface CodeBlockProps {
 
 export function CodeBlock({
   code,
-  language = 'text',
+  language = "text",
   showLineNumbers = true,
-  className = '',
+  className = "",
 }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
 
@@ -30,7 +30,9 @@ export function CodeBlock({
   };
 
   return (
-    <div className={`rounded-xl overflow-hidden border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] ${className}`}>
+    <div
+      className={`rounded-xl overflow-hidden border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] ${className}`}
+    >
       <div className="flex items-center justify-end px-2 py-1 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)]">
         <button
           type="button"
@@ -48,9 +50,14 @@ export function CodeBlock({
       <SyntaxHighlighter
         language={language}
         style={vscDarkPlus}
-        customStyle={{ margin: 0, borderRadius: 0, background: 'transparent', fontSize: '12px' }}
+        customStyle={{
+          margin: 0,
+          borderRadius: 0,
+          background: "transparent",
+          fontSize: "12px",
+        }}
         showLineNumbers={showLineNumbers}
-        codeTagProps={{ style: { fontFamily: 'var(--font-jetbrains-mono)' } }}
+        codeTagProps={{ style: { fontFamily: "var(--font-jetbrains-mono)" } }}
       >
         {code}
       </SyntaxHighlighter>

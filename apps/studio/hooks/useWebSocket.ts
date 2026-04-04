@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useRef } from 'react';
-import { WorkflowWebSocket } from '@/lib/websocket';
-import type { Workflow } from '@/lib/types';
+import { useEffect, useState, useRef } from "react";
+import { WorkflowWebSocket } from "@/lib/websocket";
+import type { Workflow } from "@/lib/types";
 
 export function useWebSocket(workflowId: string | null) {
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
@@ -12,7 +12,7 @@ export function useWebSocket(workflowId: string | null) {
 
   useEffect(() => {
     // Skip WebSocket during SSR
-    if (typeof window === 'undefined') {
+    if (typeof window === "undefined") {
       return;
     }
 
@@ -24,7 +24,11 @@ export function useWebSocket(workflowId: string | null) {
     wsRef.current = ws;
 
     const unsubscribeMessage = ws.onMessage((message) => {
-      if (message.type === 'workflow_progressed' || message.type === 'workflow_completed' || message.type === 'workflow_failed') {
+      if (
+        message.type === "workflow_progressed" ||
+        message.type === "workflow_completed" ||
+        message.type === "workflow_failed"
+      ) {
         if (message.data) {
           setWorkflow(message.data as Workflow);
         }
@@ -41,8 +45,8 @@ export function useWebSocket(workflowId: string | null) {
     });
 
     const unsubscribeError = ws.onError((err) => {
-      setError('WebSocket connection error');
-      console.error('WebSocket error:', err);
+      setError("WebSocket connection error");
+      console.error("WebSocket error:", err);
     });
 
     ws.connect();
@@ -58,4 +62,3 @@ export function useWebSocket(workflowId: string | null) {
 
   return { workflow, connected, error };
 }
-

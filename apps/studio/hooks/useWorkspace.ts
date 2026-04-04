@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { create } from 'zustand';
+import { create } from "zustand";
 
 interface WorkspaceState {
   activeWorkspaceId: string;
@@ -8,6 +8,6 @@ interface WorkspaceState {
 }
 
 export const useWorkspace = create<WorkspaceState>((set) => ({
-  activeWorkspaceId: 'default',
+  activeWorkspaceId: "default",
   setActiveWorkspace: (id) => set({ activeWorkspaceId: id }),
 }));

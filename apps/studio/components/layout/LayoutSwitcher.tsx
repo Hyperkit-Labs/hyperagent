@@ -40,7 +40,15 @@ export function LayoutSwitcher({ children }: { children: React.ReactNode }) {
     if (account !== undefined && !hasWallet) {
       router.replace(PUBLIC_ROUTE);
     }
-  }, [pathname, sessionReady, hasSession, account, walletAddress, hasWallet, router]);
+  }, [
+    pathname,
+    sessionReady,
+    hasSession,
+    account,
+    walletAddress,
+    hasWallet,
+    router,
+  ]);
 
   const isFullPage = pathname && FULL_PAGE_ROUTES.includes(pathname);
 
@@ -56,9 +64,7 @@ export function LayoutSwitcher({ children }: { children: React.ReactNode }) {
   }
 
   const wrappedChildren = (
-    <ActiveAccountProvider account={account}>
-      {children}
-    </ActiveAccountProvider>
+    <ActiveAccountProvider account={account}>{children}</ActiveAccountProvider>
   );
 
   if (pathname === PUBLIC_ROUTE) {

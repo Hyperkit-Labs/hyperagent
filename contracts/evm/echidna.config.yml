@@ -1,0 +1,13 @@
+# Echidna smoke: fast invariant for CI. For real targets, copy templates from
+# packages/contract-security-rules/echidna/ and set `contract` to your harness.
+testMode: property
+testLimit: 500
+seqLen: 5
+contract: "EchidnaSmoke"
+coverage: false
+solcArgs: "--optimize --optimize-runs 200"
+cryticArgs:
+  - "--compile-force-framework"
+  - "foundry"
+  - "--foundry-out-directory"
+  - "out"

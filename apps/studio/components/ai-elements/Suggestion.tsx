@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 export interface SuggestionItem {
   label: string;
@@ -6,9 +6,15 @@ export interface SuggestionItem {
 }
 
 const DEFAULT_SUGGESTIONS: SuggestionItem[] = [
-  { label: 'Create ERC20', prompt: 'Create an ERC20 token with name MyToken and symbol MTK' },
-  { label: 'Audit contract', prompt: 'Audit my smart contract for security issues' },
-  { label: 'Deploy to testnet', prompt: 'Deploy my contract to the testnet' },
+  {
+    label: "Create ERC20",
+    prompt: "Create an ERC20 token with name MyToken and symbol MTK",
+  },
+  {
+    label: "Audit contract",
+    prompt: "Audit my smart contract for security issues",
+  },
+  { label: "Deploy to testnet", prompt: "Deploy my contract to the testnet" },
 ];
 
 export interface SuggestionProps {
@@ -18,7 +24,12 @@ export interface SuggestionProps {
   children?: React.ReactNode;
 }
 
-export function Suggestion({ suggestion, onClick, className = '', children }: SuggestionProps) {
+export function Suggestion({
+  suggestion,
+  onClick,
+  className = "",
+  children,
+}: SuggestionProps) {
   return (
     <button
       type="button"
@@ -40,10 +51,12 @@ export interface SuggestionsProps {
 export function Suggestions({
   items = DEFAULT_SUGGESTIONS,
   onSelect,
-  className = '',
+  className = "",
 }: SuggestionsProps) {
   return (
-    <div className={`flex flex-wrap gap-2 p-2 border-b border-[var(--color-border-subtle)] ${className}`}>
+    <div
+      className={`flex flex-wrap gap-2 p-2 border-b border-[var(--color-border-subtle)] ${className}`}
+    >
       {items.map((item) => (
         <Suggestion
           key={item.label}

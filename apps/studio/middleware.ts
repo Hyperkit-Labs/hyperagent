@@ -68,7 +68,10 @@ function applySecurityHeaders(res: NextResponse, nonce: string): void {
   res.headers.set("X-Frame-Options", "DENY");
   res.headers.set("X-Content-Type-Options", "nosniff");
   res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.headers.set(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=()",
+  );
 
   if (process.env.NODE_ENV === "production") {
     res.headers.set(
@@ -94,7 +97,9 @@ function _isValidJwt(token: string): boolean {
   try {
     const parts = token.split(".");
     if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return false;
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    const payload = JSON.parse(
+      atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")),
+    );
     const exp = payload.exp;
     if (typeof exp !== "number") return false;
     return Math.floor(Date.now() / 1000) < exp;

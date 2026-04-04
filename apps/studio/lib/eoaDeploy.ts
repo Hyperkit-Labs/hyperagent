@@ -3,10 +3,10 @@
  * Deploys contract bytecode from a connected wallet.
  */
 
-import type { Chain } from 'thirdweb/chains';
-import { prepareDirectDeployTransaction } from 'thirdweb/deploys';
-import { sendTransaction, waitForReceipt } from 'thirdweb';
-import { getThirdwebClient } from '@/lib/thirdwebClient';
+import type { Chain } from "thirdweb/chains";
+import { prepareDirectDeployTransaction } from "thirdweb/deploys";
+import { sendTransaction, waitForReceipt } from "thirdweb";
+import { getThirdwebClient } from "@/lib/thirdwebClient";
 
 export interface DeployUserContractEoaParams {
   account: { address: string; type?: string; [key: string]: unknown };
@@ -22,23 +22,31 @@ export interface DeployUserContractEoaResult {
 }
 
 export async function deployUserContractEoa(
-  params: DeployUserContractEoaParams
+  params: DeployUserContractEoaParams,
 ): Promise<DeployUserContractEoaResult> {
   const client = getThirdwebClient();
-  if (!client) throw new Error('Thirdweb client not configured');
+  if (!client) throw new Error("Thirdweb client not configured");
 
-  const bytecode = params.bytecode.startsWith('0x') ? params.bytecode : `0x${params.bytecode}`;
+  const bytecode = params.bytecode.startsWith("0x")
+    ? params.bytecode
+    : `0x${params.bytecode}`;
   const tx = prepareDirectDeployTransaction({
     client,
     chain: params.chain,
     bytecode: bytecode as `0x${string}`,
-    abi: params.abi as unknown as Parameters<typeof prepareDirectDeployTransaction>[0]['abi'],
-    constructorParams: params.constructorArgs as Record<string, unknown> | undefined,
+    abi: params.abi as unknown as Parameters<
+      typeof prepareDirectDeployTransaction
+    >[0]["abi"],
+    constructorParams: params.constructorArgs as
+      | Record<string, unknown>
+      | undefined,
   });
 
   const result = await sendTransaction({
     transaction: tx,
-    account: params.account as unknown as Parameters<typeof sendTransaction>[0]['account'],
+    account: params.account as unknown as Parameters<
+      typeof sendTransaction
+    >[0]["account"],
   });
 
   const receipt = await waitForReceipt({
@@ -46,8 +54,8 @@ export async function deployUserContractEoa(
     chain: params.chain,
     transactionHash: result.transactionHash,
   });
-  const contractAddress = receipt.contractAddress ?? '';
-  if (!contractAddress) throw new Error('Contract address not in receipt');
+  const contractAddress = receipt.contractAddress ?? "";
+  if (!contractAddress) throw new Error("Contract address not in receipt");
 
   return {
     contractAddress,

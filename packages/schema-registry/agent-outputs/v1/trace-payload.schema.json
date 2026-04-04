@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hyperkitlabs.com/schema/agent-outputs/trace-payload/v1",
+  "title": "Agent trace payload v1",
+  "description": "Minimal trace blob for IPFS / provenance (see services/orchestrator/trace_writer.py build_trace_payload).",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["version", "run_id", "step_type", "step_index", "status"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "1"
+    },
+    "run_id": { "type": "string", "minLength": 1 },
+    "step_type": { "type": "string" },
+    "step_index": { "type": "integer", "minimum": 0 },
+    "status": { "type": "string" },
+    "output_summary": { "type": "string" },
+    "error_message": { "type": ["string", "null"] },
+    "agent": { "type": "object", "additionalProperties": true }
+  }
+}

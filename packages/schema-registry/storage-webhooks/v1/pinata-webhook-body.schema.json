@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hyperkitlabs.com/schema/storage-webhooks/pinata-webhook-body/v1",
+  "title": "Pinata webhook JSON body (subset)",
+  "description": "Inbound Pinata pin events; handlers accept flexible shapes and extract cid (see services/orchestrator/api/storage_webhooks.py).",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "type": { "type": "string" },
+    "event": { "type": "string" },
+    "cid": { "type": "string" },
+    "ipfsHash": { "type": "string" },
+    "data": { "type": "object", "additionalProperties": true },
+    "pin": { "type": "object", "additionalProperties": true },
+    "info": { "type": "object", "additionalProperties": true }
+  }
+}

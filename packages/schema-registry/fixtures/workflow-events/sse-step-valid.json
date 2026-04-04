@@ -1,0 +1,7 @@
+{
+  "type": "step",
+  "stage": "agent",
+  "status": "running",
+  "message": "Generating",
+  "done": false
+}

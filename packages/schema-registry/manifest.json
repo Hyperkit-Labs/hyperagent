@@ -1,0 +1,26 @@
+{
+  "version": "1",
+  "schemas": [
+    {
+      "id": "workflow-events.sse-pipeline-event.v1",
+      "path": "workflow-events/v1/sse-pipeline-event.schema.json",
+      "fixture": "fixtures/workflow-events/sse-step-valid.json",
+      "stability": "stable",
+      "description": "JSON objects sent in SSE data lines for pipeline progress"
+    },
+    {
+      "id": "storage-webhooks.pinata-body.v1",
+      "path": "storage-webhooks/v1/pinata-webhook-body.schema.json",
+      "fixture": "fixtures/storage-webhooks/pinata-sample.json",
+      "stability": "stable",
+      "description": "Pinata pin completion webhook JSON body (subset)"
+    },
+    {
+      "id": "agent-outputs.trace-payload.v1",
+      "path": "agent-outputs/v1/trace-payload.schema.json",
+      "fixture": "fixtures/agent-outputs/trace-payload-valid.json",
+      "stability": "stable",
+      "description": "Minimal trace blob aligned with trace_writer.build_trace_payload"
+    }
+  ]
+}

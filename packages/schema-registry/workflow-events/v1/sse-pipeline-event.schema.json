@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hyperkitlabs.com/schema/workflow-events/sse-pipeline-event/v1",
+  "title": "SSE pipeline event",
+  "description": "JSON object in SSE data lines for workflow pipeline streaming (see services/orchestrator/api/workflows.py).",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "type": {
+      "type": "string",
+      "description": "Event kind: step, log, require_action, etc."
+    },
+    "stage": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "message": {
+      "type": ["string", "null"]
+    },
+    "done": {
+      "type": "boolean",
+      "description": "True when the stream should end"
+    },
+    "action": {
+      "type": "string",
+      "description": "Present when type implies human action (e.g. approve_spec)"
+    }
+  }
+}

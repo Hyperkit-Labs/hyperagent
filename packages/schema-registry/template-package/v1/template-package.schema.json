@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hyperkitlabs.com/schema/template-package/v1",
+  "title": "HyperAgent template package (v1)",
+  "description": "Canonical JSON for user template publishing to IPFS; validated by orchestrator (api/user_templates.py).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "name"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "description": { "type": "string", "maxLength": 8000 },
+    "category": { "type": "string", "maxLength": 128 },
+    "chain_compatibility": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "files": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "required": ["path", "content"],
+        "properties": {
+          "path": { "type": "string", "maxLength": 512 },
+          "content": { "type": "string" },
+          "language": { "type": "string", "maxLength": 64 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "contract_code": { "type": ["string", "null"] },
+    "frontend_scaffold": { "type": "object" },
+    "tests": { "type": "object" },
+    "metadata": { "type": "object" },
+    "version": { "type": "integer", "minimum": 1 },
+    "createdAt": { "type": "string" },
+    "updatedAt": { "type": "string" }
+  }
+}

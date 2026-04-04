@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { createContext, useContext, type ReactNode } from 'react';
-import { useSignInWithWallet } from '@/hooks/useSignInWithWallet';
+import { createContext, useContext, type ReactNode } from "react";
+import { useSignInWithWallet } from "@/hooks/useSignInWithWallet";
 
 interface WalletAuthContextValue {
   signIn: () => Promise<boolean>;
@@ -31,7 +31,7 @@ export function useWalletAuth(): WalletAuthContextValue {
   if (!ctx) {
     return {
       signIn: async () => {
-        console.warn('WalletAuthProvider not found; sign-in unavailable.');
+        console.warn("WalletAuthProvider not found; sign-in unavailable.");
         return false;
       },
       isLoading: false,

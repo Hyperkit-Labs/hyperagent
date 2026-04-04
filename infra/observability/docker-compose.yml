@@ -1,0 +1,134 @@
+# Local / staging observability stack (LGTM-style: Loki, Grafana, Tempo, Mimir/Prometheus).
+# Run from repo root:
+#   docker compose -f infra/observability/docker-compose.yml up -d
+#
+# Point apps at the collector:
+#   OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+#   OPENTELEMETRY_ENABLED=1
+#
+# Optional Docker log shipping (Linux host with Docker socket):
+#   docker compose -f infra/observability/docker-compose.yml --profile docker-logs up -d
+
+name: hyperagent-observability
+
+networks:
+  observability:
+    driver: bridge
+
+volumes:
+  tempo-data: {}
+  loki-data: {}
+  prometheus-data: {}
+  grafana-data: {}
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.115.1
+    container_name: hyperagent-otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector/config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8889:8889"
+    networks:
+      - observability
+    depends_on:
+      - tempo
+      - loki
+
+  tempo:
+    image: grafana/tempo:2.6.0
+    container_name: hyperagent-tempo
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    networks:
+      - observability
+
+  loki:
+    image: grafana/loki:3.3.2
+    container_name: hyperagent-loki
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    volumes:
+      - ./loki/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "3100:3100"
+    networks:
+      - observability
+
+  promtail:
+    image: grafana/promtail:3.3.2
+    container_name: hyperagent-promtail
+    restart: unless-stopped
+    profiles:
+      - docker-logs
+    volumes:
+      - ./promtail/promtail.yaml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: ["-config.file=/etc/promtail/config.yml"]
+    networks:
+      - observability
+    depends_on:
+      - loki
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: hyperagent-prometheus
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts:/etc/prometheus/alerts:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - observability
+    depends_on:
+      - otel-collector
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: hyperagent-alertmanager
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "9093:9093"
+    networks:
+      - observability
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: hyperagent-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_HTTP_PORT: "3030"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3030:3030"
+    networks:
+      - observability
+    depends_on:
+      - prometheus
+      - loki
+      - tempo

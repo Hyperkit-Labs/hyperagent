@@ -1,0 +1,20 @@
+# Example Alertmanager rules — tune thresholds for your SLOs.
+groups:
+  - name: hyperagent-observability
+    rules:
+      - alert: OpenTelemetryCollectorDown
+        expr: up{job="otel-collector"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "OTel collector target is down"
+          description: "Prometheus cannot scrape the collector metrics endpoint."
+
+      - alert: HighOtelCollectorScrapeDuration
+        expr: scrape_duration_seconds{job="otel-collector"} > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow Prometheus scrape of OTel collector"

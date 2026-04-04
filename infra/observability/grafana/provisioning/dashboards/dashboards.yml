@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: HyperAgent
+    orgId: 1
+    folder: HyperAgent
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

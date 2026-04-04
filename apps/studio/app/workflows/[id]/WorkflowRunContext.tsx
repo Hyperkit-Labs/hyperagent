@@ -12,7 +12,11 @@ import { ArrowLeft, Loader2, CheckCircle, Rocket, Bug } from "lucide-react";
 
 export interface WorkflowRunState {
   workflow: Workflow | null;
-  contractData: { bytecode?: string; source_code?: string; [key: string]: unknown } | null;
+  contractData: {
+    bytecode?: string;
+    source_code?: string;
+    [key: string]: unknown;
+  } | null;
   loading: boolean;
   error: string | null;
   approving: boolean;
@@ -29,7 +33,9 @@ export interface WorkflowRunContextValue {
   actions: WorkflowRunActions;
 }
 
-export const WorkflowRunContext = createContext<WorkflowRunContextValue | null>(null);
+export const WorkflowRunContext = createContext<WorkflowRunContextValue | null>(
+  null,
+);
 
 export function WorkflowRunProvider({
   workflowId,
@@ -39,7 +45,8 @@ export function WorkflowRunProvider({
   children: React.ReactNode;
 }) {
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
-  const [contractData, setContractData] = useState<WorkflowRunState["contractData"]>(null);
+  const [contractData, setContractData] =
+    useState<WorkflowRunState["contractData"]>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [approving, setApproving] = useState(false);
@@ -56,7 +63,15 @@ export function WorkflowRunProvider({
       ]);
       setWorkflow(wf);
       const first = Array.isArray(list) && list.length > 0 ? list[0] : null;
-      setContractData(first ? { bytecode: first.bytecode as string | undefined, source_code: first.source_code as string | undefined, ...first } : null);
+      setContractData(
+        first
+          ? {
+              bytecode: first.bytecode as string | undefined,
+              source_code: first.source_code as string | undefined,
+              ...first,
+            }
+          : null,
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load workflow");
     } finally {
@@ -80,7 +95,9 @@ export function WorkflowRunProvider({
       await approveSpec(workflow.workflow_id);
       await refetch();
     } catch (e) {
-      setApproveError(e instanceof Error ? e.message : "Failed to approve spec");
+      setApproveError(
+        e instanceof Error ? e.message : "Failed to approve spec",
+      );
     } finally {
       setApproving(false);
     }
@@ -110,9 +127,16 @@ export function WorkflowRunProvider({
 }
 
 function statusPillClass(status: string): string {
-  if (status === "completed" || status === "success") return "status-pill-ready";
+  if (status === "completed" || status === "success")
+    return "status-pill-ready";
   if (status === "failed") return "status-pill-failed";
-  if (status === "building" || status === "running" || status === "deploying" || status === "generating") return "status-pill-building";
+  if (
+    status === "building" ||
+    status === "running" ||
+    status === "deploying" ||
+    status === "generating"
+  )
+    return "status-pill-building";
   return "status-pill-queued";
 }
 
@@ -152,9 +176,13 @@ export function WorkflowRunHeader() {
           <h1 className="text-2xl font-semibold text-white tracking-tight">
             {workflow.name || workflow.intent || workflow.workflow_id}
           </h1>
-          <p className="text-[var(--color-text-tertiary)] text-sm mt-1">ID: {workflow.workflow_id}</p>
+          <p className="text-[var(--color-text-tertiary)] text-sm mt-1">
+            ID: {workflow.workflow_id}
+          </p>
         </div>
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-medium ${statusPillClass(workflow.status)}`}>
+        <span
+          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-medium ${statusPillClass(workflow.status)}`}
+        >
           {workflow.status}
         </span>
       </div>
@@ -175,7 +203,9 @@ export function WorkflowRunMeta() {
       </div>
       <div>
         <span className="text-[var(--color-text-tertiary)]">Contract type</span>
-        <div className="text-white font-medium">{workflow.contract_type ?? "-"}</div>
+        <div className="text-white font-medium">
+          {workflow.contract_type ?? "-"}
+        </div>
       </div>
       <div>
         <span className="text-[var(--color-text-tertiary)]">Codegen</span>
@@ -193,11 +223,15 @@ export function WorkflowRunMeta() {
       )}
       <div>
         <span className="text-[var(--color-text-tertiary)]">Created</span>
-        <div className="text-white font-medium">{workflow.created_at ?? "-"}</div>
+        <div className="text-white font-medium">
+          {workflow.created_at ?? "-"}
+        </div>
       </div>
       <div>
         <span className="text-[var(--color-text-tertiary)]">Updated</span>
-        <div className="text-white font-medium">{workflow.updated_at ?? "-"}</div>
+        <div className="text-white font-medium">
+          {workflow.updated_at ?? "-"}
+        </div>
       </div>
     </div>
   );
@@ -231,31 +265,53 @@ export function WorkflowRunRiskStrip() {
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg bg-[var(--color-bg-panel)] border border-[var(--color-border-default)] px-3 py-2 text-[11px]">
       {roma && (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded status-pill-roma" title="ROMA planner was used for this run">
+        <span
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded status-pill-roma"
+          title="ROMA planner was used for this run"
+        >
           ROMA used
         </span>
       )}
       {highRisk && (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20" title="High risk until reviewed">
+        <span
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20"
+          title="High risk until reviewed"
+        >
           High risk until reviewed
         </span>
       )}
       {auditSimFailed && (
         <>
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20" title="Audit or simulation failed">
+          <span
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20"
+            title="Audit or simulation failed"
+          >
             Audit or simulation failed
           </span>
           <button
             type="button"
             onClick={handleDebugSandbox}
-            disabled={debugLoading || !(workflow.contracts && Object.keys(workflow.contracts).length > 0)}
+            disabled={
+              debugLoading ||
+              !(
+                workflow.contracts && Object.keys(workflow.contracts).length > 0
+              )
+            }
             title="Open workflow in sandbox to fix"
             className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--color-bg-hover)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] border border-[var(--color-border-subtle)] disabled:opacity-50"
           >
-            {debugLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Bug className="w-3 h-3" />}
+            {debugLoading ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <Bug className="w-3 h-3" />
+            )}
             Debug in sandbox
           </button>
-          {debugError && <span className="text-[var(--color-semantic-error)]">{debugError}</span>}
+          {debugError && (
+            <span className="text-[var(--color-semantic-error)]">
+              {debugError}
+            </span>
+          )}
         </>
       )}
     </div>
@@ -270,10 +326,19 @@ export function WorkflowRunSpecApproval() {
   if (!workflow || !needsSpecApproval(workflow)) return null;
   return (
     <div className="rounded-lg bg-[#1F1F22] border border-[var(--color-primary)]/40 p-4">
-      <h3 className="text-xs font-medium text-[var(--color-primary-light)] mb-2">Spec ready for approval</h3>
-      <p className="text-sm text-[var(--color-text-secondary)] mb-3">Review the spec above, then approve to continue the pipeline.</p>
+      <h3 className="text-xs font-medium text-[var(--color-primary-light)] mb-2">
+        Spec ready for approval
+      </h3>
+      <p className="text-sm text-[var(--color-text-secondary)] mb-3">
+        Review the spec above, then approve to continue the pipeline.
+      </p>
       {approveError && (
-        <p className="text-sm text-[var(--color-semantic-error)] mb-2" data-testid="approve-error">{approveError}</p>
+        <p
+          className="text-sm text-[var(--color-semantic-error)] mb-2"
+          data-testid="approve-error"
+        >
+          {approveError}
+        </p>
       )}
       <button
         type="button"
@@ -281,7 +346,11 @@ export function WorkflowRunSpecApproval() {
         onClick={() => actions.approve()}
         className="inline-flex items-center gap-2 px-4 py-2 rounded-lg btn-primary-gradient text-white text-xs font-medium disabled:opacity-60"
       >
-        {approving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+        {approving ? (
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        ) : (
+          <CheckCircle className="w-3.5 h-3.5" />
+        )}
         {approving ? "Approving…" : "Approve spec"}
       </button>
     </div>
@@ -305,12 +374,18 @@ export function WorkflowRunErrorBlock() {
   if (!ctx) return null;
   const { workflow } = ctx.state;
   if (!workflow || workflow.status !== "failed") return null;
-  const err = (workflow.metadata?.error ?? workflow.meta_data?.error) as string | undefined;
+  const err = (workflow.metadata?.error ?? workflow.meta_data?.error) as
+    | string
+    | undefined;
   if (!err) return null;
   return (
     <div className="rounded-lg bg-[var(--color-bg-panel)] border border-[var(--color-semantic-error)]/30 p-4">
-      <h3 className="text-xs font-medium text-[var(--color-semantic-error)] mb-1">Error</h3>
-      <p className="text-sm text-[var(--color-text-secondary)] break-words">{err}</p>
+      <h3 className="text-xs font-medium text-[var(--color-semantic-error)] mb-1">
+        Error
+      </h3>
+      <p className="text-sm text-[var(--color-text-secondary)] break-words">
+        {err}
+      </p>
     </div>
   );
 }
@@ -319,7 +394,11 @@ export function WorkflowRunActionsBlock() {
   const ctx = React.use(WorkflowRunContext);
   if (!ctx) return null;
   const { workflow } = ctx.state;
-  if (!workflow || (workflow.status !== "completed" && workflow.status !== "success")) return null;
+  if (
+    !workflow ||
+    (workflow.status !== "completed" && workflow.status !== "success")
+  )
+    return null;
   return (
     <Link
       href={ROUTES.APPS_ID(workflow.workflow_id)}

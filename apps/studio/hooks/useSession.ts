@@ -1,6 +1,9 @@
 "use client";
 
-import { useSessionContext, type BootstrapStatus } from "@/components/providers/SessionProvider";
+import {
+  useSessionContext,
+  type BootstrapStatus,
+} from "@/components/providers/SessionProvider";
 
 export interface UseSessionReturn {
   hasSession: boolean;
@@ -15,6 +18,18 @@ export interface UseSessionReturn {
  * Use useSessionContext for the full context value without extra fields.
  */
 export function useSession(): UseSessionReturn {
-  const { hasSession, isReady, bootstrapStatus, bootstrapError, recheckBootstrap } = useSessionContext();
-  return { hasSession, isReady, bootstrapStatus, bootstrapError, recheckBootstrap };
+  const {
+    hasSession,
+    isReady,
+    bootstrapStatus,
+    bootstrapError,
+    recheckBootstrap,
+  } = useSessionContext();
+  return {
+    hasSession,
+    isReady,
+    bootstrapStatus,
+    bootstrapError,
+    recheckBootstrap,
+  };
 }

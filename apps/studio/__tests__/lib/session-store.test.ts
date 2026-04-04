@@ -19,7 +19,9 @@ describe("session-store", () => {
     sessionStorage.clear();
     clearSessionOnlyLLMKey();
     document.cookie.split(";").forEach((c) => {
-      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      document.cookie = c
+        .replace(/^ +/, "")
+        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
     });
   });
 
@@ -40,7 +42,7 @@ describe("session-store", () => {
       const expiresAt = Math.floor(Date.now() / 1000) - 10;
       localStorage.setItem(
         "hyperagent_session",
-        JSON.stringify({ access_token: "x", expires_at: expiresAt })
+        JSON.stringify({ access_token: "x", expires_at: expiresAt }),
       );
       expect(getStoredSession()).toBeNull();
     });
@@ -89,7 +91,10 @@ describe("session-store", () => {
     });
 
     it("sync getter returns from cache after async populate", async () => {
-      await setSessionOnlyLLMKey({ provider: "anthropic", apiKey: "sk-ant-456" });
+      await setSessionOnlyLLMKey({
+        provider: "anthropic",
+        apiKey: "sk-ant-456",
+      });
       // setSessionOnlyLLMKey populates _decryptedCache
       const syncResult = getSessionOnlyLLMKey();
       expect(syncResult).not.toBeNull();
@@ -117,7 +122,7 @@ describe("session-store", () => {
     it("handles legacy plaintext gracefully", () => {
       sessionStorage.setItem(
         "hyperagent_llm_pass_through",
-        JSON.stringify({ provider: "google", apiKey: "legacy-plain" })
+        JSON.stringify({ provider: "google", apiKey: "legacy-plain" }),
       );
       const result = getSessionOnlyLLMKey();
       expect(result).not.toBeNull();

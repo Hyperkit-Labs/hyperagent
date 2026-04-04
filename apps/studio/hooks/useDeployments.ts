@@ -4,12 +4,15 @@
  * Follows senior frontend best practices
  */
 
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { getWorkflows, getErrorMessage, isAbortError } from '@/lib/api';
-import { POLLING } from '@/constants/defaults';
-import { transformWorkflowToDeployment, type Deployment } from '@/lib/transformers';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { getWorkflows, getErrorMessage, isAbortError } from "@/lib/api";
+import { POLLING } from "@/constants/defaults";
+import {
+  transformWorkflowToDeployment,
+  type Deployment,
+} from "@/lib/transformers";
 
 export interface DeploymentStats {
   total: number;
@@ -37,7 +40,9 @@ export interface UseDeploymentsReturn {
   isEmpty: boolean;
 }
 
-export function useDeployments(options: UseDeploymentsOptions = {}): UseDeploymentsReturn {
+export function useDeployments(
+  options: UseDeploymentsOptions = {},
+): UseDeploymentsReturn {
   const {
     network,
     status,
@@ -57,27 +62,29 @@ export function useDeployments(options: UseDeploymentsOptions = {}): UseDeployme
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const isMounted = useRef(true);
   const fetchController = useRef<AbortController | null>(null);
-
 
   // Calculate statistics
   const calculateStats = (deployments: Deployment[]): DeploymentStats => {
     const total = deployments.length;
-    const successful = deployments.filter(d => d.status === 'success').length;
-    const failed = deployments.filter(d => d.status === 'failed').length;
-    const pending = deployments.filter(d => d.status === 'pending').length;
-    
+    const successful = deployments.filter((d) => d.status === "success").length;
+    const failed = deployments.filter((d) => d.status === "failed").length;
+    const pending = deployments.filter((d) => d.status === "pending").length;
+
     const successRate = total > 0 ? (successful / total) * 100 : 0;
-    
-    const durations = deployments.filter(d => d.duration).map(d => d.duration!);
-    const avgDuration = durations.length > 0 
-      ? durations.reduce((a, b) => a + b, 0) / durations.length 
-      : 0;
-    
+
+    const durations = deployments
+      .filter((d) => d.duration)
+      .map((d) => d.duration!);
+    const avgDuration =
+      durations.length > 0
+        ? durations.reduce((a, b) => a + b, 0) / durations.length
+        : 0;
+
     const totalGasUsed = deployments
-      .filter(d => d.gasUsed)
+      .filter((d) => d.gasUsed)
       .reduce((sum, d) => sum + (d.gasUsed || 0), 0);
 
     return {
@@ -92,47 +99,50 @@ export function useDeployments(options: UseDeploymentsOptions = {}): UseDeployme
   };
 
   // Fetch deployments
-  const fetchDeployments = useCallback(async (signal?: AbortSignal) => {
-    try {
-      setError(null);
-      
-      const data = await getWorkflows({}, signal);
-      
-      if (isMounted.current) {
-        const workflows = data.workflows || [];
-        const deploymentsData = workflows.flatMap((w) => {
-          const r = transformWorkflowToDeployment(w);
-          if (r == null) return [];
-          return Array.isArray(r) ? r : [r];
-        });
-        
-        // Apply filters
-        const filtered = deploymentsData.filter(d => {
-          if (network && d.network !== network) return false;
-          if (status && d.status !== status) return false;
-          return true;
-        });
-        
-        setDeployments(filtered);
-        setStats(calculateStats(filtered));
+  const fetchDeployments = useCallback(
+    async (signal?: AbortSignal) => {
+      try {
+        setError(null);
+
+        const data = await getWorkflows({}, signal);
+
+        if (isMounted.current) {
+          const workflows = data.workflows || [];
+          const deploymentsData = workflows.flatMap((w) => {
+            const r = transformWorkflowToDeployment(w);
+            if (r == null) return [];
+            return Array.isArray(r) ? r : [r];
+          });
+
+          // Apply filters
+          const filtered = deploymentsData.filter((d) => {
+            if (network && d.network !== network) return false;
+            if (status && d.status !== status) return false;
+            return true;
+          });
+
+          setDeployments(filtered);
+          setStats(calculateStats(filtered));
+        }
+      } catch (err: unknown) {
+        if (isMounted.current && !isAbortError(err)) {
+          setError(getErrorMessage(err, "Failed to fetch deployments"));
+        }
+      } finally {
+        if (isMounted.current) {
+          setLoading(false);
+        }
       }
-    } catch (err: unknown) {
-      if (isMounted.current && !isAbortError(err)) {
-        setError(getErrorMessage(err, 'Failed to fetch deployments'));
-      }
-    } finally {
-      if (isMounted.current) {
-        setLoading(false);
-      }
-    }
-  }, [network, status]);
+    },
+    [network, status],
+  );
 
   // Manual refetch
   const refetch = useCallback(async () => {
     if (fetchController.current) {
       fetchController.current.abort();
     }
-    
+
     fetchController.current = new AbortController();
     setLoading(true);
     await fetchDeployments(fetchController.current.signal);
@@ -142,7 +152,7 @@ export function useDeployments(options: UseDeploymentsOptions = {}): UseDeployme
   useEffect(() => {
     isMounted.current = true;
     fetchController.current = new AbortController();
-    
+
     fetchDeployments(fetchController.current.signal);
 
     return () => {
@@ -175,4 +185,3 @@ export function useDeployments(options: UseDeploymentsOptions = {}): UseDeployme
     isEmpty: deployments.length === 0 && !loading,
   };
 }
-

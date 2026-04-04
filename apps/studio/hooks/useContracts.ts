@@ -4,12 +4,12 @@
  * Follows senior frontend best practices for data management
  */
 
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { getWorkflows, getErrorMessage, isAbortError } from '@/lib/api';
-import { POLLING } from '@/constants/defaults';
-import { transformWorkflowToContract, type Contract } from '@/lib/transformers';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { getWorkflows, getErrorMessage, isAbortError } from "@/lib/api";
+import { POLLING } from "@/constants/defaults";
+import { transformWorkflowToContract, type Contract } from "@/lib/transformers";
 
 export interface UseContractsOptions {
   network?: string;
@@ -27,7 +27,9 @@ export interface UseContractsReturn {
   filteredContracts: Contract[];
 }
 
-export function useContracts(options: UseContractsOptions = {}): UseContractsReturn {
+export function useContracts(
+  options: UseContractsOptions = {},
+): UseContractsReturn {
   const {
     network,
     verified,
@@ -38,19 +40,18 @@ export function useContracts(options: UseContractsOptions = {}): UseContractsRet
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const isMounted = useRef(true);
   const fetchController = useRef<AbortController | null>(null);
-
 
   // Fetch contracts from API
   const fetchContracts = useCallback(async (signal?: AbortSignal) => {
     try {
       setError(null);
-      
+
       // Fetch all workflows and filter those with deployments
       const data = await getWorkflows({}, signal);
-      
+
       if (isMounted.current) {
         const workflows = data.workflows || [];
         const contractsData = workflows.flatMap((w) => {
@@ -62,7 +63,7 @@ export function useContracts(options: UseContractsOptions = {}): UseContractsRet
       }
     } catch (err: unknown) {
       if (isMounted.current && !isAbortError(err)) {
-        setError(getErrorMessage(err, 'Failed to fetch contracts'));
+        setError(getErrorMessage(err, "Failed to fetch contracts"));
       }
     } finally {
       if (isMounted.current) {
@@ -76,14 +77,14 @@ export function useContracts(options: UseContractsOptions = {}): UseContractsRet
     if (fetchController.current) {
       fetchController.current.abort();
     }
-    
+
     fetchController.current = new AbortController();
     setLoading(true);
     await fetchContracts(fetchController.current.signal);
   }, [fetchContracts]);
 
   // Apply filters
-  const filteredContracts = contracts.filter(contract => {
+  const filteredContracts = contracts.filter((contract) => {
     if (network && contract.network !== network) return false;
     if (verified !== undefined && contract.verified !== verified) return false;
     return true;
@@ -93,7 +94,7 @@ export function useContracts(options: UseContractsOptions = {}): UseContractsRet
   useEffect(() => {
     isMounted.current = true;
     fetchController.current = new AbortController();
-    
+
     fetchContracts(fetchController.current.signal);
 
     return () => {
@@ -126,4 +127,3 @@ export function useContracts(options: UseContractsOptions = {}): UseContractsRet
     filteredContracts,
   };
 }
-

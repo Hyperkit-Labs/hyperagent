@@ -1,19 +1,19 @@
 /**
  * Grid System Utilities
- * 
+ *
  * Helper functions for working with the 12-column grid system
  */
 
-import { tokens } from './design-tokens';
+import { tokens } from "./design-tokens";
 
 /**
  * Get grid gap class name
  */
-export function getGridGap(gap: keyof typeof tokens.grid.gap = 'md'): string {
+export function getGridGap(gap: keyof typeof tokens.grid.gap = "md"): string {
   const gapMap = {
-    sm: 'gap-4',   // 1rem = 16px
-    md: 'gap-6',   // 1.5rem = 24px
-    lg: 'gap-8',   // 2rem = 32px
+    sm: "gap-4", // 1rem = 16px
+    md: "gap-6", // 1.5rem = 24px
+    lg: "gap-8", // 2rem = 32px
   };
   return gapMap[gap];
 }
@@ -24,7 +24,7 @@ export function getGridGap(gap: keyof typeof tokens.grid.gap = 'md'): string {
 export function getGridColSpan(span: number): string {
   if (span < 1 || span > 12) {
     console.warn(`Grid span must be between 1 and 12, got ${span}`);
-    return 'col-span-1';
+    return "col-span-1";
   }
   return `col-span-${span}`;
 }
@@ -40,7 +40,7 @@ export function getResponsiveGridCols(config: {
   xl?: number;
 }): string {
   const classes: string[] = [];
-  
+
   if (config.default) {
     classes.push(`grid-cols-${config.default}`);
   }
@@ -56,8 +56,8 @@ export function getResponsiveGridCols(config: {
   if (config.xl) {
     classes.push(`xl:grid-cols-${config.xl}`);
   }
-  
-  return classes.join(' ');
+
+  return classes.join(" ");
 }
 
 /**

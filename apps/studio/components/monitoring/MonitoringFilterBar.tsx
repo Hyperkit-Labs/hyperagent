@@ -35,7 +35,8 @@ function Dropdown({
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
     };
     document.addEventListener("click", handler);
     return () => document.removeEventListener("click", handler);
@@ -48,7 +49,12 @@ function Dropdown({
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--color-border-subtle)] text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] transition-colors"
       >
         {label}
-        <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", open && "rotate-180")} />
+        <ChevronDown
+          className={cn(
+            "w-3.5 h-3.5 transition-transform",
+            open && "rotate-180",
+          )}
+        />
       </button>
       {open && (
         <div
@@ -71,7 +77,8 @@ export function MonitoringFilterBar({
   onTimeRangeChange,
   onServiceChange,
 }: MonitoringFilterBarProps) {
-  const timeLabel = TIME_RANGE_OPTIONS.find((o) => o.value === timeRange)?.label ?? "Last 24h";
+  const timeLabel =
+    TIME_RANGE_OPTIONS.find((o) => o.value === timeRange)?.label ?? "Last 24h";
 
   return (
     <div className="flex flex-wrap items-center gap-3">
@@ -85,12 +92,14 @@ export function MonitoringFilterBar({
               "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
               level === opt
                 ? "bg-[var(--color-bg-panel)] text-[var(--color-text-primary)] shadow-sm"
-                : "text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
+                : "text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]",
             )}
           >
             <span className="flex items-center gap-1.5">
               {level === opt && <Check className="w-3 h-3" />}
-              {opt === "all" ? "All" : opt.charAt(0).toUpperCase() + opt.slice(1)}
+              {opt === "all"
+                ? "All"
+                : opt.charAt(0).toUpperCase() + opt.slice(1)}
             </span>
           </button>
         ))}
@@ -104,7 +113,9 @@ export function MonitoringFilterBar({
             onClick={() => onTimeRangeChange(value)}
             className={cn(
               "w-full px-3 py-2 text-left text-xs flex items-center gap-2",
-              timeRange === value ? "text-[var(--color-text-primary)] bg-[var(--color-bg-hover)]" : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]"
+              timeRange === value
+                ? "text-[var(--color-text-primary)] bg-[var(--color-bg-hover)]"
+                : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]",
             )}
           >
             {timeRange === value && <Check className="w-3 h-3" />}
@@ -121,7 +132,9 @@ export function MonitoringFilterBar({
               onClick={() => onServiceChange("")}
               className={cn(
                 "w-full px-3 py-2 text-left text-xs flex items-center gap-2",
-                !service ? "text-[var(--color-text-primary)] bg-[var(--color-bg-hover)]" : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]"
+                !service
+                  ? "text-[var(--color-text-primary)] bg-[var(--color-bg-hover)]"
+                  : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]",
               )}
             >
               {!service && <Check className="w-3 h-3" />}
@@ -134,7 +147,9 @@ export function MonitoringFilterBar({
                 onClick={() => onServiceChange(s)}
                 className={cn(
                   "w-full px-3 py-2 text-left text-xs flex items-center gap-2",
-                  service === s ? "text-[var(--color-text-primary)] bg-[var(--color-bg-hover)]" : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]"
+                  service === s
+                    ? "text-[var(--color-text-primary)] bg-[var(--color-bg-hover)]"
+                    : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]",
                 )}
               >
                 {service === s && <Check className="w-3 h-3" />}
@@ -164,7 +179,7 @@ export function useMonitoringFilters() {
       if (updates.service != null) params.set("service", updates.service);
       router.replace(`?${params.toString()}`, { scroll: false });
     },
-    [router, searchParams]
+    [router, searchParams],
   );
 
   return {
@@ -182,12 +197,9 @@ function normalizeLevel(l: string): string {
   return s === "warning" ? "warn" : s;
 }
 
-export function filterLogsByParams<T extends { level?: string; timestamp?: string; service?: string }>(
-  logs: T[],
-  level: string,
-  timeRange: string,
-  service: string
-): T[] {
+export function filterLogsByParams<
+  T extends { level?: string; timestamp?: string; service?: string },
+>(logs: T[], level: string, timeRange: string, service: string): T[] {
   let result = logs;
 
   if (level && level !== "all") {
@@ -195,12 +207,19 @@ export function filterLogsByParams<T extends { level?: string; timestamp?: strin
   }
 
   if (service) {
-    result = result.filter((e) => (e.service ?? "").toLowerCase() === service.toLowerCase());
+    result = result.filter(
+      (e) => (e.service ?? "").toLowerCase() === service.toLowerCase(),
+    );
   }
 
   if (timeRange) {
     const now = Date.now();
-    const ms = timeRange === "1h" ? 60 * 60 * 1000 : timeRange === "24h" ? 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+    const ms =
+      timeRange === "1h"
+        ? 60 * 60 * 1000
+        : timeRange === "24h"
+          ? 24 * 60 * 60 * 1000
+          : 7 * 24 * 60 * 60 * 1000;
     const cutoff = now - ms;
     result = result.filter((e) => {
       const ts = e.timestamp;

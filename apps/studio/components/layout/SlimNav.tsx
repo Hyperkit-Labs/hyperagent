@@ -33,14 +33,18 @@ const SIDEBAR_EXPANDED = 224;
 const STORAGE_KEY = "hyperkit-sidebar";
 
 function loadSidebarState() {
-  if (typeof window === "undefined") return { expanded: true, width: SIDEBAR_EXPANDED };
+  if (typeof window === "undefined")
+    return { expanded: true, width: SIDEBAR_EXPANDED };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { expanded: true, width: SIDEBAR_EXPANDED };
     const parsed = JSON.parse(raw) as { expanded?: boolean; width?: number };
     return {
       expanded: parsed.expanded ?? true,
-      width: Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, parsed.width ?? SIDEBAR_EXPANDED)),
+      width: Math.min(
+        SIDEBAR_MAX,
+        Math.max(SIDEBAR_MIN, parsed.width ?? SIDEBAR_EXPANDED),
+      ),
     };
   } catch {
     return { expanded: true, width: SIDEBAR_EXPANDED };
@@ -95,7 +99,8 @@ function NavItem({
   expanded: boolean;
 }) {
   const isActive =
-    pathname === href || (href !== ROUTES.DASHBOARD && pathname.startsWith(href));
+    pathname === href ||
+    (href !== ROUTES.DASHBOARD && pathname.startsWith(href));
 
   return (
     <Link
@@ -154,7 +159,10 @@ export function SlimNav() {
     const handleMouseMove = (e: MouseEvent) => {
       const rect = sidebarRef.current?.getBoundingClientRect();
       const left = rect?.left ?? 0;
-      const newWidth = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, e.clientX - left));
+      const newWidth = Math.min(
+        SIDEBAR_MAX,
+        Math.max(SIDEBAR_MIN, e.clientX - left),
+      );
       setSidebarState((s) => ({
         ...s,
         expanded: newWidth > SIDEBAR_COLLAPSED + 8,

@@ -8,7 +8,10 @@ export interface LiveIndicatorProps {
   className?: string;
 }
 
-export function LiveIndicator({ live = false, className = "" }: LiveIndicatorProps) {
+export function LiveIndicator({
+  live = false,
+  className = "",
+}: LiveIndicatorProps) {
   if (!live) return null;
 
   return (

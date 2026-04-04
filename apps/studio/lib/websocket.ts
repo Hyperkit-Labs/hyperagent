@@ -2,15 +2,15 @@
  * Workflow WebSocket client for real-time updates.
  */
 
-import { getServiceUrl } from '@/config/environment';
+import { getServiceUrl } from "@/config/environment";
 
 function wsBase(): string {
-  const url = getServiceUrl('backend');
+  const url = getServiceUrl("backend");
   // Convert HTTP/HTTPS to WS/WSS
-  if (url.startsWith('https://')) {
-    return url.replace(/^https/, 'wss');
+  if (url.startsWith("https://")) {
+    return url.replace(/^https/, "wss");
   }
-  return url.replace(/^http/, 'ws');
+  return url.replace(/^http/, "ws");
 }
 
 export interface WorkflowMessage {
@@ -53,11 +53,12 @@ export class WorkflowWebSocket {
   }
 
   connect(): void {
-    if (typeof window === 'undefined' || this.ws?.readyState === WebSocket.OPEN) return;
+    if (typeof window === "undefined" || this.ws?.readyState === WebSocket.OPEN)
+      return;
     const base = wsBase();
     // Backend WebSocket endpoint: /ws/workflow/{workflow_id} (not under /api/v1)
     // Remove /api/v1 from base URL for WebSocket path
-    const wsBaseUrl = base.replace('/api/v1', '');
+    const wsBaseUrl = base.replace("/api/v1", "");
     const url = `${wsBaseUrl}/ws/workflow/${this.workflowId}`;
     this.ws = new WebSocket(url);
     this.ws.onopen = () => this.connectHandlers.forEach((h) => h());

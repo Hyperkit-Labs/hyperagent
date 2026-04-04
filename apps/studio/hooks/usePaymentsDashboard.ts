@@ -6,9 +6,9 @@
  * Production pattern: lift data fetching to page level, pass to children as props.
  */
 
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from "react";
 import {
   getPaymentHistory,
   getPaymentSummary,
@@ -19,7 +19,7 @@ import {
   type PaymentSummary,
   type SpendingControlWithBudget,
   type CreditsBalance,
-} from '@/lib/api';
+} from "@/lib/api";
 
 export type StablecoinsMap = Record<string, { USDC?: string; USDT?: string }>;
 
@@ -45,13 +45,9 @@ export interface UsePaymentsDashboardReturn {
 }
 
 export function usePaymentsDashboard(
-  options: UsePaymentsDashboardOptions = {}
+  options: UsePaymentsDashboardOptions = {},
 ): UsePaymentsDashboardReturn {
-  const {
-    page = 1,
-    pageSize = 20,
-    enabled = true,
-  } = options;
+  const { page = 1, pageSize = 20, enabled = true } = options;
 
   const [data, setData] = useState<PaymentsDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,13 +61,14 @@ export function usePaymentsDashboard(
     setLoading(true);
     setError(null);
     try {
-      const [historyRes, summaryRes, controlRes, balanceRes, stablecoinsRes] = await Promise.all([
-        getPaymentHistory({ limit: pageSize, offset: (page - 1) * pageSize }),
-        getPaymentSummary(),
-        getSpendingControlWithBudget(),
-        getCreditsBalance(),
-        getStablecoins(),
-      ]);
+      const [historyRes, summaryRes, controlRes, balanceRes, stablecoinsRes] =
+        await Promise.all([
+          getPaymentHistory({ limit: pageSize, offset: (page - 1) * pageSize }),
+          getPaymentSummary(),
+          getSpendingControlWithBudget(),
+          getCreditsBalance(),
+          getStablecoins(),
+        ]);
       setData({
         history: historyRes,
         summary: summaryRes,
@@ -80,7 +77,7 @@ export function usePaymentsDashboard(
         stablecoins: stablecoinsRes ?? {},
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load payments');
+      setError(err instanceof Error ? err.message : "Failed to load payments");
     } finally {
       setLoading(false);
     }

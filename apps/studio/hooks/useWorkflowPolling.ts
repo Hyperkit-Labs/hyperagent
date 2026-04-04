@@ -1,18 +1,26 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { getWorkflow, getWorkflowContracts } from '@/lib/api';
-import { POLLING } from '@/constants/defaults';
-import type { Workflow } from '@/lib/types';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { getWorkflow, getWorkflowContracts } from "@/lib/api";
+import { POLLING } from "@/constants/defaults";
+import type { Workflow } from "@/lib/types";
 
-type ContractItem = { bytecode?: string; abi?: unknown; source_code?: string; [key: string]: unknown };
+type ContractItem = {
+  bytecode?: string;
+  abi?: unknown;
+  source_code?: string;
+  [key: string]: unknown;
+};
 
 export interface UseWorkflowPollingOptions {
   /** Override poll interval (ms). When SSE is primary, use larger value to reduce polling. */
   pollIntervalMs?: number;
 }
 
-export function useWorkflowPolling(workflowId: string | null, options?: UseWorkflowPollingOptions) {
+export function useWorkflowPolling(
+  workflowId: string | null,
+  options?: UseWorkflowPollingOptions,
+) {
   const pollIntervalMs = options?.pollIntervalMs ?? POLLING.WORKFLOW_POLL_MS;
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [contracts, setContracts] = useState<ContractItem[]>([]);
@@ -23,16 +31,24 @@ export function useWorkflowPolling(workflowId: string | null, options?: UseWorkf
   const [contractCode, setContractCode] = useState<string | null>(null);
   const [isFetching, setIsFetching] = useState(false);
   const [pollingStartTime, setPollingStartTime] = useState<number | null>(null);
-  const [lastWorkflowStatus, setLastWorkflowStatus] = useState<string | null>(null);
+  const [lastWorkflowStatus, setLastWorkflowStatus] = useState<string | null>(
+    null,
+  );
   const [statusUnchangedCount, setStatusUnchangedCount] = useState(0);
 
   const fetchWorkflow = useCallback(async () => {
     if (!workflowId || isFetching) return;
-    if (pollingStartTime && Date.now() - pollingStartTime > POLLING.WORKFLOW_POLL_TIMEOUT_MS) {
+    if (
+      pollingStartTime &&
+      Date.now() - pollingStartTime > POLLING.WORKFLOW_POLL_TIMEOUT_MS
+    ) {
       setAutoRefresh(false);
       return;
     }
-    if (lastWorkflowStatus && statusUnchangedCount >= POLLING.WORKFLOW_STATUS_UNCHANGED_LIMIT) {
+    if (
+      lastWorkflowStatus &&
+      statusUnchangedCount >= POLLING.WORKFLOW_STATUS_UNCHANGED_LIMIT
+    ) {
       setAutoRefresh(false);
       return;
     }
@@ -42,11 +58,15 @@ export function useWorkflowPolling(workflowId: string | null, options?: UseWorkf
       const shouldFetchContracts =
         !contractData ||
         lastWorkflowStatus === null ||
-        ['compiling', 'auditing', 'testing', 'completed', 'success'].includes(lastWorkflowStatus ?? '');
+        ["compiling", "auditing", "testing", "completed", "success"].includes(
+          lastWorkflowStatus ?? "",
+        );
 
       const [data, contractsResponse] = await Promise.all([
         getWorkflow(workflowId),
-        shouldFetchContracts ? getWorkflowContracts(workflowId).catch(() => []) : Promise.resolve(null),
+        shouldFetchContracts
+          ? getWorkflowContracts(workflowId).catch(() => [])
+          : Promise.resolve(null),
       ]);
 
       setWorkflow(data);
@@ -59,7 +79,9 @@ export function useWorkflowPolling(workflowId: string | null, options?: UseWorkf
       }
 
       if (contractsResponse !== null) {
-        const contractsList = Array.isArray(contractsResponse) ? contractsResponse : (contractsResponse as { contracts?: unknown[] })?.contracts ?? [];
+        const contractsList = Array.isArray(contractsResponse)
+          ? contractsResponse
+          : ((contractsResponse as { contracts?: unknown[] })?.contracts ?? []);
         if (contractsList.length > 0) {
           setContracts(contractsList as ContractItem[]);
           const first = contractsList[0] as ContractItem;
@@ -68,22 +90,39 @@ export function useWorkflowPolling(workflowId: string | null, options?: UseWorkf
         }
       }
 
-      const terminal = ['failed', 'cancelled', 'completed', 'success'].includes(data.status);
+      const terminal = ["failed", "cancelled", "completed", "success"].includes(
+        data.status,
+      );
       if (terminal) {
         setAutoRefresh(false);
         setPollingStartTime(null);
         setStatusUnchangedCount(0);
       }
 
-      const inProgress = ['running', 'building', 'generating', 'compiling', 'auditing', 'testing', 'deploying', 'processing', 'spec_review', 'design_review', 'pending'].includes(data.status);
-      const pendingSignature = data.meta_data?.deployment_status === 'pending_signature' || data.meta_data?.requires_user_signature;
+      const inProgress = [
+        "running",
+        "building",
+        "generating",
+        "compiling",
+        "auditing",
+        "testing",
+        "deploying",
+        "processing",
+        "spec_review",
+        "design_review",
+        "pending",
+      ].includes(data.status);
+      const pendingSignature =
+        data.meta_data?.deployment_status === "pending_signature" ||
+        data.meta_data?.requires_user_signature;
       if (inProgress || pendingSignature) {
         setAutoRefresh(true);
         if (!pollingStartTime) setPollingStartTime(Date.now());
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to load workflow';
-      if (!autoRefresh || !msg.includes('Network error')) setError(msg);
+      const msg =
+        err instanceof Error ? err.message : "Failed to load workflow";
+      if (!autoRefresh || !msg.includes("Network error")) setError(msg);
     } finally {
       setIsFetching(false);
     }

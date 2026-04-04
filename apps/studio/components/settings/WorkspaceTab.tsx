@@ -47,7 +47,9 @@ export function WorkspaceTab({
 
   const workspaceLoading = configLoading || networksLoading;
   const defaultLabel = defaultNetwork
-    ? networks.find((n) => n.network_id === defaultNetwork || n.id === defaultNetwork)?.name ?? defaultNetwork
+    ? (networks.find(
+        (n) => n.network_id === defaultNetwork || n.id === defaultNetwork,
+      )?.name ?? defaultNetwork)
     : "Auto (first testnet)";
 
   return (
@@ -61,7 +63,11 @@ export function WorkspaceTab({
       {configError && (
         <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 flex items-center justify-between">
           <p className="text-xs text-red-400">{configError}</p>
-          <button type="button" onClick={refetchWorkspace} className="text-xs text-red-400 underline">
+          <button
+            type="button"
+            onClick={refetchWorkspace}
+            className="text-xs text-red-400 underline"
+          >
             Retry
           </button>
         </div>
@@ -72,14 +78,18 @@ export function WorkspaceTab({
             <span className="text-[var(--color-text-muted)]">Runtime</span>
             <span
               className={`px-2 py-0.5 rounded-full ${
-                config?.monitoring_enabled ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"
+                config?.monitoring_enabled
+                  ? "bg-emerald-500/10 text-emerald-400"
+                  : "bg-amber-500/10 text-amber-400"
               }`}
             >
               Monitoring {config?.monitoring_enabled ? "enabled" : "disabled"}
             </span>
             <span
               className={`px-2 py-0.5 rounded-full ${
-                config?.x402_enabled ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
+                config?.x402_enabled
+                  ? "bg-emerald-500/10 text-emerald-400"
+                  : "bg-rose-500/10 text-rose-400"
               }`}
             >
               x402 {config?.x402_enabled ? "enabled" : "disabled"}
@@ -96,12 +106,17 @@ export function WorkspaceTab({
           <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-6 text-sm">
             <div className="space-y-4">
               <div>
-                <label className="block text-xs text-[var(--color-text-muted)] mb-1">Default network</label>
+                <label className="block text-xs text-[var(--color-text-muted)] mb-1">
+                  Default network
+                </label>
                 <select
                   value={defaultNetwork}
                   onChange={(e) => {
                     setDefaultNetwork(e.target.value);
-                    localStorage.setItem("hyperagent_default_network", e.target.value);
+                    localStorage.setItem(
+                      "hyperagent_default_network",
+                      e.target.value,
+                    );
                   }}
                   className="rounded-lg bg-[var(--color-bg-base)] border border-[var(--color-border-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] w-full"
                 >
@@ -115,11 +130,25 @@ export function WorkspaceTab({
               </div>
               <div className="flex gap-3 text-xs">
                 <span className="text-[var(--color-text-muted)]">x402:</span>
-                <span className={config?.x402_enabled ? "text-emerald-400" : "text-[var(--color-text-tertiary)]"}>
+                <span
+                  className={
+                    config?.x402_enabled
+                      ? "text-emerald-400"
+                      : "text-[var(--color-text-tertiary)]"
+                  }
+                >
                   {config?.x402_enabled ? "On" : "Off"}
                 </span>
-                <span className="text-[var(--color-text-muted)]">Monitoring:</span>
-                <span className={config?.monitoring_enabled ? "text-emerald-400" : "text-[var(--color-text-tertiary)]"}>
+                <span className="text-[var(--color-text-muted)]">
+                  Monitoring:
+                </span>
+                <span
+                  className={
+                    config?.monitoring_enabled
+                      ? "text-emerald-400"
+                      : "text-[var(--color-text-tertiary)]"
+                  }
+                >
                   {config?.monitoring_enabled ? "On" : "Off"}
                 </span>
               </div>
@@ -127,7 +156,9 @@ export function WorkspaceTab({
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-[var(--color-text-muted)]">Available networks</span>
+                <span className="text-xs text-[var(--color-text-muted)]">
+                  Available networks
+                </span>
                 <Link
                   href={ROUTES.NETWORKS}
                   className="text-[11px] text-[var(--color-primary-light)] hover:text-[var(--color-primary)] transition-colors"
@@ -137,7 +168,8 @@ export function WorkspaceTab({
               </div>
               {networks.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] px-3 py-4 text-xs text-[var(--color-text-muted)]">
-                  No networks configured. Add one from the registry to start deploying.
+                  No networks configured. Add one from the registry to start
+                  deploying.
                 </div>
               ) : (
                 <div className="rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] max-h-40 overflow-y-auto">
@@ -146,7 +178,9 @@ export function WorkspaceTab({
                       key={n.network_id}
                       className="flex items-center justify-between py-2 px-3 text-xs hover:bg-[var(--color-bg-panel)] border-b border-[var(--color-border-subtle)] last:border-0"
                     >
-                      <span className="text-[var(--color-text-primary)]">{n.name}</span>
+                      <span className="text-[var(--color-text-primary)]">
+                        {n.name}
+                      </span>
                       <span className="text-[var(--color-text-muted)]">
                         {n.category ?? "-"} / {n.tier ?? "-"}
                       </span>

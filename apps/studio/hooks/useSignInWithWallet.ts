@@ -1,9 +1,16 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useActiveAccount, useActiveWallet, useActiveWalletChain } from "thirdweb/react";
+import {
+  useActiveAccount,
+  useActiveWallet,
+  useActiveWalletChain,
+} from "thirdweb/react";
 import { signMessage } from "thirdweb/utils";
-import { bootstrapWithSiwe, bootstrapWithThirdwebInApp } from "@/lib/authBootstrap";
+import {
+  bootstrapWithSiwe,
+  bootstrapWithThirdwebInApp,
+} from "@/lib/authBootstrap";
 import { getErrorRequestId, signInFailureMessage } from "@/lib/sadPathCopy";
 import { clearStoredSession, setStoredSession } from "@/lib/session-store";
 
@@ -15,13 +22,19 @@ async function getAuthTokenWithRetry(
   walletRef: unknown,
 ): Promise<string> {
   for (let attempt = 0; attempt < AUTH_TOKEN_MAX_RETRIES; attempt++) {
-    const token = getAuth ? await Promise.resolve(getAuth.call(walletRef)) : null;
+    const token = getAuth
+      ? await Promise.resolve(getAuth.call(walletRef))
+      : null;
     if (token) return token;
     if (attempt < AUTH_TOKEN_MAX_RETRIES - 1) {
-      await new Promise((r) => setTimeout(r, AUTH_TOKEN_RETRY_BASE_MS * 2 ** attempt));
+      await new Promise((r) =>
+        setTimeout(r, AUTH_TOKEN_RETRY_BASE_MS * 2 ** attempt),
+      );
     }
   }
-  throw new Error("Could not retrieve auth token from wallet after multiple attempts. Please reconnect and try again.");
+  throw new Error(
+    "Could not retrieve auth token from wallet after multiple attempts. Please reconnect and try again.",
+  );
 }
 
 /**
@@ -44,11 +57,14 @@ export function useSignInWithWallet() {
     setIsLoading(true);
     try {
       const isInAppWallet =
-        typeof (wallet as { getAuthToken?: () => Promise<string> } | undefined)?.getAuthToken === "function";
+        typeof (wallet as { getAuthToken?: () => Promise<string> } | undefined)
+          ?.getAuthToken === "function";
 
       let session;
       if (isInAppWallet && wallet) {
-        const getAuth = (wallet as { getAuthToken?: () => string | null | Promise<string> }).getAuthToken;
+        const getAuth = (
+          wallet as { getAuthToken?: () => string | null | Promise<string> }
+        ).getAuthToken;
         session = await bootstrapWithThirdwebInApp({
           walletAddress: account.address,
           getAuthToken: () => getAuthTokenWithRetry(getAuth, wallet),
@@ -67,7 +83,10 @@ export function useSignInWithWallet() {
       return true;
     } catch (err) {
       clearStoredSession();
-      const status = err && typeof err === "object" && "status" in err ? (err as { status?: number }).status : undefined;
+      const status =
+        err && typeof err === "object" && "status" in err
+          ? (err as { status?: number }).status
+          : undefined;
       const raw = err instanceof Error ? err.message : "Sign in failed.";
       const code =
         err && typeof err === "object" && "code" in err

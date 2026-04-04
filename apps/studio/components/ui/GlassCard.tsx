@@ -9,7 +9,11 @@ export interface GlassCardProps {
   hover?: boolean;
 }
 
-export function GlassCard({ children, className = "", hover = false }: GlassCardProps) {
+export function GlassCard({
+  children,
+  className = "",
+  hover = false,
+}: GlassCardProps) {
   return (
     <div
       className={`glass-panel rounded-xl ${hover ? "hover:translate-y-[-2px] transition-transform duration-300" : ""} ${className}`.trim()}

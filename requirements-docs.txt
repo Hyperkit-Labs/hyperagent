@@ -1,0 +1,3 @@
+# Documentation site (MkDocs Material). Install: pip install -r requirements-docs.txt
+mkdocs-material>=9.5.0
+mkdocs-mermaid2-plugin>=1.1.0

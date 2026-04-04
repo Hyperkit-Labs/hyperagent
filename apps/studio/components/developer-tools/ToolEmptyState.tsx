@@ -9,7 +9,12 @@ export interface ToolEmptyStateProps {
   className?: string;
 }
 
-export function ToolEmptyState({ title, description, suggestions, className = "" }: ToolEmptyStateProps) {
+export function ToolEmptyState({
+  title,
+  description,
+  suggestions,
+  className = "",
+}: ToolEmptyStateProps) {
   return (
     <div
       className={`flex flex-col items-center justify-center text-center py-12 px-4 ${className}`.trim()}
@@ -28,12 +33,27 @@ export function ToolEmptyState({ title, description, suggestions, className = ""
           fill="none"
           className="text-[var(--color-primary-light)]"
         >
-          <circle cx="8.5" cy="8.5" r="6" stroke="currentColor" strokeWidth="1.5" />
-          <path d="M13 13L17 17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          <circle
+            cx="8.5"
+            cy="8.5"
+            r="6"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          />
+          <path
+            d="M13 13L17 17"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
         </svg>
       </motion.div>
-      <p className="text-[var(--color-text-secondary)] text-sm font-medium mb-1">{title}</p>
-      <p className="text-[var(--color-text-tertiary)] text-xs leading-relaxed max-w-xs">{description}</p>
+      <p className="text-[var(--color-text-secondary)] text-sm font-medium mb-1">
+        {title}
+      </p>
+      <p className="text-[var(--color-text-tertiary)] text-xs leading-relaxed max-w-xs">
+        {description}
+      </p>
       {suggestions && suggestions.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-3 justify-center">
           {suggestions.map((s) => (

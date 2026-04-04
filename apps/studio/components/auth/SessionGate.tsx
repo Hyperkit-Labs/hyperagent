@@ -37,13 +37,13 @@ export function SessionGate({
   const isBusy = isConnecting || isLoading;
 
   const content = (
-    <div className={`space-y-4 ${noWrapper ? '' : 'max-w-md w-full glass-panel rounded-xl p-6'}`}>
+    <div
+      className={`space-y-4 ${noWrapper ? "" : "max-w-md w-full glass-panel rounded-xl p-6"}`}
+    >
       <h1 className="text-lg font-semibold text-[var(--color-text-primary)] tracking-tight">
         {title}
       </h1>
-      <p className="text-[var(--color-text-tertiary)] text-sm">
-        {description}
-      </p>
+      <p className="text-[var(--color-text-tertiary)] text-sm">{description}</p>
       <div className="flex flex-col gap-3">
         {!account ? (
           <button
@@ -59,7 +59,11 @@ export function SessionGate({
               ${isConnectState && !isBusy ? "animate-pulse-glow" : ""}
             `}
           >
-            {isConnecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wallet className="w-4 h-4" />}
+            {isConnecting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Wallet className="w-4 h-4" />
+            )}
             {isConnecting ? "Connecting..." : "Connect wallet"}
           </button>
         ) : (
@@ -81,7 +85,8 @@ export function SessionGate({
       </div>
       {!client && (
         <p className="text-xs text-[var(--color-text-muted)]">
-          Wallet connection is not configured. Set NEXT_PUBLIC_THIRDWEB_CLIENT_ID in .env.
+          Wallet connection is not configured. Set
+          NEXT_PUBLIC_THIRDWEB_CLIENT_ID in .env.
         </p>
       )}
       {error && (

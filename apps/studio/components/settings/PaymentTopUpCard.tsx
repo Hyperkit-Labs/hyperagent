@@ -29,7 +29,10 @@ export interface PaymentTopUpCardProps {
   stablecoinsFromParent?: StablecoinsMap;
 }
 
-export function PaymentTopUpCard({ onTopUpSuccess, stablecoinsFromParent }: PaymentTopUpCardProps) {
+export function PaymentTopUpCard({
+  onTopUpSuccess,
+  stablecoinsFromParent,
+}: PaymentTopUpCardProps) {
   const account = useActiveAccount();
   const { hasSession } = useSession();
   const { networks } = useNetworks();
@@ -42,7 +45,9 @@ export function PaymentTopUpCard({ onTopUpSuccess, stablecoinsFromParent }: Paym
   const [stablecoinsLocal, setStablecoinsLocal] = useState<StablecoinsMap>({});
 
   const fetchStablecoins = useCallback(() => {
-    getStablecoins().then(setStablecoinsLocal).catch(() => setStablecoinsLocal({}));
+    getStablecoins()
+      .then(setStablecoinsLocal)
+      .catch(() => setStablecoinsLocal({}));
   }, []);
 
   useEffect(() => {
@@ -55,7 +60,12 @@ export function PaymentTopUpCard({ onTopUpSuccess, stablecoinsFromParent }: Paym
   const stablecoins = stablecoinsFromParent ?? stablecoinsLocal;
 
   const { selectedNetwork, chain, tokenAddress } = useMemo(() => {
-    const net = networks.find((n) => n.id === selectedNetworkId || n.network_id === selectedNetworkId) ?? networks.find((n) => !n.is_mainnet) ?? networks[0];
+    const net =
+      networks.find(
+        (n) => n.id === selectedNetworkId || n.network_id === selectedNetworkId,
+      ) ??
+      networks.find((n) => !n.is_mainnet) ??
+      networks[0];
     const cid = net?.chain_id;
     const ch = cid != null ? getChainByChainId(cid) : undefined;
     const addrs = cid != null ? stablecoins[String(cid)] : undefined;
@@ -76,7 +86,9 @@ export function PaymentTopUpCard({ onTopUpSuccess, stablecoinsFromParent }: Paym
       return;
     }
     if (!chain || !tokenAddress) {
-      setError(`USDC/USDT not supported on ${selectedNetwork?.name ?? "selected network"}. Switch network in the header or use Base.`);
+      setError(
+        `USDC/USDT not supported on ${selectedNetwork?.name ?? "selected network"}. Switch network in the header or use Base.`,
+      );
       return;
     }
 
@@ -126,7 +138,9 @@ export function PaymentTopUpCard({ onTopUpSuccess, stablecoinsFromParent }: Paym
       const creditsAdded = Math.floor(num * creditsPerUsd);
       setAmount("");
       onTopUpSuccess?.();
-      toast.success(`Added ${creditsAdded} credits (${num} USD). Tx: ${result.transactionHash.slice(0, 10)}...`);
+      toast.success(
+        `Added ${creditsAdded} credits (${num} USD). Tx: ${result.transactionHash.slice(0, 10)}...`,
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Transfer failed";
       setError(handleApiError(e));
@@ -143,7 +157,9 @@ export function PaymentTopUpCard({ onTopUpSuccess, stablecoinsFromParent }: Paym
           <Wallet className="w-5 h-5" />
           <h3 className="text-sm font-medium">Add budget</h3>
         </div>
-        <p className="text-sm text-[var(--color-text-tertiary)] mt-2">Sign in to add USDC or USDT budget.</p>
+        <p className="text-sm text-[var(--color-text-tertiary)] mt-2">
+          Sign in to add USDC or USDT budget.
+        </p>
       </div>
     );
   }
@@ -155,7 +171,9 @@ export function PaymentTopUpCard({ onTopUpSuccess, stablecoinsFromParent }: Paym
           <Wallet className="w-5 h-5" />
           <h3 className="text-sm font-medium">Add budget (USDC/USDT)</h3>
         </div>
-        <p className="text-sm text-[var(--color-text-tertiary)] mt-2">Connect your wallet to top up with USDC or USDT.</p>
+        <p className="text-sm text-[var(--color-text-tertiary)] mt-2">
+          Connect your wallet to top up with USDC or USDT.
+        </p>
       </div>
     );
   }
@@ -166,14 +184,19 @@ export function PaymentTopUpCard({ onTopUpSuccess, stablecoinsFromParent }: Paym
     <div className="rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] p-4 space-y-4">
       <div className="flex items-center gap-2">
         <Coins className="w-5 h-5 text-[var(--color-text-muted)]" />
-        <h3 className="text-sm font-medium text-[var(--color-text-primary)]">Add budget (USDC/USDT)</h3>
+        <h3 className="text-sm font-medium text-[var(--color-text-primary)]">
+          Add budget (USDC/USDT)
+        </h3>
       </div>
       <p className="text-xs text-[var(--color-text-tertiary)]">
-        Send USDC or USDT on <strong>{selectedNetwork?.name ?? "selected network"}</strong>. 1 USD = {creditsPerUsd} credits. Funds go to merchant wallet.
+        Send USDC or USDT on{" "}
+        <strong>{selectedNetwork?.name ?? "selected network"}</strong>. 1 USD ={" "}
+        {creditsPerUsd} credits. Funds go to merchant wallet.
       </p>
       {!canPay && selectedNetwork && (
         <p className="text-xs text-[var(--color-text-muted)]">
-          Select a network with USDC/USDT in the header (e.g. SKALE Base Sepolia, Base).
+          Select a network with USDC/USDT in the header (e.g. SKALE Base
+          Sepolia, Base).
         </p>
       )}
       {error && <ApiErrorBanner error={error} onRetry={() => setError(null)} />}
@@ -201,12 +224,18 @@ export function PaymentTopUpCard({ onTopUpSuccess, stablecoinsFromParent }: Paym
           disabled={loading || !amount.trim() || !canPay || !account}
           className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)] disabled:opacity-50 disabled:pointer-events-none"
         >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wallet className="w-4 h-4" />}
+          {loading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Wallet className="w-4 h-4" />
+          )}
           {loading ? "Processing..." : "Pay with " + token}
         </button>
       </div>
       {!merchantAddress && (
-        <p className="text-xs text-[var(--color-text-muted)]">Configure MERCHANT_WALLET_ADDRESS to enable payments.</p>
+        <p className="text-xs text-[var(--color-text-muted)]">
+          Configure MERCHANT_WALLET_ADDRESS to enable payments.
+        </p>
       )}
     </div>
   );

@@ -17,7 +17,8 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Hyperkit - AI-Powered Smart Contract Platform",
-  description: "Production-ready smart contract development in under 2 minutes. x402 Native | Mantle SDK | Thirdweb",
+  description:
+    "Production-ready smart contract development in under 2 minutes. x402 Native | Mantle SDK | Thirdweb",
 };
 
 export default function RootLayout({

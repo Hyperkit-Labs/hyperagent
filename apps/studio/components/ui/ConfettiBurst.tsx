@@ -10,7 +10,17 @@ const COLORS = [
   "var(--color-semantic-info)",
 ];
 
-function Particle({ delay, color, dx, dy }: { delay: number; color: string; dx: number; dy: number }) {
+function Particle({
+  delay,
+  color,
+  dx,
+  dy,
+}: {
+  delay: number;
+  color: string;
+  dx: number;
+  dy: number;
+}) {
   return (
     <motion.div
       className="absolute w-2 h-2 rounded-sm"
@@ -55,7 +65,7 @@ export function ConfettiBurst({ active, onComplete }: ConfettiBurstProps) {
         dx: Math.cos(rad) * r,
         dy: Math.sin(rad) * r,
       };
-    })
+    }),
   );
 
   useEffect(() => {

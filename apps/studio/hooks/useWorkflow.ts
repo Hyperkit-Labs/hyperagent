@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { getWorkflow } from '@/lib/api';
-import type { Workflow } from '@/lib/types';
+import { useState, useEffect } from "react";
+import { getWorkflow } from "@/lib/api";
+import type { Workflow } from "@/lib/types";
 
 const INITIAL_FETCH_TIMEOUT_MS = 10000;
 
@@ -10,7 +10,15 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
     promise,
     new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error('Request timed out. Workflow may not exist or the server is slow.')), ms)
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              "Request timed out. Workflow may not exist or the server is slow.",
+            ),
+          ),
+        ms,
+      ),
     ),
   ]);
 }
@@ -35,7 +43,7 @@ export function useWorkflow(workflowId: string | null, pollInterval = 2000) {
           if (!isMounted) return;
           setWorkflow(data);
           setError(null);
-          if (['completed', 'failed', 'cancelled'].includes(data.status)) {
+          if (["completed", "failed", "cancelled"].includes(data.status)) {
             if (intervalId) {
               clearInterval(intervalId);
               intervalId = null;
@@ -44,27 +52,38 @@ export function useWorkflow(workflowId: string | null, pollInterval = 2000) {
         })
         .catch((err: unknown) => {
           if (!isMounted) return;
-          const msg = err instanceof Error ? err.message : 'Failed to fetch workflow';
-          const ref = err && typeof err === 'object' && 'requestId' in err ? (err as { requestId?: string }).requestId : undefined;
+          const msg =
+            err instanceof Error ? err.message : "Failed to fetch workflow";
+          const ref =
+            err && typeof err === "object" && "requestId" in err
+              ? (err as { requestId?: string }).requestId
+              : undefined;
           setError(ref ? `${msg} Reference: ${ref}` : msg);
         });
     };
 
-    const initialFetch = withTimeout(getWorkflow(workflowId), INITIAL_FETCH_TIMEOUT_MS);
+    const initialFetch = withTimeout(
+      getWorkflow(workflowId),
+      INITIAL_FETCH_TIMEOUT_MS,
+    );
 
     initialFetch
       .then((data) => {
         if (!isMounted) return;
         setWorkflow(data);
         setError(null);
-        if (!['completed', 'failed', 'cancelled'].includes(data.status)) {
+        if (!["completed", "failed", "cancelled"].includes(data.status)) {
           intervalId = setInterval(fetchWorkflow, pollInterval);
         }
       })
       .catch((err: unknown) => {
         if (!isMounted) return;
-        const msg = err instanceof Error ? err.message : 'Failed to fetch workflow';
-        const ref = err && typeof err === 'object' && 'requestId' in err ? (err as { requestId?: string }).requestId : undefined;
+        const msg =
+          err instanceof Error ? err.message : "Failed to fetch workflow";
+        const ref =
+          err && typeof err === "object" && "requestId" in err
+            ? (err as { requestId?: string }).requestId
+            : undefined;
         setError(ref ? `${msg} Reference: ${ref}` : msg);
       })
       .finally(() => {
@@ -84,7 +103,7 @@ export function useWorkflow(workflowId: string | null, pollInterval = 2000) {
       setWorkflow(data);
       setError(null);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch workflow');
+      setError(err instanceof Error ? err.message : "Failed to fetch workflow");
     }
   };
 

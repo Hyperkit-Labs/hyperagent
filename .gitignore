@@ -502,8 +502,8 @@ turbo-build-graph.html
 # ============================================================
 # DOCUMENTATION & SCRIPTS (Project-specific ignores)
 # ============================================================
-# Scripts (local/dev only, not main-level)
-scripts/
+# Scripts (local/dev only, repo root — do not use bare scripts/ or .github/**/scripts is ignored)
+/scripts/
 e2e/
 # Planning documents
 external/*

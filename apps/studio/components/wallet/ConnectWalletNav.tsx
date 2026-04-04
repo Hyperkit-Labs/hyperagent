@@ -3,12 +3,20 @@
 import { useRef, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useConnectModal, useActiveAccount, useDisconnect, useActiveWallet } from "thirdweb/react";
+import {
+  useConnectModal,
+  useActiveAccount,
+  useDisconnect,
+  useActiveWallet,
+} from "thirdweb/react";
 import { toast } from "sonner";
 import { getThirdwebClient } from "@/lib/thirdwebClient";
 import { getConnectConfig } from "@/lib/connectWallets";
 import { useSignInWithWallet } from "@/hooks/useSignInWithWallet";
-import { clearStoredSession, clearSessionOnlyLLMKey } from "@/lib/session-store";
+import {
+  clearStoredSession,
+  clearSessionOnlyLLMKey,
+} from "@/lib/session-store";
 import { deleteLLMKeys } from "@/lib/api";
 import { useSession } from "@/hooks/useSession";
 import { ROUTES } from "@/constants/routes";
@@ -22,8 +30,11 @@ function useAutoBootstrapInApp() {
   const attemptedRef = useRef(false);
 
   useEffect(() => {
-    if (!isReady || hasSession || !account || !wallet || attemptedRef.current) return;
-    const isInApp = typeof (wallet as { getAuthToken?: () => Promise<string> }).getAuthToken === "function";
+    if (!isReady || hasSession || !account || !wallet || attemptedRef.current)
+      return;
+    const isInApp =
+      typeof (wallet as { getAuthToken?: () => Promise<string> })
+        .getAuthToken === "function";
     if (!isInApp) return;
     attemptedRef.current = true;
     void signIn();
@@ -46,7 +57,11 @@ export function ConnectWalletNav() {
   const wallet = useActiveWallet();
   const { connect, isConnecting } = useConnectModal();
   const { disconnect } = useDisconnect();
-  const { signIn, isLoading: isSigningIn, error: signInError } = useSignInWithWallet();
+  const {
+    signIn,
+    isLoading: isSigningIn,
+    error: signInError,
+  } = useSignInWithWallet();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const isDashboard = pathname === ROUTES.DASHBOARD;
@@ -60,7 +75,8 @@ export function ConnectWalletNav() {
     }
     if (open) {
       document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [open]);
 
@@ -69,7 +85,7 @@ export function ConnectWalletNav() {
       connect(getConnectConfig(client));
     } else {
       toast.error(
-        "Wallet connection is not configured. Set NEXT_PUBLIC_THIRDWEB_CLIENT_ID in .env and restart the app."
+        "Wallet connection is not configured. Set NEXT_PUBLIC_THIRDWEB_CLIENT_ID in .env and restart the app.",
       );
     }
   };
@@ -87,7 +103,11 @@ export function ConnectWalletNav() {
       clearStoredSession();
     }
     if (wallet) disconnect(wallet);
-    toast.success(hadSession ? "Disconnected. LLM keys cleared from this device and from the server." : "Disconnected. Session cleared.");
+    toast.success(
+      hadSession
+        ? "Disconnected. LLM keys cleared from this device and from the server."
+        : "Disconnected. Session cleared.",
+    );
   };
 
   const handleSignInWithWallet = async () => {
@@ -106,7 +126,9 @@ export function ConnectWalletNav() {
       // best-effort
     }
     clearStoredSession();
-    toast.success("Signed out. LLM keys cleared from this device and from the server.");
+    toast.success(
+      "Signed out. LLM keys cleared from this device and from the server.",
+    );
   };
 
   if (account) {
@@ -145,7 +167,10 @@ export function ConnectWalletNav() {
             )}
             {hasSession ? (
               <>
-                <div className="px-3 py-2 text-sm text-[var(--color-text-muted)]" role="none">
+                <div
+                  className="px-3 py-2 text-sm text-[var(--color-text-muted)]"
+                  role="none"
+                >
                   Signed in
                 </div>
                 <button

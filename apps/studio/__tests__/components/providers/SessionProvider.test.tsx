@@ -11,7 +11,10 @@ jest.mock("next/navigation", () => ({
 }));
 
 jest.mock("@/lib/session-store", () => ({
-  getStoredSession: jest.fn(() => ({ access_token: "tok", expires_at: Date.now() / 1000 + 3600 })),
+  getStoredSession: jest.fn(() => ({
+    access_token: "tok",
+    expires_at: Date.now() / 1000 + 3600,
+  })),
   clearStoredSession: jest.fn(),
   SESSION_CHANGE_EVENT: "hyperagent_session_change",
 }));
@@ -25,11 +28,15 @@ jest.mock("@/lib/authRedirect", () => ({
   redirectToLoginWithNext: jest.fn(),
 }));
 
-import { SessionProvider, useSessionContext } from "@/components/providers/SessionProvider";
+import {
+  SessionProvider,
+  useSessionContext,
+} from "@/components/providers/SessionProvider";
 import { redirectToLoginWithNext } from "@/lib/authRedirect";
 
 function SessionStatus() {
-  const { bootstrapStatus, hasSession, isReady, bootstrapError } = useSessionContext();
+  const { bootstrapStatus, hasSession, isReady, bootstrapError } =
+    useSessionContext();
   return (
     <div>
       <span data-testid="status">{bootstrapStatus}</span>
@@ -47,13 +54,17 @@ describe("SessionProvider", () => {
   });
 
   it("sets bootstrapStatus=success when fetchConfigStrict resolves", async () => {
-    mockFetchConfigStrict.mockImplementation(() => Promise.resolve({ version: "1.0" }));
+    mockFetchConfigStrict.mockImplementation(() =>
+      Promise.resolve({ version: "1.0" }),
+    );
     const { getByTestId } = render(
       <SessionProvider>
         <SessionStatus />
-      </SessionProvider>
+      </SessionProvider>,
     );
-    await waitFor(() => expect(getByTestId("status").textContent).toBe("success"));
+    await waitFor(() =>
+      expect(getByTestId("status").textContent).toBe("success"),
+    );
   });
 
   it("sets bootstrapStatus=failed on 401 and redirects to login", async () => {
@@ -62,43 +73,61 @@ describe("SessionProvider", () => {
     const { getByTestId } = render(
       <SessionProvider>
         <SessionStatus />
-      </SessionProvider>
+      </SessionProvider>,
     );
-    await waitFor(() => expect(getByTestId("status").textContent).toBe("failed"));
+    await waitFor(() =>
+      expect(getByTestId("status").textContent).toBe("failed"),
+    );
     expect(redirectToLoginWithNext).toHaveBeenCalled();
   });
 
   it("sets bootstrapStatus=failed on 500 (fail-closed, not success)", async () => {
-    const err = Object.assign(new Error("Internal Server Error"), { status: 500 });
+    const err = Object.assign(new Error("Internal Server Error"), {
+      status: 500,
+    });
     mockFetchConfigStrict.mockImplementation(() => Promise.reject(err));
     const { getByTestId } = render(
       <SessionProvider>
         <SessionStatus />
-      </SessionProvider>
+      </SessionProvider>,
     );
-    await waitFor(() => expect(getByTestId("status").textContent).toBe("failed"));
+    await waitFor(() =>
+      expect(getByTestId("status").textContent).toBe("failed"),
+    );
   });
 
   it("sets bootstrapStatus=failed on network error (fail-closed)", async () => {
-    mockFetchConfigStrict.mockImplementation(() => Promise.reject(new TypeError("Failed to fetch")));
+    mockFetchConfigStrict.mockImplementation(() =>
+      Promise.reject(new TypeError("Failed to fetch")),
+    );
     const { getByTestId } = render(
       <SessionProvider>
         <SessionStatus />
-      </SessionProvider>
+      </SessionProvider>,
     );
-    await waitFor(() => expect(getByTestId("status").textContent).toBe("failed"));
+    await waitFor(() =>
+      expect(getByTestId("status").textContent).toBe("failed"),
+    );
   });
 
   it("503 does not redirect to login (session preserved for retry)", async () => {
-    const err = Object.assign(new Error("Service Unavailable"), { status: 503 });
+    const err = Object.assign(new Error("Service Unavailable"), {
+      status: 503,
+    });
     mockFetchConfigStrict.mockImplementation(() => Promise.reject(err));
     const { getByTestId } = render(
       <SessionProvider>
         <SessionStatus />
-      </SessionProvider>
+      </SessionProvider>,
     );
-    await waitFor(() => expect(getByTestId("status").textContent).toBe("failed"));
+    await waitFor(() =>
+      expect(getByTestId("status").textContent).toBe("failed"),
+    );
     expect(redirectToLoginWithNext).not.toHaveBeenCalled();
-    await waitFor(() => expect(getByTestId("bootstrap-err").textContent.length).toBeGreaterThan(0));
+    await waitFor(() =>
+      expect(getByTestId("bootstrap-err").textContent.length).toBeGreaterThan(
+        0,
+      ),
+    );
   });
 });

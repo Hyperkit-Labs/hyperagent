@@ -5,14 +5,27 @@
  * (getWorkflow, getWorkflowContracts, getWorkflowDeployments) with one Promise.all.
  */
 
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { getWorkflow, getWorkflowContracts, getWorkflowDeployments } from '@/lib/api';
-import type { Workflow } from '@/lib/types';
+import { useState, useEffect, useCallback } from "react";
+import {
+  getWorkflow,
+  getWorkflowContracts,
+  getWorkflowDeployments,
+} from "@/lib/api";
+import type { Workflow } from "@/lib/types";
 
-export type ContractItem = { bytecode?: string; abi?: unknown; contract_name?: string; [key: string]: unknown };
-export type DeploymentItem = { contract_address?: string; network?: string; [key: string]: unknown };
+export type ContractItem = {
+  bytecode?: string;
+  abi?: unknown;
+  contract_name?: string;
+  [key: string]: unknown;
+};
+export type DeploymentItem = {
+  contract_address?: string;
+  network?: string;
+  [key: string]: unknown;
+};
 
 export interface UseAppDetailDataOptions {
   workflowId: string | undefined;
@@ -28,7 +41,9 @@ export interface UseAppDetailDataReturn {
   refetch: () => Promise<void>;
 }
 
-export function useAppDetailData(options: UseAppDetailDataOptions): UseAppDetailDataReturn {
+export function useAppDetailData(
+  options: UseAppDetailDataOptions,
+): UseAppDetailDataReturn {
   const { workflowId, enabled = true } = options;
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [contracts, setContracts] = useState<ContractItem[]>([]);
@@ -54,10 +69,11 @@ export function useAppDetailData(options: UseAppDetailDataOptions): UseAppDetail
       ]);
       setWorkflow(wf);
       setContracts(Array.isArray(cList) ? cList : []);
-      const dList = (dRes as { deployments?: DeploymentItem[] })?.deployments ?? [];
+      const dList =
+        (dRes as { deployments?: DeploymentItem[] })?.deployments ?? [];
       setDeployments(Array.isArray(dList) ? dList : []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load app');
+      setError(err instanceof Error ? err.message : "Failed to load app");
       setWorkflow(null);
       setContracts([]);
       setDeployments([]);
@@ -70,5 +86,12 @@ export function useAppDetailData(options: UseAppDetailDataOptions): UseAppDetail
     void fetchAll();
   }, [fetchAll]);
 
-  return { workflow, contracts, deployments, loading, error, refetch: fetchAll };
+  return {
+    workflow,
+    contracts,
+    deployments,
+    loading,
+    error,
+    refetch: fetchAll,
+  };
 }

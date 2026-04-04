@@ -73,7 +73,10 @@ export function LLMKeysCard() {
     together: "",
   });
   const [keyValidated, setKeyValidated] = useState<string | null>(null);
-  const [sessionOnlyKey, setSessionOnlyKey] = useState<{ provider: string; apiKey: string } | null>(null);
+  const [sessionOnlyKey, setSessionOnlyKey] = useState<{
+    provider: string;
+    apiKey: string;
+  } | null>(null);
   const account = useActiveAccountFromContext();
 
   useEffect(() => {
@@ -82,10 +85,18 @@ export function LLMKeysCard() {
   useEffect(() => {
     const onUpdate = () => setSessionOnlyKey(getSessionOnlyLLMKey());
     window.addEventListener(SESSION_LLM_PASS_THROUGH_UPDATED_EVENT, onUpdate);
-    return () => window.removeEventListener(SESSION_LLM_PASS_THROUGH_UPDATED_EVENT, onUpdate);
+    return () =>
+      window.removeEventListener(
+        SESSION_LLM_PASS_THROUGH_UPDATED_EVENT,
+        onUpdate,
+      );
   }, []);
   const supabase = getSupabaseBrowserClient();
-  const { signIn, isLoading: isSigningIn, error: signInError } = useWalletAuth();
+  const {
+    signIn,
+    isLoading: isSigningIn,
+    error: signInError,
+  } = useWalletAuth();
   const { hasSession } = useSession();
 
   const isUnauthorized = Boolean(error && isAuthError(error));
@@ -117,7 +128,9 @@ export function LLMKeysCard() {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const prevSessionRef = useRef(hasSession);
@@ -160,7 +173,9 @@ export function LLMKeysCard() {
               [provider]: {
                 loading: false,
                 latency: res.latency_ms,
-                error: res.valid ? undefined : (res.error || "Invalid or expired key"),
+                error: res.valid
+                  ? undefined
+                  : res.error || "Invalid or expired key",
               },
             }));
           }
@@ -175,12 +190,14 @@ export function LLMKeysCard() {
       }
     };
     validateStoredKeys();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [hasSession, configured]);
 
   const handleSaveKeys = () => {
     const toSend = Object.fromEntries(
-      Object.entries(keys).filter(([, v]) => v && String(v).trim())
+      Object.entries(keys).filter(([, v]) => v && String(v).trim()),
     );
     if (Object.keys(toSend).length === 0) return;
     if (!hasSession) {
@@ -239,7 +256,9 @@ export function LLMKeysCard() {
         return;
       }
     }
-    setError("Enter at least one key (OpenAI, Anthropic, or Google) to use for this session only.");
+    setError(
+      "Enter at least one key (OpenAI, Anthropic, or Google) to use for this session only.",
+    );
   };
 
   const handleClearSessionOnly = () => {
@@ -256,28 +275,33 @@ export function LLMKeysCard() {
     return trimmed.length >= 20 && /^[a-zA-Z0-9_-]+$/.test(trimmed);
   };
 
-  const [testStatus, setTestStatus] = useState<Record<string, { loading: boolean; latency?: number; error?: string }>>({});
+  const [testStatus, setTestStatus] = useState<
+    Record<string, { loading: boolean; latency?: number; error?: string }>
+  >({});
 
   const handleTestConnection = async (provider: string) => {
     const keyToTest = keys[provider]?.trim();
     const hasStored = configured.includes(provider) && !keyToTest;
     if (!keyToTest && !hasStored) {
-      setTestStatus(prev => ({ ...prev, [provider]: { loading: false, error: "Enter a key or save one first" } }));
+      setTestStatus((prev) => ({
+        ...prev,
+        [provider]: { loading: false, error: "Enter a key or save one first" },
+      }));
       return;
     }
-    setTestStatus(prev => ({ ...prev, [provider]: { loading: true } }));
+    setTestStatus((prev) => ({ ...prev, [provider]: { loading: true } }));
     try {
       const res = await validateLLMKey(provider, keyToTest || undefined);
-      setTestStatus(prev => ({
+      setTestStatus((prev) => ({
         ...prev,
         [provider]: {
           loading: false,
           latency: res.latency_ms,
-          error: res.valid ? undefined : (res.error || "Invalid key"),
+          error: res.valid ? undefined : res.error || "Invalid key",
         },
       }));
     } catch (e) {
-      setTestStatus(prev => ({
+      setTestStatus((prev) => ({
         ...prev,
         [provider]: { loading: false, error: handleApiError(e) },
       }));
@@ -298,10 +322,14 @@ export function LLMKeysCard() {
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <Key className="w-5 h-5 text-[var(--color-text-muted)]" />
-        <h2 className="text-lg font-medium text-[var(--color-text-primary)]">LLM API keys (BYOK)</h2>
+        <h2 className="text-lg font-medium text-[var(--color-text-primary)]">
+          LLM API keys (BYOK)
+        </h2>
       </div>
       <p className="text-[var(--color-text-tertiary)] text-sm">
-        Add API keys to use models in the Build chat. Save keys to store them encrypted on the server, or use for this session only (key sent per request, never stored).
+        Add API keys to use models in the Build chat. Save keys to store them
+        encrypted on the server, or use for this session only (key sent per
+        request, never stored).
       </p>
 
       {loading ? (
@@ -330,7 +358,9 @@ export function LLMKeysCard() {
                 disabled={isSigningIn}
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)] disabled:opacity-50"
               >
-                {isSigningIn ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                {isSigningIn ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : null}
                 {isSigningIn ? "Signing in..." : "Sign in with wallet"}
               </button>
             )}
@@ -343,7 +373,9 @@ export function LLMKeysCard() {
             </button>
           </div>
           {signInError && (
-            <p className="text-xs text-[var(--color-semantic-error)]">{signInError}</p>
+            <p className="text-xs text-[var(--color-semantic-error)]">
+              {signInError}
+            </p>
           )}
         </div>
       ) : error ? (
@@ -358,13 +390,17 @@ export function LLMKeysCard() {
       ) : (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-[var(--color-text-muted)]">Storage mode</span>
+            <span className="text-xs text-[var(--color-text-muted)]">
+              Storage mode
+            </span>
             <div className="inline-flex rounded-full bg-[var(--color-bg-elevated)] p-0.5 text-[11px]">
               <button
                 type="button"
                 onClick={() => setStorageMode("persisted")}
                 className={`px-2 py-0.5 rounded-full transition-colors ${
-                  storageMode === "persisted" ? "bg-[var(--color-bg-panel)] text-[var(--color-text-primary)]" : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
+                  storageMode === "persisted"
+                    ? "bg-[var(--color-bg-panel)] text-[var(--color-text-primary)]"
+                    : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
                 }`}
               >
                 Persisted
@@ -373,7 +409,9 @@ export function LLMKeysCard() {
                 type="button"
                 onClick={() => setStorageMode("session")}
                 className={`px-2 py-0.5 rounded-full transition-colors ${
-                  storageMode === "session" ? "bg-[var(--color-bg-panel)] text-[var(--color-text-primary)]" : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
+                  storageMode === "session"
+                    ? "bg-[var(--color-bg-panel)] text-[var(--color-text-primary)]"
+                    : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
                 }`}
               >
                 Session only
@@ -402,9 +440,21 @@ export function LLMKeysCard() {
                     htmlFor={`key-${provider}-card`}
                     className="text-sm font-medium text-[var(--color-text-secondary)] flex items-center gap-2"
                   >
-                    {provider === "openai" && <span className="w-4 h-4 bg-white rounded-full flex items-center justify-center shrink-0"><span className="w-2 h-2 bg-black rounded-full block" /></span>}
-                    {provider === "google" && <span className="w-4 h-4 bg-blue-500 rounded flex items-center justify-center shrink-0 text-white text-[8px] font-bold">G</span>}
-                    {provider === "anthropic" && <span className="w-4 h-4 bg-orange-200 rounded flex items-center justify-center shrink-0"><span className="w-2 h-2 bg-orange-600 rounded-sm block" /></span>}
+                    {provider === "openai" && (
+                      <span className="w-4 h-4 bg-white rounded-full flex items-center justify-center shrink-0">
+                        <span className="w-2 h-2 bg-black rounded-full block" />
+                      </span>
+                    )}
+                    {provider === "google" && (
+                      <span className="w-4 h-4 bg-blue-500 rounded flex items-center justify-center shrink-0 text-white text-[8px] font-bold">
+                        G
+                      </span>
+                    )}
+                    {provider === "anthropic" && (
+                      <span className="w-4 h-4 bg-orange-200 rounded flex items-center justify-center shrink-0">
+                        <span className="w-2 h-2 bg-orange-600 rounded-sm block" />
+                      </span>
+                    )}
                     {PROVIDER_LABELS[provider] ?? provider}
                     {PROVIDER_TAGS[provider] && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-primary-alpha-20)] text-[var(--color-primary-light)]">
@@ -416,13 +466,25 @@ export function LLMKeysCard() {
                     <button
                       type="button"
                       onClick={() => handleTestConnection(provider)}
-                      disabled={!keys[provider] && !configured.includes(provider)}
+                      disabled={
+                        !keys[provider] && !configured.includes(provider)
+                      }
                       className="text-[10px] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                     >
-                      {testStatus[provider]?.loading && <Loader2 className="w-3 h-3 animate-spin" />}
+                      {testStatus[provider]?.loading && (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      )}
                       {!testStatus[provider]?.loading && <span>Test</span>}
-                      {testStatus[provider]?.latency && <span className="text-[var(--color-semantic-success)] ml-1">{testStatus[provider]?.latency}ms</span>}
-                      {testStatus[provider]?.error && <span className="text-[var(--color-semantic-error)] ml-1">{testStatus[provider]?.error}</span>}
+                      {testStatus[provider]?.latency && (
+                        <span className="text-[var(--color-semantic-success)] ml-1">
+                          {testStatus[provider]?.latency}ms
+                        </span>
+                      )}
+                      {testStatus[provider]?.error && (
+                        <span className="text-[var(--color-semantic-error)] ml-1">
+                          {testStatus[provider]?.error}
+                        </span>
+                      )}
                     </button>
                     {PROVIDER_KEY_URLS[provider] && (
                       <a
@@ -442,12 +504,18 @@ export function LLMKeysCard() {
                     type="password"
                     value={keys[provider] ?? ""}
                     onChange={(e) => handleKeyChange(provider, e.target.value)}
-                    placeholder={configured.includes(provider) ? "Set new key to replace" : "API key"}
+                    placeholder={
+                      configured.includes(provider)
+                        ? "Set new key to replace"
+                        : "API key"
+                    }
                     className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-border-default)] focus:outline-none"
                     autoComplete="off"
                   />
                   {keyValidated === provider && (
-                    <span className="mt-1 block text-[11px] text-emerald-400">Key looks valid</span>
+                    <span className="mt-1 block text-[11px] text-emerald-400">
+                      Key looks valid
+                    </span>
                   )}
                 </div>
               </div>
@@ -457,7 +525,11 @@ export function LLMKeysCard() {
           {sessionOnlyKey && (
             <div className="rounded-lg border border-[var(--color-primary-alpha-20)] bg-[var(--color-primary-alpha-10)] px-3 py-2 flex items-center justify-between gap-2">
               <span className="text-xs text-[var(--color-text-secondary)]">
-                Session-only (pass-through): <span className="font-medium capitalize">{sessionOnlyKey.provider}</span>. Key is not stored on the server.
+                Session-only (pass-through):{" "}
+                <span className="font-medium capitalize">
+                  {sessionOnlyKey.provider}
+                </span>
+                . Key is not stored on the server.
               </span>
               <button
                 type="button"
@@ -479,10 +551,17 @@ export function LLMKeysCard() {
                   <button
                     type="button"
                     onClick={handleSaveKeys}
-                    disabled={saving || !Object.values(keys).some((v) => v && String(v).trim())}
+                    disabled={
+                      saving ||
+                      !Object.values(keys).some((v) => v && String(v).trim())
+                    }
                     className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--color-primary)] text-white text-xs font-medium shadow-lg shadow-[var(--color-primary)]/40 hover:opacity-90 disabled:opacity-50 disabled:pointer-events-none"
                   >
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Key className="w-4 h-4" />}
+                    {saving ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Key className="w-4 h-4" />
+                    )}
                     Save keys
                   </button>
                   {configured.length > 0 && (
@@ -492,7 +571,11 @@ export function LLMKeysCard() {
                       disabled={removing}
                       className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-panel)] hover:text-[var(--color-text-primary)] disabled:opacity-50"
                     >
-                      {removing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                      {removing ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
                       Remove all
                     </button>
                   )}
@@ -501,7 +584,11 @@ export function LLMKeysCard() {
                 <button
                   type="button"
                   onClick={handleUseSessionOnly}
-                  disabled={!Object.keys(CHAT_PROVIDER_MAP).some((p) => keys[p as keyof typeof keys]?.trim())}
+                  disabled={
+                    !Object.keys(CHAT_PROVIDER_MAP).some((p) =>
+                      keys[p as keyof typeof keys]?.trim(),
+                    )
+                  }
                   className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--color-primary)] text-white text-xs font-medium shadow-lg shadow-[var(--color-primary)]/40 hover:opacity-90 disabled:opacity-50 disabled:pointer-events-none"
                 >
                   Use for this session only

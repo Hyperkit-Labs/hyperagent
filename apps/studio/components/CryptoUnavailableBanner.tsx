@@ -19,9 +19,9 @@ export function CryptoUnavailableBanner() {
     >
       <p className="font-medium">Secure context required</p>
       <p className="mt-1 text-xs text-amber-300/80">
-        Your browser does not expose the Web Crypto API on this origin.
-        LLM key encryption and session-only keys are unavailable.
-        Access HyperAgent over HTTPS or localhost to enable full functionality.
+        Your browser does not expose the Web Crypto API on this origin. LLM key
+        encryption and session-only keys are unavailable. Access HyperAgent over
+        HTTPS or localhost to enable full functionality.
       </p>
     </div>
   );

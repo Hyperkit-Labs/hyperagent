@@ -98,7 +98,10 @@ export async function searchWorkspace(
     const res = await fetch("/api/tools/search", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...request, workspaceRoot: "__server_override__" }),
+      body: JSON.stringify({
+        ...request,
+        workspaceRoot: "__server_override__",
+      }),
       signal,
     });
 

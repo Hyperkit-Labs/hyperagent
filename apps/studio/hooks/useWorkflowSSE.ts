@@ -1,6 +1,9 @@
-'use client';
+"use client";
 
-import { useAgentDiscussion, type AgentDiscussionEvent } from '@/hooks/useAgentDiscussion';
+import {
+  useAgentDiscussion,
+  type AgentDiscussionEvent,
+} from "@/hooks/useAgentDiscussion";
 
 /**
  * SSE-first workflow progress. Connects to the discussion stream for real-time step events.

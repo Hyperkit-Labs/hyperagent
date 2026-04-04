@@ -1,15 +1,15 @@
 /**
  * useWorkflowStreaming Hook
- * 
+ *
  * Custom hook wrapping Vercel AI SDK's useCompletion for workflow code generation streaming.
  * Handles streaming errors, reconnection, timeout/abort, and integrates with existing workflow state.
  */
 
-'use client';
+"use client";
 
-import { useCompletion } from 'ai/react';
-import { useMemo, useEffect, useRef, useCallback } from 'react';
-import { getStoredSession } from '@/lib/session-store';
+import { useCompletion } from "ai/react";
+import { useMemo, useEffect, useRef, useCallback } from "react";
+import { getStoredSession } from "@/lib/session-store";
 
 export interface UseWorkflowStreamingOptions {
   workflowId: string | null;
@@ -31,9 +31,17 @@ export interface UseWorkflowStreamingReturn {
 }
 
 export function useWorkflowStreaming(
-  options: UseWorkflowStreamingOptions
+  options: UseWorkflowStreamingOptions,
 ): UseWorkflowStreamingReturn {
-  const { workflowId, enabled = true, timeout, abortSignal, onFinish, onError, onTimeout } = options;
+  const {
+    workflowId,
+    enabled = true,
+    timeout,
+    abortSignal,
+    onFinish,
+    onError,
+    onTimeout,
+  } = options;
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -43,14 +51,17 @@ export function useWorkflowStreaming(
     return `/api/streaming/workflows/${workflowId}/code`;
   }, [workflowId]);
 
-  const streamingFetch = useCallback(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const session = getStoredSession();
-    const headers = new Headers(init?.headers);
-    if (session?.access_token?.trim()) {
-      headers.set('Authorization', `Bearer ${session.access_token.trim()}`);
-    }
-    return fetch(input, { ...init, headers });
-  }, []);
+  const streamingFetch = useCallback(
+    async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const session = getStoredSession();
+      const headers = new Headers(init?.headers);
+      if (session?.access_token?.trim()) {
+        headers.set("Authorization", `Bearer ${session.access_token.trim()}`);
+      }
+      return fetch(input, { ...init, headers });
+    },
+    [],
+  );
 
   // Use Vercel AI SDK's useCompletion hook with auth
   const {
@@ -62,7 +73,7 @@ export function useWorkflowStreaming(
   } = useCompletion({
     api: apiUrl || undefined,
     fetch: streamingFetch,
-    streamProtocol: 'data',
+    streamProtocol: "data",
     body: abortSignal ? { signal: abortSignal } : undefined,
     onFinish: (completion) => {
       if (timeoutRef.current) {
@@ -78,7 +89,7 @@ export function useWorkflowStreaming(
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
-      console.error('Workflow streaming error:', error);
+      console.error("Workflow streaming error:", error);
       if (onError) {
         onError(error);
       }
@@ -112,12 +123,12 @@ export function useWorkflowStreaming(
       const handleAbort = () => {
         stop();
         if (onError) {
-          onError(new Error('Streaming aborted'));
+          onError(new Error("Streaming aborted"));
         }
       };
-      abortSignal.addEventListener('abort', handleAbort);
+      abortSignal.addEventListener("abort", handleAbort);
       return () => {
-        abortSignal.removeEventListener('abort', handleAbort);
+        abortSignal.removeEventListener("abort", handleAbort);
       };
     }
   }, [abortSignal, enabled, apiUrl, isLoading, stop, onError]);
@@ -128,6 +139,8 @@ export function useWorkflowStreaming(
     error: error as Error | undefined,
     complete: !isLoading,
     stop,
-    retry: () => { completeCompletion(''); },
+    retry: () => {
+      completeCompletion("");
+    },
   };
 }

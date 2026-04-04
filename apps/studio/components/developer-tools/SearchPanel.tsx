@@ -3,7 +3,11 @@
 import { useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { SearchMode, SearchResponse } from "@/lib/tools/search";
-import { SEARCH_MODES, searchWorkspace, isSearchError } from "@/lib/tools/search";
+import {
+  SEARCH_MODES,
+  searchWorkspace,
+  isSearchError,
+} from "@/lib/tools/search";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { ToolResultList } from "./ToolResultList";
 import { ToolEmptyState } from "./ToolEmptyState";
@@ -39,10 +43,15 @@ interface SearchState {
 export function SearchPanel() {
   const [mode, setMode] = useState<SearchMode>("content");
   const [query, setQuery] = useState("");
-  const [state, setState] = useState<SearchState>({ loading: false, result: null, error: null });
+  const [state, setState] = useState<SearchState>({
+    loading: false,
+    result: null,
+    error: null,
+  });
   const abortRef = useRef<AbortController | null>(null);
 
-  const noQueryNeeded = mode === "risk" || mode === "scaffold" || mode === "todo";
+  const noQueryNeeded =
+    mode === "risk" || mode === "scaffold" || mode === "todo";
 
   const handleSearch = useCallback(async () => {
     if (!noQueryNeeded && !query.trim()) return;
@@ -85,11 +94,30 @@ export function SearchPanel() {
   return (
     <GlassCard className="p-4 flex flex-col gap-3">
       <div className="flex items-center gap-2">
-        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" className="text-[var(--color-primary-light)] flex-shrink-0">
-          <circle cx="8.5" cy="8.5" r="6" stroke="currentColor" strokeWidth="1.5" />
-          <path d="M13 13L17 17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 20 20"
+          fill="none"
+          className="text-[var(--color-primary-light)] flex-shrink-0"
+        >
+          <circle
+            cx="8.5"
+            cy="8.5"
+            r="6"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          />
+          <path
+            d="M13 13L17 17"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
         </svg>
-        <h3 className="text-sm font-medium text-[var(--color-text-primary)]">Search</h3>
+        <h3 className="text-sm font-medium text-[var(--color-text-primary)]">
+          Search
+        </h3>
       </div>
 
       <div className="flex flex-wrap gap-1">
@@ -157,50 +185,83 @@ export function SearchPanel() {
           </motion.div>
         )}
 
-        {!state.loading && !state.error && state.result && state.result.matches.length === 0 && (
-          <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <ToolEmptyState
-              title="No matches"
-              description={`No ${MODE_LABELS[mode].toLowerCase()} found${query ? ` for "${query}"` : ""}.`}
-              suggestions={["Try a broader query", "Check file globs", "Toggle hidden files"]}
-            />
-          </motion.div>
-        )}
+        {!state.loading &&
+          !state.error &&
+          state.result &&
+          state.result.matches.length === 0 && (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <ToolEmptyState
+                title="No matches"
+                description={`No ${MODE_LABELS[mode].toLowerCase()} found${query ? ` for "${query}"` : ""}.`}
+                suggestions={[
+                  "Try a broader query",
+                  "Check file globs",
+                  "Toggle hidden files",
+                ]}
+              />
+            </motion.div>
+          )}
 
-        {!state.loading && !state.error && state.result && state.result.matches.length > 0 && (
-          <motion.div key="results" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] text-[var(--color-text-muted)]">
-                {state.result.totalMatches} match{state.result.totalMatches === 1 ? "" : "es"} in {state.result.filesMatched} file{state.result.filesMatched === 1 ? "" : "s"}
-                {" "}&middot; {state.result.elapsedMs}ms
-              </span>
-              {state.result.truncated && (
-                <span className="text-[10px] text-amber-400">Truncated</span>
-              )}
-            </div>
-
-            {state.result.warnings.length > 0 && (
-              <div className="mb-2 text-[10px] text-amber-400">
-                {state.result.warnings.map((w, i) => (
-                  <p key={i}>{w}</p>
-                ))}
+        {!state.loading &&
+          !state.error &&
+          state.result &&
+          state.result.matches.length > 0 && (
+            <motion.div
+              key="results"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] text-[var(--color-text-muted)]">
+                  {state.result.totalMatches} match
+                  {state.result.totalMatches === 1 ? "" : "es"} in{" "}
+                  {state.result.filesMatched} file
+                  {state.result.filesMatched === 1 ? "" : "s"} &middot;{" "}
+                  {state.result.elapsedMs}ms
+                </span>
+                {state.result.truncated && (
+                  <span className="text-[10px] text-amber-400">Truncated</span>
+                )}
               </div>
-            )}
 
-            <ToolResultList
-              matches={state.result.matches}
-              mode={state.result.mode}
-              onFileClick={handleFileClick}
-            />
-          </motion.div>
-        )}
+              {state.result.warnings.length > 0 && (
+                <div className="mb-2 text-[10px] text-amber-400">
+                  {state.result.warnings.map((w, i) => (
+                    <p key={i}>{w}</p>
+                  ))}
+                </div>
+              )}
+
+              <ToolResultList
+                matches={state.result.matches}
+                mode={state.result.mode}
+                onFileClick={handleFileClick}
+              />
+            </motion.div>
+          )}
 
         {!state.loading && !state.error && !state.result && (
-          <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <motion.div
+            key="idle"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
             <ToolEmptyState
               title="Workspace Search"
               description="Search your codebase for content, files, symbols, TODOs, env vars, exports, or risky patterns."
-              suggestions={["TODOs", "process.env", "eval()", "scaffold verify"]}
+              suggestions={[
+                "TODOs",
+                "process.env",
+                "eval()",
+                "scaffold verify",
+              ]}
             />
           </motion.div>
         )}

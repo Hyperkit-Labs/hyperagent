@@ -5,16 +5,16 @@
  * (getPricingPlans, getPricingResources, getPricingUsage) with one Promise.all.
  */
 
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from "react";
 import {
   getPricingPlans,
   getPricingResources,
   getPricingUsage,
   getErrorMessage,
-} from '@/lib/api';
-import type { PricingPlan, PricingResource, UsageSummary } from '@/lib/api';
+} from "@/lib/api";
+import type { PricingPlan, PricingResource, UsageSummary } from "@/lib/api";
 
 export interface UsePlanDataOptions {
   enabled?: boolean;
@@ -29,7 +29,9 @@ export interface UsePlanDataReturn {
   refetch: () => Promise<void>;
 }
 
-export function usePlanData(options: UsePlanDataOptions = {}): UsePlanDataReturn {
+export function usePlanData(
+  options: UsePlanDataOptions = {},
+): UsePlanDataReturn {
   const { enabled = true } = options;
   const [plans, setPlans] = useState<PricingPlan[]>([]);
   const [resources, setResources] = useState<PricingResource[]>([]);
@@ -51,7 +53,7 @@ export function usePlanData(options: UsePlanDataOptions = {}): UsePlanDataReturn
       setResources(resourcesRes?.resources ?? []);
       setUsage(usageRes ?? null);
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to load plan data'));
+      setError(getErrorMessage(err, "Failed to load plan data"));
     } finally {
       setLoading(false);
     }

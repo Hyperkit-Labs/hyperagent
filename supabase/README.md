@@ -40,6 +40,10 @@ That runs `node scripts/apply-supabase-migrations.mjs`, which applies every `sup
 
 **Hosted project:** Run the same migration pipeline you use for staging and production. Do not rely on application startup to create tables unless that is an explicit, documented exception.
 
+**Docker / Coolify / app deploy:** Building and starting the API does **not** run SQL migrations. If production sign-in fails with PostgREST **`PGRST204`** on `wallet_users.auth_method`, the database was never fully migrated or predates a column the gateway expects. Apply migrations against the **same** `DATABASE_URL` as Supabase (or run the SQL in the Supabase SQL Editor).
+
+**Schema drift (common):** `00000000000000_baseline.sql` uses `CREATE TABLE IF NOT EXISTS wallet_users (...)`. If `wallet_users` already existed **without** `auth_method`, PostgreSQL does not add missing columns; baseline is a no-op for that table. Forward migrations such as `20260407100000_wallet_users_ensure_auth_method.sql` use `ADD COLUMN IF NOT EXISTS` to repair older databases.
+
 ## Verification scripts
 
 After apply, you can confirm RLS coverage with the helper SQL (not a migration):

@@ -22,10 +22,13 @@ export type StatusBadgeVariant =
 
 function getStatusPillClass(status: string): string {
   const s = status.toLowerCase();
-  if (s === "completed" || s === "success" || s === "active" || s === "running") return "status-pill-ready";
+  if (s === "completed" || s === "success" || s === "active" || s === "running")
+    return "status-pill-ready";
   if (s === "failed") return "status-pill-failed";
-  if (s === "building" || s === "deploying" || s === "generating") return "status-pill-building";
-  if (s === "pending" || s === "queued" || s === "idle") return "status-pill-queued";
+  if (s === "building" || s === "deploying" || s === "generating")
+    return "status-pill-building";
+  if (s === "pending" || s === "queued" || s === "idle")
+    return "status-pill-queued";
   return "status-pill-queued";
 }
 
@@ -47,7 +50,9 @@ function getVariantClass(variant: StatusBadgeVariant): string {
     case "analyzing":
     case "pending":
     case "queued":
-      return variant === "building" || variant === "analyzing" ? "status-pill-building" : "status-pill-queued";
+      return variant === "building" || variant === "analyzing"
+        ? "status-pill-building"
+        : "status-pill-queued";
     case "warning":
       return "bg-[var(--color-semantic-warning)]/20 text-[var(--color-semantic-warning)] border border-[var(--color-semantic-warning)]/30";
     case "spec":
@@ -71,12 +76,32 @@ export interface StatusBadgeProps {
 }
 
 const VARIANT_KEYS: Set<string> = new Set([
-  "success", "completed", "failed", "building", "pending", "queued", "warning",
-  "spec", "roma", "high-risk", "audit-failed", "active", "running", "idle", "analyzing", "urgent",
+  "success",
+  "completed",
+  "failed",
+  "building",
+  "pending",
+  "queued",
+  "warning",
+  "spec",
+  "roma",
+  "high-risk",
+  "audit-failed",
+  "active",
+  "running",
+  "idle",
+  "analyzing",
+  "urgent",
 ]);
 
 const LIVE_STATES: Set<string> = new Set([
-  "building", "running", "generating", "deploying", "analyzing", "active", "scanning",
+  "building",
+  "running",
+  "generating",
+  "deploying",
+  "analyzing",
+  "active",
+  "scanning",
 ]);
 
 const GLOW_COLORS: Record<string, string> = {
@@ -91,7 +116,8 @@ const GLOW_COLORS: Record<string, string> = {
 
 function GlowingDot({ status }: { status: string }) {
   const s = status.toLowerCase();
-  const colorClass = GLOW_COLORS[s] ?? "bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)]";
+  const colorClass =
+    GLOW_COLORS[s] ?? "bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)]";
   return (
     <span
       className={`inline-block w-1.5 h-1.5 rounded-full animate-pulse ${colorClass}`}
@@ -100,10 +126,18 @@ function GlowingDot({ status }: { status: string }) {
   );
 }
 
-export function StatusBadge({ status, variant, title, className = "", showSpinner }: StatusBadgeProps) {
+export function StatusBadge({
+  status,
+  variant,
+  title,
+  className = "",
+  showSpinner,
+}: StatusBadgeProps) {
   const pillClass = variant
     ? getVariantClass(variant)
-    : (VARIANT_KEYS.has(status.toLowerCase()) ? getVariantClass(status as StatusBadgeVariant) : getStatusPillClass(status));
+    : VARIANT_KEYS.has(status.toLowerCase())
+      ? getVariantClass(status as StatusBadgeVariant)
+      : getStatusPillClass(status);
   const isLive = showSpinner ?? LIVE_STATES.has(status.toLowerCase());
   const useGlow = isLive && !showSpinner;
   return (

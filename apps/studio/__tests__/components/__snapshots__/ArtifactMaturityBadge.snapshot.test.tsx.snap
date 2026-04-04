@@ -1,0 +1,37 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ArtifactMaturityBadge matches snapshot for blocked 1`] = `
+<span
+  class="px-2 py-0.5 rounded text-[10px] font-medium border bg-rose-500/15 text-rose-300 border-rose-500/30"
+  title="Artifact maturity from pipeline gates (draft → validated → production-ready). Not a legal audit."
+>
+  Blocked
+</span>
+`;
+
+exports[`ArtifactMaturityBadge matches snapshot for draft 1`] = `
+<span
+  class="px-2 py-0.5 rounded text-[10px] font-medium border bg-zinc-500/15 text-zinc-300 border-zinc-500/25"
+  title="Artifact maturity from pipeline gates (draft → validated → production-ready). Not a legal audit."
+>
+  Draft
+</span>
+`;
+
+exports[`ArtifactMaturityBadge matches snapshot for production_ready 1`] = `
+<span
+  class="px-2 py-0.5 rounded text-[10px] font-medium border bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+  title="Artifact maturity from pipeline gates (draft → validated → production-ready). Not a legal audit."
+>
+  Production-ready
+</span>
+`;
+
+exports[`ArtifactMaturityBadge matches snapshot for validated 1`] = `
+<span
+  class="px-2 py-0.5 rounded text-[10px] font-medium border bg-sky-500/15 text-sky-300 border-sky-500/25"
+  title="Artifact maturity from pipeline gates (draft → validated → production-ready). Not a legal audit."
+>
+  Validated
+</span>
+`;

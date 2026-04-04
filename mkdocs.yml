@@ -1,0 +1,102 @@
+# HyperAgent documentation site (MkDocs Material).
+# Local preview: pip install -r requirements-docs.txt && mkdocs serve
+# Build: mkdocs build --strict
+
+site_name: HyperAgent
+site_description: AI-assisted smart contract development platform
+site_author: HyperKit Labs
+
+# Set when publishing (e.g. GitHub Pages): site_url: https://hyperkit-labs.github.io/hyperagent/
+site_url: ""
+
+repo_url: https://github.com/Hyperkit-Labs/hyperagent
+repo_name: Hyperkit-Labs/hyperagent
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mermaid2
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+exclude_docs: |
+  DEPENDENCY_AUDIT.md
+  /README.md
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Troubleshooting: troubleshooting.md
+  - User guide: user-guide.md
+  - Contributor guide: developer-guide.md
+  - Contributing: contributing.md
+  - Documentation site: documentation-site.md
+  - Architecture:
+      - Overview: architecture/README.md
+      - System context (diagram): architecture/system-context.md
+      - Network architecture: architecture-networks.md
+  - Control plane & storage:
+      - Runs and steps: control-plane-runs-steps.md
+      - Storage policy: storage-policy.md
+      - Workflow state: workflow-state-management.md
+  - API & contracts:
+      - API governance: api-governance.md
+      - OZ wizard conventions: contracts/oz-wizard-conventions.md
+  - Security:
+      - Policy vs implementation gap register: security/implementation-gap-register.md
+  - Operations:
+      - Deploy ownership: deploy-ownership.md
+      - Runbooks: runbooks/README.md
+      - Deployment runbook: runbooks/deployment-runbook.md
+      - Payment onboarding: payment-onboarding-flow.md
+  - Agent operating model:
+      - Index: agent-operating-model/README.md
+      - Architecture map: agent-operating-model/architecture-map.md
+      - Glossary: agent-operating-model/glossary.md
+      - Recovery runbook: agent-operating-model/recovery-runbook.md
+  - ADRs:
+      - Index: adrs/README.md
+      - Template: adrs/0000-template.md
+      - "0001 Honesty & artifact maturity": adrs/0001-mandatory-honesty-artifact-maturity.md
+      - "0002 API schema governance": adrs/0002-api-schema-governance.md
+      - "0003 Workflow state OSS": adrs/0003-workflow-state-oss.md
+  - Mission: mission.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Hyperkit-Labs/hyperagent

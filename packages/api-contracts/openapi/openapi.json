@@ -1,0 +1,3463 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "HyperAgent Orchestrator",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/workflows/generate": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Workflows Generate",
+        "description": "Studio contract: create workflow from nlp_input; persist and return workflow_id.\n\nPhase 2: create workflow + DB run, enqueue background pipeline job, return quickly with workflow_id.\nStudio polls /api/v1/workflows/{id} and /api/v1/runs/{id}/steps for progress.\nCredit-based: when credits_supabase is configured, deducts credits per run (CREDITS_PER_RUN); insufficient balance returns 402.",
+        "operationId": "workflows_generate_api_v1_workflows_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWorkflowBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Workflows Generate Api V1 Workflows Generate Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflows": {
+      "get": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "List Workflows Api",
+        "description": "List workflows for Studio. Newest first. Scoped to authenticated user.",
+        "operationId": "list_workflows_api_api_v1_workflows_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response List Workflows Api Api V1 Workflows Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflows/{workflow_id}": {
+      "get": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Get Workflow Api",
+        "description": "Return single workflow by id. Validates caller owns the workflow.",
+        "operationId": "get_workflow_api_api_v1_workflows__workflow_id__get",
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workflow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Workflow Api Api V1 Workflows  Workflow Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflows/{workflow_id}/status": {
+      "get": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Get Workflow Status Api",
+        "description": "Return workflow status only.",
+        "operationId": "get_workflow_status_api_api_v1_workflows__workflow_id__status_get",
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workflow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Get Workflow Status Api Api V1 Workflows  Workflow Id  Status Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflows/{workflow_id}/contracts": {
+      "get": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Get Workflow Contracts Api",
+        "description": "Return generated contracts for a workflow.",
+        "operationId": "get_workflow_contracts_api_api_v1_workflows__workflow_id__contracts_get",
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workflow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Get Workflow Contracts Api Api V1 Workflows  Workflow Id  Contracts Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflows/{workflow_id}/tarball": {
+      "get": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Get Workflow Tarball Api",
+        "description": "Return workflow as tarball for Docker sandbox dynamic source.",
+        "operationId": "get_workflow_tarball_api_api_v1_workflows__workflow_id__tarball_get",
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workflow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflows/{workflow_id}/deployments": {
+      "get": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Get Workflow Deployments Api",
+        "description": "Return deployments for a workflow.",
+        "operationId": "get_workflow_deployments_api_api_v1_workflows__workflow_id__deployments_get",
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workflow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Workflow Deployments Api Api V1 Workflows  Workflow Id  Deployments Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflows/{workflow_id}/ui-schema": {
+      "get": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Get Workflow Ui Schema Api",
+        "description": "Return UI schema for contract interaction if generated.",
+        "operationId": "get_workflow_ui_schema_api_api_v1_workflows__workflow_id__ui_schema_get",
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workflow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Workflow Ui Schema Api Api V1 Workflows  Workflow Id  Ui Schema Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflows/{workflow_id}/ui-schema/generate": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Generate Workflow Ui Schema Api",
+        "description": "Generate UI schema from first deployment and contract; store and return.",
+        "operationId": "generate_workflow_ui_schema_api_api_v1_workflows__workflow_id__ui_schema_generate_post",
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workflow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Generate Workflow Ui Schema Api Api V1 Workflows  Workflow Id  Ui Schema Generate Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflows/{workflow_id}/deploy/prepare": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Prepare Deploy Api",
+        "description": "Compile first contract and return deploy payload for client to sign. Mainnet guarded.",
+        "operationId": "prepare_deploy_api_api_v1_workflows__workflow_id__deploy_prepare_post",
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workflow Id"
+            }
+          },
+          {
+            "name": "chain_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Chain Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/PrepareDeployBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Prepare Deploy Api Api V1 Workflows  Workflow Id  Deploy Prepare Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflows/{workflow_id}/deploy/approve": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Deploy Approve Api",
+        "description": "Approve deploy after Guardian; resume pipeline to create deploy plans.",
+        "operationId": "deploy_approve_api_api_v1_workflows__workflow_id__deploy_approve_post",
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workflow Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeployApproveBody",
+                "default": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Deploy Approve Api Api V1 Workflows  Workflow Id  Deploy Approve Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflows/{workflow_id}/deploy/complete": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Complete Deploy Api",
+        "description": "Record deployment from client and persist to workflow.",
+        "operationId": "complete_deploy_api_api_v1_workflows__workflow_id__deploy_complete_post",
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workflow Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeployCompleteBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Complete Deploy Api Api V1 Workflows  Workflow Id  Deploy Complete Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflows/{workflow_id}/clarify": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Clarify Workflow Api",
+        "description": "Persist user clarification message on workflow and return updated clarification list.",
+        "operationId": "clarify_workflow_api_api_v1_workflows__workflow_id__clarify_post",
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workflow Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClarifyBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Clarify Workflow Api Api V1 Workflows  Workflow Id  Clarify Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflows/{workflow_id}/cancel": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Cancel Workflow Api",
+        "description": "Mark workflow cancelled if still running.",
+        "operationId": "cancel_workflow_api_api_v1_workflows__workflow_id__cancel_post",
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workflow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Cancel Workflow Api Api V1 Workflows  Workflow Id  Cancel Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/streaming/workflows/{workflow_id}/code": {
+      "get": {
+        "tags": [
+          "workflows",
+          "streaming"
+        ],
+        "summary": "Stream Workflow Code Api",
+        "description": "SSE stream of workflow contract source for Studio code viewer.",
+        "operationId": "stream_workflow_code_api_api_v1_streaming_workflows__workflow_id__code_get",
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workflow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/streaming/workflows/{workflow_id}/discussion": {
+      "get": {
+        "tags": [
+          "workflows",
+          "streaming"
+        ],
+        "summary": "Stream Agent Discussion Api",
+        "description": "SSE stream of agent discussion events for real-time visibility.",
+        "operationId": "stream_agent_discussion_api_api_v1_streaming_workflows__workflow_id__discussion_get",
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workflow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflows/{workflow_id}/ui-apps/export": {
+      "post": {
+        "tags": [
+          "ui-export"
+        ],
+        "summary": "Export Ui App Api",
+        "description": "Export dApp as zip: full React/Next.js scaffold with contract integration. Returns zip_base64 and filename.",
+        "operationId": "export_ui_app_api_api_v1_workflows__workflow_id__ui_apps_export_post",
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workflow Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/UiAppExportBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Export Ui App Api Api V1 Workflows  Workflow Id  Ui Apps Export Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflows/{workflow_id}/debug-sandbox": {
+      "post": {
+        "tags": [
+          "sandbox"
+        ],
+        "summary": "Debug Sandbox Api",
+        "description": "Create debug sandbox for workflow. Requires SANDBOX_API_URL.",
+        "operationId": "debug_sandbox_api_api_v1_workflows__workflow_id__debug_sandbox_post",
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workflow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Debug Sandbox Api Api V1 Workflows  Workflow Id  Debug Sandbox Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Get Run Api",
+        "description": "Return run detail; run_id is workflow_id.",
+        "operationId": "get_run_api_api_v1_runs__run_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Run Api Api V1 Runs  Run Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/steps": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Get Run Steps Api",
+        "description": "Return step-level audit for a run. trace_verifiable: false when any step has stub blob_id.",
+        "operationId": "get_run_steps_api_api_v1_runs__run_id__steps_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Run Steps Api Api V1 Runs  Run Id  Steps Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/approve_spec": {
+      "patch": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Approve Spec",
+        "description": "Set spec_approved and resume pipeline from design node.",
+        "operationId": "approve_spec_api_v1_runs__run_id__approve_spec_patch",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Approve Spec Api V1 Runs  Run Id  Approve Spec Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{run_id}/approve_spec": {
+      "patch": {
+        "tags": [
+          "runs",
+          "legacy"
+        ],
+        "summary": "Approve Spec Legacy",
+        "description": "Legacy path. Use PATCH /api/v1/runs/{run_id}/approve_spec.",
+        "operationId": "approve_spec_legacy_runs__run_id__approve_spec_patch",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Approve Spec Legacy Runs  Run Id  Approve Spec Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/security/findings": {
+      "get": {
+        "tags": [
+          "security"
+        ],
+        "summary": "Get Security Findings Api",
+        "description": "Return security findings for authenticated user's runs.",
+        "operationId": "get_security_findings_api_api_v1_security_findings_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Security Findings Api Api V1 Security Findings Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/networks": {
+      "get": {
+        "tags": [
+          "registry"
+        ],
+        "summary": "Get Networks Api",
+        "description": "Return networks from chain registry.",
+        "operationId": "get_networks_api_api_v1_networks_get",
+        "parameters": [
+          {
+            "name": "skale",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Skale"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Get Networks Api Api V1 Networks Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/networks/rpc-test": {
+      "get": {
+        "tags": [
+          "registry"
+        ],
+        "summary": "Rpc Test Api",
+        "description": "Test RPC connectivity by calling eth_blockNumber.",
+        "operationId": "rpc_test_api_api_v1_networks_rpc_test_get",
+        "parameters": [
+          {
+            "name": "network_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Network Id"
+            }
+          },
+          {
+            "name": "chain_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Chain Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Rpc Test Api Api V1 Networks Rpc Test Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tokens/stablecoins": {
+      "get": {
+        "tags": [
+          "registry"
+        ],
+        "summary": "Get Stablecoins Api",
+        "description": "Return USDC/USDT addresses per chain.",
+        "operationId": "get_stablecoins_api_api_v1_tokens_stablecoins_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "type": "object",
+                  "title": "Response Get Stablecoins Api Api V1 Tokens Stablecoins Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/track-record": {
+      "get": {
+        "tags": [
+          "registry"
+        ],
+        "summary": "Get Platform Track Record Api",
+        "description": "Return platform track record stats for login page. Public.",
+        "operationId": "get_platform_track_record_api_api_v1_platform_track_record_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Platform Track Record Api Api V1 Platform Track Record Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/presets": {
+      "get": {
+        "tags": [
+          "registry"
+        ],
+        "summary": "Get Presets Api",
+        "description": "Return presets from token template registry.",
+        "operationId": "get_presets_api_api_v1_presets_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Get Presets Api Api V1 Presets Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/blueprints": {
+      "get": {
+        "tags": [
+          "registry"
+        ],
+        "summary": "Get Blueprints Api",
+        "description": "Return blueprints from token template registry.",
+        "operationId": "get_blueprints_api_api_v1_blueprints_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Get Blueprints Api Api V1 Blueprints Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/templates": {
+      "get": {
+        "tags": [
+          "registry"
+        ],
+        "summary": "Get Templates Api",
+        "description": "Return templates from registry.",
+        "operationId": "get_templates_api_api_v1_templates_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Get Templates Api Api V1 Templates Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/templates/search": {
+      "get": {
+        "tags": [
+          "registry"
+        ],
+        "summary": "Search Templates Api",
+        "description": "Search templates by query.",
+        "operationId": "search_templates_api_api_v1_templates_search_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Search Templates Api Api V1 Templates Search Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/platform/track-record": {
+      "get": {
+        "tags": [
+          "registry",
+          "legacy"
+        ],
+        "summary": "Get Platform Track Record Legacy Api",
+        "description": "Legacy path. Mirrors /api/v1/platform/track-record.",
+        "operationId": "get_platform_track_record_legacy_api_platform_track_record_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Platform Track Record Legacy Api Platform Track Record Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/logs": {
+      "get": {
+        "tags": [
+          "logs"
+        ],
+        "summary": "Logs Api",
+        "description": "Recent activity from run_steps. Returns empty list when Supabase not configured.",
+        "operationId": "logs_api_api_v1_logs_get",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Logs Api Api V1 Logs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/logs/services": {
+      "get": {
+        "tags": [
+          "logs"
+        ],
+        "summary": "Logs Services Api",
+        "description": "Return distinct service names from recent activity.",
+        "operationId": "logs_services_api_api_v1_logs_services_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "title": "Response Logs Services Api Api V1 Logs Services Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/logs/hosts": {
+      "get": {
+        "tags": [
+          "logs"
+        ],
+        "summary": "Logs Hosts Api",
+        "description": "Return distinct log sources from run_steps and agent_logs.",
+        "operationId": "logs_hosts_api_api_v1_logs_hosts_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "title": "Response Logs Hosts Api Api V1 Logs Hosts Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Agents Api",
+        "description": "Return pipeline agents from workflow (spec, design, codegen, audit, simulation, deploy, ui_scaffold).",
+        "operationId": "agents_api_api_v1_agents_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Agents Api Api V1 Agents Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/contracts/read": {
+      "post": {
+        "tags": [
+          "contracts"
+        ],
+        "summary": "Contract Read Api",
+        "description": "Contract read (view/pure) via chain RPC.",
+        "operationId": "contract_read_api_api_v1_contracts_read_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContractReadBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Contract Read Api Api V1 Contracts Read Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/contracts/call": {
+      "post": {
+        "tags": [
+          "contracts"
+        ],
+        "summary": "Contract Call Api",
+        "description": "Build unsigned transaction for contract write.",
+        "operationId": "contract_call_api_api_v1_contracts_call_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContractCallBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Contract Call Api Api V1 Contracts Call Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/current/llm-keys": {
+      "get": {
+        "tags": [
+          "llm-keys"
+        ],
+        "summary": "Get Llm Keys",
+        "description": "Return configured provider names only (no key values).",
+        "operationId": "get_llm_keys_api_v1_workspaces_current_llm_keys_get",
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Llm Keys Api V1 Workspaces Current Llm Keys Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "llm-keys"
+        ],
+        "summary": "Post Llm Keys",
+        "description": "Store LLM keys for current workspace or user. Uses Supabase when X-User-Id present and configured.",
+        "operationId": "post_llm_keys_api_v1_workspaces_current_llm_keys_post",
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LLMKeysBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Post Llm Keys Api V1 Workspaces Current Llm Keys Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "llm-keys"
+        ],
+        "summary": "Delete Llm Keys",
+        "description": "Remove all LLM keys for current workspace or user.",
+        "operationId": "delete_llm_keys_api_v1_workspaces_current_llm_keys_delete",
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Llm Keys Api V1 Workspaces Current Llm Keys Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/current/llm-keys/validate": {
+      "post": {
+        "tags": [
+          "llm-keys"
+        ],
+        "summary": "Validate Llm Key",
+        "description": "Validate an LLM API key by calling the provider's models endpoint.",
+        "operationId": "validate_llm_key_api_v1_workspaces_current_llm_keys_validate_post",
+        "parameters": [
+          {
+            "name": "X-Workspace-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LLMKeyValidateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Validate Llm Key Api V1 Workspaces Current Llm Keys Validate Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/quick-demo": {
+      "post": {
+        "tags": [
+          "sandbox"
+        ],
+        "summary": "Quick Demo Api",
+        "description": "Create a sandbox from workflow-generated code.",
+        "operationId": "quick_demo_api_api_v1_quick_demo_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/QuickDemoBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Quick Demo Api Api V1 Quick Demo Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/credits/balance": {
+      "get": {
+        "tags": [
+          "billing",
+          "credits"
+        ],
+        "summary": "Credits Balance Api",
+        "description": "Return current credit balance for the authenticated user.",
+        "operationId": "credits_balance_api_api_v1_credits_balance_get",
+        "parameters": [
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Credits Balance Api Api V1 Credits Balance Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/credits/top-up": {
+      "post": {
+        "tags": [
+          "billing",
+          "credits"
+        ],
+        "summary": "Credits Top Up Api",
+        "description": "Record a credit top-up. When amount is in USD, multiplied by CREDITS_PER_USD.",
+        "operationId": "credits_top_up_api_api_v1_credits_top_up_post",
+        "parameters": [
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreditsTopUpBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Credits Top Up Api Api V1 Credits Top Up Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/payments/history": {
+      "get": {
+        "tags": [
+          "billing",
+          "payments"
+        ],
+        "summary": "Payments History Api",
+        "description": "Return payment history for the authenticated user.",
+        "operationId": "payments_history_api_api_v1_payments_history_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Payments History Api Api V1 Payments History Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/payments/summary": {
+      "get": {
+        "tags": [
+          "billing",
+          "payments"
+        ],
+        "summary": "Payments Summary Api",
+        "description": "Return payment summary (total spent, count) for the authenticated user.",
+        "operationId": "payments_summary_api_api_v1_payments_summary_get",
+        "parameters": [
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Payments Summary Api Api V1 Payments Summary Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/payments/spending-control": {
+      "get": {
+        "tags": [
+          "billing",
+          "payments"
+        ],
+        "summary": "Payments Spending Control Get Api",
+        "description": "Return spending control (budget, period, alert) for the authenticated user.",
+        "operationId": "payments_spending_control_get_api_api_v1_payments_spending_control_get",
+        "parameters": [
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Payments Spending Control Get Api Api V1 Payments Spending Control Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "billing",
+          "payments"
+        ],
+        "summary": "Payments Spending Control Patch Api",
+        "description": "Update spending control for the authenticated user.",
+        "operationId": "payments_spending_control_patch_api_api_v1_payments_spending_control_patch",
+        "parameters": [
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpendingControlBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Payments Spending Control Patch Api Api V1 Payments Spending Control Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pricing/plans": {
+      "get": {
+        "tags": [
+          "billing",
+          "pricing"
+        ],
+        "summary": "Pricing Plans Api",
+        "description": "Return available subscription plans from x402-products.yaml.",
+        "operationId": "pricing_plans_api_api_v1_pricing_plans_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Pricing Plans Api Api V1 Pricing Plans Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pricing/plans/{plan_id}": {
+      "get": {
+        "tags": [
+          "billing",
+          "pricing"
+        ],
+        "summary": "Pricing Plan Detail Api",
+        "description": "Return a single plan by id.",
+        "operationId": "pricing_plan_detail_api_api_v1_pricing_plans__plan_id__get",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Pricing Plan Detail Api Api V1 Pricing Plans  Plan Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pricing/resources": {
+      "get": {
+        "tags": [
+          "billing",
+          "pricing"
+        ],
+        "summary": "Pricing Resources Api",
+        "description": "Return x402 billable resources with unit prices.",
+        "operationId": "pricing_resources_api_api_v1_pricing_resources_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Pricing Resources Api Api V1 Pricing Resources Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pricing/usage": {
+      "get": {
+        "tags": [
+          "billing",
+          "pricing"
+        ],
+        "summary": "Pricing Usage Api",
+        "description": "Return current usage vs plan limits for the authenticated user.",
+        "operationId": "pricing_usage_api_api_v1_pricing_usage_get",
+        "parameters": [
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Pricing Usage Api Api V1 Pricing Usage Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/billing/reconciliation": {
+      "get": {
+        "tags": [
+          "billing",
+          "reconciliation"
+        ],
+        "summary": "Reconciliation Status Api",
+        "description": "Run reconciliation for the requesting user and return drift status.",
+        "operationId": "reconciliation_status_api_api_v1_billing_reconciliation_get",
+        "parameters": [
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Reconciliation Status Api Api V1 Billing Reconciliation Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/billing/reconciliation/all": {
+      "get": {
+        "tags": [
+          "billing",
+          "reconciliation"
+        ],
+        "summary": "Reconciliation All Api",
+        "description": "Run reconciliation for all users. Admin/internal use.",
+        "operationId": "reconciliation_all_api_api_v1_billing_reconciliation_all_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Reconciliation All Api Api V1 Billing Reconciliation All Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/storage/webhooks/pinata": {
+      "post": {
+        "tags": [
+          "storage"
+        ],
+        "summary": "Pinata Pin Webhook",
+        "description": "Pinata sends pin completion events. Set PINATA_WEBHOOK_SECRET to the signing secret\nfrom the Pinata dashboard. Confirmed pins set matching storage_records to reconciled.",
+        "operationId": "pinata_pin_webhook_api_v1_storage_webhooks_pinata_post",
+        "parameters": [
+          {
+            "name": "x-pinata-signature",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Pinata-Signature"
+            }
+          },
+          {
+            "name": "x-pinata-hmac-sha256",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Pinata-Hmac-Sha256"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Pinata Pin Webhook Api V1 Storage Webhooks Pinata Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health Live",
+        "description": "Liveness: HTTP 200 if the app process is serving. No I/O to Supabase, Redis, or downstream services.\nUse this for Docker/Kubernetes liveness so transient dependency failures do not mark the container dead.\nReadiness and dependency status remain on GET /health and /health/ready.",
+        "operationId": "health_live_health_live_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health Ready",
+        "description": "Readiness: checks critical dependencies (Supabase, Redis when QUEUE_ENABLED).\nReturns 503 if any critical dep is unreachable. Use for K8s readiness probes\nso traffic is not routed to pods that cannot serve requests.",
+        "operationId": "health_ready_health_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health",
+        "description": "Health and registry versions. Returns 503 when startup env is missing or\ncritical deps (Supabase, Redis when QUEUE_ENABLED) fail.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Metrics",
+        "description": "Prometheus-format metrics for pipeline runs and p95 latency.",
+        "operationId": "metrics_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health/detailed": {
+      "get": {
+        "tags": [
+          "health",
+          "metrics"
+        ],
+        "summary": "Health Detailed",
+        "description": "Detailed health for Studio. Includes Supabase, Redis, compile, simulation, deploy, tools, RAG.\nIncludes p95_latency_ms for SLO monitoring (target: under 2000ms).",
+        "operationId": "health_detailed_api_v1_health_detailed_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Health Detailed Api V1 Health Detailed Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/config/integrations-debug": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Get Integrations Debug Api",
+        "description": "Debug endpoint: raw integration health. Use to diagnose Settings > Integrations 'Not configured'.",
+        "operationId": "get_integrations_debug_api_api_v1_config_integrations_debug_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Integrations Debug Api Api V1 Config Integrations Debug Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/config": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Get Config Api",
+        "description": "Return public runtime config (x402, monitoring, payment, integrations, A2A identity) from registries.",
+        "operationId": "get_config_api_api_v1_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Config Api Api V1 Config Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/metrics": {
+      "get": {
+        "tags": [
+          "metrics"
+        ],
+        "summary": "Get Metrics Api",
+        "description": "Return basic metrics for Studio dashboard. time_range: 7d, 30d, 90d, all.",
+        "operationId": "get_metrics_api_api_v1_metrics_get",
+        "parameters": [
+          {
+            "name": "time_range",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "all",
+              "title": "Time Range"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Metrics Api Api V1 Metrics Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/identity": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Get Agent Identity",
+        "description": "Return ERC-8004 agent identity for this HyperAgent instance.\n\nIncludes agentId, identityRegistry address, and registration proof (txHash) from\ninfra/registries/erc8004/erc8004.yaml. The agent is pre-registered on SKALE Sepolia\n(agentId=1) and Avalanche Fuji (agentId=60). New chain registration is Phase 2.",
+        "operationId": "get_agent_identity_api_v1_identity_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Agent Identity Api V1 Identity Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/identity/register": {
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Register Agent Identity",
+        "description": "Register this HyperAgent instance on ERC-8004 IdentityRegistry for the given chain.\nRequires ERC8004_REGISTER_PRIVATE_KEY. Persists proof to agent_registrations. Returns agentId, txHash, persistedProof.",
+        "operationId": "register_agent_identity_api_v1_identity_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RegisterIdentityBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Register Agent Identity Api V1 Identity Register Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ClarifyBody": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "maxLength": 5000,
+            "title": "Message",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "ClarifyBody"
+      },
+      "ContractCallBody": {
+        "properties": {
+          "contract_address": {
+            "type": "string",
+            "title": "Contract Address",
+            "default": ""
+          },
+          "network": {
+            "type": "string",
+            "title": "Network",
+            "default": ""
+          },
+          "chain_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chain Id"
+          },
+          "function_name": {
+            "type": "string",
+            "title": "Function Name",
+            "default": ""
+          },
+          "function_args": {
+            "items": {},
+            "type": "array",
+            "title": "Function Args"
+          },
+          "caller_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caller Address"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value",
+            "default": "0"
+          },
+          "gas_limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gas Limit"
+          },
+          "abi": {
+            "items": {},
+            "type": "array",
+            "title": "Abi"
+          }
+        },
+        "type": "object",
+        "title": "ContractCallBody"
+      },
+      "ContractReadBody": {
+        "properties": {
+          "contract_address": {
+            "type": "string",
+            "title": "Contract Address",
+            "default": ""
+          },
+          "network": {
+            "type": "string",
+            "title": "Network",
+            "default": ""
+          },
+          "chain_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chain Id"
+          },
+          "function_name": {
+            "type": "string",
+            "title": "Function Name",
+            "default": ""
+          },
+          "function_args": {
+            "items": {},
+            "type": "array",
+            "title": "Function Args"
+          },
+          "abi": {
+            "items": {},
+            "type": "array",
+            "title": "Abi"
+          }
+        },
+        "type": "object",
+        "title": "ContractReadBody"
+      },
+      "CreateWorkflowBody": {
+        "properties": {
+          "nlp_input": {
+            "type": "string",
+            "maxLength": 10000,
+            "minLength": 1,
+            "title": "Nlp Input"
+          },
+          "network": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Network"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "default": ""
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id",
+            "default": ""
+          },
+          "pipeline_id": {
+            "type": "string",
+            "title": "Pipeline Id",
+            "default": "evm-default"
+          },
+          "api_keys": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Api Keys"
+          },
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id"
+          },
+          "auto_approve": {
+            "type": "boolean",
+            "title": "Auto Approve",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "nlp_input"
+        ],
+        "title": "CreateWorkflowBody"
+      },
+      "CreditsTopUpBody": {
+        "properties": {
+          "amount": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Amount",
+            "description": "Credit amount to add (e.g. fiat/USDC/USDT conversion)"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "default": "USD"
+          },
+          "reference_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Id"
+          },
+          "reference_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Type",
+            "default": "manual"
+          }
+        },
+        "type": "object",
+        "required": [
+          "amount"
+        ],
+        "title": "CreditsTopUpBody"
+      },
+      "DeployApproveBody": {
+        "properties": {
+          "api_keys": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Keys",
+            "description": "Optional LLM keys for resume; when omitted, uses workspace keys."
+          }
+        },
+        "type": "object",
+        "title": "DeployApproveBody"
+      },
+      "DeployCompleteBody": {
+        "properties": {
+          "contractAddress": {
+            "type": "string",
+            "title": "Contractaddress",
+            "default": ""
+          },
+          "transactionHash": {
+            "type": "string",
+            "title": "Transactionhash",
+            "default": ""
+          },
+          "walletAddress": {
+            "type": "string",
+            "title": "Walletaddress",
+            "default": ""
+          },
+          "abi": {
+            "items": {},
+            "type": "array",
+            "title": "Abi"
+          },
+          "chainId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chainid"
+          }
+        },
+        "type": "object",
+        "title": "DeployCompleteBody"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LLMKeyValidateBody": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Provider"
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider"
+        ],
+        "title": "LLMKeyValidateBody"
+      },
+      "LLMKeysBody": {
+        "properties": {
+          "keys": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Keys"
+          }
+        },
+        "type": "object",
+        "title": "LLMKeysBody"
+      },
+      "PrepareDeployBody": {
+        "properties": {
+          "mainnet_confirm": {
+            "type": "boolean",
+            "title": "Mainnet Confirm",
+            "description": "Set true to confirm mainnet deploy; required for mainnet chain_id.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "PrepareDeployBody"
+      },
+      "QuickDemoBody": {
+        "properties": {
+          "workflow_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workflow Id"
+          }
+        },
+        "type": "object",
+        "title": "QuickDemoBody"
+      },
+      "RegisterIdentityBody": {
+        "properties": {
+          "chain_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chain Id",
+            "description": "Chain ID. Defaults to A2A_DEFAULT_CHAIN_ID."
+          },
+          "agent_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Uri",
+            "description": "Agent metadata URI. Defaults to ERC8004_AGENT_URI or https://hyperkitlabs.com/agent.json"
+          }
+        },
+        "type": "object",
+        "title": "RegisterIdentityBody"
+      },
+      "SpendingControlBody": {
+        "properties": {
+          "budget_amount": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Budget Amount",
+            "description": "Budget amount per period"
+          },
+          "budget_currency": {
+            "type": "string",
+            "title": "Budget Currency",
+            "default": "USD"
+          },
+          "period": {
+            "type": "string",
+            "title": "Period",
+            "default": "monthly"
+          },
+          "alert_threshold_percent": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Alert Threshold Percent",
+            "default": 80
+          }
+        },
+        "type": "object",
+        "required": [
+          "budget_amount"
+        ],
+        "title": "SpendingControlBody"
+      },
+      "UiAppExportBody": {
+        "properties": {
+          "template": {
+            "type": "string",
+            "title": "Template",
+            "description": "viem-wagmi (default) or hyperagent-default",
+            "default": "viem-wagmi"
+          },
+          "include_deploy_scripts": {
+            "type": "boolean",
+            "title": "Include Deploy Scripts",
+            "description": "Include deployment scripts when contract source available",
+            "default": true
+          },
+          "deploy_target": {
+            "type": "string",
+            "title": "Deploy Target",
+            "description": "Export target: zip, ipfs, vercel, sandbox, or coolify. sandbox/coolify = self-hosted primary.",
+            "default": "zip"
+          }
+        },
+        "type": "object",
+        "title": "UiAppExportBody"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

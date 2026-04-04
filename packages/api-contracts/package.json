@@ -1,0 +1,35 @@
+{
+  "name": "@hyperagent/api-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenAPI-derived types, Zod boundary schemas, and typed HTTP client for the orchestrator (Studio and tooling).",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "openapi",
+    "src"
+  ],
+  "scripts": {
+    "generate": "node scripts/generate.mjs",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.13.8",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "openapi-typescript": "^7.13.0",
+    "typescript": "^5.3.0"
+  }
+}

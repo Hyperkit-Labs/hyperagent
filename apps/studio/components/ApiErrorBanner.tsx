@@ -10,7 +10,11 @@ export interface ApiErrorBannerProps {
   className?: string;
 }
 
-export function ApiErrorBanner({ error, onRetry, className = "" }: ApiErrorBannerProps) {
+export function ApiErrorBanner({
+  error,
+  onRetry,
+  className = "",
+}: ApiErrorBannerProps) {
   if (!error?.trim()) return null;
 
   return (

@@ -42,10 +42,23 @@ CREATE INDEX IF NOT EXISTS idx_user_templates_wallet_status
 CREATE INDEX IF NOT EXISTS idx_user_template_versions_template
   ON user_template_versions (template_id, version_number DESC);
 
-ALTER TABLE user_templates
-  ADD CONSTRAINT fk_user_templates_current_version
-  FOREIGN KEY (current_version_id) REFERENCES user_template_versions (id)
-  ON DELETE SET NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint c
+    JOIN pg_class t ON c.conrelid = t.oid
+    JOIN pg_namespace n ON t.relnamespace = n.oid
+    WHERE n.nspname = 'public'
+      AND t.relname = 'user_templates'
+      AND c.conname = 'fk_user_templates_current_version'
+  ) THEN
+    ALTER TABLE user_templates
+      ADD CONSTRAINT fk_user_templates_current_version
+      FOREIGN KEY (current_version_id) REFERENCES user_template_versions (id)
+      ON DELETE SET NULL;
+  END IF;
+END $$;
 
 COMMENT ON TABLE user_templates IS 'Logical template; mutable index. Content bytes live on IPFS via CID on user_template_versions.';
 COMMENT ON TABLE user_template_versions IS 'Immutable version row per content change; cid + content_hash; pin_status reconciled via webhook.';

@@ -3,7 +3,11 @@
 import { useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import { Code2, Shield, Rocket, Wrench, Plus } from "lucide-react";
-import { PromptInput, PromptInputButton, PromptInputFooter } from "@/components/ai-elements";
+import {
+  PromptInput,
+  PromptInputButton,
+  PromptInputFooter,
+} from "@/components/ai-elements";
 
 export interface ActionPill {
   id: string;
@@ -70,7 +74,8 @@ export function ChatCommandBar({
     {
       id: "create",
       label: "Create",
-      onClick: () => onChange("Create an ERC20 token with name MyToken and symbol MTK"),
+      onClick: () =>
+        onChange("Create an ERC20 token with name MyToken and symbol MTK"),
       icon: <Code2 className="w-3.5 h-3.5" />,
     },
   ];

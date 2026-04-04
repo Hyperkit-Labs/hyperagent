@@ -23,17 +23,41 @@ export interface Workflow {
   needs_human_approval?: boolean;
   created_at?: string;
   updated_at?: string;
-  meta_data?: { wallet_address?: string; error?: string; deployment_status?: string; requires_user_signature?: boolean };
-  metadata?: { wallet_address?: string; error?: string; deployment_status?: string; requires_user_signature?: boolean };
+  meta_data?: {
+    wallet_address?: string;
+    error?: string;
+    deployment_status?: string;
+    requires_user_signature?: boolean;
+  };
+  metadata?: {
+    wallet_address?: string;
+    error?: string;
+    deployment_status?: string;
+    requires_user_signature?: boolean;
+  };
   template_id?: string;
-  codegen_mode?: 'oz_wizard' | 'custom';
+  codegen_mode?: "oz_wizard" | "custom";
   oz_wizard_options?: { kind?: string; options?: Record<string, unknown> };
   roma_used?: boolean;
   risk_profile?: string;
   ui_schema?: unknown;
   contracts?: Record<string, string>;
-  deployments?: Array<{ chain_id?: number; contract_name?: string; contract_address?: string; network?: string; transaction_hash?: string; created_at?: string; plan?: unknown }>;
-  audit_findings?: Array<{ tool?: string; severity?: string; title?: string; description?: string; [key: string]: unknown }>;
+  deployments?: Array<{
+    chain_id?: number;
+    contract_name?: string;
+    contract_address?: string;
+    network?: string;
+    transaction_hash?: string;
+    created_at?: string;
+    plan?: unknown;
+  }>;
+  audit_findings?: Array<{
+    tool?: string;
+    severity?: string;
+    title?: string;
+    description?: string;
+    [key: string]: unknown;
+  }>;
   simulation_passed?: boolean;
   simulation_results?: unknown;
   auto_approve?: boolean;
@@ -51,35 +75,48 @@ export interface Workflow {
 export function needsSpecApproval(w: Workflow): boolean {
   if (w.auto_approve) return false;
   return Boolean(
-    (w.status === 'building' || w.status === 'running' || w.status === 'spec_review') &&
+    (w.status === "building" ||
+      w.status === "running" ||
+      w.status === "spec_review") &&
     w.spec &&
-    (w.needs_human_approval === true || w.spec_approved === false)
+    (w.needs_human_approval === true || w.spec_approved === false),
   );
 }
 
 /** True when workflow is paused at Guardian gate and needs user to approve deploy. */
 export function needsDeployApproval(w: Workflow): boolean {
-  return (w.status === 'building' || w.status === 'running') && w.current_stage === 'awaiting_deploy_approval';
+  return (
+    (w.status === "building" || w.status === "running") &&
+    w.current_stage === "awaiting_deploy_approval"
+  );
 }
 
 /** True when any stage named audit or simulation has status failed. */
-export function hasAuditOrSimFailure(w: { stages?: Array<{ name?: string; stage?: string; status?: string }> }): boolean {
+export function hasAuditOrSimFailure(w: {
+  stages?: Array<{ name?: string; stage?: string; status?: string }>;
+}): boolean {
   const stages = w.stages ?? [];
   return stages.some(
     (s) =>
-      (s.name === 'audit' || s.stage === 'audit' || s.name === 'simulation' || s.stage === 'simulation') &&
-      (s.status === 'failed' || s.status === 'error')
+      (s.name === "audit" ||
+        s.stage === "audit" ||
+        s.name === "simulation" ||
+        s.stage === "simulation") &&
+      (s.status === "failed" || s.status === "error"),
   );
 }
 
 /** True when security_check stage failed (sensitive data detected). */
-export function hasSecurityCheckFailure(w: { stages?: Array<{ name?: string; stage?: string; status?: string }>; current_stage?: string }): boolean {
-  if (w.current_stage === 'failed') return true;
+export function hasSecurityCheckFailure(w: {
+  stages?: Array<{ name?: string; stage?: string; status?: string }>;
+  current_stage?: string;
+}): boolean {
+  if (w.current_stage === "failed") return true;
   const stages = w.stages ?? [];
   return stages.some(
     (s) =>
-      (s.name === 'security_check' || s.stage === 'security_check') &&
-      (s.status === 'failed' || s.status === 'error')
+      (s.name === "security_check" || s.stage === "security_check") &&
+      (s.status === "failed" || s.status === "error"),
   );
 }
 
@@ -100,7 +137,7 @@ export interface Template {
   name?: string;
   description?: string;
   source?: string;
-  codegen_mode?: 'oz_wizard' | 'custom';
+  codegen_mode?: "oz_wizard" | "custom";
   risk_profile?: string;
   requires_human_approval?: boolean;
   wizard_kind?: string;

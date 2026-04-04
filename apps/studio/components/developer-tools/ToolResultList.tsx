@@ -56,7 +56,12 @@ function modeBadge(mode: SearchMode): string {
   return badges[mode] ?? mode;
 }
 
-export function ToolResultList({ matches, mode, onFileClick, className = "" }: ToolResultListProps) {
+export function ToolResultList({
+  matches,
+  mode,
+  onFileClick,
+  className = "",
+}: ToolResultListProps) {
   const groups = groupByFile(matches);
   const [expandedFile, setExpandedFile] = useState<string | null>(
     groups.length === 1 ? groups[0].filePath : null,
@@ -77,7 +82,9 @@ export function ToolResultList({ matches, mode, onFileClick, className = "" }: T
           >
             <button
               type="button"
-              onClick={() => setExpandedFile(isExpanded ? null : group.filePath)}
+              onClick={() =>
+                setExpandedFile(isExpanded ? null : group.filePath)
+              }
               className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[var(--color-bg-hover)] transition-colors"
             >
               <svg
@@ -86,7 +93,13 @@ export function ToolResultList({ matches, mode, onFileClick, className = "" }: T
                 viewBox="0 0 12 12"
                 className={`text-[var(--color-text-muted)] transition-transform ${isExpanded ? "rotate-90" : ""}`}
               >
-                <path d="M4 2L8 6L4 10" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+                <path
+                  d="M4 2L8 6L4 10"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  fill="none"
+                  strokeLinecap="round"
+                />
               </svg>
               <span className="text-xs text-[var(--color-text-secondary)] font-mono truncate flex-1">
                 {group.filePath}
@@ -122,7 +135,9 @@ export function ToolResultList({ matches, mode, onFileClick, className = "" }: T
                           {m.snippet}
                         </span>
                         {m.severity && (
-                          <span className={`text-[10px] flex-shrink-0 ${severityColor(m.severity)}`}>
+                          <span
+                            className={`text-[10px] flex-shrink-0 ${severityColor(m.severity)}`}
+                          >
                             {m.severity}
                           </span>
                         )}

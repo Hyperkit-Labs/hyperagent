@@ -9,7 +9,9 @@ export interface BentoGridProps {
 
 export function BentoGrid({ children, className = "" }: BentoGridProps) {
   return (
-    <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 auto-rows-fr ${className}`}>
+    <div
+      className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 auto-rows-fr ${className}`}
+    >
       {children}
     </div>
   );
@@ -36,7 +38,12 @@ const ROW_SPAN_CLASSES: Record<number, string> = {
   2: "row-span-2",
 };
 
-export function BentoCard({ children, colSpan = 1, rowSpan = 1, className = "" }: BentoCardProps) {
+export function BentoCard({
+  children,
+  colSpan = 1,
+  rowSpan = 1,
+  className = "",
+}: BentoCardProps) {
   const colClass = COL_SPAN_CLASSES[colSpan] ?? "";
   const rowClass = ROW_SPAN_CLASSES[rowSpan] ?? "";
   return (

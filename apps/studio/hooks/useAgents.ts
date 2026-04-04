@@ -1,6 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
-import { getAgents, getErrorMessage, type AgentStatus, type AgentsResponse } from '@/lib/api';
-import { POLLING } from '@/constants/defaults';
+import { useState, useEffect, useCallback } from "react";
+import {
+  getAgents,
+  getErrorMessage,
+  type AgentStatus,
+  type AgentsResponse,
+} from "@/lib/api";
+import { POLLING } from "@/constants/defaults";
 
 export interface UseAgentsOptions {
   autoRefresh?: boolean;
@@ -35,9 +40,13 @@ export function useAgents(options: UseAgentsOptions = {}): UseAgentsReturn {
       const response: AgentsResponse = await getAgents();
       const list = response.agents ?? [];
       setAgents(list);
-      setTotal(typeof (response as { total?: number }).total === "number" ? (response as { total: number }).total : list.length);
+      setTotal(
+        typeof (response as { total?: number }).total === "number"
+          ? (response as { total: number }).total
+          : list.length,
+      );
     } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Failed to fetch agents'));
+      setError(getErrorMessage(err, "Failed to fetch agents"));
     } finally {
       setLoading(false);
     }
@@ -67,4 +76,3 @@ export function useAgents(options: UseAgentsOptions = {}): UseAgentsReturn {
     isEmpty: agents.length === 0 && !loading,
   };
 }
-

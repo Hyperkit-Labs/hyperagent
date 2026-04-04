@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
 export default function WorkflowsError({
   error,
@@ -10,7 +10,7 @@ export default function WorkflowsError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('[WorkflowsError]', error);
+    console.error("[WorkflowsError]", error);
   }, [error]);
 
   return (
@@ -19,7 +19,8 @@ export default function WorkflowsError({
         Workflows failed to load
       </h2>
       <p className="max-w-md text-sm text-[var(--color-text-secondary)]">
-        An error occurred loading workflows. Your data is safe. Try again or return to the dashboard.
+        An error occurred loading workflows. Your data is safe. Try again or
+        return to the dashboard.
         {error.digest && (
           <span className="block mt-1 font-mono text-xs opacity-60">
             Error ID: {error.digest}

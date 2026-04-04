@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { getAgentDiscussionStreamUrl } from '@/lib/api';
-import { getStoredSession } from '@/lib/session-store';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { getAgentDiscussionStreamUrl } from "@/lib/api";
+import { getStoredSession } from "@/lib/session-store";
 
 export interface AgentDiscussionEvent {
   stage?: string;
@@ -25,14 +25,22 @@ export function useAgentDiscussion(workflowId: string | null) {
     const baseUrl = getAgentDiscussionStreamUrl(workflowId);
     const url = `${baseUrl}?token=${encodeURIComponent(token || "")}`;
 
-    if (process.env.NODE_ENV === "development" && typeof window !== "undefined" && "console" in window) {
+    if (
+      process.env.NODE_ENV === "development" &&
+      typeof window !== "undefined" &&
+      "console" in window
+    ) {
       console.log("[ZSPS] Connecting to Discussion Stream:", baseUrl);
     }
 
     const es = new EventSource(url, { withCredentials: true });
 
     es.onopen = () => {
-      if (process.env.NODE_ENV === "development" && typeof window !== "undefined" && "console" in window) {
+      if (
+        process.env.NODE_ENV === "development" &&
+        typeof window !== "undefined" &&
+        "console" in window
+      ) {
         console.log("[ZSPS] Discussion Stream Connected.");
       }
     };
@@ -51,8 +59,14 @@ export function useAgentDiscussion(workflowId: string | null) {
     };
 
     es.onerror = () => {
-      if (process.env.NODE_ENV === "development" && typeof window !== "undefined" && "console" in window) {
-        console.error("[ZSPS] Discussion Stream Auth Failure or connection closed");
+      if (
+        process.env.NODE_ENV === "development" &&
+        typeof window !== "undefined" &&
+        "console" in window
+      ) {
+        console.error(
+          "[ZSPS] Discussion Stream Auth Failure or connection closed",
+        );
       }
       es.close();
       setStreaming(false);

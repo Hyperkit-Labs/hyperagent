@@ -221,7 +221,17 @@ function getSpecificMessage(filePath, status, dryRun) {
     if (!dryRun) {
       const addResult = spawnSync('git', ['add', '--', filePath], opts);
       if (addResult.error || addResult.status !== 0) {
-        return conventionalSubject('chore', `modify ${path.basename(filePath)}`);
+        const errOut = `${addResult.stderr || ""}${addResult.stdout || ""}`.trim();
+        throw new Error(
+          `git add failed for ${filePath} (exit ${addResult.status}): ${errOut || addResult.error?.message || "unknown"}`
+        );
+      }
+      const stagedNames = spawnSync("git", ["diff", "--cached", "--name-only", "--", filePath], opts);
+      const staged = (stagedNames.stdout || "").toString().trim();
+      if (!staged) {
+        throw new Error(
+          `git add reported success but nothing is staged for ${filePath}; fix path or line endings and retry`
+        );
       }
     }
 
@@ -253,6 +263,9 @@ function getSpecificMessage(filePath, status, dryRun) {
 
     return conventionalSubject('refactor', `modify logic in ${filePath}`);
   } catch (e) {
+    if (e instanceof Error && /git add|nothing is staged/i.test(e.message)) {
+      throw e;
+    }
     return conventionalSubject('chore', `modify ${path.basename(filePath)}`);
   }
 }

@@ -22,7 +22,8 @@ export const ShinyText = ({
       style={
         !disabled
           ? {
-              backgroundImage: "linear-gradient(120deg, rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0.8) 50%, rgba(255, 255, 255, 0) 60%)",
+              backgroundImage:
+                "linear-gradient(120deg, rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0.8) 50%, rgba(255, 255, 255, 0) 60%)",
               backgroundSize: "200% 100%",
               WebkitBackgroundClip: "text",
               animationDuration: `${speed}s`,

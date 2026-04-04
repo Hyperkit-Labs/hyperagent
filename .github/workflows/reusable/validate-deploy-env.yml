@@ -1,0 +1,38 @@
+# Reusable: validate required env keys for a profile (strict) or .env.example coverage (PR gate).
+on:
+  workflow_call:
+    inputs:
+      mode:
+        required: false
+        type: string
+        default: "example-keys"
+        description: "example-keys | strict (requires secrets as env on runner)"
+      profile:
+        required: true
+        type: string
+        description: "ci | staging | production"
+      env-file:
+        required: false
+        type: string
+        default: ""
+        description: "Optional path; omit for strict env-only. example-keys defaults to .env.example when empty."
+
+jobs:
+  validate:
+    name: Env validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate
+        run: |
+          pip install --disable-pip-version-check -q pyyaml
+          ARGS=(--profile "${{ inputs.profile }}" --mode "${{ inputs.mode }}")
+          if [ -n "${{ inputs.env-file }}" ]; then
+            ARGS+=(--env-file "${{ inputs.env-file }}")
+          fi
+          python scripts/deploy/validate_env.py "${ARGS[@]}"

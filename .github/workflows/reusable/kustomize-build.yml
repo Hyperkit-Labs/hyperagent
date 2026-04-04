@@ -1,0 +1,28 @@
+# Reusable: verify Kustomize overlays render (kubectl kustomize).
+on:
+  workflow_call:
+    inputs:
+      overlay-path:
+        required: true
+        type: string
+        description: "Path to overlay, e.g. infra/k8s/overlays/production"
+
+jobs:
+  kustomize:
+    name: Kustomize build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.31.0
+
+      - name: kustomize build
+        run: |
+          set -euo pipefail
+          kubectl kustomize "${{ inputs.overlay-path }}" > /tmp/rendered.yaml
+          test -s /tmp/rendered.yaml
+          echo "Rendered $(wc -l < /tmp/rendered.yaml) lines"
+          head -n 40 /tmp/rendered.yaml

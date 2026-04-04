@@ -6,7 +6,9 @@ import { getWorkflows } from "@/lib/api";
 
 export function NotificationsDropdown() {
   const [open, setOpen] = useState(false);
-  const [notifications, setNotifications] = useState<{ id: string; title: string; time?: string }[]>([]);
+  const [notifications, setNotifications] = useState<
+    { id: string; title: string; time?: string }[]
+  >([]);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -17,26 +19,36 @@ export function NotificationsDropdown() {
         setNotifications(
           wfs.slice(0, 5).map((w) => ({
             id: w.workflow_id,
-            title: w.status === "completed" ? `Workflow completed` : w.status === "failed" ? `Workflow failed` : `Workflow ${w.status}`,
+            title:
+              w.status === "completed"
+                ? `Workflow completed`
+                : w.status === "failed"
+                  ? `Workflow failed`
+                  : `Workflow ${w.status}`,
             time: w.updated_at ?? w.created_at,
-          }))
+          })),
         );
       })
       .catch((err) => {
         setNotifications([]);
-        if (process.env.NODE_ENV === 'development' && typeof console !== 'undefined') {
-          console.warn('[Notifications] fetch failed:', err);
+        if (
+          process.env.NODE_ENV === "development" &&
+          typeof console !== "undefined"
+        ) {
+          console.warn("[Notifications] fetch failed:", err);
         }
       });
   }, [open]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
     }
     if (open) {
       document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [open]);
 
@@ -61,8 +73,12 @@ export function NotificationsDropdown() {
           </div>
           {notifications.length === 0 ? (
             <div className="px-4 py-8 text-center text-[var(--color-text-tertiary)] text-sm">
-              <p className="font-medium text-[var(--color-text-secondary)] mb-1">No recent activity</p>
-              <p className="text-[11px] text-[var(--color-text-muted)]">Workflow status updates will appear here.</p>
+              <p className="font-medium text-[var(--color-text-secondary)] mb-1">
+                No recent activity
+              </p>
+              <p className="text-[11px] text-[var(--color-text-muted)]">
+                Workflow status updates will appear here.
+              </p>
             </div>
           ) : (
             <ul className="py-1">
@@ -70,7 +86,11 @@ export function NotificationsDropdown() {
                 <li key={n.id}>
                   <div className="px-4 py-2 hover:bg-[var(--color-bg-panel)] text-[13px] text-[var(--color-text-primary)]">
                     {n.title}
-                    {n.time && <span className="block text-[11px] text-[var(--color-text-dim)] mt-0.5">{n.time}</span>}
+                    {n.time && (
+                      <span className="block text-[11px] text-[var(--color-text-dim)] mt-0.5">
+                        {n.time}
+                      </span>
+                    )}
                   </div>
                 </li>
               ))}

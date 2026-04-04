@@ -8,7 +8,12 @@
 
 import { spawn } from "child_process";
 import path from "path";
-import type { SearchRequest, SearchResponse, SearchMatch, SearchMode } from "./search";
+import type {
+  SearchRequest,
+  SearchResponse,
+  SearchMatch,
+  SearchMode,
+} from "./search";
 
 const DANGEROUS_PATTERNS = /[;&|`$(){}[\]<>!\\]/;
 const DANGEROUS_GLOB = /[;&|`$!\\<>]/;
@@ -34,14 +39,20 @@ function normalizePath(p: string, root: string): string {
 }
 
 function buildArgs(req: SearchRequest): string[] {
-  const args: string[] = ["--no-heading", "--line-number", "--column", "--color=never"];
+  const args: string[] = [
+    "--no-heading",
+    "--line-number",
+    "--column",
+    "--color=never",
+  ];
 
   if (!req.caseSensitive) args.push("--ignore-case");
   if (req.wholeWord) args.push("--word-regexp");
   if (req.includeHidden) args.push("--hidden");
   if (req.includeIgnored) args.push("--no-ignore");
   if (req.maxResults) args.push("--max-count", String(req.maxResults));
-  if (req.contextLines && req.contextLines > 0) args.push(`-C${req.contextLines}`);
+  if (req.contextLines && req.contextLines > 0)
+    args.push(`-C${req.contextLines}`);
 
   if (req.includeGlobs) {
     for (const g of req.includeGlobs) {
@@ -58,12 +69,18 @@ function buildArgs(req: SearchRequest): string[] {
 
   switch (req.mode) {
     case "filename": {
-      const globArg = req.query && validateGlob(req.query) ? ["--glob", `*${req.query}*`] : [];
+      const globArg =
+        req.query && validateGlob(req.query)
+          ? ["--glob", `*${req.query}*`]
+          : [];
       return ["--files", ...globArg, req.workspaceRoot];
     }
 
     case "todo":
-      args.push("-e", safeQ ? `(TODO|FIXME|HACK|XXX).*${safeQ}` : "(TODO|FIXME|HACK|XXX)");
+      args.push(
+        "-e",
+        safeQ ? `(TODO|FIXME|HACK|XXX).*${safeQ}` : "(TODO|FIXME|HACK|XXX)",
+      );
       break;
 
     case "symbol":
@@ -73,19 +90,28 @@ function buildArgs(req: SearchRequest): string[] {
       break;
 
     case "env":
-      args.push("-e", safeQ
-        ? `(process\\.env|import\\.meta\\.env|NEXT_PUBLIC_).*${safeQ}`
-        : "(process\\.env\\.|import\\.meta\\.env\\.|NEXT_PUBLIC_)");
+      args.push(
+        "-e",
+        safeQ
+          ? `(process\\.env|import\\.meta\\.env|NEXT_PUBLIC_).*${safeQ}`
+          : "(process\\.env\\.|import\\.meta\\.env\\.|NEXT_PUBLIC_)",
+      );
       break;
 
     case "export":
-      args.push("-e", safeQ
-        ? `export\\s+(default\\s+)?(function|class|const|let|var|type|interface|enum)\\s+${safeQ}`
-        : "^export\\s+(default\\s+)?(function|class|const|let|var|type|interface|enum)\\s+");
+      args.push(
+        "-e",
+        safeQ
+          ? `export\\s+(default\\s+)?(function|class|const|let|var|type|interface|enum)\\s+${safeQ}`
+          : "^export\\s+(default\\s+)?(function|class|const|let|var|type|interface|enum)\\s+",
+      );
       break;
 
     case "risk":
-      args.push("-e", "\\beval\\s*\\(|new\\s+Function\\s*\\(|innerHTML\\s*=|dangerouslySetInnerHTML|__proto__|constructor\\[");
+      args.push(
+        "-e",
+        "\\beval\\s*\\(|new\\s+Function\\s*\\(|innerHTML\\s*=|dangerouslySetInnerHTML|__proto__|constructor\\[",
+      );
       break;
 
     case "scaffold":
@@ -141,7 +167,10 @@ function parseRgOutput(stdout: string, mode: SearchMode): SearchMatch[] {
   return matches;
 }
 
-function runRg(args: string[], cwd: string): Promise<{ stdout: string; stderr: string; code: number }> {
+function runRg(
+  args: string[],
+  cwd: string,
+): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolve) => {
     const proc = spawn("rg", args, {
       cwd,
@@ -227,7 +256,10 @@ export class WorkspaceSearchService {
     };
   }
 
-  private async runScaffoldCheck(req: SearchRequest, startTime: number): Promise<SearchResponse> {
+  private async runScaffoldCheck(
+    req: SearchRequest,
+    startTime: number,
+  ): Promise<SearchResponse> {
     const warnings: string[] = [];
     const matches: SearchMatch[] = [];
 
@@ -277,8 +309,15 @@ export class WorkspaceSearchService {
     }
 
     const riskSearch = await runRg(
-      ["--no-heading", "--line-number", "--column", "--color=never", "-e",
-        "\\beval\\s*\\(|new\\s+Function\\s*\\(", req.workspaceRoot],
+      [
+        "--no-heading",
+        "--line-number",
+        "--column",
+        "--color=never",
+        "-e",
+        "\\beval\\s*\\(|new\\s+Function\\s*\\(",
+        req.workspaceRoot,
+      ],
       req.workspaceRoot,
     );
 

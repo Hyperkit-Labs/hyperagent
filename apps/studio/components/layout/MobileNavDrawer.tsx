@@ -49,7 +49,8 @@ const resourceItems = [
   { href: ROUTES.DOCS, label: "Docs", icon: BookOpen },
 ];
 
-const NAV_LINK_BASE = "flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] min-h-[40px] transition-colors";
+const NAV_LINK_BASE =
+  "flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] min-h-[40px] transition-colors";
 
 function NavLink({
   href,
@@ -67,13 +68,18 @@ function NavLink({
   onNavigate?: () => void;
 }) {
   const hasQuery = href.includes("?");
-  const isActive = hasQuery ? fullPath === href : (pathname === href || (href !== ROUTES.DASHBOARD && pathname.startsWith(href)));
+  const isActive = hasQuery
+    ? fullPath === href
+    : pathname === href ||
+      (href !== ROUTES.DASHBOARD && pathname.startsWith(href));
   return (
     <Link
       href={href}
       onClick={onNavigate}
       className={`${NAV_LINK_BASE} ${
-        isActive ? "nav-item-active" : "text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-panel)] hover:text-[var(--color-text-primary)]"
+        isActive
+          ? "nav-item-active"
+          : "text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-panel)] hover:text-[var(--color-text-primary)]"
       }`}
     >
       <Icon className="w-4 h-4 shrink-0" />
@@ -90,7 +96,8 @@ export interface MobileNavDrawerProps {
 export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const fullPath = pathname + (searchParams.toString() ? "?" + searchParams.toString() : "");
+  const fullPath =
+    pathname + (searchParams.toString() ? "?" + searchParams.toString() : "");
 
   useEffect(() => {
     if (open) {
@@ -131,13 +138,13 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
                   Navigation
                 </h2>
                 <button
-                type="button"
-                onClick={onClose}
-                className="p-2 rounded-lg hover:bg-[var(--color-bg-hover)] text-[var(--color-text-tertiary)]"
-                aria-label="Close menu"
-              >
-                <X className="w-5 h-5" />
-              </button>
+                  type="button"
+                  onClick={onClose}
+                  className="p-2 rounded-lg hover:bg-[var(--color-bg-hover)] text-[var(--color-text-tertiary)]"
+                  aria-label="Close menu"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
               <Link
                 href={ROUTES.HOME}
@@ -147,7 +154,9 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
                 <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
                   <Blocks className="w-4 h-4" />
                 </div>
-                <span className="text-[13px] font-medium text-white">Back to Project</span>
+                <span className="text-[13px] font-medium text-white">
+                  Back to Project
+                </span>
               </Link>
             </div>
             <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-4">
@@ -156,7 +165,15 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
                   Core
                 </span>
                 {coreNavItems.map(({ href, label, icon }) => (
-                  <NavLink key={href + label} href={href} label={label} icon={icon} pathname={pathname} fullPath={fullPath} onNavigate={onClose} />
+                  <NavLink
+                    key={href + label}
+                    href={href}
+                    label={label}
+                    icon={icon}
+                    pathname={pathname}
+                    fullPath={fullPath}
+                    onNavigate={onClose}
+                  />
                 ))}
               </div>
               <div className="space-y-1">
@@ -164,7 +181,15 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
                   Tools
                 </span>
                 {toolsNavItems.map(({ href, label, icon }) => (
-                  <NavLink key={href + label} href={href} label={label} icon={icon} pathname={pathname} fullPath={fullPath} onNavigate={onClose} />
+                  <NavLink
+                    key={href + label}
+                    href={href}
+                    label={label}
+                    icon={icon}
+                    pathname={pathname}
+                    fullPath={fullPath}
+                    onNavigate={onClose}
+                  />
                 ))}
               </div>
               <div className="space-y-1">
@@ -172,7 +197,15 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
                   Resources
                 </span>
                 {resourceItems.map(({ href, label, icon }) => (
-                  <NavLink key={href} href={href} label={label} icon={icon} pathname={pathname} fullPath={fullPath} onNavigate={onClose} />
+                  <NavLink
+                    key={href}
+                    href={href}
+                    label={label}
+                    icon={icon}
+                    pathname={pathname}
+                    fullPath={fullPath}
+                    onNavigate={onClose}
+                  />
                 ))}
               </div>
             </nav>

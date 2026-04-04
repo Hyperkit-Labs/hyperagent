@@ -45,7 +45,9 @@ export interface StarterGridProps {
 
 export function StarterGrid({ onSelect, className = "" }: StarterGridProps) {
   return (
-    <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-3xl mx-auto ${className}`}>
+    <div
+      className={`grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-3xl mx-auto ${className}`}
+    >
       {DEFAULT_STARTERS.map((card, i) => (
         <motion.div
           key={card.id}
@@ -65,8 +67,12 @@ export function StarterGrid({ onSelect, className = "" }: StarterGridProps) {
                 {card.icon}
               </span>
               <div>
-                <p className="text-sm font-semibold text-[var(--color-text-primary)] group-hover:text-[var(--color-primary-light)] transition-colors">{card.label}</p>
-                <p className="text-xs text-[var(--color-text-tertiary)] mt-0.5 line-clamp-2">{card.prompt}</p>
+                <p className="text-sm font-semibold text-[var(--color-text-primary)] group-hover:text-[var(--color-primary-light)] transition-colors">
+                  {card.label}
+                </p>
+                <p className="text-xs text-[var(--color-text-tertiary)] mt-0.5 line-clamp-2">
+                  {card.prompt}
+                </p>
               </div>
             </button>
           </SpotlightCard>

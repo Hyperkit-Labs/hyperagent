@@ -28,7 +28,8 @@
     "staged": "git diff --cached --name-only",
     "db:apply-migrations": "node scripts/apply-supabase-migrations.mjs",
     "docs:auth-snapshots": "node scripts/export-auth-snapshots.mjs",
-    "test:e2e:real-server": "pnpm --filter hyperagent-studio run test:e2e:real-server"
+    "test:e2e:real-server": "pnpm --filter hyperagent-studio run test:e2e:real-server",
+    "prepare": "husky"
   },
   "keywords": [
     "smart-contracts",
@@ -59,7 +60,11 @@
     "vercel": "^50.28.0"
   },
   "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
     "dotenv": "^16.4.7",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2",
     "pg": "^8.14.1",
     "turbo": "^2.8.17"
   },

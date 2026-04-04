@@ -52,7 +52,16 @@ module.exports = {
     }
 
     if (other.length > 0) {
-      cmds.push("pnpm turbo run lint format --continue");
+      const onlyLintStagedConfig =
+        other.length === 1 &&
+        path.basename(other[0]).toLowerCase() === "lint-staged.config.cjs";
+      if (onlyLintStagedConfig) {
+        cmds.push(
+          `pnpm --filter hyperagent-studio exec prettier --write ${quoteArg(other[0])}`,
+        );
+      } else {
+        cmds.push("pnpm turbo run lint format --continue");
+      }
     }
 
     return cmds;

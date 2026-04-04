@@ -16,7 +16,13 @@ interface RequireApiSessionProps {
  * If no session, redirect to /login. If bootstrap failed with a retryable error, show message + Retry.
  */
 export function RequireApiSession({ children }: RequireApiSessionProps) {
-  const { hasSession, bootstrapStatus, isReady, bootstrapError, recheckBootstrap } = useSessionContext();
+  const {
+    hasSession,
+    bootstrapStatus,
+    isReady,
+    bootstrapError,
+    recheckBootstrap,
+  } = useSessionContext();
   const router = useRouter();
 
   useEffect(() => {
@@ -46,7 +52,8 @@ export function RequireApiSession({ children }: RequireApiSessionProps) {
     return (
       <div className="p-6 lg:p-8 flex flex-col items-center justify-center min-h-[60vh] gap-4 max-w-md mx-auto text-center">
         <p className="text-sm text-[var(--color-text-secondary)] whitespace-pre-line">
-          {bootstrapError ?? "We could not load your workspace. Your session is still here; try Retry."}
+          {bootstrapError ??
+            "We could not load your workspace. Your session is still here; try Retry."}
         </p>
         <button
           type="button"

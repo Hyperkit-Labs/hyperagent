@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useCallback,
-  useMemo,
-} from "react";
+import { createContext, useContext, useCallback, useMemo } from "react";
 import useSWR from "swr";
 import { getNetworks, type NetworkConfig } from "@/lib/api";
 import { networkRegistryFailureMessage } from "@/lib/sadPathCopy";
@@ -35,14 +30,18 @@ export function useNetworksContext(): NetworksContextValue | null {
 }
 
 export function NetworksProvider({ children }: { children: React.ReactNode }) {
-  const { data, error, isLoading, mutate } = useSWR(NETWORKS_SWR_KEY, fetcherNetworks, {
-    revalidateOnFocus: false,
-    revalidateOnReconnect: true,
-    revalidateOnMount: false,
-    dedupingInterval: NETWORKS_STALE_TIME_MS,
-    errorRetryCount: 1,
-    keepPreviousData: true,
-  });
+  const { data, error, isLoading, mutate } = useSWR(
+    NETWORKS_SWR_KEY,
+    fetcherNetworks,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: true,
+      revalidateOnMount: false,
+      dedupingInterval: NETWORKS_STALE_TIME_MS,
+      errorRetryCount: 1,
+      keepPreviousData: true,
+    },
+  );
 
   const refetch = useCallback(async () => {
     await mutate();
@@ -50,12 +49,12 @@ export function NetworksProvider({ children }: { children: React.ReactNode }) {
 
   const getNetworkByChainId = useCallback(
     (chainId: number) => (data ?? []).find((n) => n.chain_id === chainId),
-    [data]
+    [data],
   );
 
   const getNetworkById = useCallback(
     (id: string) => (data ?? []).find((n) => n.id === id),
-    [data]
+    [data],
   );
 
   const value: NetworksContextValue = useMemo(
@@ -67,10 +66,12 @@ export function NetworksProvider({ children }: { children: React.ReactNode }) {
       getNetworkByChainId,
       getNetworkById,
     }),
-    [data, isLoading, error, refetch, getNetworkByChainId, getNetworkById]
+    [data, isLoading, error, refetch, getNetworkByChainId, getNetworkById],
   );
 
   return (
-    <NetworksContext.Provider value={value}>{children}</NetworksContext.Provider>
+    <NetworksContext.Provider value={value}>
+      {children}
+    </NetworksContext.Provider>
   );
 }

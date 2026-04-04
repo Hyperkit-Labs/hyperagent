@@ -1,0 +1,47 @@
+# Semgrep OSS: static analysis and security-oriented rulesets.
+name: Semgrep
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    branches: [main, development]
+  push:
+    branches: [main, development]
+
+concurrency:
+  group: semgrep-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  semgrep:
+    name: Semgrep scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Semgrep
+        run: pip install semgrep
+
+      - name: Run Semgrep (CI + security-audit + Python)
+        run: |
+          semgrep scan \
+            --config p/ci \
+            --config p/r2c-security-audit \
+            --config p/python \
+            --sarif \
+            --output semgrep.sarif \
+            .
+
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: >-
+          always() &&
+          hashFiles('semgrep.sarif') != '' &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep

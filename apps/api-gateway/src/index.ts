@@ -11,9 +11,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: resolve(__dirname, "../../../.env") });
 
 import cors from "cors";
-import express from "express";
+import express, { NextFunction } from "express";
 import { createProxyMiddleware } from "http-proxy-middleware";
-import { requestIdMiddleware } from "./requestId.js";
+import { requestIdMiddleware, type RequestWithId } from "./requestId.js";
 import { otelRequestSpanMiddleware, validateRequiredSecrets } from "@hyperagent/backend-middleware";
 import { log } from "./logger.js";
 import { authMiddleware } from "./auth.js";
@@ -96,7 +96,9 @@ app.use((req, res, next) => {
 
 // --- Routes ---
 
-app.post("/api/v1/auth/bootstrap", jsonParser, authBootstrapHandler);
+app.post("/api/v1/auth/bootstrap", jsonParser, (req, res, next) => {
+  void authBootstrapHandler(req, res).catch(next);
+});
 app.use("/api/v1/byok", jsonParser, byokRouter);
 
 const proxyOpts = () => createProxyOptions(ORCHESTRATOR_URL, PROXY_TIMEOUT_MS);
@@ -107,6 +109,24 @@ app.use("/runs", createProxyMiddleware(proxyOpts()));
 app.use("/api", createProxyMiddleware(proxyOpts()));
 app.use("/docs", createProxyMiddleware(proxyOpts()));
 app.use("/openapi.json", createProxyMiddleware(proxyOpts()));
+
+app.use((err: unknown, req: RequestWithId, res: express.Response, _next: NextFunction) => {
+  const msg = err instanceof Error ? err.message : String(err);
+  log.error(
+    {
+      err: msg,
+      stack: err instanceof Error ? err.stack : undefined,
+      requestId: req.requestId,
+    },
+    "unhandled route error"
+  );
+  if (res.headersSent) return;
+  res.status(500).json({
+    error: "Internal Server Error",
+    message: "An unexpected error occurred",
+    requestId: req.requestId,
+  });
+});
 
 const port = Number(process.env.PORT) || 4000;
 app.listen(port, "0.0.0.0", () => {

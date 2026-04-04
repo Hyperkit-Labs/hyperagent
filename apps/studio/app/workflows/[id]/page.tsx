@@ -21,7 +21,10 @@ export default function WorkflowIdRedirectPage() {
       return;
     }
     toast.info("Opening workflow...");
-    const t = setTimeout(() => router.replace(`${ROUTES.HOME}?workflow=${encodeURIComponent(id)}`), 150);
+    const t = setTimeout(
+      () => router.replace(`${ROUTES.HOME}?workflow=${encodeURIComponent(id)}`),
+      150,
+    );
     return () => clearTimeout(t);
   }, [router, id]);
 

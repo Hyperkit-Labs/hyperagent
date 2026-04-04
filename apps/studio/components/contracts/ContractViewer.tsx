@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { Artifact, CodeBlock } from '@/components/ai-elements';
-import { Copy, Check, Download, Rocket } from 'lucide-react';
-import { copyToClipboard } from '@/lib/utils';
-import { ROUTES } from '@/constants/routes';
+import { useState } from "react";
+import Link from "next/link";
+import { Artifact, CodeBlock } from "@/components/ai-elements";
+import { Copy, Check, Download, Rocket } from "lucide-react";
+import { copyToClipboard } from "@/lib/utils";
+import { ROUTES } from "@/constants/routes";
 
 interface ContractViewerProps {
   contractCode: string;
@@ -14,7 +14,12 @@ interface ContractViewerProps {
   workflowId?: string;
 }
 
-export function ContractViewer({ contractCode, abi, contractName, workflowId }: ContractViewerProps) {
+export function ContractViewer({
+  contractCode,
+  abi,
+  contractName,
+  workflowId,
+}: ContractViewerProps) {
   const [copied, setCopied] = useState(false);
   const [showABI, setShowABI] = useState(false);
 
@@ -27,11 +32,11 @@ export function ContractViewer({ contractCode, abi, contractName, workflowId }: 
   };
 
   const handleDownload = () => {
-    const blob = new Blob([contractCode], { type: 'text/plain' });
+    const blob = new Blob([contractCode], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = `${contractName || 'contract'}.sol`;
+    a.download = `${contractName || "contract"}.sol`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -88,7 +93,7 @@ export function ContractViewer({ contractCode, abi, contractName, workflowId }: 
             onClick={() => setShowABI(!showABI)}
             className="px-3 py-1.5 text-sm text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition-colors"
           >
-            {showABI ? 'Hide' : 'Show'} ABI
+            {showABI ? "Hide" : "Show"} ABI
           </button>
           {showABI && (
             <CodeBlock

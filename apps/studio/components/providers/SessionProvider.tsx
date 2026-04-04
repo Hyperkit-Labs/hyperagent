@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import {
   createContext,
@@ -9,16 +9,23 @@ import {
   useCallback,
   useRef,
   type ReactNode,
-} from 'react';
-import { usePathname } from 'next/navigation';
-import { getStoredSession, clearStoredSession, SESSION_CHANGE_EVENT } from '@/lib/session-store';
-import { fetchConfigStrict } from '@/lib/api';
-import type { ApiErrorWithStatus } from '@/lib/api';
-import { ROUTES } from '@/constants/routes';
-import { redirectToLoginWithNext } from '@/lib/authRedirect';
-import { bootstrapConfigFailureMessage, getErrorRequestId } from '@/lib/sadPathCopy';
+} from "react";
+import { usePathname } from "next/navigation";
+import {
+  getStoredSession,
+  clearStoredSession,
+  SESSION_CHANGE_EVENT,
+} from "@/lib/session-store";
+import { fetchConfigStrict } from "@/lib/api";
+import type { ApiErrorWithStatus } from "@/lib/api";
+import { ROUTES } from "@/constants/routes";
+import { redirectToLoginWithNext } from "@/lib/authRedirect";
+import {
+  bootstrapConfigFailureMessage,
+  getErrorRequestId,
+} from "@/lib/sadPathCopy";
 
-export type BootstrapStatus = 'pending' | 'success' | 'failed';
+export type BootstrapStatus = "pending" | "success" | "failed";
 
 export interface SessionContextValue {
   hasSession: boolean;
@@ -34,7 +41,7 @@ const SessionContext = createContext<SessionContextValue | null>(null);
 export function useSessionContext(): SessionContextValue {
   const ctx = useContext(SessionContext);
   if (!ctx) {
-    throw new Error('useSessionContext must be used within SessionProvider');
+    throw new Error("useSessionContext must be used within SessionProvider");
   }
   return ctx;
 }
@@ -59,20 +66,24 @@ const PROTECTED_PATHS: (string | ((p: string) => boolean))[] = [
   ROUTES.HISTORY,
   ROUTES.DOMAINS,
   ROUTES.DOCS,
-  (p) => p.startsWith('/workflows/'),
-  (p) => p.startsWith('/apps/'),
+  (p) => p.startsWith("/workflows/"),
+  (p) => p.startsWith("/apps/"),
 ];
 
 function isProtectedPath(pathname: string): boolean {
   if (pathname === ROUTES.LOGIN) return false;
   return PROTECTED_PATHS.some((p) =>
-    typeof p === 'function' ? p(pathname) : pathname === p
+    typeof p === "function" ? p(pathname) : pathname === p,
   );
 }
 
 function logAuth(...args: unknown[]) {
-  if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && sessionStorage.getItem('DEBUG_SESSION_PROVIDER') === '1') {
-    console.log('[SessionProvider]', ...args);
+  if (
+    process.env.NODE_ENV === "development" &&
+    typeof window !== "undefined" &&
+    sessionStorage.getItem("DEBUG_SESSION_PROVIDER") === "1"
+  ) {
+    console.log("[SessionProvider]", ...args);
   }
 }
 
@@ -83,7 +94,8 @@ function logAuth(...args: unknown[]) {
 export function SessionProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [hasSession, setHasSession] = useState(false);
-  const [bootstrapStatus, setBootstrapStatus] = useState<BootstrapStatus>('pending');
+  const [bootstrapStatus, setBootstrapStatus] =
+    useState<BootstrapStatus>("pending");
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const bootstrapInFlight = useRef(false);
@@ -96,42 +108,49 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const runBootstrap = useCallback(async () => {
-    const path = pathname ?? '';
+    const path = pathname ?? "";
     if (!isProtectedPath(path)) {
-      setBootstrapStatus('success');
+      setBootstrapStatus("success");
       setBootstrapError(null);
       return;
     }
 
     const session = getStoredSession();
     if (!session?.access_token) {
-      setBootstrapStatus('failed');
+      setBootstrapStatus("failed");
       setBootstrapError(null);
       safeRedirectToLogin();
       return;
     }
 
     if (bootstrapInFlight.current) {
-      logAuth('runBootstrap skipped (in flight)');
+      logAuth("runBootstrap skipped (in flight)");
       return;
     }
 
     bootstrapInFlight.current = true;
-    setBootstrapStatus('pending');
+    setBootstrapStatus("pending");
     setBootstrapError(null);
-    logAuth('fetchConfigStrict start pathname=', path);
+    logAuth("fetchConfigStrict start pathname=", path);
 
     try {
       await fetchConfigStrict();
-      setBootstrapStatus('success');
+      setBootstrapStatus("success");
       setBootstrapError(null);
       redirectingRef.current = false;
-      logAuth('fetchConfigStrict success');
+      logAuth("fetchConfigStrict success");
     } catch (err) {
       const status = (err as ApiErrorWithStatus)?.status;
       const code = (err as ApiErrorWithStatus & { code?: string })?.code;
-      logAuth('fetchConfigStrict failed status=', status, 'code=', code, 'err=', (err as Error)?.message);
-      setBootstrapStatus('failed');
+      logAuth(
+        "fetchConfigStrict failed status=",
+        status,
+        "code=",
+        code,
+        "err=",
+        (err as Error)?.message,
+      );
+      setBootstrapStatus("failed");
 
       if (status === 401 || status === 403) {
         clearStoredSession();
@@ -141,8 +160,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
 
       const requestId = getErrorRequestId(err);
-      const rawMessage = err instanceof Error && err.message ? err.message : 'Could not verify your session with the server.';
-      setBootstrapError(bootstrapConfigFailureMessage(status, code, rawMessage, requestId));
+      const rawMessage =
+        err instanceof Error && err.message
+          ? err.message
+          : "Could not verify your session with the server.";
+      setBootstrapError(
+        bootstrapConfigFailureMessage(status, code, rawMessage, requestId),
+      );
     } finally {
       bootstrapInFlight.current = false;
     }
@@ -158,7 +182,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const session = getStoredSession();
     setHasSession(Boolean(session));
     setIsReady(true);
-    logAuth('initial hasSession=', Boolean(session));
+    logAuth("initial hasSession=", Boolean(session));
   }, []);
 
   useEffect(() => {
@@ -170,7 +194,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         redirectingRef.current = false;
         setBootstrapError(null);
       }
-      logAuth('SESSION_CHANGE_EVENT hasSession=', next);
+      logAuth("SESSION_CHANGE_EVENT hasSession=", next);
     };
     window.addEventListener(SESSION_CHANGE_EVENT, handler);
     return () => window.removeEventListener(SESSION_CHANGE_EVENT, handler);
@@ -178,17 +202,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isReady) return;
-    const path = (pathname ?? (typeof window !== 'undefined' ? window.location.pathname : '')) || '';
-    logAuth('route effect pathname=', path, 'hasSession=', hasSession);
+    const path =
+      (pathname ??
+        (typeof window !== "undefined" ? window.location.pathname : "")) ||
+      "";
+    logAuth("route effect pathname=", path, "hasSession=", hasSession);
 
     if (!isProtectedPath(path)) {
-      setBootstrapStatus('success');
+      setBootstrapStatus("success");
       setBootstrapError(null);
       return;
     }
 
     if (!hasSession) {
-      setBootstrapStatus('failed');
+      setBootstrapStatus("failed");
       setBootstrapError(null);
       safeRedirectToLogin();
       return;
@@ -205,5 +232,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     recheckBootstrap,
   };
 
-  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+  return (
+    <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+  );
 }

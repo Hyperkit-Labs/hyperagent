@@ -1,21 +1,31 @@
 import type { NextConfig } from "next";
-import { config as dotenvConfig } from 'dotenv';
-import path from 'path';
+import { config as dotenvConfig } from "dotenv";
+import path from "path";
 
-const root = path.resolve(__dirname, '../..');
-dotenvConfig({ path: path.join(root, '.env') });
-dotenvConfig({ path: path.join(root, process.env.NODE_ENV === 'production' ? '.env.production' : '.env.development') });
-dotenvConfig({ path: path.resolve(__dirname, '../.env') });
+const root = path.resolve(__dirname, "../..");
+dotenvConfig({ path: path.join(root, ".env") });
+dotenvConfig({
+  path: path.join(
+    root,
+    process.env.NODE_ENV === "production"
+      ? ".env.production"
+      : ".env.development",
+  ),
+});
+dotenvConfig({ path: path.resolve(__dirname, "../.env") });
 
-const isProduction = process.env.NODE_ENV === 'production';
-const isStaging = (process.env.NODE_ENV as string) === 'staging';
+const isProduction = process.env.NODE_ENV === "production";
+const isStaging = (process.env.NODE_ENV as string) === "staging";
 
 // Validate required environment variables in production (fail build if missing)
 if (isProduction || isStaging) {
-  const requiredVars = ['NEXT_PUBLIC_API_URL', 'NEXT_PUBLIC_THIRDWEB_CLIENT_ID'];
-  const missing = requiredVars.filter(varName => !process.env[varName]);
+  const requiredVars = [
+    "NEXT_PUBLIC_API_URL",
+    "NEXT_PUBLIC_THIRDWEB_CLIENT_ID",
+  ];
+  const missing = requiredVars.filter((varName) => !process.env[varName]);
   if (missing.length > 0) {
-    const msg = `Missing required environment variables in ${process.env.NODE_ENV}: ${missing.join(', ')}. Set them before building or deploying.`;
+    const msg = `Missing required environment variables in ${process.env.NODE_ENV}: ${missing.join(", ")}. Set them before building or deploying.`;
     if (isProduction) {
       throw new Error(msg);
     }
@@ -25,16 +35,22 @@ if (isProduction || isStaging) {
 
 const nextConfig: NextConfig = {
   // Configure server external packages for Turbopack compatibility
-  serverExternalPackages: ['pino', 'pino-pretty', 'thread-stream', 'pino-abstract-transport', 'sonic-boom'],
+  serverExternalPackages: [
+    "pino",
+    "pino-pretty",
+    "thread-stream",
+    "pino-abstract-transport",
+    "sonic-boom",
+  ],
 
   // Faster dev: only bundle used modules from large packages (faster first compile and HMR)
   experimental: {
     optimizePackageImports: [
-      'lucide-react',
-      'recharts',
-      '@headlessui/react',
-      '@heroicons/react',
-      'framer-motion',
+      "lucide-react",
+      "recharts",
+      "@headlessui/react",
+      "@heroicons/react",
+      "framer-motion",
     ],
   },
 
@@ -42,14 +58,14 @@ const nextConfig: NextConfig = {
     // In production, fail on type errors; in development, allow for faster iteration
     ignoreBuildErrors: !isProduction,
   },
-  
+
   // Force dynamic rendering to avoid SSG issues with pino
-  output: 'standalone',
-  
+  output: "standalone",
+
   // Production optimizations
   compress: true,
   poweredByHeader: false,
-  
+
   // Ensure API calls work correctly
   async rewrites() {
     return [];
@@ -57,32 +73,38 @@ const nextConfig: NextConfig = {
 
   // BYOK: strict CSP to limit XSS impact; only allow connections to gateway and known LLM providers
   async headers() {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? (isProduction ? '' : 'http://localhost:4000');
-    let apiOrigin = '';
+    const apiUrl =
+      process.env.NEXT_PUBLIC_API_URL ??
+      (isProduction ? "" : "http://localhost:4000");
+    let apiOrigin = "";
     try {
-      if (apiUrl && apiUrl.startsWith('http')) apiOrigin = new URL(apiUrl).origin;
+      if (apiUrl && apiUrl.startsWith("http"))
+        apiOrigin = new URL(apiUrl).origin;
       else if (apiUrl) apiOrigin = apiUrl;
     } catch {
-      apiOrigin = '';
+      apiOrigin = "";
     }
     const connectSrc = [
       "'self'",
       apiOrigin,
-      'https://api.openai.com',
-      'https://api.anthropic.com',
-      'https://generativelanguage.googleapis.com',
-      'https://api.together.xyz',
-      'wss:',
-      'https://*.thirdweb.com',
-      'https://*.supabase.co',
+      "https://api.openai.com",
+      "https://api.anthropic.com",
+      "https://generativelanguage.googleapis.com",
+      "https://api.together.xyz",
+      "wss:",
+      "https://*.thirdweb.com",
+      "https://*.supabase.co",
       // Chain RPCs: wallet connect and smart-account resolution
-      'https://base-sepolia-testnet.skalenodes.com',
-      'https://skale-base.skalenodes.com',
-      'https://sepolia.base.org',
+      "https://base-sepolia-testnet.skalenodes.com",
+      "https://skale-base.skalenodes.com",
+      "https://sepolia.base.org",
       // thirdweb bundler (AA)
-      'https://*.bundler.thirdweb.com',
-    ].filter(Boolean).join(' ');
-    const scriptSrc = "'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com";
+      "https://*.bundler.thirdweb.com",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const scriptSrc =
+      "'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com";
     const csp = [
       "default-src 'self'",
       `connect-src ${connectSrc}`,
@@ -94,14 +116,14 @@ const nextConfig: NextConfig = {
       "form-action 'self'",
       "frame-ancestors 'self'",
       "base-uri 'self'",
-    ].join('; ');
+    ].join("; ");
     return [
       {
-        source: '/:path*',
+        source: "/:path*",
         headers: [
-          { key: 'Content-Security-Policy', value: csp },
-          { key: 'X-Content-Type-Options', value: 'nosniff' },
-          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: "Content-Security-Policy", value: csp },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
         ],
       },
     ];
@@ -111,13 +133,25 @@ const nextConfig: NextConfig = {
   // Next.js only exposes variables prefixed with NEXT_PUBLIC_ to the browser.
   // Single source of truth: SUPABASE_* are used here so Studio does not duplicate env.
   env: {
-    NEXT_PUBLIC_THIRDWEB_CLIENT_ID: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || '',
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? (isProduction ? '' : 'http://localhost:4000'),
-    NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL || (isProduction ? '' : 'ws://localhost:4000'),
-    NEXT_PUBLIC_X402_VERIFIER_URL: process.env.NEXT_PUBLIC_X402_VERIFIER_URL || (isProduction ? '' : 'http://localhost:3001'),
-    NEXT_PUBLIC_ENV: process.env.NEXT_PUBLIC_ENV || process.env.NODE_ENV || 'development',
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '',
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
+    NEXT_PUBLIC_THIRDWEB_CLIENT_ID:
+      process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || "",
+    NEXT_PUBLIC_API_URL:
+      process.env.NEXT_PUBLIC_API_URL ??
+      (isProduction ? "" : "http://localhost:4000"),
+    NEXT_PUBLIC_WS_URL:
+      process.env.NEXT_PUBLIC_WS_URL ||
+      (isProduction ? "" : "ws://localhost:4000"),
+    NEXT_PUBLIC_X402_VERIFIER_URL:
+      process.env.NEXT_PUBLIC_X402_VERIFIER_URL ||
+      (isProduction ? "" : "http://localhost:3001"),
+    NEXT_PUBLIC_ENV:
+      process.env.NEXT_PUBLIC_ENV || process.env.NODE_ENV || "development",
+    NEXT_PUBLIC_SUPABASE_URL:
+      process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "",
+    NEXT_PUBLIC_SUPABASE_ANON_KEY:
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      process.env.SUPABASE_ANON_KEY ||
+      "",
   },
 };
 

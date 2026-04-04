@@ -16,8 +16,12 @@ export function AmbientBackground() {
 
   return (
     <div className="fixed inset-0 pointer-events-none z-0 transition-colors duration-1000">
-      <div className={`absolute top-[-10%] left-[20%] w-[600px] h-[600px] ${colors.top} rounded-full blur-[120px]`} />
-      <div className={`absolute bottom-[-10%] right-[10%] w-[500px] h-[500px] ${colors.bottom} rounded-full blur-[100px]`} />
+      <div
+        className={`absolute top-[-10%] left-[20%] w-[600px] h-[600px] ${colors.top} rounded-full blur-[120px]`}
+      />
+      <div
+        className={`absolute bottom-[-10%] right-[10%] w-[500px] h-[500px] ${colors.bottom} rounded-full blur-[100px]`}
+      />
     </div>
   );
 }

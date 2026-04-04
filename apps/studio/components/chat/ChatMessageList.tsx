@@ -1,17 +1,36 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Conversation, ConversationContent, ConversationScrollButton, Message, Tool, Shimmer, Plan, Artifact, Terminal, StackTrace } from '@/components/ai-elements';
-import { GlowingBorder } from '@/components/ui';
-import { XTermTerminal } from '@/components/chat/XTermTerminal';
-import { Check, Loader2 } from 'lucide-react';
+import { useState } from "react";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+  Message,
+  Tool,
+  Shimmer,
+  Plan,
+  Artifact,
+  Terminal,
+  StackTrace,
+} from "@/components/ai-elements";
+import { GlowingBorder } from "@/components/ui";
+import { XTermTerminal } from "@/components/chat/XTermTerminal";
+import { Check, Loader2 } from "lucide-react";
 
-function SpecApproveButton({ workflowId, onApprove }: { workflowId: string; onApprove: (id: string) => Promise<void> }) {
+function SpecApproveButton({
+  workflowId,
+  onApprove,
+}: {
+  workflowId: string;
+  onApprove: (id: string) => Promise<void>;
+}) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (
     <div className="space-y-2">
-      <p className="text-[11px] text-amber-400">Action required: approve spec to continue</p>
+      <p className="text-[11px] text-amber-400">
+        Action required: approve spec to continue
+      </p>
       <button
         type="button"
         disabled={sending}
@@ -21,14 +40,18 @@ function SpecApproveButton({ workflowId, onApprove }: { workflowId: string; onAp
           try {
             await onApprove(workflowId);
           } catch (e) {
-            setError(e instanceof Error ? e.message : 'Approval failed');
+            setError(e instanceof Error ? e.message : "Approval failed");
           } finally {
             setSending(false);
           }
         }}
         className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
       >
-        {sending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+        {sending ? (
+          <Loader2 className="w-3 h-3 animate-spin" />
+        ) : (
+          <Check className="w-3 h-3" />
+        )}
         Approve spec
       </button>
       {error && <p className="text-[10px] text-red-400">{error}</p>}
@@ -36,7 +59,7 @@ function SpecApproveButton({ workflowId, onApprove }: { workflowId: string; onAp
   );
 }
 
-export type ChatMessageRole = 'user' | 'assistant' | 'system';
+export type ChatMessageRole = "user" | "assistant" | "system";
 
 export interface ToolInvocation {
   toolCallId?: string;
@@ -50,7 +73,12 @@ export interface ChatMessage {
   role: ChatMessageRole;
   content: string;
   toolInvocations?: ToolInvocation[];
-  planSteps?: { id: string; label: string; status: 'pending' | 'processing' | 'completed' | 'failed'; error?: string }[];
+  planSteps?: {
+    id: string;
+    label: string;
+    status: "pending" | "processing" | "completed" | "failed";
+    error?: string;
+  }[];
   artifact?: { title: string; content: string; description?: string };
   errorStack?: string;
   terminalLines?: { message: string; timestamp?: string; level?: string }[];
@@ -79,13 +107,15 @@ export function ChatMessageList({
   isLoading = false,
   streamingContent,
   discussionEvents = [],
-  emptyMessage = 'No messages yet. Describe your contract or ask a question.',
+  emptyMessage = "No messages yet. Describe your contract or ask a question.",
   onDownloadMarkdown,
   onApproveSpec,
   workflowIdForApproval,
 }: ChatMessageListProps) {
   const hasRequireAction = discussionEvents.some(
-    (e) => (e as { type?: string; action?: string }).type === 'require_action' && (e as { action?: string }).action === 'approve_spec'
+    (e) =>
+      (e as { type?: string; action?: string }).type === "require_action" &&
+      (e as { action?: string }).action === "approve_spec",
   );
   const handleDownloadMarkdown = () => {
     if (onDownloadMarkdown) {
@@ -93,14 +123,14 @@ export function ChatMessageList({
       return;
     }
     const lines = messages.map((m) => {
-      const role = m.role === 'user' ? 'User' : 'HyperAgent';
+      const role = m.role === "user" ? "User" : "HyperAgent";
       return `## ${role}\n\n${m.content}`;
     });
-    const blob = new Blob([lines.join('\n\n')], { type: 'text/markdown' });
+    const blob = new Blob([lines.join("\n\n")], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = 'chat-export.md';
+    a.download = "chat-export.md";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -110,42 +140,74 @@ export function ChatMessageList({
   return (
     <Conversation
       emptyMessage={emptyMessage}
-      onDownloadMarkdown={messages.length > 0 ? handleDownloadMarkdown : undefined}
+      onDownloadMarkdown={
+        messages.length > 0 ? handleDownloadMarkdown : undefined
+      }
     >
       <ConversationContent>
         {messages.map((msg) => (
           <div
             key={msg.id}
-            className={`flex flex-col gap-1 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
+            className={`flex flex-col gap-1 ${msg.role === "user" ? "items-end" : "items-start"}`}
           >
-            <Message from={msg.role} content={typeof msg.content === 'string' ? msg.content : ''}>
-              {msg.role === 'assistant' && msg.planSteps && msg.planSteps.length > 0 && (
-                <Plan steps={msg.planSteps} title="Pipeline" className="mt-2" />
-              )}
-              {msg.role === 'assistant' &&
+            <Message
+              from={msg.role}
+              content={typeof msg.content === "string" ? msg.content : ""}
+            >
+              {msg.role === "assistant" &&
+                msg.planSteps &&
+                msg.planSteps.length > 0 && (
+                  <Plan
+                    steps={msg.planSteps}
+                    title="Pipeline"
+                    className="mt-2"
+                  />
+                )}
+              {msg.role === "assistant" &&
                 msg.toolInvocations?.map((inv, i) => (
                   <div key={inv.toolCallId ?? i} className="mt-2 space-y-1">
                     <Tool
-                      toolName={inv.toolName ?? 'create_workflow'}
-                      status={inv.state === 'result' ? 'result' : inv.state === 'partial' ? 'running' : 'result'}
+                      toolName={inv.toolName ?? "create_workflow"}
+                      status={
+                        inv.state === "result"
+                          ? "result"
+                          : inv.state === "partial"
+                            ? "running"
+                            : "result"
+                      }
                       result={inv.result}
                     />
                     {(inv as { errorStack?: string }).errorStack && (
-                      <StackTrace raw={(inv as { errorStack?: string }).errorStack!} title="Tool error" />
+                      <StackTrace
+                        raw={(inv as { errorStack?: string }).errorStack!}
+                        title="Tool error"
+                      />
                     )}
                   </div>
                 ))}
-              {msg.role === 'assistant' && msg.artifact && (
-                <Artifact title={msg.artifact.title} description={msg.artifact.description} className="mt-2">
-                  <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto">{msg.artifact.content}</pre>
+              {msg.role === "assistant" && msg.artifact && (
+                <Artifact
+                  title={msg.artifact.title}
+                  description={msg.artifact.description}
+                  className="mt-2"
+                >
+                  <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto">
+                    {msg.artifact.content}
+                  </pre>
                 </Artifact>
               )}
-              {msg.role === 'assistant' && msg.errorStack && (
-                <StackTrace raw={msg.errorStack} title="Error" className="mt-2" />
+              {msg.role === "assistant" && msg.errorStack && (
+                <StackTrace
+                  raw={msg.errorStack}
+                  title="Error"
+                  className="mt-2"
+                />
               )}
-              {msg.role === 'assistant' && msg.terminalLines && msg.terminalLines.length > 0 && (
-                <Terminal lines={msg.terminalLines} className="mt-2" />
-              )}
+              {msg.role === "assistant" &&
+                msg.terminalLines &&
+                msg.terminalLines.length > 0 && (
+                  <Terminal lines={msg.terminalLines} className="mt-2" />
+                )}
             </Message>
           </div>
         ))}
@@ -160,14 +222,30 @@ export function ChatMessageList({
                 HyperAgent
               </span>
             </div>
-            <GlowingBorder active={true} className="rounded-xl border border-indigo-500/20 bg-indigo-500/10 backdrop-blur-sm px-4 py-3 max-w-[90%] w-full">
+            <GlowingBorder
+              active={true}
+              className="rounded-xl border border-indigo-500/20 bg-indigo-500/10 backdrop-blur-sm px-4 py-3 max-w-[90%] w-full"
+            >
               {discussionEvents.some((e) => e.stage) && (
                 <Plan
                   title="Pipeline"
-                  steps={Array.from(new Map(discussionEvents.filter((e) => e.stage).map((e) => [e.stage, e])).entries()).map(([stage, e]) => ({
-                    id: stage ?? '',
-                    label: (stage ?? 'step').replace(/_/g, ' '),
-                    status: e.status === 'completed' ? 'completed' : e.status === 'failed' ? 'failed' : e.status === 'running' ? 'processing' : 'pending',
+                  steps={Array.from(
+                    new Map(
+                      discussionEvents
+                        .filter((e) => e.stage)
+                        .map((e) => [e.stage, e]),
+                    ).entries(),
+                  ).map(([stage, e]) => ({
+                    id: stage ?? "",
+                    label: (stage ?? "step").replace(/_/g, " "),
+                    status:
+                      e.status === "completed"
+                        ? "completed"
+                        : e.status === "failed"
+                          ? "failed"
+                          : e.status === "running"
+                            ? "processing"
+                            : "pending",
                     error: (e as { error?: string }).error,
                   }))}
                   className="mb-3"
@@ -179,7 +257,10 @@ export function ChatMessageList({
                 </div>
                 <div className="px-0 py-0 overflow-hidden rounded">
                   {discussionEvents.length > 0 ? (
-                    <XTermTerminal events={discussionEvents} className="min-h-[180px]" />
+                    <XTermTerminal
+                      events={discussionEvents}
+                      className="min-h-[180px]"
+                    />
                   ) : (
                     <div className="px-2 py-2 animate-pulse text-[var(--color-text-muted)] text-[10px]">
                       Waiting for agent activity...
@@ -195,9 +276,11 @@ export function ChatMessageList({
                   </div>
                 )}
               </div>
-              {streamingContent != null && streamingContent !== '' && (
+              {streamingContent != null && streamingContent !== "" && (
                 <div className="mt-3 text-[13px] text-[var(--color-text-secondary)] leading-relaxed whitespace-pre-wrap">
-                  {typeof streamingContent === 'string' ? streamingContent : String(streamingContent)}
+                  {typeof streamingContent === "string"
+                    ? streamingContent
+                    : String(streamingContent)}
                 </div>
               )}
             </GlowingBorder>

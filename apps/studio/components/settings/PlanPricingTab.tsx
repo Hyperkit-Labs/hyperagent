@@ -24,9 +24,11 @@ export function PlanPricingTab({
   const [hoveredPlanId, setHoveredPlanId] = useState<string | null>(null);
 
   const primaryUsageKey = usage ? Object.keys(usage.usage)[0] : null;
-  const primaryVal = primaryUsageKey ? usage?.usage[primaryUsageKey] ?? 0 : 0;
+  const primaryVal = primaryUsageKey ? (usage?.usage[primaryUsageKey] ?? 0) : 0;
   const primaryLimit = primaryUsageKey ? usage?.limits[primaryUsageKey] : null;
-  const usagePct = primaryLimit ? Math.min(100, (primaryVal / primaryLimit) * 100) : 0;
+  const usagePct = primaryLimit
+    ? Math.min(100, (primaryVal / primaryLimit) * 100)
+    : 0;
 
   return (
     <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] backdrop-blur-md p-4 space-y-4">
@@ -39,7 +41,11 @@ export function PlanPricingTab({
       {planError && (
         <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 flex items-center justify-between">
           <p className="text-xs text-red-400">{planError}</p>
-          <button type="button" onClick={refetchPlan} className="text-xs text-red-400 underline">
+          <button
+            type="button"
+            onClick={refetchPlan}
+            className="text-xs text-red-400 underline"
+          >
             Retry
           </button>
         </div>
@@ -50,10 +56,13 @@ export function PlanPricingTab({
             <div className="flex items-center gap-4 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] px-4 py-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium text-[var(--color-text-primary)]">{usage.plan_name}</span>
+                  <span className="text-sm font-medium text-[var(--color-text-primary)]">
+                    {usage.plan_name}
+                  </span>
                   <span className="text-xs text-[var(--color-text-muted)]">
                     {primaryVal}
-                    {primaryLimit ? ` / ${primaryLimit}` : ""} {primaryUsageKey ?? ""}
+                    {primaryLimit ? ` / ${primaryLimit}` : ""}{" "}
+                    {primaryUsageKey ?? ""}
                   </span>
                 </div>
                 <div className="h-1.5 bg-[var(--color-bg-panel)] rounded-full overflow-hidden">
@@ -73,7 +82,9 @@ export function PlanPricingTab({
           )}
 
           <div>
-            <h3 className="text-sm font-medium text-[var(--color-text-primary)] mb-3">Plans</h3>
+            <h3 className="text-sm font-medium text-[var(--color-text-primary)] mb-3">
+              Plans
+            </h3>
             <div className="overflow-x-auto overflow-y-hidden -mx-1 pb-2">
               <div className="flex gap-4 min-w-max">
                 {plans.map((plan) => {
@@ -93,7 +104,9 @@ export function PlanPricingTab({
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-[var(--color-text-primary)]">{plan.name}</span>
+                        <span className="font-semibold text-[var(--color-text-primary)]">
+                          {plan.name}
+                        </span>
                         {isCurrent && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-primary-alpha-20)] text-[var(--color-primary-light)] font-medium">
                             Current
@@ -101,22 +114,41 @@ export function PlanPricingTab({
                         )}
                       </div>
                       <ul className="text-xs text-[var(--color-text-tertiary)] space-y-1">
-                        {Object.entries(plan.limits).map(([resource, limit]) => (
-                          <li key={resource} className="flex justify-between">
-                            <span>{resource}</span>
-                            <span className="font-mono">{typeof limit === "number" ? limit.toLocaleString() : "Unlimited"}</span>
-                          </li>
-                        ))}
+                        {Object.entries(plan.limits).map(
+                          ([resource, limit]) => (
+                            <li key={resource} className="flex justify-between">
+                              <span>{resource}</span>
+                              <span className="font-mono">
+                                {typeof limit === "number"
+                                  ? limit.toLocaleString()
+                                  : "Unlimited"}
+                              </span>
+                            </li>
+                          ),
+                        )}
                         {Object.keys(plan.limits).length === 0 && (
-                          <li className="text-[var(--color-primary-light)]">Unlimited</li>
+                          <li className="text-[var(--color-primary-light)]">
+                            Unlimited
+                          </li>
                         )}
                       </ul>
                       {plan.features.length > 0 && (
                         <ul className="pt-3 border-t border-[var(--color-border-subtle)] space-y-2">
                           {plan.features.map((f) => (
-                            <li key={f} className="flex items-start gap-2 text-xs">
-                              <span className="text-[var(--color-primary)] mt-0.5">✓</span>
-                              <span className={isHovered || isCurrent ? "text-[var(--color-text-secondary)]" : "text-[var(--color-text-muted)]"}>
+                            <li
+                              key={f}
+                              className="flex items-start gap-2 text-xs"
+                            >
+                              <span className="text-[var(--color-primary)] mt-0.5">
+                                ✓
+                              </span>
+                              <span
+                                className={
+                                  isHovered || isCurrent
+                                    ? "text-[var(--color-text-secondary)]"
+                                    : "text-[var(--color-text-muted)]"
+                                }
+                              >
                                 {f}
                               </span>
                             </li>
@@ -132,24 +164,43 @@ export function PlanPricingTab({
 
           {resources.length > 0 && (
             <div className="w-full">
-              <h3 className="text-sm font-medium text-[var(--color-text-primary)] mb-2">Resource pricing</h3>
+              <h3 className="text-sm font-medium text-[var(--color-text-primary)] mb-2">
+                Resource pricing
+              </h3>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[var(--color-border-subtle)]">
-                    <th className="text-left py-2 text-[var(--color-text-muted)] font-medium">Resource</th>
-                    <th className="text-left py-2 text-[var(--color-text-muted)] font-medium">Unit</th>
-                    <th className="text-right py-2 text-[var(--color-text-muted)] font-medium">Price</th>
+                    <th className="text-left py-2 text-[var(--color-text-muted)] font-medium">
+                      Resource
+                    </th>
+                    <th className="text-left py-2 text-[var(--color-text-muted)] font-medium">
+                      Unit
+                    </th>
+                    <th className="text-right py-2 text-[var(--color-text-muted)] font-medium">
+                      Price
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {resources.map((r) => (
-                    <tr key={r.id} className="border-b border-[var(--color-border-subtle)] last:border-0 hover:bg-[var(--color-bg-elevated)]">
+                    <tr
+                      key={r.id}
+                      className="border-b border-[var(--color-border-subtle)] last:border-0 hover:bg-[var(--color-bg-elevated)]"
+                    >
                       <td className="py-2">
-                        <div className="text-[var(--color-text-primary)]">{r.name}</div>
-                        <div className="text-xs text-[var(--color-text-muted)]">{r.description}</div>
+                        <div className="text-[var(--color-text-primary)]">
+                          {r.name}
+                        </div>
+                        <div className="text-xs text-[var(--color-text-muted)]">
+                          {r.description}
+                        </div>
                       </td>
-                      <td className="py-2 text-[var(--color-text-tertiary)]">{r.unit}</td>
-                      <td className="py-2 text-right font-mono text-[var(--color-text-primary)]">${r.unit_price.toFixed(2)}</td>
+                      <td className="py-2 text-[var(--color-text-tertiary)]">
+                        {r.unit}
+                      </td>
+                      <td className="py-2 text-right font-mono text-[var(--color-text-primary)]">
+                        ${r.unit_price.toFixed(2)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

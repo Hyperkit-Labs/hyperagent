@@ -24,7 +24,10 @@ export default function WorkflowRunRedirectPage() {
     toast.info("Opening workflow...");
     const q = new URLSearchParams({ workflow: workflowId });
     if (runId) q.set("run", runId);
-    const t = setTimeout(() => router.replace(`${ROUTES.HOME}?${q.toString()}`), 150);
+    const t = setTimeout(
+      () => router.replace(`${ROUTES.HOME}?${q.toString()}`),
+      150,
+    );
     return () => clearTimeout(t);
   }, [router, workflowId, runId]);
 

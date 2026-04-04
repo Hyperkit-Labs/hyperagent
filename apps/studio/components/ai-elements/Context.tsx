@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { ChevronDown, ChevronRight, Database } from 'lucide-react';
+import { useState } from "react";
+import { ChevronDown, ChevronRight, Database } from "lucide-react";
 
 export interface ContextUsage {
   /** Input tokens (prompt). */
@@ -27,13 +27,17 @@ export interface ContextProps {
 /** Token/context usage display. Aligns with registry Context (trigger + breakdown for BYOK usage). */
 export function Context({
   usage,
-  title = 'Context',
+  title = "Context",
   defaultOpen = false,
   children,
-  className = '',
+  className = "",
 }: ContextProps) {
   const [open, setOpen] = useState(defaultOpen);
-  const hasUsage = usage && (usage.inputTokens != null || usage.outputTokens != null || usage.totalTokens != null);
+  const hasUsage =
+    usage &&
+    (usage.inputTokens != null ||
+      usage.outputTokens != null ||
+      usage.totalTokens != null);
 
   return (
     <div
@@ -52,7 +56,9 @@ export function Context({
         <Database className="w-4 h-4 shrink-0 text-[var(--color-text-muted)]" />
         <span className="text-[11px] font-medium">{title}</span>
         {usage?.label && (
-          <span className="text-[10px] text-[var(--color-text-muted)] ml-1">{usage.label}</span>
+          <span className="text-[10px] text-[var(--color-text-muted)] ml-1">
+            {usage.label}
+          </span>
         )}
       </button>
       {open && (
@@ -63,7 +69,9 @@ export function Context({
                 <span>Input: {usage.inputTokens.toLocaleString()} tokens</span>
               )}
               {usage.outputTokens != null && (
-                <span>Output: {usage.outputTokens.toLocaleString()} tokens</span>
+                <span>
+                  Output: {usage.outputTokens.toLocaleString()} tokens
+                </span>
               )}
               {usage.totalTokens != null && (
                 <span>Total: {usage.totalTokens.toLocaleString()} tokens</span>

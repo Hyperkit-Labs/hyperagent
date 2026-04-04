@@ -4,12 +4,12 @@
  * Follows senior frontend best practices for state management and data fetching
  */
 
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { getWorkflows, getErrorMessage, isAbortError } from '@/lib/api';
-import { POLLING } from '@/constants/defaults';
-import type { Workflow } from '@/lib/types';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { getWorkflows, getErrorMessage, isAbortError } from "@/lib/api";
+import { POLLING } from "@/constants/defaults";
+import type { Workflow } from "@/lib/types";
 
 export interface UseWorkflowsOptions {
   autoRefresh?: boolean;
@@ -30,7 +30,9 @@ export interface UseWorkflowsReturn {
   total: number;
 }
 
-export function useWorkflows(options: UseWorkflowsOptions = {}): UseWorkflowsReturn {
+export function useWorkflows(
+  options: UseWorkflowsOptions = {},
+): UseWorkflowsReturn {
   const {
     autoRefresh = true,
     refreshInterval = POLLING.WORKFLOWS_MS,
@@ -41,37 +43,44 @@ export function useWorkflows(options: UseWorkflowsOptions = {}): UseWorkflowsRet
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
-  
+
   const isMounted = useRef(true);
   const fetchController = useRef<AbortController | null>(null);
 
   // Fetch workflows from API
-  const fetchWorkflows = useCallback(async (signal?: AbortSignal) => {
-    try {
-      setError(null);
-      
-      const data = await getWorkflows({
-        status: filters.status,
-        limit: filters.limit,
-      }, signal);
+  const fetchWorkflows = useCallback(
+    async (signal?: AbortSignal) => {
+      try {
+        setError(null);
 
-      if (isMounted.current) {
-        const list = Array.isArray(data) ? data : (data?.workflows ?? []);
-        const totalFromApi = (data as unknown as { total?: number }).total;
-        const count = typeof totalFromApi === 'number' ? totalFromApi : list.length;
-        setWorkflows(list);
-        setTotal(count);
+        const data = await getWorkflows(
+          {
+            status: filters.status,
+            limit: filters.limit,
+          },
+          signal,
+        );
+
+        if (isMounted.current) {
+          const list = Array.isArray(data) ? data : (data?.workflows ?? []);
+          const totalFromApi = (data as unknown as { total?: number }).total;
+          const count =
+            typeof totalFromApi === "number" ? totalFromApi : list.length;
+          setWorkflows(list);
+          setTotal(count);
+        }
+      } catch (err: unknown) {
+        if (isMounted.current && !isAbortError(err)) {
+          setError(getErrorMessage(err, "Failed to fetch workflows"));
+        }
+      } finally {
+        if (isMounted.current) {
+          setLoading(false);
+        }
       }
-    } catch (err: unknown) {
-      if (isMounted.current && !isAbortError(err)) {
-        setError(getErrorMessage(err, 'Failed to fetch workflows'));
-      }
-    } finally {
-      if (isMounted.current) {
-        setLoading(false);
-      }
-    }
-  }, [filters.status, filters.limit]);
+    },
+    [filters.status, filters.limit],
+  );
 
   // Manual refetch function
   const refetch = useCallback(async () => {
@@ -93,7 +102,7 @@ export function useWorkflows(options: UseWorkflowsOptions = {}): UseWorkflowsRet
   useEffect(() => {
     isMounted.current = true;
     fetchController.current = new AbortController();
-    
+
     fetchWorkflows(fetchController.current.signal);
 
     return () => {
@@ -127,4 +136,3 @@ export function useWorkflows(options: UseWorkflowsOptions = {}): UseWorkflowsRet
     total,
   };
 }
-

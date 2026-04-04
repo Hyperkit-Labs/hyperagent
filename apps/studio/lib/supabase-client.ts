@@ -10,8 +10,12 @@
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-const url = typeof process !== "undefined" ? process.env.NEXT_PUBLIC_SUPABASE_URL : "";
-const anon = typeof process !== "undefined" ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY : "";
+const url =
+  typeof process !== "undefined" ? process.env.NEXT_PUBLIC_SUPABASE_URL : "";
+const anon =
+  typeof process !== "undefined"
+    ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    : "";
 
 let client: SupabaseClient | null = null;
 

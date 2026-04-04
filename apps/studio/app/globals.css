@@ -55,7 +55,11 @@ body {
 
 /* Primary button (gradient from HTML) */
 .btn-primary-gradient {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-mid) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--color-primary) 0%,
+    var(--color-primary-mid) 100%
+  );
 }
 
 .btn-primary-gradient:hover {
@@ -65,19 +69,37 @@ body {
 
 /* Animations (from Dashboard Overview.html) */
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes slideInRight {
-  from { transform: translateX(32px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  from {
+    transform: translateX(32px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 @keyframes pulseGlow {
-  0% { box-shadow: 0 0 0 0 var(--color-primary-alpha-40); }
-  70% { box-shadow: 0 0 0 6px rgba(124, 58, 237, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0); }
+  0% {
+    box-shadow: 0 0 0 0 var(--color-primary-alpha-40);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(124, 58, 237, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(124, 58, 237, 0);
+  }
 }
 
 .animate-pulse-glow {
@@ -92,9 +114,15 @@ body {
   animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.delay-100 { animation-delay: 0.1s; }
-.delay-200 { animation-delay: 0.2s; }
-.delay-300 { animation-delay: 0.3s; }
+.delay-100 {
+  animation-delay: 0.1s;
+}
+.delay-200 {
+  animation-delay: 0.2s;
+}
+.delay-300 {
+  animation-delay: 0.3s;
+}
 
 .msg-animate {
   animation: fadeInUp 0.3s ease-out forwards;
@@ -102,7 +130,9 @@ body {
 
 /* Chart bars (from HTML) */
 .chart-bar {
-  transition: height 0.5s ease-out, background-color 0.2s;
+  transition:
+    height 0.5s ease-out,
+    background-color 0.2s;
 }
 
 .chart-bar:hover {
@@ -148,12 +178,20 @@ input[type="number"] {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-mid) 100%);
-  box-shadow: 0 2px 10px var(--color-primary-alpha-30), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  background: linear-gradient(
+    135deg,
+    var(--color-primary) 0%,
+    var(--color-primary-mid) 100%
+  );
+  box-shadow:
+    0 2px 10px var(--color-primary-alpha-30),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .btn-primary:hover {
-  box-shadow: 0 4px 15px var(--color-primary-alpha-40), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 4px 15px var(--color-primary-alpha-40),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .nav-subitem-active {
@@ -178,25 +216,25 @@ input[type="number"] {
 
 .status-pill-ready {
   background: rgba(16, 185, 129, 0.1);
-  color: #34D399;
+  color: #34d399;
   border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 .status-pill-building {
   background: rgba(59, 130, 246, 0.1);
-  color: #60A5FA;
+  color: #60a5fa;
   border: 1px solid rgba(59, 130, 246, 0.2);
 }
 
 .status-pill-failed {
   background: rgba(239, 68, 68, 0.1);
-  color: #F87171;
+  color: #f87171;
   border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
 .status-pill-queued {
   background: rgba(113, 113, 122, 0.1);
-  color: #A1A1AA;
+  color: #a1a1aa;
   border: 1px solid rgba(113, 113, 122, 0.2);
 }
 
@@ -270,7 +308,8 @@ input[type="number"] {
 }
 
 @keyframes ping {
-  75%, 100% {
+  75%,
+  100% {
     transform: scale(1.5);
     opacity: 0;
   }
@@ -327,7 +366,8 @@ input[type="number"] {
 }
 
 @keyframes pulse-subtle {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
@@ -360,9 +400,17 @@ input[type="number"] {
 }
 
 @keyframes radar-sweep {
-  0% { transform: rotate(0deg); opacity: 0.6; }
-  50% { opacity: 1; }
-  100% { transform: rotate(360deg); opacity: 0.6; }
+  0% {
+    transform: rotate(0deg);
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(360deg);
+    opacity: 0.6;
+  }
 }
 
 .animate-radar {
@@ -383,7 +431,11 @@ input[type="number"] {
   background-image:
     radial-gradient(at 0% 0%, rgba(168, 85, 247, 0.12) 0px, transparent 50%),
     radial-gradient(at 100% 0%, rgba(124, 58, 237, 0.12) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(192, 132, 252, 0.05) 0px, transparent 50%);
+    radial-gradient(
+      at 100% 100%,
+      rgba(192, 132, 252, 0.05) 0px,
+      transparent 50%
+    );
 }
 
 .grid-pattern {
@@ -392,7 +444,11 @@ input[type="number"] {
     linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
   background-size: 50px 50px;
   mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
-  -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+  -webkit-mask-image: radial-gradient(
+    circle at center,
+    black 40%,
+    transparent 100%
+  );
 }
 
 .cta-glass-card {
@@ -413,23 +469,48 @@ input[type="number"] {
 }
 
 .neon-border {
-  box-shadow: 0 0 10px rgba(168, 85, 247, 0.1), inset 0 0 10px rgba(168, 85, 247, 0.05);
+  box-shadow:
+    0 0 10px rgba(168, 85, 247, 0.1),
+    inset 0 0 10px rgba(168, 85, 247, 0.05);
 }
 
 /* AI Chat page */
-.syntax-keyword { color: #c678dd; }
-.syntax-func { color: #61afef; }
-.syntax-string { color: #98c379; }
-.syntax-comment { color: #5c6370; font-style: italic; }
-.syntax-tag { color: #e06c75; }
-.syntax-attr { color: #d19a66; }
-.diff-add { background-color: rgba(16, 185, 129, 0.15); border-left: 2px solid var(--color-semantic-success); }
-.diff-remove { background-color: rgba(239, 68, 68, 0.15); border-left: 2px solid var(--color-semantic-error); text-decoration: line-through; opacity: 0.6; }
+.syntax-keyword {
+  color: #c678dd;
+}
+.syntax-func {
+  color: #61afef;
+}
+.syntax-string {
+  color: #98c379;
+}
+.syntax-comment {
+  color: #5c6370;
+  font-style: italic;
+}
+.syntax-tag {
+  color: #e06c75;
+}
+.syntax-attr {
+  color: #d19a66;
+}
+.diff-add {
+  background-color: rgba(16, 185, 129, 0.15);
+  border-left: 2px solid var(--color-semantic-success);
+}
+.diff-remove {
+  background-color: rgba(239, 68, 68, 0.15);
+  border-left: 2px solid var(--color-semantic-error);
+  text-decoration: line-through;
+  opacity: 0.6;
+}
 .pane-resize-handle {
   width: 4px;
   min-width: 4px;
   cursor: col-resize;
-  transition: background 0.2s, width 0.2s;
+  transition:
+    background 0.2s,
+    width 0.2s;
   background: var(--color-border-subtle);
 }
 .pane-resize-handle:hover {
@@ -439,12 +520,27 @@ input[type="number"] {
 .pane-resize-handle:active {
   background: var(--color-primary-alpha-40);
 }
-@keyframes fade-in-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-.msg-animate { animation: fade-in-up 0.3s ease-out forwards; }
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.msg-animate {
+  animation: fade-in-up 0.3s ease-out forwards;
+}
 
 @keyframes shine {
-  0% { background-position: 200% center; }
-  100% { background-position: -200% center; }
+  0% {
+    background-position: 200% center;
+  }
+  100% {
+    background-position: -200% center;
+  }
 }
 .animate-shine {
   animation: shine linear infinite;

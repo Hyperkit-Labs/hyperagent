@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
 export default function PaymentsError({
   error,
@@ -10,7 +10,7 @@ export default function PaymentsError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('[PaymentsError]', error);
+    console.error("[PaymentsError]", error);
   }, [error]);
 
   return (

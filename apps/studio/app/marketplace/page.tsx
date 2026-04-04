@@ -7,7 +7,14 @@ import { toast } from "sonner";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import { LayoutTemplate, Loader2, Rocket } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
-import { createWorkflow, DEFAULT_NETWORK, requireLLMKeys, LLM_KEYS_REQUIRED_MESSAGE, handleApiError, isCreditsError } from "@/lib/api";
+import {
+  createWorkflow,
+  DEFAULT_NETWORK,
+  requireLLMKeys,
+  LLM_KEYS_REQUIRED_MESSAGE,
+  handleApiError,
+  isCreditsError,
+} from "@/lib/api";
 import { useTemplatesData } from "@/hooks/useTemplatesData";
 import { useSelectedNetwork } from "@/components/providers/SelectedNetworkProvider";
 import { ShimmerGrid } from "@/components/ai-elements";
@@ -20,7 +27,10 @@ export default function MarketplacePage() {
   const networkId = selectedNetworkId || DEFAULT_NETWORK;
   const [deployingId, setDeployingId] = useState<string | null>(null);
 
-  async function handleOneClickDeploy(templateId: string, templateName: string) {
+  async function handleOneClickDeploy(
+    templateId: string,
+    templateName: string,
+  ) {
     const { ok } = await requireLLMKeys();
     if (!ok) {
       toast.error(LLM_KEYS_REQUIRED_MESSAGE);
@@ -65,8 +75,14 @@ export default function MarketplacePage() {
 
           {error && (
             <div className="glass-panel rounded-xl p-6 flex items-center justify-between">
-              <p className="text-xs text-[var(--color-semantic-error)]">{error}</p>
-              <button type="button" onClick={() => void refetch()} className="text-xs text-[var(--color-primary-light)] underline">
+              <p className="text-xs text-[var(--color-semantic-error)]">
+                {error}
+              </p>
+              <button
+                type="button"
+                onClick={() => void refetch()}
+                className="text-xs text-[var(--color-primary-light)] underline"
+              >
                 Retry
               </button>
             </div>
@@ -88,7 +104,9 @@ export default function MarketplacePage() {
                         <LayoutTemplate className="w-5 h-5 text-[var(--color-primary-light)]" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h3 className="font-medium text-white truncate text-sm">{item.name || item.id}</h3>
+                        <h3 className="font-medium text-white truncate text-sm">
+                          {item.name || item.id}
+                        </h3>
                         {item.source && (
                           <span className="text-[9px] px-1.5 py-0.5 rounded border border-[var(--color-border-subtle)] text-[var(--color-text-muted)] bg-[var(--color-bg-hover)]">
                             {item.source}
@@ -101,7 +119,9 @@ export default function MarketplacePage() {
                     </p>
                     <button
                       type="button"
-                      onClick={() => handleOneClickDeploy(item.id, item.name || item.id)}
+                      onClick={() =>
+                        handleOneClickDeploy(item.id, item.name || item.id)
+                      }
                       disabled={isDeploying}
                       className="w-full btn-primary-gradient text-xs py-2 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
                     >
@@ -121,11 +141,17 @@ export default function MarketplacePage() {
           {!loading && templates.length === 0 && !error && (
             <div className="glass-panel rounded-xl p-12 flex flex-col items-center justify-center text-center max-w-sm mx-auto">
               <LayoutTemplate className="w-12 h-12 text-[var(--color-text-muted)] mb-4" />
-              <p className="text-[var(--color-text-secondary)] text-sm font-medium mb-1">No templates available</p>
-              <p className="text-[var(--color-text-tertiary)] text-xs mb-5">
-                Templates come from the registry. Start from a prompt to generate a contract.
+              <p className="text-[var(--color-text-secondary)] text-sm font-medium mb-1">
+                No templates available
               </p>
-              <Link href={ROUTES.HOME} className="btn-primary-gradient text-xs px-4 py-2 rounded-lg">
+              <p className="text-[var(--color-text-tertiary)] text-xs mb-5">
+                Templates come from the registry. Start from a prompt to
+                generate a contract.
+              </p>
+              <Link
+                href={ROUTES.HOME}
+                className="btn-primary-gradient text-xs px-4 py-2 rounded-lg"
+              >
                 Create from prompt
               </Link>
             </div>

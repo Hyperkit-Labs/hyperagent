@@ -1,0 +1,66 @@
+name: Contracts security
+
+on:
+  pull_request:
+    paths:
+      - "contracts/**"
+      - "packages/contract-security-rules/**"
+      - ".github/workflows/contracts-security.yml"
+  push:
+    branches: [main, development]
+    paths:
+      - "contracts/**"
+      - "packages/contract-security-rules/**"
+
+permissions:
+  contents: read
+
+jobs:
+  foundry-slither-echidna:
+    name: Foundry + Slither + Echidna smoke
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/evm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install forge-std
+        run: forge install foundry-rs/forge-std@v1.9.4
+
+      - name: Forge build and test
+        run: |
+          forge build
+          forge test -vvv
+
+      - name: Set up Python (Slither)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Slither
+        run: pip install slither-analyzer
+
+      - name: Slither
+        working-directory: contracts/evm
+        run: |
+          slither . \
+            --config-file ../../packages/contract-security-rules/slither.config.json \
+            --fail-on high
+
+      - name: Install Echidna
+        run: |
+          cd /tmp
+          wget -q https://github.com/crytic/echidna/releases/download/v2.2.5/echidna-2.2.5-x86_64-linux.tar.gz
+          tar -xzf echidna-2.2.5-x86_64-linux.tar.gz
+          sudo mv echidna /usr/local/bin/
+          sudo chmod +x /usr/local/bin/echidna
+          echidna --version
+
+      - name: Echidna smoke
+        working-directory: contracts/evm
+        run: echidna . --config echidna.config.yml

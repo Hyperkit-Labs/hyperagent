@@ -14,8 +14,8 @@ interface PaymentSummaryProps {
   };
 }
 
-import { Card } from '@/components/ui/Card';
-import { DollarSign, Calendar, History, TrendingUp } from 'lucide-react'
+import { Card } from "@/components/ui/Card";
+import { DollarSign, Calendar, History, TrendingUp } from "lucide-react";
 
 export function PaymentSummary({ summary }: PaymentSummaryProps) {
   // Safely handle undefined or null values
@@ -32,20 +32,24 @@ export function PaymentSummary({ summary }: PaymentSummaryProps) {
             <DollarSign className="w-4 h-4" />
             <span className="text-sm font-semibold">Daily Total</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">${dailyTotal.toFixed(2)}</p>
+          <p className="text-2xl font-bold text-gray-900">
+            ${dailyTotal.toFixed(2)}
+          </p>
         </div>
       </Card>
-      
+
       <Card hover>
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-gray-600">
             <Calendar className="w-4 h-4" />
             <span className="text-sm font-semibold">Monthly Total</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">${monthlyTotal.toFixed(2)}</p>
+          <p className="text-2xl font-bold text-gray-900">
+            ${monthlyTotal.toFixed(2)}
+          </p>
         </div>
       </Card>
-      
+
       <Card hover>
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-gray-600">
@@ -55,17 +59,18 @@ export function PaymentSummary({ summary }: PaymentSummaryProps) {
           <p className="text-2xl font-bold text-gray-900">{transactionCount}</p>
         </div>
       </Card>
-      
+
       <Card hover>
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-gray-600">
             <TrendingUp className="w-4 h-4" />
             <span className="text-sm font-semibold">Average Amount</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">${averageAmount.toFixed(2)}</p>
+          <p className="text-2xl font-bold text-gray-900">
+            ${averageAmount.toFixed(2)}
+          </p>
         </div>
       </Card>
     </div>
   );
 }
-

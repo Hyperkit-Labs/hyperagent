@@ -114,7 +114,10 @@ export function OrchestratorRail({
         <div className="flex gap-1 text-[11px] flex-wrap">
           {[
             { mode: "Audit", href: ROUTES.SECURITY },
-            { mode: "Debug", href: `${ROUTES.HOME}?q=${encodeURIComponent("Debug the last workflow")}` },
+            {
+              mode: "Debug",
+              href: `${ROUTES.HOME}?q=${encodeURIComponent("Debug the last workflow")}`,
+            },
             { mode: "Deploy", href: ROUTES.DEPLOYMENTS },
             { mode: "Create", href: ROUTES.HOME },
           ].map(({ mode, href }) => (

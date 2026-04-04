@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useRef, useEffect } from 'react';
-import { ArrowUp } from 'lucide-react';
+import { useRef, useEffect } from "react";
+import { ArrowUp } from "lucide-react";
 
 const MIN_ROWS = 1;
 const MAX_ROWS = 8;
 
 const textareaBaseClass =
-  'w-full bg-transparent text-[var(--color-text-primary)] text-[13px] px-3 py-3 min-h-[50px] max-h-[200px] focus:outline-none resize-none placeholder:text-[var(--color-text-muted)] disabled:opacity-60';
+  "w-full bg-transparent text-[var(--color-text-primary)] text-[13px] px-3 py-3 min-h-[50px] max-h-[200px] focus:outline-none resize-none placeholder:text-[var(--color-text-muted)] disabled:opacity-60";
 
 export interface PromptInputTextareaProps {
   value: string;
@@ -21,18 +21,21 @@ export interface PromptInputTextareaProps {
 export function PromptInputTextarea({
   value,
   onChange,
-  placeholder = 'Describe your contract or ask a question...',
+  placeholder = "Describe your contract or ask a question...",
   disabled = false,
-  className = '',
+  className = "",
   onKeyDown,
 }: PromptInputTextareaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
-    el.style.height = 'auto';
+    el.style.height = "auto";
     const lineHeight = 20;
-    const rows = Math.min(Math.max(MIN_ROWS, el.value.split('\n').length), MAX_ROWS);
+    const rows = Math.min(
+      Math.max(MIN_ROWS, el.value.split("\n").length),
+      MAX_ROWS,
+    );
     el.style.height = `${rows * lineHeight}px`;
   }, [value]);
   return (
@@ -51,7 +54,7 @@ export function PromptInputTextarea({
 
 export function PromptInputButton({
   disabled,
-  className = '',
+  className = "",
 }: {
   disabled?: boolean;
   className?: string;
@@ -68,12 +71,34 @@ export function PromptInputButton({
   );
 }
 
-export function PromptInputAttachments({ children }: { children: React.ReactNode }) {
-  return <div className="px-3 pt-2 flex flex-wrap gap-2 border-b border-[var(--color-border-subtle)]">{children}</div>;
+export function PromptInputAttachments({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="px-3 pt-2 flex flex-wrap gap-2 border-b border-[var(--color-border-subtle)]">
+      {children}
+    </div>
+  );
 }
 
-export function PromptInputFooter({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={className ?? "flex items-center justify-between px-2 pb-2 pt-1"}>{children}</div>;
+export function PromptInputFooter({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={
+        className ?? "flex items-center justify-between px-2 pb-2 pt-1"
+      }
+    >
+      {children}
+    </div>
+  );
 }
 
 export interface PromptInputProps {
@@ -89,15 +114,15 @@ export interface PromptInputProps {
 }
 
 export function PromptInput({
-  value = '',
+  value = "",
   onChange,
   onSubmit,
   disabled = false,
-  placeholder = 'Describe your contract or ask a question...',
+  placeholder = "Describe your contract or ask a question...",
   attachments,
   footer,
   children,
-  className = '',
+  className = "",
 }: PromptInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const handleSubmit = (e: React.FormEvent) => {
@@ -109,15 +134,21 @@ export function PromptInput({
     if (children) return;
     const el = textareaRef.current;
     if (!el) return;
-    el.style.height = 'auto';
+    el.style.height = "auto";
     const lineHeight = 20;
-    const rows = Math.min(Math.max(MIN_ROWS, el.value.split('\n').length), MAX_ROWS);
+    const rows = Math.min(
+      Math.max(MIN_ROWS, el.value.split("\n").length),
+      MAX_ROWS,
+    );
     el.style.height = `${rows * lineHeight}px`;
   }, [value, children]);
 
   if (children) {
     return (
-      <form onSubmit={handleSubmit} className={`p-4 bg-[var(--color-bg-elevated)] border-t border-[var(--color-border-subtle)] ${className}`}>
+      <form
+        onSubmit={handleSubmit}
+        className={`p-4 bg-[var(--color-bg-elevated)] border-t border-[var(--color-border-subtle)] ${className}`}
+      >
         <div className="relative rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] shadow-sm focus-within:ring-1 focus-within:ring-[var(--color-primary)] transition-all">
           {children}
         </div>
@@ -126,7 +157,10 @@ export function PromptInput({
   }
 
   return (
-    <form onSubmit={handleSubmit} className={`p-4 bg-[var(--color-bg-elevated)] border-t border-[var(--color-border-subtle)] ${className}`}>
+    <form
+      onSubmit={handleSubmit}
+      className={`p-4 bg-[var(--color-bg-elevated)] border-t border-[var(--color-border-subtle)] ${className}`}
+    >
       <div className="relative rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] shadow-sm focus-within:ring-1 focus-within:ring-[var(--color-primary)] transition-all">
         {attachments}
         <textarea
@@ -138,9 +172,10 @@ export function PromptInput({
           rows={MIN_ROWS}
           className={textareaBaseClass}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              if (!disabled && value.trim()) onSubmit(e as unknown as React.FormEvent<HTMLFormElement>);
+              if (!disabled && value.trim())
+                onSubmit(e as unknown as React.FormEvent<HTMLFormElement>);
             }
           }}
         />

@@ -17,8 +17,16 @@ export interface CreditsCardProps {
   creditsPerRun?: number;
 }
 
-export function CreditsCard({ refetchTrigger = 0, balanceFromParent, onRefetch, creditsPerRun }: CreditsCardProps) {
-  const [balance, setBalance] = useState<{ balance: number; currency: string } | null>(null);
+export function CreditsCard({
+  refetchTrigger = 0,
+  balanceFromParent,
+  onRefetch,
+  creditsPerRun,
+}: CreditsCardProps) {
+  const [balance, setBalance] = useState<{
+    balance: number;
+    currency: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [topUpAmount, setTopUpAmount] = useState("");
@@ -30,7 +38,10 @@ export function CreditsCard({ refetchTrigger = 0, balanceFromParent, onRefetch, 
     setLoading(true);
     getCreditsBalance()
       .then((res) => {
-        setBalance({ balance: res.balance ?? 0, currency: res.currency ?? "USD" });
+        setBalance({
+          balance: res.balance ?? 0,
+          currency: res.currency ?? "USD",
+        });
       })
       .catch((e) => setError(handleApiError(e)))
       .finally(() => setLoading(false));
@@ -55,7 +66,10 @@ export function CreditsCard({ refetchTrigger = 0, balanceFromParent, onRefetch, 
     setError(null);
     topUpCredits({ amount, currency: "USD", reference_type: "manual" })
       .then((res) => {
-        setBalance({ balance: res.balance ?? 0, currency: res.currency ?? "USD" });
+        setBalance({
+          balance: res.balance ?? 0,
+          currency: res.currency ?? "USD",
+        });
         setTopUpAmount("");
         onRefetch?.();
       })
@@ -70,7 +84,9 @@ export function CreditsCard({ refetchTrigger = 0, balanceFromParent, onRefetch, 
           <Coins className="w-5 h-5" />
           <h3 className="text-sm font-medium">Credits</h3>
         </div>
-        <p className="text-sm text-[var(--color-text-tertiary)] mt-2">Sign in to view and top up credits.</p>
+        <p className="text-sm text-[var(--color-text-tertiary)] mt-2">
+          Sign in to view and top up credits.
+        </p>
       </div>
     );
   }
@@ -79,12 +95,16 @@ export function CreditsCard({ refetchTrigger = 0, balanceFromParent, onRefetch, 
     <div className="rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] p-4 space-y-4">
       <div className="flex items-center gap-2">
         <Coins className="w-5 h-5 text-[var(--color-text-muted)]" />
-        <h3 className="text-sm font-medium text-[var(--color-text-primary)]">Credits</h3>
+        <h3 className="text-sm font-medium text-[var(--color-text-primary)]">
+          Credits
+        </h3>
       </div>
       <p className="text-xs text-[var(--color-text-tertiary)]">
         Top up with fiat or stablecoins (USDC/USDT).
-        {creditsPerRun != null && creditsPerRun > 0 ? ` Each run costs ${creditsPerRun} credits.` : " Each workflow run consumes credits."}
-        {" "}x402 is used for external pay-per-call.
+        {creditsPerRun != null && creditsPerRun > 0
+          ? ` Each run costs ${creditsPerRun} credits.`
+          : " Each workflow run consumes credits."}{" "}
+        x402 is used for external pay-per-call.
       </p>
       {error && <ApiErrorBanner error={error} onRetry={handleRefetch} />}
       {loading ? (
@@ -95,7 +115,9 @@ export function CreditsCard({ refetchTrigger = 0, balanceFromParent, onRefetch, 
       ) : (
         <>
           <div className="flex items-center justify-between">
-            <span className="text-sm text-[var(--color-text-secondary)]">Balance</span>
+            <span className="text-sm text-[var(--color-text-secondary)]">
+              Balance
+            </span>
             <span className="text-lg font-semibold text-[var(--color-text-primary)]">
               {balance?.balance ?? 0} {balance?.currency ?? "USD"}
             </span>
@@ -116,7 +138,11 @@ export function CreditsCard({ refetchTrigger = 0, balanceFromParent, onRefetch, 
               disabled={toppingUp || !topUpAmount.trim()}
               className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)] disabled:opacity-50 disabled:pointer-events-none"
             >
-              {toppingUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              {toppingUp ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4" />
+              )}
               Top up
             </button>
           </div>

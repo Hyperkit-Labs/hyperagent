@@ -10,7 +10,10 @@ export interface SpotlightCardProps {
 /**
  * Card with a spotlight gradient that follows the cursor on hover.
  */
-export function SpotlightCard({ children, className = "" }: SpotlightCardProps) {
+export function SpotlightCard({
+  children,
+  className = "",
+}: SpotlightCardProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ x: 50, y: 50 });
   const [hover, setHover] = useState(false);
@@ -28,7 +31,10 @@ export function SpotlightCard({ children, className = "" }: SpotlightCardProps) 
       ref={ref}
       onMouseMove={handleMouseMove}
       onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => { setHover(false); setPos({ x: 50, y: 50 }); }}
+      onMouseLeave={() => {
+        setHover(false);
+        setPos({ x: 50, y: 50 });
+      }}
       className={`relative overflow-hidden rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)]/60 backdrop-blur-sm hover:border-[var(--color-primary-alpha-30)] transition-all duration-200 ${className}`}
     >
       {hover && (

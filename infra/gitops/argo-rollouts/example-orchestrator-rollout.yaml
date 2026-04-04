@@ -1,0 +1,35 @@
+# Example only — not applied by default. Requires Argo Rollouts CRDs.
+# Replace namespace, image, and canary steps with values that match your cluster.
+# Full spec: https://argo-rollouts.readthedocs.io/en/stable/features/specification/
+
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: orchestrator-example
+  namespace: hyperagent-production
+spec:
+  replicas: 2
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: orchestrator
+  template:
+    metadata:
+      labels:
+        app: orchestrator
+    spec:
+      containers:
+        - name: orchestrator
+          image: hyperagent-orchestrator:latest
+          ports:
+            - containerPort: 8000
+              name: http
+  strategy:
+    canary:
+      maxSurge: 1
+      maxUnavailable: 0
+      steps:
+        - setWeight: 20
+        - pause: { duration: 3m }
+        - setWeight: 60
+        - pause: { duration: 3m }

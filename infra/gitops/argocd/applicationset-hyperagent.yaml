@@ -1,0 +1,50 @@
+# ApplicationSet: GitOps at scale — one Application per environment from a list.
+# Replace repoURL with your fork/org. Sync waves and namespaces match infra/k8s/overlays/*.
+#
+# Install: kubectl apply -n argocd -f applicationset-hyperagent.yaml
+# Requires: Argo CD 2.x, ApplicationSet controller (bundled in modern Argo CD installs).
+
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: hyperagent-environments
+  namespace: argocd
+spec:
+  goTemplate: true
+  generators:
+    - list:
+        elements:
+          - env: development
+            revision: development
+            namespace: hyperagent-development
+            overlay: infra/k8s/overlays/development
+          - env: staging
+            revision: development
+            namespace: hyperagent-staging
+            overlay: infra/k8s/overlays/staging
+          - env: production
+            revision: main
+            namespace: hyperagent-production
+            overlay: infra/k8s/overlays/production
+  template:
+    metadata:
+      name: "hyperagent-{{.env}}"
+    spec:
+      project: hyperagent
+      source:
+        repoURL: https://github.com/Hyperkit-Labs/hyperagent.git
+        targetRevision: "{{.revision}}"
+        path: "{{.overlay}}"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{.namespace}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+          allowEmpty: false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground
+          - PruneLast=true
+      revisionHistoryLimit: 10

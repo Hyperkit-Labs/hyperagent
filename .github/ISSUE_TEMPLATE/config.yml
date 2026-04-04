@@ -1,0 +1,9 @@
+blank_issues_enabled: true
+
+contact_links:
+  - name: Security report
+    url: https://github.com/Hyperkit-Labs/hyperagent/security/advisories/new
+    about: Report a vulnerability privately (preferred). See SECURITY.md for policy.
+  - name: Documentation
+    url: https://github.com/Hyperkit-Labs/hyperagent/tree/main/docs
+    about: Read docs and ADRs before filing; many questions are answered there.

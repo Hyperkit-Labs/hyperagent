@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest an enhancement or new capability
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem you are solving, not only a specific solution.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / use case
+      description: What user or operator need is unmet today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed direction
+      description: Optional sketch of how you imagine it working (API, UI, docs).
+    validations:
+      required: false
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Area
+      description: e.g. studio, orchestrator, contracts, docs, infra.
+    validations:
+      required: false

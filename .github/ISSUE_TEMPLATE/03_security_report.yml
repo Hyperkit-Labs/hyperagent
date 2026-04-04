@@ -1,0 +1,23 @@
+name: Security report
+description: Link to private reporting (do not post secrets in issues)
+title: "[security] read instructions"
+labels: ["security"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not paste exploit code, credentials, or live user data in this public issue.**
+
+        Use **GitHub Security Advisories** for coordinated disclosure:
+
+        - [Open a private advisory](https://github.com/Hyperkit-Labs/hyperagent/security/advisories/new)
+
+        Read [SECURITY.md](https://github.com/Hyperkit-Labs/hyperagent/blob/main/SECURITY.md) for scope and expectations.
+
+  - type: checkboxes
+    id: ack
+    attributes:
+      label: Acknowledgement
+      options:
+        - label: I will use the private advisory flow for sensitive details.
+          required: true

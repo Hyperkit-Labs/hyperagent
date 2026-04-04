@@ -13,7 +13,8 @@ const SESSION_TOKEN_COOKIE_NAME = "hyperagent_session_token";
 function setSessionCookie(maxAgeSec: number, accessToken?: string) {
   if (typeof document === "undefined") return;
   const expiresAt = Math.floor(Date.now() / 1000) + maxAgeSec;
-  const secure = typeof location !== "undefined" && location?.protocol === "https:";
+  const secure =
+    typeof location !== "undefined" && location?.protocol === "https:";
   const secureAttr = secure ? "; Secure" : "";
   document.cookie = `${SESSION_COOKIE_NAME}=1; path=/; max-age=${maxAgeSec}; SameSite=Lax${secureAttr}`;
   document.cookie = `${SESSION_EXPIRES_COOKIE_NAME}=${expiresAt}; path=/; max-age=${maxAgeSec}; SameSite=Lax${secureAttr}`;
@@ -25,7 +26,8 @@ function setSessionCookie(maxAgeSec: number, accessToken?: string) {
 
 function clearSessionCookie() {
   if (typeof document === "undefined") return;
-  const secure = typeof location !== "undefined" && location?.protocol === "https:";
+  const secure =
+    typeof location !== "undefined" && location?.protocol === "https:";
   const secureAttr = secure ? "; Secure" : "";
   document.cookie = `${SESSION_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax${secureAttr}`;
   document.cookie = `${SESSION_EXPIRES_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax${secureAttr}`;
@@ -38,7 +40,8 @@ export const SESSION_CHANGE_EVENT = "hyperagent_session_change";
 export const BYOK_UPDATED_EVENT = "hyperagent_byok_updated";
 
 /** Fired when session-only (pass-through) LLM key is set or cleared. Chat page uses it for X-LLM-* headers. */
-export const SESSION_LLM_PASS_THROUGH_UPDATED_EVENT = "hyperagent_session_llm_pass_through_updated";
+export const SESSION_LLM_PASS_THROUGH_UPDATED_EVENT =
+  "hyperagent_session_llm_pass_through_updated";
 
 const SESSION_LLM_PASS_THROUGH_STORAGE_KEY = "hyperagent_llm_pass_through";
 const SESSION_NONCE_KEY = "hyperagent_session_nonce";
@@ -92,7 +95,9 @@ function getJwtSub(): string {
   try {
     const parts = session.access_token.split(".");
     if (parts.length !== 3 || !parts[1]) return "";
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    const payload = JSON.parse(
+      atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")),
+    );
     return typeof payload.sub === "string" ? payload.sub : "";
   } catch {
     return "";
@@ -126,7 +131,7 @@ async function deriveSessionLlmCryptoKey(salt: Uint8Array): Promise<CryptoKey> {
     toAB(entropy),
     { name: "PBKDF2" },
     false,
-    ["deriveKey"]
+    ["deriveKey"],
   );
   return window.crypto.subtle.deriveKey(
     {
@@ -138,12 +143,18 @@ async function deriveSessionLlmCryptoKey(salt: Uint8Array): Promise<CryptoKey> {
     baseKey,
     { name: SESSION_LLM_CRYPTO_ALGO, length: 256 },
     false,
-    ["encrypt", "decrypt"]
+    ["encrypt", "decrypt"],
   );
 }
 
-async function encryptSessionLlmApiKey(plainText: string): Promise<{ cipherText: string; iv: string; salt: string }> {
-  if (typeof window === "undefined" || !window.crypto || !window.crypto.subtle) {
+async function encryptSessionLlmApiKey(
+  plainText: string,
+): Promise<{ cipherText: string; iv: string; salt: string }> {
+  if (
+    typeof window === "undefined" ||
+    !window.crypto ||
+    !window.crypto.subtle
+  ) {
     throw new Error("Web Crypto API not available");
   }
   const enc = new TextEncoder();
@@ -153,7 +164,7 @@ async function encryptSessionLlmApiKey(plainText: string): Promise<{ cipherText:
   const cipherBuffer = await window.crypto.subtle.encrypt(
     { name: SESSION_LLM_CRYPTO_ALGO, iv: toAB(iv) },
     key,
-    toAB(enc.encode(plainText))
+    toAB(enc.encode(plainText)),
   );
   const cipherArray = new Uint8Array(cipherBuffer);
   return {
@@ -163,19 +174,27 @@ async function encryptSessionLlmApiKey(plainText: string): Promise<{ cipherText:
   };
 }
 
-async function decryptSessionLlmApiKey(params: { cipherText: string; iv: string; salt: string }): Promise<string> {
-  if (typeof window === "undefined" || !window.crypto || !window.crypto.subtle) {
+async function decryptSessionLlmApiKey(params: {
+  cipherText: string;
+  iv: string;
+  salt: string;
+}): Promise<string> {
+  if (
+    typeof window === "undefined" ||
+    !window.crypto ||
+    !window.crypto.subtle
+  ) {
     throw new Error("Web Crypto API not available");
   }
   const { cipherText, iv, salt } = params;
-  const cipherBytes = Uint8Array.from(atob(cipherText), c => c.charCodeAt(0));
-  const ivBytes = Uint8Array.from(atob(iv), c => c.charCodeAt(0));
-  const saltBytes = Uint8Array.from(atob(salt), c => c.charCodeAt(0));
+  const cipherBytes = Uint8Array.from(atob(cipherText), (c) => c.charCodeAt(0));
+  const ivBytes = Uint8Array.from(atob(iv), (c) => c.charCodeAt(0));
+  const saltBytes = Uint8Array.from(atob(salt), (c) => c.charCodeAt(0));
   const key = await deriveSessionLlmCryptoKey(saltBytes);
   const plainBuffer = await window.crypto.subtle.decrypt(
     { name: SESSION_LLM_CRYPTO_ALGO, iv: toAB(ivBytes) },
     key,
-    toAB(cipherBytes)
+    toAB(cipherBytes),
   );
   const dec = new TextDecoder();
   return dec.decode(plainBuffer);
@@ -197,18 +216,25 @@ async function deriveKey(salt: Uint8Array): Promise<CryptoKey> {
     toAB(entropy),
     "PBKDF2",
     false,
-    ["deriveBits", "deriveKey"]
+    ["deriveBits", "deriveKey"],
   );
   return crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt: pbkdf2Salt(salt), iterations: 100000, hash: "SHA-256" },
+    {
+      name: "PBKDF2",
+      salt: pbkdf2Salt(salt),
+      iterations: 100000,
+      hash: "SHA-256",
+    },
     keyMaterial,
     { name: "AES-GCM", length: 256 },
     false,
-    ["encrypt", "decrypt"]
+    ["encrypt", "decrypt"],
   );
 }
 
-async function encrypt(plaintext: string): Promise<{ ciphertext: string; iv: string; salt: string }> {
+async function encrypt(
+  plaintext: string,
+): Promise<{ ciphertext: string; iv: string; salt: string }> {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveKey(salt);
@@ -216,7 +242,7 @@ async function encrypt(plaintext: string): Promise<{ ciphertext: string; iv: str
   const ciphertext = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv: toAB(iv) },
     key,
-    toAB(enc.encode(plaintext))
+    toAB(enc.encode(plaintext)),
   );
   return {
     ciphertext: btoa(String.fromCharCode(...new Uint8Array(ciphertext))),
@@ -225,16 +251,32 @@ async function encrypt(plaintext: string): Promise<{ ciphertext: string; iv: str
   };
 }
 
-async function decrypt(ciphertext: string, iv: string, salt: string): Promise<string> {
+async function decrypt(
+  ciphertext: string,
+  iv: string,
+  salt: string,
+): Promise<string> {
   const key = await deriveKey(
-    new Uint8Array(atob(salt).split("").map((c) => c.charCodeAt(0)))
+    new Uint8Array(
+      atob(salt)
+        .split("")
+        .map((c) => c.charCodeAt(0)),
+    ),
   );
-  const ivArr = new Uint8Array(atob(iv).split("").map((c) => c.charCodeAt(0)));
-  const cipherArr = new Uint8Array(atob(ciphertext).split("").map((c) => c.charCodeAt(0)));
+  const ivArr = new Uint8Array(
+    atob(iv)
+      .split("")
+      .map((c) => c.charCodeAt(0)),
+  );
+  const cipherArr = new Uint8Array(
+    atob(ciphertext)
+      .split("")
+      .map((c) => c.charCodeAt(0)),
+  );
   const dec = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: toAB(ivArr) },
     key,
-    toAB(cipherArr)
+    toAB(cipherArr),
   );
   return new TextDecoder().decode(dec);
 }
@@ -282,7 +324,10 @@ export function getSessionOnlyLLMKey(): SessionOnlyLLMKey | null {
           return null;
         }
         if (typeof apiKeyField === "string" && apiKeyField.trim()) {
-          const result: SessionOnlyLLMKey = { provider: provider as SessionLLMProvider, apiKey: apiKeyField.trim() };
+          const result: SessionOnlyLLMKey = {
+            provider: provider as SessionLLMProvider,
+            apiKey: apiKeyField.trim(),
+          };
           _decryptedCache = result;
           return result;
         }
@@ -336,7 +381,10 @@ export async function getSessionOnlyLLMKeyAsync(): Promise<SessionOnlyLLMKey | n
           decryptedApiKey = apiKeyField;
         }
         if (typeof decryptedApiKey === "string" && decryptedApiKey.trim()) {
-          const result: SessionOnlyLLMKey = { provider: provider as SessionLLMProvider, apiKey: decryptedApiKey.trim() };
+          const result: SessionOnlyLLMKey = {
+            provider: provider as SessionLLMProvider,
+            apiKey: decryptedApiKey.trim(),
+          };
           _decryptedCache = result;
           return result;
         }
@@ -348,7 +396,9 @@ export async function getSessionOnlyLLMKeyAsync(): Promise<SessionOnlyLLMKey | n
   return null;
 }
 
-export async function setSessionOnlyLLMKey(payload: SessionOnlyLLMKey): Promise<void> {
+export async function setSessionOnlyLLMKey(
+  payload: SessionOnlyLLMKey,
+): Promise<void> {
   if (typeof window === "undefined") return;
   try {
     const encrypted = await encryptSessionLlmApiKey(payload.apiKey);
@@ -359,7 +409,7 @@ export async function setSessionOnlyLLMKey(payload: SessionOnlyLLMKey): Promise<
         apiKey: encrypted.cipherText,
         iv: encrypted.iv,
         salt: encrypted.salt,
-      })
+      }),
     );
     _decryptedCache = { provider: payload.provider, apiKey: payload.apiKey };
     window.dispatchEvent(new Event(SESSION_LLM_PASS_THROUGH_UPDATED_EVENT));
@@ -402,7 +452,8 @@ function getBroadcastChannel(): BroadcastChannel | null {
       _broadcastChannel = new BroadcastChannel(SESSION_BROADCAST_CHANNEL);
       _broadcastChannel.onmessage = (event) => {
         const msgType = event.data?.type;
-        if (typeof msgType !== "string" || !VALID_BROADCAST_TYPES.has(msgType)) return;
+        if (typeof msgType !== "string" || !VALID_BROADCAST_TYPES.has(msgType))
+          return;
         if (msgType === "session_cleared") {
           _decryptedCache = null;
           localStorage.removeItem(STORAGE_KEY);
@@ -465,7 +516,12 @@ export function getStoredSession(): StoredSession | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw) as unknown;
-    if (data && typeof data === "object" && "access_token" in data && "expires_at" in data) {
+    if (
+      data &&
+      typeof data === "object" &&
+      "access_token" in data &&
+      "expires_at" in data
+    ) {
       const token = (data as { access_token: unknown }).access_token;
       const expiresAt = (data as { expires_at: unknown }).expires_at;
       if (typeof token === "string" && typeof expiresAt === "number") {
@@ -482,11 +538,17 @@ export function getStoredSession(): StoredSession | null {
   return null;
 }
 
-export function setStoredSession(access_token: string, expires_in: number): void {
+export function setStoredSession(
+  access_token: string,
+  expires_in: number,
+): void {
   if (typeof window === "undefined") return;
   const expires_at = Math.floor(Date.now() / 1000) + expires_in;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ access_token, expires_at }));
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ access_token, expires_at }),
+    );
     // Pass the token so middleware can verify exp from cookie without localStorage.
     setSessionCookie(expires_in, access_token);
     notifySessionChange();
@@ -532,10 +594,17 @@ export function clearExpiredSessionIfNeeded(): boolean {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return false;
     const data = JSON.parse(raw) as unknown;
-    if (!data || typeof data !== "object" || !("expires_at" in data) || !("access_token" in data)) return false;
+    if (
+      !data ||
+      typeof data !== "object" ||
+      !("expires_at" in data) ||
+      !("access_token" in data)
+    )
+      return false;
     const expiresAt = (data as { expires_at: unknown }).expires_at;
     const token = (data as { access_token: unknown }).access_token;
-    if (typeof expiresAt !== "number" || typeof token !== "string") return false;
+    if (typeof expiresAt !== "number" || typeof token !== "string")
+      return false;
     if (expiresAt * 1000 <= Date.now()) {
       clearStoredSession();
       return true;

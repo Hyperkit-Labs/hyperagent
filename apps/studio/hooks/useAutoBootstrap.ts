@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useEffect, useRef } from 'react';
-import { useActiveAccount } from 'thirdweb/react';
-import { useSignInWithWallet } from '@/hooks/useSignInWithWallet';
-import { clearStoredSession, getStoredSession } from '@/lib/session-store';
-import { redirectToLoginWithNext } from '@/lib/authRedirect';
+import { useEffect, useRef } from "react";
+import { useActiveAccount } from "thirdweb/react";
+import { useSignInWithWallet } from "@/hooks/useSignInWithWallet";
+import { clearStoredSession, getStoredSession } from "@/lib/session-store";
+import { redirectToLoginWithNext } from "@/lib/authRedirect";
 
 /**
  * Proactive session bootstrap.

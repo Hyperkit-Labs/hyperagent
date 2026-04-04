@@ -3,7 +3,16 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
-import { Settings as SettingsIcon, Folder, Key, Plug, ExternalLink, DollarSign, CreditCard, Loader2 } from "lucide-react";
+import {
+  Settings as SettingsIcon,
+  Folder,
+  Key,
+  Plug,
+  ExternalLink,
+  DollarSign,
+  CreditCard,
+  Loader2,
+} from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import { LLMKeysCard } from "@/components/settings/LLMKeysCard";
 import { WorkspaceTab } from "@/components/settings/WorkspaceTab";
@@ -29,7 +38,12 @@ export default function SettingsPage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const x402Enabled = isFeatureEnabled("x402");
   const { config, loading: configLoading } = useConfig();
-  const { networks, loading: networksLoading, error: networksError, refetch: refetchNetworks } = useNetworks();
+  const {
+    networks,
+    loading: networksLoading,
+    error: networksError,
+    refetch: refetchNetworks,
+  } = useNetworks();
   const [defaultNetwork, setDefaultNetwork] = useState<string>("");
   const {
     plans,
@@ -69,185 +83,248 @@ export default function SettingsPage() {
 
   return (
     <RequireApiSession>
-    <div className="p-6 lg:p-8">
-      <div className="max-w-6xl mx-auto animate-enter">
-        <div className="flex items-center gap-2 mb-8">
-          <SettingsIcon className="w-5 h-5 text-[var(--color-text-muted)] shrink-0" />
-          <PageTitle title="Settings" />
-        </div>
-        
-        <div className="flex flex-col md:flex-row gap-8">
-          <aside className="w-full md:w-64 shrink-0">
-            <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
-              <button type="button" onClick={() => setTab("workspace")} className={tabClass("workspace")}>
-                <Folder className="w-4 h-4" />Workspace
-              </button>
-              <button type="button" onClick={() => setTab("byok")} className={tabClass("byok")}>
-                <Key className="w-4 h-4" />LLM keys (BYOK)
-              </button>
-              <button type="button" onClick={() => setTab("x402")} className={tabClass("x402")}>
-                <DollarSign className="w-4 h-4" />x402 & Spending
-              </button>
-              <button type="button" onClick={() => setTab("plan")} className={tabClass("plan")}>
-                <CreditCard className="w-4 h-4" />Plan & Pricing
-              </button>
-              <button type="button" onClick={() => setTab("integrations")} className={tabClass("integrations")}>
-                <Plug className="w-4 h-4" />Integrations
-              </button>
-            </nav>
-            
-            <div className="mt-8 pt-6 border-t border-[var(--color-border-subtle)] hidden md:block">
-              <Link
-                href={ROUTES.CHAT}
-                className="inline-flex items-center gap-2 text-sm text-[var(--color-text-tertiary)] hover:text-[var(--color-primary-light)]"
-              >
-                <ExternalLink className="w-4 h-4" />
-                Open Chat to build
-              </Link>
-            </div>
-          </aside>
-
-          <main className="flex-1 min-w-0 space-y-6">
-          {tab === "workspace" && (
-          <WorkspaceTab
-            config={config}
-            configError={configError}
-            configLoading={configLoading}
-            networks={networks}
-            networksLoading={networksLoading}
-            defaultNetwork={defaultNetwork}
-            setDefaultNetwork={setDefaultNetwork}
-            refetchWorkspace={refetchWorkspace}
-          />
-        )}
-
-        {tab === "byok" && (
-          <div className="glass-panel rounded-xl p-6">
-            <LLMKeysCard />
-            <p className="text-xs text-[var(--color-text-muted)] mt-4">
-              You can also manage API keys from the Chat page via the settings icon in the header.
-            </p>
+      <div className="p-6 lg:p-8">
+        <div className="max-w-6xl mx-auto animate-enter">
+          <div className="flex items-center gap-2 mb-8">
+            <SettingsIcon className="w-5 h-5 text-[var(--color-text-muted)] shrink-0" />
+            <PageTitle title="Settings" />
           </div>
-        )}
 
-        {tab === "x402" && (
-          <X402SpendingTab
-            x402Enabled={x402Enabled}
-            x402Loading={x402Loading}
-            x402Error={x402Error}
-            x402Balance={x402Balance}
-            x402Control={x402Control}
-            config={config}
-            refetchX402={refetchX402}
-          />
-        )}
-
-        {tab === "plan" && (
-          <PlanPricingTab
-            plans={plans}
-            resources={resources}
-            usage={usage}
-            planLoading={planLoading}
-            planError={planError}
-            refetchPlan={refetchPlan}
-          />
-        )}
-
-        {tab === "integrations" && (
-            <IntegrationsTab config={config} networksCount={networks.length} />
-          )}
-
-          {/* Danger Zone */}
-          <div className="mt-12 pt-8 border-t border-red-900/30">
-            <h3 className="text-lg font-medium text-red-500 mb-4">Danger Zone</h3>
-            <div className="glass-panel border-red-900/30 rounded-xl p-5 space-y-4">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <h4 className="text-sm font-medium text-[var(--color-text-primary)]">Revoke All Keys</h4>
-                  <p className="text-xs text-[var(--color-text-muted)] mt-1">Remove all LLM API keys from this workspace.</p>
-                </div>
+          <div className="flex flex-col md:flex-row gap-8">
+            <aside className="w-full md:w-64 shrink-0">
+              <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
                 <button
                   type="button"
-                  disabled={revokeLoading}
-                  onClick={async () => {
-                    if (!window.confirm("Are you sure you want to revoke all LLM keys? This cannot be undone.")) return;
-                    setRevokeLoading(true);
-                    try {
-                      await deleteLLMKeys();
-                      notifyByokUpdated();
-                      toast.success("All LLM keys have been revoked.");
-                    } catch (err) {
-                      toast.error(err instanceof Error ? err.message : "Failed to revoke keys.");
-                    } finally {
-                      setRevokeLoading(false);
-                    }
-                  }}
-                  className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-medium rounded-lg border border-red-500/20 transition-colors shrink-0 disabled:opacity-50 inline-flex items-center gap-2"
+                  onClick={() => setTab("workspace")}
+                  className={tabClass("workspace")}
                 >
-                  {revokeLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  Revoke Keys
+                  <Folder className="w-4 h-4" />
+                  Workspace
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setTab("byok")}
+                  className={tabClass("byok")}
+                >
+                  <Key className="w-4 h-4" />
+                  LLM keys (BYOK)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab("x402")}
+                  className={tabClass("x402")}
+                >
+                  <DollarSign className="w-4 h-4" />
+                  x402 & Spending
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab("plan")}
+                  className={tabClass("plan")}
+                >
+                  <CreditCard className="w-4 h-4" />
+                  Plan & Pricing
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab("integrations")}
+                  className={tabClass("integrations")}
+                >
+                  <Plug className="w-4 h-4" />
+                  Integrations
+                </button>
+              </nav>
+
+              <div className="mt-8 pt-6 border-t border-[var(--color-border-subtle)] hidden md:block">
+                <Link
+                  href={ROUTES.CHAT}
+                  className="inline-flex items-center gap-2 text-sm text-[var(--color-text-tertiary)] hover:text-[var(--color-primary-light)]"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Open Chat to build
+                </Link>
               </div>
-              <div className="h-px bg-red-900/30 w-full" />
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <h4 className="text-sm font-medium text-[var(--color-text-primary)]">Delete Workspace</h4>
-                  <p className="text-xs text-[var(--color-text-muted)] mt-1">Permanently delete this workspace and all associated data.</p>
+            </aside>
+
+            <main className="flex-1 min-w-0 space-y-6">
+              {tab === "workspace" && (
+                <WorkspaceTab
+                  config={config}
+                  configError={configError}
+                  configLoading={configLoading}
+                  networks={networks}
+                  networksLoading={networksLoading}
+                  defaultNetwork={defaultNetwork}
+                  setDefaultNetwork={setDefaultNetwork}
+                  refetchWorkspace={refetchWorkspace}
+                />
+              )}
+
+              {tab === "byok" && (
+                <div className="glass-panel rounded-xl p-6">
+                  <LLMKeysCard />
+                  <p className="text-xs text-[var(--color-text-muted)] mt-4">
+                    You can also manage API keys from the Chat page via the
+                    settings icon in the header.
+                  </p>
                 </div>
-                {!deleteConfirm ? (
-                  <button
-                    type="button"
-                    onClick={() => setDeleteConfirm(true)}
-                    className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-lg transition-colors shrink-0"
-                  >
-                    Delete Workspace
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-red-400">Type &quot;delete&quot; in the prompt to confirm.</span>
+              )}
+
+              {tab === "x402" && (
+                <X402SpendingTab
+                  x402Enabled={x402Enabled}
+                  x402Loading={x402Loading}
+                  x402Error={x402Error}
+                  x402Balance={x402Balance}
+                  x402Control={x402Control}
+                  config={config}
+                  refetchX402={refetchX402}
+                />
+              )}
+
+              {tab === "plan" && (
+                <PlanPricingTab
+                  plans={plans}
+                  resources={resources}
+                  usage={usage}
+                  planLoading={planLoading}
+                  planError={planError}
+                  refetchPlan={refetchPlan}
+                />
+              )}
+
+              {tab === "integrations" && (
+                <IntegrationsTab
+                  config={config}
+                  networksCount={networks.length}
+                />
+              )}
+
+              {/* Danger Zone */}
+              <div className="mt-12 pt-8 border-t border-red-900/30">
+                <h3 className="text-lg font-medium text-red-500 mb-4">
+                  Danger Zone
+                </h3>
+                <div className="glass-panel border-red-900/30 rounded-xl p-5 space-y-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <h4 className="text-sm font-medium text-[var(--color-text-primary)]">
+                        Revoke All Keys
+                      </h4>
+                      <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                        Remove all LLM API keys from this workspace.
+                      </p>
+                    </div>
                     <button
                       type="button"
-                      disabled={deleteLoading}
+                      disabled={revokeLoading}
                       onClick={async () => {
-                        const answer = window.prompt('Type "delete" to permanently delete this workspace:');
-                        if (answer?.toLowerCase() !== "delete") {
-                          setDeleteConfirm(false);
+                        if (
+                          !window.confirm(
+                            "Are you sure you want to revoke all LLM keys? This cannot be undone.",
+                          )
+                        )
                           return;
-                        }
-                        setDeleteLoading(true);
+                        setRevokeLoading(true);
                         try {
                           await deleteLLMKeys();
-                          clearStoredSession();
-                          toast.success("Workspace data cleared. You have been signed out.");
-                          window.location.href = "/login";
+                          notifyByokUpdated();
+                          toast.success("All LLM keys have been revoked.");
                         } catch (err) {
-                          toast.error(err instanceof Error ? err.message : "Failed to delete workspace.");
+                          toast.error(
+                            err instanceof Error
+                              ? err.message
+                              : "Failed to revoke keys.",
+                          );
                         } finally {
-                          setDeleteLoading(false);
-                          setDeleteConfirm(false);
+                          setRevokeLoading(false);
                         }
                       }}
-                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg transition-colors shrink-0 disabled:opacity-50 inline-flex items-center gap-2"
+                      className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-medium rounded-lg border border-red-500/20 transition-colors shrink-0 disabled:opacity-50 inline-flex items-center gap-2"
                     >
-                      {deleteLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                      Confirm Delete
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteConfirm(false)}
-                      className="px-3 py-2 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
-                    >
-                      Cancel
+                      {revokeLoading && (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      )}
+                      Revoke Keys
                     </button>
                   </div>
-                )}
+                  <div className="h-px bg-red-900/30 w-full" />
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <h4 className="text-sm font-medium text-[var(--color-text-primary)]">
+                        Delete Workspace
+                      </h4>
+                      <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                        Permanently delete this workspace and all associated
+                        data.
+                      </p>
+                    </div>
+                    {!deleteConfirm ? (
+                      <button
+                        type="button"
+                        onClick={() => setDeleteConfirm(true)}
+                        className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-lg transition-colors shrink-0"
+                      >
+                        Delete Workspace
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-red-400">
+                          Type &quot;delete&quot; in the prompt to confirm.
+                        </span>
+                        <button
+                          type="button"
+                          disabled={deleteLoading}
+                          onClick={async () => {
+                            const answer = window.prompt(
+                              'Type "delete" to permanently delete this workspace:',
+                            );
+                            if (answer?.toLowerCase() !== "delete") {
+                              setDeleteConfirm(false);
+                              return;
+                            }
+                            setDeleteLoading(true);
+                            try {
+                              await deleteLLMKeys();
+                              clearStoredSession();
+                              toast.success(
+                                "Workspace data cleared. You have been signed out.",
+                              );
+                              window.location.href = "/login";
+                            } catch (err) {
+                              toast.error(
+                                err instanceof Error
+                                  ? err.message
+                                  : "Failed to delete workspace.",
+                              );
+                            } finally {
+                              setDeleteLoading(false);
+                              setDeleteConfirm(false);
+                            }
+                          }}
+                          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg transition-colors shrink-0 disabled:opacity-50 inline-flex items-center gap-2"
+                        >
+                          {deleteLoading && (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          )}
+                          Confirm Delete
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteConfirm(false)}
+                          className="px-3 py-2 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
+            </main>
           </div>
-          </main>
         </div>
       </div>
-    </div>
     </RequireApiSession>
   );
 }

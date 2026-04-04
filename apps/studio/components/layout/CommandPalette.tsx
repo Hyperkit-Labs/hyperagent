@@ -33,26 +33,128 @@ interface PaletteItem {
 }
 
 const ROUTE_ITEMS: PaletteItem[] = [
-  { id: "nav-dashboard", label: "Go to Dashboard", href: ROUTES.DASHBOARD, icon: LayoutDashboard, description: "Overview of projects and activity" },
-  { id: "nav-workflows", label: "Go to Projects", href: ROUTES.WORKFLOWS, icon: Folder, description: "Manage workflows and runs" },
-  { id: "nav-networks", label: "Go to Networks", href: ROUTES.NETWORKS, icon: Globe, description: "Configure blockchain networks" },
-  { id: "nav-security", label: "Go to Security", href: ROUTES.SECURITY, icon: Shield, description: "Security audits and findings" },
-  { id: "nav-monitoring", label: "Go to Logs", href: ROUTES.MONITORING, icon: FileText, description: "Pipeline logs and history" },
-  { id: "nav-analytics", label: "Go to Analytics", href: ROUTES.ANALYTICS, icon: BarChart3, description: "Usage and performance metrics" },
-  { id: "nav-contracts", label: "Go to Contracts", href: ROUTES.CONTRACTS, icon: FileCode, description: "Deployed contract addresses" },
-  { id: "nav-apps", label: "Go to Apps", href: ROUTES.APPS, icon: AppWindow, description: "Manage deployed applications" },
-  { id: "nav-agents", label: "Go to Agents", href: ROUTES.AGENTS, icon: Bot, description: "AI agents and capabilities" },
-  { id: "nav-history", label: "Go to History", href: ROUTES.HISTORY, icon: History, description: "Past workflow runs" },
-  { id: "nav-payments", label: "Go to Payments", href: ROUTES.PAYMENTS, icon: DollarSign, description: "x402 payments and spending" },
-  { id: "nav-settings", label: "Go to Settings", href: ROUTES.SETTINGS, icon: Settings, description: "Workspace and API keys" },
-  { id: "nav-docs", label: "Go to Docs", href: ROUTES.DOCS, icon: BookOpen, description: "API reference and guides" },
-  { id: "nav-templates", label: "Go to Templates", href: ROUTES.TEMPLATES, icon: LayoutTemplate, description: "Pre-built contract templates" },
+  {
+    id: "nav-dashboard",
+    label: "Go to Dashboard",
+    href: ROUTES.DASHBOARD,
+    icon: LayoutDashboard,
+    description: "Overview of projects and activity",
+  },
+  {
+    id: "nav-workflows",
+    label: "Go to Projects",
+    href: ROUTES.WORKFLOWS,
+    icon: Folder,
+    description: "Manage workflows and runs",
+  },
+  {
+    id: "nav-networks",
+    label: "Go to Networks",
+    href: ROUTES.NETWORKS,
+    icon: Globe,
+    description: "Configure blockchain networks",
+  },
+  {
+    id: "nav-security",
+    label: "Go to Security",
+    href: ROUTES.SECURITY,
+    icon: Shield,
+    description: "Security audits and findings",
+  },
+  {
+    id: "nav-monitoring",
+    label: "Go to Logs",
+    href: ROUTES.MONITORING,
+    icon: FileText,
+    description: "Pipeline logs and history",
+  },
+  {
+    id: "nav-analytics",
+    label: "Go to Analytics",
+    href: ROUTES.ANALYTICS,
+    icon: BarChart3,
+    description: "Usage and performance metrics",
+  },
+  {
+    id: "nav-contracts",
+    label: "Go to Contracts",
+    href: ROUTES.CONTRACTS,
+    icon: FileCode,
+    description: "Deployed contract addresses",
+  },
+  {
+    id: "nav-apps",
+    label: "Go to Apps",
+    href: ROUTES.APPS,
+    icon: AppWindow,
+    description: "Manage deployed applications",
+  },
+  {
+    id: "nav-agents",
+    label: "Go to Agents",
+    href: ROUTES.AGENTS,
+    icon: Bot,
+    description: "AI agents and capabilities",
+  },
+  {
+    id: "nav-history",
+    label: "Go to History",
+    href: ROUTES.HISTORY,
+    icon: History,
+    description: "Past workflow runs",
+  },
+  {
+    id: "nav-payments",
+    label: "Go to Payments",
+    href: ROUTES.PAYMENTS,
+    icon: DollarSign,
+    description: "x402 payments and spending",
+  },
+  {
+    id: "nav-settings",
+    label: "Go to Settings",
+    href: ROUTES.SETTINGS,
+    icon: Settings,
+    description: "Workspace and API keys",
+  },
+  {
+    id: "nav-docs",
+    label: "Go to Docs",
+    href: ROUTES.DOCS,
+    icon: BookOpen,
+    description: "API reference and guides",
+  },
+  {
+    id: "nav-templates",
+    label: "Go to Templates",
+    href: ROUTES.TEMPLATES,
+    icon: LayoutTemplate,
+    description: "Pre-built contract templates",
+  },
 ];
 
 const ACTION_ITEMS: PaletteItem[] = [
-  { id: "action-new-workflow", label: "New Workflow", href: ROUTES.CHAT, icon: Plus, description: "Start a new build with HyperAgent" },
-  { id: "action-deploy-base", label: "Deploy to Base", href: ROUTES.DEPLOYMENTS, icon: Rocket, description: "Deploy contracts to Base network" },
-  { id: "action-audit", label: "Start OpenSandbox Audit", href: ROUTES.CHAT, icon: Shield, description: "Run security audit on a contract" },
+  {
+    id: "action-new-workflow",
+    label: "New Workflow",
+    href: ROUTES.CHAT,
+    icon: Plus,
+    description: "Start a new build with HyperAgent",
+  },
+  {
+    id: "action-deploy-base",
+    label: "Deploy to Base",
+    href: ROUTES.DEPLOYMENTS,
+    icon: Rocket,
+    description: "Deploy contracts to Base network",
+  },
+  {
+    id: "action-audit",
+    label: "Start OpenSandbox Audit",
+    href: ROUTES.CHAT,
+    icon: Shield,
+    description: "Run security audit on a contract",
+  },
 ];
 
 interface CommandPaletteProps {
@@ -100,7 +202,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       onOpenChange(false);
       router.push(href);
     },
-    [onOpenChange, router]
+    [onOpenChange, router],
   );
 
   if (!open) return null;
@@ -180,11 +282,15 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
               <p className="text-[11px] text-slate-500 mb-1">Preview</p>
               {selectedItem ? (
                 <div className="text-[11px] text-slate-400">
-                  <p className="font-medium text-slate-300 mb-1">{selectedItem.label}</p>
+                  <p className="font-medium text-slate-300 mb-1">
+                    {selectedItem.label}
+                  </p>
                   <p>{selectedItem.description ?? "No description"}</p>
                 </div>
               ) : (
-                <p className="text-[11px] text-slate-600">Select an item to see details.</p>
+                <p className="text-[11px] text-slate-600">
+                  Select an item to see details.
+                </p>
               )}
             </div>
           </div>

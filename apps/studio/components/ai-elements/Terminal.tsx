@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Copy, Check, Trash2 } from 'lucide-react';
-import { copyToClipboard } from '@/lib/utils';
+import { useState } from "react";
+import { Copy, Check, Trash2 } from "lucide-react";
+import { copyToClipboard } from "@/lib/utils";
 
 export interface TerminalLine {
   timestamp?: string;
@@ -24,7 +24,7 @@ function formatLine(entry: TerminalLine): string {
   if (entry.timestamp) parts.push(entry.timestamp);
   if (entry.level) parts.push(`[${entry.level}]`);
   parts.push(entry.message);
-  return parts.join(' ');
+  return parts.join(" ");
 }
 
 function getSeverityBorderColor(level?: string): string {
@@ -34,11 +34,16 @@ function getSeverityBorderColor(level?: string): string {
   return "var(--color-semantic-success)";
 }
 
-export function Terminal({ lines, onClear, noScroll = false, className = '' }: TerminalProps) {
+export function Terminal({
+  lines,
+  onClear,
+  noScroll = false,
+  className = "",
+}: TerminalProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
-    const text = lines.map(formatLine).join('\n');
+    const text = lines.map(formatLine).join("\n");
     const success = await copyToClipboard(text);
     if (success) {
       setCopied(true);
@@ -59,7 +64,11 @@ export function Terminal({ lines, onClear, noScroll = false, className = '' }: T
           className="p-1.5 rounded hover:bg-[var(--color-bg-hover)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition-colors"
           aria-label="Copy output"
         >
-          {copied ? <Check className="w-3.5 h-3.5 text-[var(--color-semantic-success)]" /> : <Copy className="w-3.5 h-3.5" />}
+          {copied ? (
+            <Check className="w-3.5 h-3.5 text-[var(--color-semantic-success)]" />
+          ) : (
+            <Copy className="w-3.5 h-3.5" />
+          )}
         </button>
         {onClear && (
           <button
@@ -72,7 +81,9 @@ export function Terminal({ lines, onClear, noScroll = false, className = '' }: T
           </button>
         )}
       </div>
-      <div className={`divide-y divide-[var(--color-border-subtle)] flex-1 min-h-0 ${noScroll ? "overflow-hidden" : "overflow-y-auto"}`}>
+      <div
+        className={`divide-y divide-[var(--color-border-subtle)] flex-1 min-h-0 ${noScroll ? "overflow-hidden" : "overflow-y-auto"}`}
+      >
         {lines.map((entry, i) => (
           <div
             key={i}

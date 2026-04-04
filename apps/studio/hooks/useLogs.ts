@@ -1,6 +1,13 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { getLogs, getLogServices, getLogHosts, getErrorMessage, type LogEntry, type LogsFilters } from '@/lib/api';
-import { POLLING } from '@/constants/defaults';
+import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  getLogs,
+  getLogServices,
+  getLogHosts,
+  getErrorMessage,
+  type LogEntry,
+  type LogsFilters,
+} from "@/lib/api";
+import { POLLING } from "@/constants/defaults";
 
 export interface UseLogsOptions {
   autoRefresh?: boolean;
@@ -36,21 +43,21 @@ export function useLogs(options: UseLogsOptions = {}): UseLogsReturn {
   const [page_size, setPageSize] = useState(filters.page_size || 50);
   const [services, setServices] = useState<string[]>([]);
   const [hosts, setHosts] = useState<string[]>([]);
-  
+
   // Use refs to avoid dependency issues
   const filtersRef = useRef(filters);
   const pageRef = useRef(page);
   const pageSizeRef = useRef(page_size);
-  
+
   // Update refs when values change
   useEffect(() => {
     filtersRef.current = filters;
   }, [filters]);
-  
+
   useEffect(() => {
     pageRef.current = page;
   }, [page]);
-  
+
   useEffect(() => {
     pageSizeRef.current = page_size;
   }, [page_size]);
@@ -74,7 +81,7 @@ export function useLogs(options: UseLogsOptions = {}): UseLogsReturn {
       setServices(Array.isArray(servicesList) ? servicesList : []);
       setHosts(Array.isArray(hostsList) ? hostsList : []);
     } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Failed to fetch logs'));
+      setError(getErrorMessage(err, "Failed to fetch logs"));
     } finally {
       setLoading(false);
     }
@@ -93,7 +100,7 @@ export function useLogs(options: UseLogsOptions = {}): UseLogsReturn {
       setPage(response.page);
       setPageSize(response.page_size);
     } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Failed to fetch logs'));
+      setError(getErrorMessage(err, "Failed to fetch logs"));
     } finally {
       setLoading(false);
     }
@@ -130,4 +137,3 @@ export function useLogs(options: UseLogsOptions = {}): UseLogsReturn {
     isEmpty: logs.length === 0 && !loading,
   };
 }
-

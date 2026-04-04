@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { getDetailedHealth, getErrorMessage } from '@/lib/api';
-import { POLLING } from '@/constants/defaults';
-import type { HealthStatus } from '@/lib/types';
+import { useState, useEffect } from "react";
+import { getDetailedHealth, getErrorMessage } from "@/lib/api";
+import { POLLING } from "@/constants/defaults";
+import type { HealthStatus } from "@/lib/types";
 
 export function useHealth(pollInterval = POLLING.HEALTH_MS) {
   const [health, setHealth] = useState<HealthStatus | null>(null);
@@ -23,7 +23,7 @@ export function useHealth(pollInterval = POLLING.HEALTH_MS) {
         }
       } catch (err: unknown) {
         if (isMounted) {
-          setError(getErrorMessage(err, 'Failed to fetch health status'));
+          setError(getErrorMessage(err, "Failed to fetch health status"));
         }
       } finally {
         if (isMounted) {
@@ -45,4 +45,3 @@ export function useHealth(pollInterval = POLLING.HEALTH_MS) {
 
   return { health, loading, error };
 }
-

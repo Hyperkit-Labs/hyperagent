@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { Rocket } from 'lucide-react';
-import { ROUTES } from '@/constants/routes';
+import Link from "next/link";
+import { Rocket } from "lucide-react";
+import { ROUTES } from "@/constants/routes";
 
-export type ToolStatus = 'pending' | 'running' | 'result' | 'error';
+export type ToolStatus = "pending" | "running" | "result" | "error";
 
 export interface ToolProps {
   toolName: string;
@@ -28,12 +28,18 @@ export function ToolHeader({
 }) {
   return (
     <div className="flex items-center gap-2 mb-1">
-      <span className="text-[11px] font-medium text-[var(--color-primary-light)]">{toolName}</span>
-      {status === 'running' && (
-        <span className="text-[10px] text-[var(--color-text-muted)]">Running...</span>
+      <span className="text-[11px] font-medium text-[var(--color-primary-light)]">
+        {toolName}
+      </span>
+      {status === "running" && (
+        <span className="text-[10px] text-[var(--color-text-muted)]">
+          Running...
+        </span>
       )}
-      {status === 'error' && error && (
-        <span className="text-[10px] text-[var(--color-semantic-error)]">{error}</span>
+      {status === "error" && error && (
+        <span className="text-[10px] text-[var(--color-semantic-error)]">
+          {error}
+        </span>
       )}
       {children}
     </div>
@@ -51,7 +57,11 @@ export function ToolInput({ children }: { children: React.ReactNode }) {
 
 /** Wrapper for tool result. */
 export function ToolOutput({ children }: { children: React.ReactNode }) {
-  return <div className="text-[13px] text-[var(--color-text-secondary)]">{children}</div>;
+  return (
+    <div className="text-[13px] text-[var(--color-text-secondary)]">
+      {children}
+    </div>
+  );
 }
 
 /** Container for tool card. */
@@ -63,8 +73,14 @@ export function ToolContent({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function Tool({ toolName, status = 'result', input, result, error }: ToolProps) {
-  const isCreateWorkflow = toolName === 'create_workflow';
+export function Tool({
+  toolName,
+  status = "result",
+  input,
+  result,
+  error,
+}: ToolProps) {
+  const isCreateWorkflow = toolName === "create_workflow";
   const hasWorkflowId = result?.workflow_id;
 
   return (
@@ -72,7 +88,7 @@ export function Tool({ toolName, status = 'result', input, result, error }: Tool
       <ToolHeader toolName={toolName} status={status} error={error} />
       {result && (
         <ToolOutput>
-          <p>{result.message ?? 'Done.'}</p>
+          <p>{result.message ?? "Done."}</p>
         </ToolOutput>
       )}
       {isCreateWorkflow && hasWorkflowId && (

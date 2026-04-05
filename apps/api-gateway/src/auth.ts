@@ -5,16 +5,13 @@
  */
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import { getGatewayEnv } from "@hyperagent/config";
 import { log } from "./logger.js";
 
 export interface RequestWithUser extends Request {
   userId?: string;
   walletAddress?: string;
 }
-
-const NODE_ENV = process.env.NODE_ENV || "development";
-const IS_PRODUCTION = NODE_ENV === "production";
-const REQUIRE_AUTH = process.env.REQUIRE_AUTH !== "false" || NODE_ENV === "production";
 
 /** Normalize path: trim query, collapse slashes, trim trailing slash. */
 function normalizePath(input: string): string {
@@ -56,7 +53,7 @@ function isPublicPathFromReq(req: Request): boolean {
     )
       return true;
     if (PUBLIC_PATHS.has(p)) return true;
-    if (DEV_ONLY_PUBLIC_PATHS.has(p) && !IS_PRODUCTION) return true;
+    if (DEV_ONLY_PUBLIC_PATHS.has(p) && !getGatewayEnv().isProduction) return true;
     return false;
   });
 }
@@ -69,7 +66,7 @@ function traceAuth(
   authScheme: "Bearer" | "none" | "other",
   outcome: "pass" | "401_missing_header" | "401_invalid_token" | "503_no_secret"
 ): void {
-  if (IS_PRODUCTION && outcome === "pass") return;
+  if (getGatewayEnv().isProduction && outcome === "pass") return;
   const payload: Record<string, unknown> = {
     trace: "auth",
     path,
@@ -94,9 +91,10 @@ export function authMiddleware(
     return;
   }
 
-  const authJwtSecret = process.env.AUTH_JWT_SECRET;
+  const gw = getGatewayEnv();
+  const authJwtSecret = gw.auth.jwtSecret;
   if (!authJwtSecret) {
-    if (REQUIRE_AUTH) {
+    if (gw.auth.requireAuth) {
       traceAuth(path, requestId, false, "none", "503_no_secret");
       logSecurityEvent("auth_failure", 503, path, requestId, undefined);
       log.fatal("Production requires AUTH_JWT_SECRET");

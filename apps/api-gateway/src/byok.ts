@@ -1,7 +1,7 @@
 /**
  * BYOK (Bring Your Own Key) API endpoints.
- * POST /api/v1/byok/validate - validate an encrypted LLM key
- * POST /api/v1/byok/save - persist encrypted key to Supabase
+ * POST /api/v1/byok/validate - proxy to orchestrator for live provider validation (api_key), or 422 for ciphertext-only
+ * POST /api/v1/byok/save - persist encrypted key to Supabase (legacy user_byok_keys table)
  * DELETE /api/v1/byok/:provider - remove a stored key
  * GET /api/v1/byok/status - check which providers have keys stored
  */
@@ -10,9 +10,10 @@ import { getSupabaseAdmin } from "./authBootstrap.js";
 import type { RequestWithUser } from "./auth.js";
 import { log } from "./logger.js";
 import { emitAuditEvent } from "./audit.js";
+import { getGatewayEnv } from "@hyperagent/config";
 
-export type LLMProvider = "openai" | "anthropic" | "google";
-const VALID_PROVIDERS = new Set<string>(["openai", "anthropic", "google"]);
+export type LLMProvider = "openai" | "anthropic" | "google" | "together";
+const VALID_PROVIDERS = new Set<string>(["openai", "anthropic", "google", "together"]);
 
 interface EncryptedKeyPayload {
   cipherText: string;
@@ -32,30 +33,68 @@ function isValidEncryptedPayload(obj: unknown): obj is EncryptedKeyPayload {
   );
 }
 
-function maskKey(raw: string): string {
-  if (raw.length <= 8) return "****";
-  return `${raw.slice(0, 5)}...${raw.slice(-4)}`;
-}
-
 export const byokRouter = Router();
 
 byokRouter.post("/validate", async (req: Request, res: Response) => {
-  const body = req.body as { provider?: string; encryptedKey?: unknown };
+  const user = (req as RequestWithUser).userId;
+  if (!user) {
+    res.status(401).json({ error: "Unauthorized", message: "JWT required for BYOK validation" });
+    return;
+  }
+
+  const body = req.body as {
+    provider?: string;
+    api_key?: string;
+    encryptedKey?: unknown;
+  };
+
   if (!body.provider || !VALID_PROVIDERS.has(body.provider)) {
     res.status(400).json({ error: "Invalid provider" });
     return;
   }
-  if (!isValidEncryptedPayload(body.encryptedKey)) {
-    res.status(400).json({ error: "Invalid encryptedKey payload" });
+
+  const apiKey = typeof body.api_key === "string" ? body.api_key.trim() : "";
+  if (apiKey) {
+    const base = getGatewayEnv().orchestratorUrl.replace(/\/$/, "");
+    const url = `${base}/api/v1/workspaces/current/llm-keys/validate`;
+    const auth = req.headers.authorization;
+    try {
+      const r = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(auth ? { Authorization: auth } : {}),
+          "x-user-id": user,
+        },
+        body: JSON.stringify({ provider: body.provider, api_key: apiKey }),
+      });
+      const text = await r.text();
+      emitAuditEvent(req, "byok_key_validated", { provider: body.provider, mode: "live" });
+      res.status(r.status);
+      res.type("application/json").send(text);
+      return;
+    } catch (e) {
+      log.error({ err: e instanceof Error ? e.message : String(e) }, "byok validate proxy failed");
+      res.status(502).json({
+        error: "Bad Gateway",
+        message: "Orchestrator unavailable for key validation.",
+      });
+      return;
+    }
+  }
+
+  if (isValidEncryptedPayload(body.encryptedKey)) {
+    res.status(422).json({
+      error: "encrypted_validation_not_supported",
+      message:
+        "Ciphertext-only validation is not supported. Send api_key for live validation, or use POST /api/v1/workspaces/current/llm-keys/validate from Studio.",
+    });
     return;
   }
 
-  emitAuditEvent(req, "byok_key_validated", { provider: body.provider });
-
-  res.status(200).json({
-    valid: true,
-    provider: body.provider,
-    maskedKey: maskKey(body.encryptedKey.cipherText.slice(0, 20)),
+  res.status(400).json({
+    error: "Invalid payload",
+    message: "Provide api_key for live provider validation.",
   });
 });
 
@@ -168,7 +207,7 @@ byokRouter.get("/status", async (req: Request, res: Response) => {
     return;
   }
 
-  const providers = { openai: false, anthropic: false, google: false };
+  const providers = { openai: false, anthropic: false, google: false, together: false };
   for (const row of data ?? []) {
     const p = row.provider as LLMProvider;
     if (p in providers) providers[p] = true;

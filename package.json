@@ -27,6 +27,8 @@
     "changes": "git status --porcelain",
     "staged": "git diff --cached --name-only",
     "db:apply-migrations": "node scripts/apply-supabase-migrations.mjs",
+    "db:verify-security": "node scripts/verify-supabase-security.mjs",
+    "db:ci-setup-rls-test-users": "node scripts/ci-setup-rls-test-users.mjs",
     "docs:auth-snapshots": "node scripts/export-auth-snapshots.mjs",
     "test:e2e:real-server": "pnpm --filter hyperagent-studio run test:e2e:real-server",
     "prepare": "husky"

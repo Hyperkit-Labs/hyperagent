@@ -60,7 +60,7 @@ HyperAgent is an AI-powered multi-agent platform that turns natural-language spe
 - **Natural language to contracts** – Describe behavior in plain language; get Solidity, tests, and artifacts for the audit workflow (static analysis and fuzzing).
 - **BYOK** – Bring your own LLM keys (OpenAI, Anthropic, Google, OpenRouter); no server-side LLM config for user workloads.
 - **Tenderly simulation** – Transaction simulation and reports in the pipeline before deploy when your environment and workflow enable it.
-- **Security tooling** – Slither, Mythril, MythX, Echidna as mandatory pipeline stages.
+- **Security tooling** – Slither, Mythril, and related tools run when the audit service is deployed and reachable; gates use findings when the audit stage completes (not a substitute for human review on high-value contracts).
 - **Multi-chain** – Chain and SDK registries for plug-and-play networks
 - **Account abstraction** – ERC-4337 and EIP-7702 via Thirdweb; optional x402 metering when enabled in registry and environment.
 - **Metrics and tracing** – OpenTelemetry, MLflow, Tenderly monitoring, Dune dashboards where the deployment wires them.
@@ -105,6 +105,7 @@ For full setup and usage, see [Getting started](docs/getting-started.md) and the
 
 ## Documentation
 
+- [Capability truth table](docs/CAPABILITY_TRUTH_TABLE.md) – What is implemented vs optional vs not shipped (living document).
 - [Docs index](docs/README.md) – Onboarding, Studio usage, and contributor references.
 - **MkDocs site** – `pip install -r requirements-docs.txt && mkdocs serve` for searchable HTML (see [docs/documentation-site.md](docs/documentation-site.md)).
 - [Getting started](docs/getting-started.md) – First-time setup and run locally.

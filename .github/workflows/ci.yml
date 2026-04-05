@@ -212,10 +212,32 @@ jobs:
           python -m pip install --upgrade pip build
           pip install -e packages/execution-backend
           pip install -r services/orchestrator/requirements.txt
-          pip install pytest pytest-asyncio
+          pip install pytest pytest-asyncio "psycopg[binary]>=3.1"
         env:
           ENVIRONMENT: test
-      
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+
+      - name: Set up Node.js (for DB migrations)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install workspace deps (migration scripts)
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply Supabase migrations + RLS test users
+        run: |
+          pnpm db:apply-migrations
+          pnpm db:ci-setup-rls-test-users
+          pnpm db:verify-security
+        env:
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/hyperagent_test
+
       - name: Run orchestrator integration tests
         working-directory: services/orchestrator
         run: |
@@ -223,6 +245,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://test_user:test_password@localhost:5432/hyperagent_test
           ENVIRONMENT: test
+          RLS_INTEGRATION_TESTS: "1"
 
   # ============================================================================
   # STAGE 3.5: FRONTEND CODE QUALITY & TESTS

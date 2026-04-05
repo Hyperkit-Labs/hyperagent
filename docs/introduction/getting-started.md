@@ -1,6 +1,6 @@
 # Getting started
 
-Run HyperAgent locally and locate support references. For Studio usage, see the [Studio guide](user-guide.md). For repository work, see the [Contributor guide](developer-guide.md).
+Run HyperAgent locally and locate support references. For Studio usage, see the [Studio guide](../product/user-guide.md). For repository work, see the [Contributor guide](../contributing/developer-guide.md).
 
 ---
 
@@ -58,6 +58,6 @@ Run HyperAgent locally and locate support references. For Studio usage, see the 
 
 - **Bugs and features:** [GitHub Issues](https://github.com/Hyperkit-Labs/hyperagent/issues)
 - **Questions:** [GitHub Discussions](https://github.com/Hyperkit-Labs/hyperagent/discussions)
-- **Studio usage:** [Studio guide](user-guide.md)
-- **Repository and setup:** [Contributor guide](developer-guide.md)
-- **"Failed to fetch" / Settings (BYOK):** [Troubleshooting](troubleshooting.md)
+- **Studio usage:** [Studio guide](../product/user-guide.md)
+- **Repository and setup:** [Contributor guide](../contributing/developer-guide.md)
+- **"Failed to fetch" / Settings (BYOK):** [Troubleshooting](../product/troubleshooting.md)

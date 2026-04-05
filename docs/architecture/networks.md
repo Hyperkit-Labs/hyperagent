@@ -12,5 +12,5 @@ Thirdweb is used for wallet flows where integrated. **x402** metering is optiona
 
 ## Related docs
 
-- [Deploy ownership](deploy-ownership.md)
-- [Payment and onboarding flow](payment-onboarding-flow.md)
+- [Deploy ownership](../runbooks/deploy-ownership.md)
+- [Payment and onboarding flow](../product/payment-onboarding-flow.md)

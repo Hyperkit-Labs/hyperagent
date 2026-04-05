@@ -16,7 +16,7 @@ The repository is a monorepo (pnpm workspaces). Main areas:
 | `services/agent-runtime` | Agent runtime (simulation, deploy, storage). Used by orchestrator. |
 | `services/compile` | Solidity compilation service. |
 | `services/audit` | Security audit service (Slither, Mythril). |
-| `packages/*` | Shared packages (sdk-ts, config, ui, core-types, web3-utils, ai-tools, **agent-os**). |
+| `packages/*` | Shared packages and schemas. Real runtime examples include `core-types`, `config`, `workflow-state`, `web3-utils`, `ai-tools`, and **`agent-os`**. Some roadmap placeholders remain explicitly labeled in-package (for example `sdk-ts`, `shared-ui`). |
 | `infra/registries` | Chain registry (`network/chains.yaml`), x402 config. |
 | `infra/docker` | Docker Compose for backend stack. |
 | `platform/supabase` | Supabase migrations (runs, run_steps, wallet_users, etc.). |
@@ -102,7 +102,7 @@ make run-web    # Start Studio (after make up)
 4. Push and open a Pull Request. Fill in the PR template if present.
 5. Address review feedback. Merge when approved and checks pass.
 
-See [CONTRIBUTING.md](../CONTRIBUTING.md) in the repo root for full guidelines.
+See [Contributing](contributing.md) for the public contribution guidelines used by the docs site.
 
 ---
 
@@ -112,7 +112,7 @@ Shared library **`@hyperagent/agent-os`** (`packages/agent-os`): command registr
 
 ## Related docs
 
-- **Onboarding:** [Getting started](getting-started.md)
-- **Studio usage:** [Studio guide](user-guide.md)
-- **Architecture:** [Network architecture](architecture-networks.md), [Control plane](control-plane-runs-steps.md), [Deploy ownership](deploy-ownership.md)
+- **Onboarding:** [Getting started](../introduction/getting-started.md)
+- **Studio usage:** [Studio guide](../product/user-guide.md)
+- **Architecture:** [Network architecture](../architecture/networks.md), [Control plane](../control-plane/runs-and-steps.md), [Deploy ownership](../runbooks/deploy-ownership.md)
 - **Internal specs:** `external/docs/` for plans, runbooks, and detailed specs.

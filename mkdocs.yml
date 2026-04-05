@@ -3,7 +3,7 @@
 # Build: mkdocs build --strict
 
 site_name: HyperAgent
-site_description: AI-assisted smart contract development platform
+site_description: Documentation for HyperAgent, an AI-assisted smart contract development platform
 site_author: HyperKit Labs
 
 # Set when publishing (e.g. GitHub Pages): site_url: https://hyperkit-labs.github.io/hyperagent/
@@ -19,11 +19,16 @@ site_dir: site
 theme:
   name: material
   features:
+    - navigation.indexes
     - navigation.tabs
     - navigation.sections
     - navigation.expand
+    - navigation.top
+    - toc.follow
     - search.suggest
     - search.highlight
+    - content.action.edit
+    - content.action.view
     - content.code.copy
   palette:
     - media: "(prefers-color-scheme: light)"
@@ -41,7 +46,10 @@ theme:
 
 plugins:
   - search
-  - mermaid2
+  - mermaid2:
+      javascript: assets/javascripts/mermaid.esm.min.mjs
+      arguments:
+        startOnLoad: true
 
 markdown_extensions:
   - admonition
@@ -49,6 +57,11 @@ markdown_extensions:
   - pymdownx.superfences
   - pymdownx.tabbed:
       alternate_style: true
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tasklist:
+      custom_checkbox: true
   - tables
   - toc:
       permalink: true
@@ -58,43 +71,71 @@ exclude_docs: |
   /README.md
 
 nav:
-  - Home: index.md
-  - Getting started: getting-started.md
-  - Troubleshooting: troubleshooting.md
-  - User guide: user-guide.md
-  - Contributor guide: developer-guide.md
-  - Contributing: contributing.md
-  - Documentation site: documentation-site.md
+  - Introduction:
+      - Overview: index.md
+      - Quick start: introduction/getting-started.md
+      - Key concepts: introduction/key-concepts.md
+      - Mission: introduction/mission.md
+      - Documentation site: introduction/documentation-site.md
+  - Product & frontend:
+      - Frontend application: product/frontend-application.md
+      - User guide: product/user-guide.md
+      - Payment and onboarding flow: product/payment-onboarding-flow.md
+      - Troubleshooting: product/troubleshooting.md
   - Architecture:
+      - System architecture: architecture/system-architecture.md
       - Overview: architecture/README.md
       - System context (diagram): architecture/system-context.md
-      - Network architecture: architecture-networks.md
-  - Control plane & storage:
-      - Runs and steps: control-plane-runs-steps.md
-      - Storage policy: storage-policy.md
-      - Workflow state: workflow-state-management.md
+      - Network architecture: architecture/networks.md
+      - Core workflow pipeline: architecture/core-workflow-pipeline.md
+      - Deployment strategies: architecture/deployment-strategies.md
+      - x402 payment system: architecture/x402-payment-system.md
+  - Control plane, state & storage:
+      - Runs and steps: control-plane/runs-and-steps.md
+      - Storage policy: control-plane/storage-policy.md
+      - Workflow state: control-plane/workflow-state-management.md
+      - Capability truth table: control-plane/capability-truth-table.md
+      - Engineering honesty deliverables: control-plane/engineering-honesty-deliverables.md
+      - Production hardening roadmap: control-plane/production-hardening-roadmap.md
   - API & contracts:
-      - API governance: api-governance.md
+      - API governance: reference/api-governance.md
       - OZ wizard conventions: contracts/oz-wizard-conventions.md
+  - Data & persistence:
+      - Dashboard and migrations: database/DASHBOARD_AND_MIGRATIONS.md
+      - Security and migrations audit: database/SECURITY_AND_MIGRATIONS_AUDIT.md
+  - Reference:
+      - Security audit stream: reference/security-audit-stream.md
   - Security:
       - Policy vs implementation gap register: security/implementation-gap-register.md
   - Operations:
-      - Deploy ownership: deploy-ownership.md
+      - Deploy ownership: runbooks/deploy-ownership.md
       - Runbooks: runbooks/README.md
       - Deployment runbook: runbooks/deployment-runbook.md
-      - Payment onboarding: payment-onboarding-flow.md
   - Agent operating model:
       - Index: agent-operating-model/README.md
+      - Agents: agent-operating-model/agents.md
       - Architecture map: agent-operating-model/architecture-map.md
+      - Bridge: agent-operating-model/bridge.md
+      - Commands: agent-operating-model/commands.md
       - Glossary: agent-operating-model/glossary.md
+      - High-risk files: agent-operating-model/high-risk-files.md
+      - Permission approval policy: agent-operating-model/permission-approval-policy.md
+      - Plugin trust validation: agent-operating-model/plugin-trust-validation.md
       - Recovery runbook: agent-operating-model/recovery-runbook.md
+      - Skill operating guide: agent-operating-model/skill-operating-guide.md
+      - State boundaries: agent-operating-model/state-boundaries.md
+      - Subagent handoff rules: agent-operating-model/subagent-handoff-rules.md
+      - Task lifecycle spec: agent-operating-model/task-lifecycle-spec.md
+      - Verification methodology: agent-operating-model/verification-methodology.md
+  - Contributing:
+      - Contributor guide: contributing/developer-guide.md
+      - Contributing: contributing/contributing.md
   - ADRs:
       - Index: adrs/README.md
       - Template: adrs/0000-template.md
       - "0001 Honesty & artifact maturity": adrs/0001-mandatory-honesty-artifact-maturity.md
       - "0002 API schema governance": adrs/0002-api-schema-governance.md
       - "0003 Workflow state OSS": adrs/0003-workflow-state-oss.md
-  - Mission: mission.md
 
 extra:
   social:

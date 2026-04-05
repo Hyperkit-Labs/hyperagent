@@ -36,4 +36,4 @@ Output is written to `site/` (gitignored). Use any static host or [GitHub Pages]
 | `mkdocs.yml` | Site name, theme, nav, plugins |
 | `requirements-docs.txt` | Python deps for MkDocs |
 
-Diagrams use **Mermaid** via the `mkdocs-mermaid2-plugin` (see [Architecture](architecture/system-context.md)).
+Diagrams use **Mermaid** via the `mkdocs-mermaid2-plugin` (see [Architecture](../architecture/system-context.md)). The docs site is configured to work in offline or restricted-network environments by using a local Mermaid-compatible fallback module, so `mkdocs build --strict` does not depend on CDN reachability.

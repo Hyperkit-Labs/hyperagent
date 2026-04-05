@@ -1,0 +1,303 @@
+{
+  "repo_notes": [
+    {
+      "content": "HyperAgent is a monorepo for an AI-assisted smart contract platform. Prefer repo reality over roadmap language when generating wiki content. The strongest implemented path today is Studio -> API gateway -> orchestrator -> agent-runtime/compile/audit with Supabase-backed persistence. Treat multi-chain support, advanced RAG, some deployment variants, and some auxiliary services as configuration-dependent or partial unless directly evidenced in code and docs."
+    }
+  ],
+  "pages": [
+    {
+      "title": "Introduction",
+      "purpose": "Provide a high-level overview of HyperAgent, its purpose as an AI-powered smart contract platform, key features (AI generation, automated auditing, multi-chain deployment, x402 payments, parallel deployment), and technology stack",
+      "page_notes": [
+        {
+          "content": "Keep this page honest: describe HyperAgent as an AI-assisted smart contract platform with a real Studio, API gateway, orchestrator, compile, and audit path. Frame multi-chain support and advanced deployment acceleration as capability-matrix dependent rather than universally production-ready."
+        }
+      ]
+    },
+    {
+      "title": "Quick Start",
+      "purpose": "Guide users through initial setup and first contract deployment, covering prerequisites, installation steps for both Docker and simplified cloud approaches, and running the first workflow",
+      "parent": "Introduction",
+      "page_notes": [
+        {
+          "content": "Source this page primarily from docs/getting-started.md, docs/user-guide.md, the root README, Makefile commands, and infra/docker/docker-compose.local.yml. Prefer the local Docker plus Studio flow as the canonical quick start."
+        }
+      ]
+    },
+    {
+      "title": "Key Concepts",
+      "purpose": "Explain fundamental concepts including workflows, contracts, templates, x402 payments, networks, and deployment strategies to establish common terminology",
+      "parent": "Introduction",
+      "page_notes": [
+        {
+          "content": "Use docs/key-concepts.md and docs/control-plane-runs-steps.md as the grounding sources. Keep terminology aligned with runs, run_steps, BYOK, credits, x402, chain registry, and deployment strategies as currently documented."
+        }
+      ]
+    },
+    {
+      "title": "System Architecture",
+      "purpose": "Explain the high-level architecture including Service-Oriented Architecture (SOA) pattern, service registry, workflow coordinator, and event-driven communication via Redis Streams",
+      "page_notes": [
+        {
+          "content": "Use services/orchestrator, apps/api-gateway, apps/studio, and infra/registries as primary evidence. Do not overstate Redis Streams specifically unless a concrete implementation is shown; the repo clearly uses Redis for queue/checkpointer scenarios, but event-bus wording should match actual code."
+        }
+      ]
+    },
+    {
+      "title": "Service Architecture",
+      "purpose": "Detail the core services (Generation, Compilation, Audit, Testing, Deployment), service registry pattern, and how services communicate through the workflow coordinator",
+      "parent": "System Architecture",
+      "page_notes": [
+        {
+          "content": "Treat orchestrator, agent-runtime, compile, and audit as the most concrete services. Mark simulation, deploy, storage, context, vectordb, sandbox, and roma-service carefully according to their actual implementation and current maturity."
+        }
+      ]
+    },
+    {
+      "title": "Data Architecture",
+      "purpose": "Describe the data persistence layer including PostgreSQL schema, pgvector for RAG, Redis for caching and event bus, and the event-driven workflow state machine",
+      "parent": "System Architecture",
+      "page_notes": [
+        {
+          "content": "Anchor this page in platform/supabase/migrations/run.sql, docs/storage-policy.md, docs/control-plane-runs-steps.md, and services/orchestrator store/trace code. Be explicit that pgvector support exists in schema, while full RAG utilization may still be partial."
+        }
+      ]
+    },
+    {
+      "title": "AI and LLM Integration",
+      "purpose": "Explain how LLM providers (Gemini, OpenAI) are integrated, RAG system for template retrieval, and AI agents for intelligent contract operations",
+      "parent": "System Architecture",
+      "page_notes": [
+        {
+          "content": "Focus on BYOK, agent-runtime endpoints, orchestrator workflow stages, and provider integration. Treat RAG and long-term memory as partial or future-facing where the repo itself does so."
+        }
+      ]
+    },
+    {
+      "title": "Core Workflow Pipeline",
+      "purpose": "Describe the complete contract lifecycle from natural language input through generation, compilation, auditing, testing, and deployment, including event flow and state transitions",
+      "page_notes": [
+        {
+          "content": "Base this page on services/orchestrator/workflow.py, docs/core-workflow-pipeline.md, and docs/control-plane-runs-steps.md. Explain autofix loops, approval boundaries, and persisted run_steps."
+        }
+      ]
+    },
+    {
+      "title": "Generation Service",
+      "purpose": "Detail how natural language is converted to Solidity using LLM providers, RAG-based template retrieval, and the Generation Agent's role in code generation",
+      "parent": "Core Workflow Pipeline",
+      "page_notes": [
+        {
+          "content": "Use services/agent-runtime/src/index.ts and agents-related orchestrator code as evidence. Avoid claiming a separate fully independent generation microservice if the actual generation path is through agent-runtime and orchestrator integration."
+        }
+      ]
+    },
+    {
+      "title": "Compilation Service",
+      "purpose": "Explain Solidity compilation process, bytecode generation, ABI creation, and handling of constructor arguments",
+      "parent": "Core Workflow Pipeline",
+      "page_notes": [
+        {
+          "content": "Use services/compile/main.py and contracts/evm as the primary sources. Mention Hardhat, Foundry, and remote tools-backed compilation where supported."
+        }
+      ]
+    },
+    {
+      "title": "Audit Service",
+      "purpose": "Describe automated security analysis using Slither, Mythril, and Echidna, vulnerability detection, and audit report generation",
+      "parent": "Core Workflow Pipeline",
+      "page_notes": [
+        {
+          "content": "Use services/audit/main.py and the capability truth table. Mention MythX only as configured/optional cloud-backed analysis, not as universally available."
+        }
+      ]
+    },
+    {
+      "title": "Testing Service",
+      "purpose": "Detail automated test generation and execution for smart contracts, including the Testing Agent's role",
+      "parent": "Core Workflow Pipeline",
+      "page_notes": [
+        {
+          "content": "Treat testing as part of the pipeline and agent-runtime/orchestrator integration rather than overclaiming a large standalone production service unless directly evidenced."
+        }
+      ]
+    },
+    {
+      "title": "Deployment Service",
+      "purpose": "Explain the deployment orchestration, integration with various deployment strategies, and coordination with payment systems and blockchain networks",
+      "parent": "Core Workflow Pipeline",
+      "page_notes": [
+        {
+          "content": "Use docs/deploy-ownership.md, services/deploy, services/agent-runtime, and registry docs. Be clear about what is deploy preparation versus actual wallet-signed deployment through Studio."
+        }
+      ]
+    },
+    {
+      "title": "x402 Payment System",
+      "purpose": "Introduce the x402 pay-per-use payment mechanism for Avalanche networks, payment gating middleware, and integration with Thirdweb",
+      "page_notes": [
+        {
+          "content": "Do not narrow this page only to Avalanche unless the code clearly does so. The repo supports x402 conceptually through registries and middleware across a broader capability matrix, but actual enabled networks should be derived from config and code."
+        }
+      ]
+    },
+    {
+      "title": "Payment Routes and Middleware",
+      "purpose": "Detail the x402 API routes for contracts, deployments, and workflows, including payment verification flow and error handling",
+      "parent": "x402 Payment System",
+      "page_notes": [
+        {
+          "content": "Use apps/api-gateway and services/orchestrator x402-related middleware and payment routes as the main sources. Distinguish x402-gated calls from the credits system."
+        }
+      ]
+    },
+    {
+      "title": "Spending Controls",
+      "purpose": "Explain spending control features including daily/monthly limits, merchant whitelisting, budget calculations, and enforcement mechanisms",
+      "parent": "x402 Payment System",
+      "page_notes": [
+        {
+          "content": "Ground this in the Supabase schema, payments docs, and frontend analytics/settings components. Avoid promising merchant whitelisting if it is not fully implemented."
+        }
+      ]
+    },
+    {
+      "title": "Payment History and Analytics",
+      "purpose": "Describe payment logging, analytics endpoints, and integration with frontend analytics dashboard for spending visualization",
+      "parent": "x402 Payment System",
+      "page_notes": [
+        {
+          "content": "Use payment history tables, analytics UI components, and orchestrator billing routes as evidence. Be explicit about whether the flow is credits-based, x402-based, or both."
+        }
+      ]
+    },
+    {
+      "title": "ERC4337 Integration",
+      "purpose": "Explain Smart Account deployments, user wallet signing flow, and Thirdweb SDK integration for x402 networks",
+      "parent": "x402 Payment System",
+      "page_notes": [
+        {
+          "content": "Frame ERC-4337 and gas sponsorship as capability-dependent. Use .env.example, network registry, and Studio wallet/provider code for evidence."
+        }
+      ]
+    },
+    {
+      "title": "Deployment Strategies",
+      "purpose": "Overview of the four deployment strategies (Standard, Gasless, x402, Batch) and when to use each based on network and requirements",
+      "page_notes": [
+        {
+          "content": "Use docs/deployment-strategies.md and docs/deploy-ownership.md as grounding pages. Treat deployment strategy support as a matrix, not as uniform across all chains."
+        }
+      ]
+    },
+    {
+      "title": "Standard Deployment",
+      "purpose": "Detail Web3.py-based deployment, Mantle SDK integration, gas estimation, EIP-1559 support, and transaction signing flow",
+      "parent": "Deployment Strategies",
+      "page_notes": [
+        {
+          "content": "Be careful not to overstate Web3.py or Mantle-specific execution as the only deployment path. The repo is mixed-language and uses multiple execution modes; describe what is directly implemented and where."
+        }
+      ]
+    },
+    {
+      "title": "Gasless Deployment",
+      "purpose": "Explain facilitator-based gasless deployments for EOA wallets, facilitator configuration, and restrictions on x402 networks",
+      "parent": "Deployment Strategies",
+      "page_notes": [
+        {
+          "content": "Ground this in thirdweb account abstraction and sponsorship configuration. Mark restrictions and supported paths clearly."
+        }
+      ]
+    },
+    {
+      "title": "x402 User-Signed Deployment",
+      "purpose": "Describe user-signed transaction flow for x402 networks, transaction preparation, broadcasting, and Smart Account support",
+      "parent": "Deployment Strategies",
+      "page_notes": [
+        {
+          "content": "Tie this to Studio wallet flows and deploy ownership docs. Avoid implying that every x402-capable network already has full production deployment UX."
+        }
+      ]
+    },
+    {
+      "title": "Batch Deployment",
+      "purpose": "Detail sequential and parallel batch deployment orchestration, Hyperion PEF integration for 10-50x faster deployments, and concurrency management",
+      "parent": "Deployment Strategies",
+      "page_notes": [
+        {
+          "content": "Treat Hyperion PEF and major speedup claims cautiously unless directly evidenced in code and docs. If present only in plans or registries, label as roadmap or conditional."
+        }
+      ]
+    },
+    {
+      "title": "Multi-Chain Support",
+      "purpose": "Explain support for Avalanche, Hyperion, Mantle, and Ethereum networks, network feature detection, and network-specific optimizations",
+      "parent": "Deployment Strategies",
+      "page_notes": [
+        {
+          "content": "Use infra/registries/network/chains.yaml and the capability truth table. Distinguish enabled chains from fully production-supported chains."
+        }
+      ]
+    },
+    {
+      "title": "Frontend Application",
+      "purpose": "Overview of the Next.js 16/React 19 frontend, its architecture, key pages, and integration with backend APIs",
+      "page_notes": [
+        {
+          "content": "Use apps/studio/app, apps/studio/components, and docs/frontend-application.md. Keep the page focused on current Studio structure and integrations."
+        }
+      ]
+    },
+    {
+      "title": "Web3 Integration",
+      "purpose": "Detail Thirdweb SDK integration, multi-chain wallet support (Ethereum, Avalanche, Solana), and blockchain interaction patterns",
+      "parent": "Frontend Application",
+      "page_notes": [
+        {
+          "content": "Only mention Solana if directly evidenced in runtime code or docs. Thirdweb/EVM flows are the clearest current implementation."
+        }
+      ]
+    },
+    {
+      "title": "Dashboard and Home Page",
+      "purpose": "Describe the home dashboard layout, system health display, quick actions, and supported networks visualization",
+      "parent": "Frontend Application",
+      "page_notes": [
+        {
+          "content": "Ground this in the current Studio routes and components, not aspirational design language."
+        }
+      ]
+    },
+    {
+      "title": "Avalanche Studio",
+      "purpose": "Detail the pay-per-deploy studio interface, recipe selection (ERC20, ERC721, Custom), contract generation flow, and workflow creation",
+      "parent": "Frontend Application",
+      "page_notes": [
+        {
+          "content": "Treat any Avalanche-specific studio branding as conditional unless there is a dedicated current route and supported UX. Prefer describing the general Studio workflow when that is what the repo actually implements."
+        }
+      ]
+    },
+    {
+      "title": "Workflow and Template Pages",
+      "purpose": "Explain workflow detail views, real-time updates via WebSockets, contract viewer, and template browsing functionality",
+      "parent": "Frontend Application",
+      "page_notes": [
+        {
+          "content": "Use current routes under apps/studio/app/workflows, contracts, templates, and related components. Be careful with real-time claims and specify the actual transport when evidenced."
+        }
+      ]
+    },
+    {
+      "title": "Payment and Analytics UI",
+      "purpose": "Describe payment modal components, spending trends visualization, payment history tables, and budget displays",
+      "parent": "Frontend Application",
+      "page_notes": [
+        {
+          "content": "Use analytics and settings/payment components as the source of truth, and align wording with the implemented credits/x402 split."
+        }
+      ]
+    }
+  ]
+}

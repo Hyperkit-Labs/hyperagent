@@ -42,6 +42,6 @@ Key configuration can be removed at any time; keys are wiped without long-lived 
 
 ## Related docs
 
-- **First-time setup:** [Getting started](getting-started.md)
-- **Repository and local stack:** [Contributor guide](developer-guide.md)
+- **First-time setup:** [Getting started](../introduction/getting-started.md)
+- **Repository and local stack:** [Contributor guide](../contributing/developer-guide.md)
 - **Troubleshooting:** [Troubleshooting](troubleshooting.md)

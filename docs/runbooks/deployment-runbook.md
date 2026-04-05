@@ -4,7 +4,7 @@ High-level checklist for operators shipping HyperAgent components. Adjust for yo
 
 ## Preconditions
 
-- [ ] Read [Deploy ownership](../deploy-ownership.md) (who signs deploys, what runs in Studio vs backend).
+- [ ] Read [Deploy ownership](deploy-ownership.md) (who signs deploys, what runs in Studio vs backend).
 - [ ] Confirm **secrets** are in the vault or host environment, not in the repo (see `.env.example` and `SECURITY.md`).
 - [ ] **Supabase** migrations applied for the target project.
 - [ ] **Redis**: gateway rate limits (Upstash REST) and orchestrator queue/checkpointer (`REDIS_URL`) configured per `production.mdc` / `.env.example`.

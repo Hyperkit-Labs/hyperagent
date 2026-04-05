@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Short pointers for common local setup issues. For the full doc index, see the repository [docs folder on GitHub](https://github.com/Hyperkit-Labs/hyperagent/tree/main/docs) or the MkDocs nav starting at [Home](index.md).
+Short pointers for common local setup issues. For the full doc index, see the repository [docs folder on GitHub](https://github.com/Hyperkit-Labs/hyperagent/tree/main/docs) or the MkDocs nav starting at [Home](../index.md).
 
 | Symptom | Things to check |
 |---------|------------------|

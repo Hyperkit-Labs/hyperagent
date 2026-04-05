@@ -7,7 +7,7 @@ ADRs record **significant** technical and product decisions: what was chosen, wh
 1. Copy [`0000-template.md`](./0000-template.md) to `docs/adrs/NNNN-short-kebab-title.md` with the next number (`0004-...`, and so on).
 2. Fill **Context**, **Decision**, and **Consequences**. Link issues or PRs.
 3. Open a PR. Mark **Status** as `Proposed` until maintainers accept it.
-4. Update this index table and, if needed, [MkDocs nav](../documentation-site.md) in `mkdocs.yml`.
+4. Update this index table and, if needed, [MkDocs nav](../introduction/documentation-site.md) in `mkdocs.yml`.
 
 ## Index
 

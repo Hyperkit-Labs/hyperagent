@@ -20,6 +20,6 @@ This document is the **source of truth** for what gets stored where, and how has
 
 ## Related docs
 
-- [Control plane: runs and steps](control-plane-runs-steps.md)
+- [Control plane: runs and steps](runs-and-steps.md)
 - [Workflow state management](workflow-state-management.md)
 - [Security policy](https://github.com/Hyperkit-Labs/hyperagent/blob/main/SECURITY.md)

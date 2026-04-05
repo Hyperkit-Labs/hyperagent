@@ -10,14 +10,14 @@ Do **not** open public issues for security vulnerabilities. Follow [SECURITY.md]
 
 1. **Fork** the repository and clone your fork.
 2. **Branch** from the integration branch your team uses (often `development` or `main`; follow existing PR targets).
-3. **Install** tooling: Node 18+, pnpm, and Python 3.11+ when working on backend services. See [Getting started](getting-started.md) and [Developer guide](developer-guide.md).
+3. **Install** tooling: Node 18+, pnpm, and Python 3.11+ when working on backend services. See [Getting started](../introduction/getting-started.md) and [Developer guide](developer-guide.md).
 4. **Make changes** in focused commits. Match existing style and run linters/tests for touched areas.
 5. **Open a Pull Request** using the template. PR titles must match CI format (`scope: description`). See `.github/pull_request_template.md`.
 
 ## Documentation and ADRs
 
-- User-facing and technical docs live under **`docs/`**. Preview the site with MkDocs: [Documentation site](documentation-site.md).
-- Significant decisions belong in **`docs/adrs/`** using the [ADR template](adrs/0000-template.md). Update the [ADR index](adrs/README.md).
+- User-facing and technical docs live under **`docs/`**. Preview the site with MkDocs: [Documentation site](../introduction/documentation-site.md).
+- Significant decisions belong in **`docs/adrs/`** using the [ADR template](../adrs/0000-template.md). Update the [ADR index](../adrs/README.md).
 
 ## Tests
 

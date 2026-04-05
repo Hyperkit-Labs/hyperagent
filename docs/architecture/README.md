@@ -5,7 +5,7 @@ This section holds **human-readable architecture** and **diagrams as code** for 
 | Doc | Purpose |
 |-----|---------|
 | [System context](system-context.md) | High-level diagram (Mermaid): clients, gateway, orchestrator, data plane |
-| [Network architecture](../architecture-networks.md) | Chain registry, x402, execution defaults |
+| [Network architecture](networks.md) | Chain registry, x402, execution defaults |
 
 Deeper repository mapping lives in the [agent operating model](../agent-operating-model/architecture-map.md).
 

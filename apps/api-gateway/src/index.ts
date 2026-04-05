@@ -3,55 +3,50 @@
  * Versioned proxy /api/v1 to orchestrator; legacy /run, /runs.
  * Required: JWT auth (AUTH_JWT_SECRET), Upstash REST rate limit (UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN). Security is mandatory.
  */
-import { config } from "dotenv";
-import { dirname, resolve } from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-config({ path: resolve(__dirname, "../../../.env") });
-
+import "./load-env.js";
 import cors from "cors";
 import express, { NextFunction } from "express";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { requestIdMiddleware, type RequestWithId } from "./requestId.js";
 import { otelRequestSpanMiddleware, validateRequiredSecrets } from "@hyperagent/backend-middleware";
 import { log } from "./logger.js";
-import { authMiddleware } from "./auth.js";
+import { authMiddleware, type RequestWithUser } from "./auth.js";
 import { rateLimitMiddleware, hasRestRateLimitEnv } from "./rateLimit.js";
 import { authBootstrapHandler } from "./authBootstrap.js";
 import { byokRouter } from "./byok.js";
 import { createProxyOptions } from "./proxy.js";
 import { healthHandler } from "./health.js";
+import { meteringMiddleware } from "./metering.js";
+import { Env, getGatewayEnv } from "@hyperagent/config";
+import { initOtel } from "./otel-sdk.js";
+import { initSentry } from "./sentry-init.js";
+
+initSentry();
+initOtel();
+
+const gw = getGatewayEnv();
 
 validateRequiredSecrets(
-  ["AUTH_JWT_SECRET", "SUPABASE_URL", "SUPABASE_SERVICE_KEY"],
+  [Env.AUTH_JWT_SECRET, Env.SUPABASE_URL, Env.SUPABASE_SERVICE_KEY],
   "api-gateway",
 );
 
-const ORCHESTRATOR_URL = process.env.ORCHESTRATOR_URL || "http://localhost:8000";
-const NODE_ENV = process.env.NODE_ENV || "development";
-const PROXY_TIMEOUT_MS = Number(process.env.PROXY_TIMEOUT_MS) || 25_000;
-
-if (NODE_ENV === "production" && !hasRestRateLimitEnv()) {
+if (gw.isProduction && !hasRestRateLimitEnv()) {
   log.fatal("Production requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN for rate limiting");
   process.exit(1);
 }
 
-const AUTH_JWT_SECRET = process.env.AUTH_JWT_SECRET;
-if (NODE_ENV === "production" && !AUTH_JWT_SECRET) {
+if (gw.isProduction && !gw.auth.jwtSecret) {
   log.fatal("Production requires AUTH_JWT_SECRET");
   process.exit(1);
 }
 
-const allowedOrigins = (process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || "http://localhost:3000")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
+const allowedOrigins = gw.corsOrigins;
 
 function isAllowedOrigin(origin: string | undefined): boolean {
   if (!origin) return true;
   if (allowedOrigins.includes(origin)) return true;
-  if (NODE_ENV === "development") {
+  if (gw.nodeEnv === "development") {
     try {
       const u = new URL(origin);
       const host = u.hostname;
@@ -87,11 +82,15 @@ app.get("/health/live", (_req, res) => {
   res.json({ status: "ok", gateway: true });
 });
 
-app.get("/health", healthHandler(ORCHESTRATOR_URL));
+app.get("/health", healthHandler(gw.orchestratorUrl));
 
 app.use(authMiddleware);
 app.use((req, res, next) => {
   (rateLimitMiddleware as (req: express.Request, res: express.Response, next: express.NextFunction) => Promise<void>)(req, res, next).catch(next);
+});
+
+app.use((req, res, next) => {
+  void meteringMiddleware(req as RequestWithUser, res, next).catch(next);
 });
 
 // --- Routes ---
@@ -101,7 +100,7 @@ app.post("/api/v1/auth/bootstrap", jsonParser, (req, res, next) => {
 });
 app.use("/api/v1/byok", jsonParser, byokRouter);
 
-const proxyOpts = () => createProxyOptions(ORCHESTRATOR_URL, PROXY_TIMEOUT_MS);
+const proxyOpts = () => createProxyOptions(gw.orchestratorUrl, gw.proxyTimeoutMs);
 
 app.use("/api/v1", createProxyMiddleware(proxyOpts()));
 app.use("/run", createProxyMiddleware(proxyOpts()));
@@ -128,11 +127,11 @@ app.use((err: unknown, req: RequestWithId, res: express.Response, _next: NextFun
   });
 });
 
-const port = Number(process.env.PORT) || 4000;
+const port = gw.port;
 app.listen(port, "0.0.0.0", () => {
   log.info({
     msg: "api-gateway started",
     port,
-    orchestrator: ORCHESTRATOR_URL,
+    orchestrator: gw.orchestratorUrl,
   });
 });

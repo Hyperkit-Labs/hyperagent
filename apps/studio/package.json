@@ -29,8 +29,6 @@
     "@headlessui/react": "^2.2.9",
     "@heroicons/react": "^2.2.0",
     "@hyperagent/config": "workspace:*",
-    "@hyperagent/sdk-ts": "workspace:*",
-    "@hyperagent/shared-ui": "workspace:*",
     "@supabase/supabase-js": "^2.47.0",
     "@vercel/analytics": "^2.0.1",
     "@xterm/addon-fit": "^0.11.0",

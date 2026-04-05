@@ -2,6 +2,20 @@
   "name": "@hyperagent/core-types",
   "version": "0.1.0",
   "private": true,
+  "description": "Runtime-shared contracts and security utilities used by HyperAgent services.",
+  "hyperagentStatus": "runtime-contract",
   "main": "index.js",
-  "types": "index.d.ts"
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "require": "./index.js",
+      "default": "./index.js"
+    },
+    "./run-model.json": "./run-model.json"
+  },
+  "scripts": {
+    "test": "node --test index.test.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
 }

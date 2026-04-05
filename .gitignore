@@ -461,7 +461,6 @@ _site/
 *.gz
 *.bz2
 *.xz
-*
 # AI Agent Directories
 .claude/
 .agent/

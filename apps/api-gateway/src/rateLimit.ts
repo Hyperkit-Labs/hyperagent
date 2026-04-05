@@ -9,49 +9,25 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { Response, NextFunction } from "express";
+import { getGatewayEnv } from "@hyperagent/config";
 import { RequestWithId } from "./requestId.js";
 import { RequestWithUser } from "./auth.js";
 import { log } from "./logger.js";
 
 function restUrl(): string {
-  return (process.env.UPSTASH_REDIS_REST_URL || "").trim();
+  return getGatewayEnv().redisRest.restUrl;
 }
 
 function restToken(): string {
-  return (process.env.UPSTASH_REDIS_REST_TOKEN || "").trim();
+  return getGatewayEnv().redisRest.restToken;
 }
 
 function nodeEnv(): string {
-  return process.env.NODE_ENV || "development";
+  return getGatewayEnv().nodeEnv;
 }
-/** When true, allow requests through when Upstash is unreachable (skip rate limit). Dev/staging only. */
-const RATE_LIMIT_BYPASS_ON_FAIL = process.env.RATE_LIMIT_BYPASS_ON_FAIL === "true";
-const RATE_LIMIT_WINDOW_SEC = Number(process.env.RATE_LIMIT_WINDOW_SEC) || 60;
-/** Multiplier applied to all rate limits. Use 2 to double limits, 0.5 to halve. Default 1. */
-const RATE_LIMIT_MULTIPLIER = Math.max(0.1, Number(process.env.RATE_LIMIT_MULTIPLIER) || 1);
-
-const RATE_LIMIT_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_MAX_IP) || 300) * RATE_LIMIT_MULTIPLIER);
-const RATE_LIMIT_MAX_USER = Math.round((Number(process.env.RATE_LIMIT_MAX_USER) || 500) * RATE_LIMIT_MULTIPLIER);
 
 const LLM_KEYS_PATH = "/api/v1/workspaces/current/llm-keys";
-const RATE_LIMIT_LLM_KEYS_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_LLM_KEYS_MAX_IP) || 10) * RATE_LIMIT_MULTIPLIER);
-const RATE_LIMIT_LLM_KEYS_MAX_USER = Math.round((Number(process.env.RATE_LIMIT_LLM_KEYS_MAX_USER) || 5) * RATE_LIMIT_MULTIPLIER);
-
-const RATE_LIMIT_WORKFLOW_GENERATE_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_WORKFLOW_GENERATE_MAX_IP) || 20) * RATE_LIMIT_MULTIPLIER);
-const RATE_LIMIT_WORKFLOW_GENERATE_MAX_USER = Math.round((Number(process.env.RATE_LIMIT_WORKFLOW_GENERATE_MAX_USER) || 30) * RATE_LIMIT_MULTIPLIER);
-
-const RATE_LIMIT_DEPLOY_PREPARE_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_DEPLOY_PREPARE_MAX_IP) || 30) * RATE_LIMIT_MULTIPLIER);
-const RATE_LIMIT_DEPLOY_PREPARE_MAX_USER = Math.round((Number(process.env.RATE_LIMIT_DEPLOY_PREPARE_MAX_USER) || 50) * RATE_LIMIT_MULTIPLIER);
-
 const BOOTSTRAP_PATH = "/api/v1/auth/bootstrap";
-const RATE_LIMIT_BOOTSTRAP_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_BOOTSTRAP_MAX_IP) || Number(process.env.RATE_LIMIT_SIWE_MAX_IP) || 5) * RATE_LIMIT_MULTIPLIER);
-const RATE_LIMIT_BOOTSTRAP_WINDOW_SEC = Number(process.env.RATE_LIMIT_SIWE_WINDOW_SEC) || Number(process.env.RATE_LIMIT_BOOTSTRAP_WINDOW_SEC) || 60;
-
-const RATE_LIMIT_LIGHT_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_LIGHT_MAX_IP) || 100) * RATE_LIMIT_MULTIPLIER);
-const RATE_LIMIT_LIGHT_MAX_USER = Math.round((Number(process.env.RATE_LIMIT_LIGHT_MAX_USER) || 500) * RATE_LIMIT_MULTIPLIER);
-
-const RATE_LIMIT_BYOK_MAX_IP = Math.round((Number(process.env.RATE_LIMIT_BYOK_MAX_IP) || 15) * RATE_LIMIT_MULTIPLIER);
-const RATE_LIMIT_BYOK_MAX_USER = Math.round((Number(process.env.RATE_LIMIT_BYOK_MAX_USER) || 10) * RATE_LIMIT_MULTIPLIER);
 
 const REST_BACKOFF_MS = 60_000;
 let lastRestFailure = 0;
@@ -203,6 +179,8 @@ export async function rateLimitMiddleware(
     return;
   }
 
+  const rl = getGatewayEnv().rateLimits;
+
   if (!hasRestRateLimitEnv()) {
     if (nodeEnv() === "production") {
       logSecurityEvent("rate_limit_unavailable", 503, req.path, req.requestId, req.userId);
@@ -221,8 +199,8 @@ export async function rateLimitMiddleware(
   const redis = getRedisRest();
   if (!redis) {
     if (nodeEnv() === "production") {
-      if (RATE_LIMIT_BYPASS_ON_FAIL) {
-        log.warn("Upstash unreachable. RATE_LIMIT_BYPASS_ON_FAIL ignored in production (fail-closed)");
+      if (rl.bypassOnFail) {
+        log.warn("Upstash unreachable. rl.bypassOnFail ignored in production (fail-closed)");
       }
       logSecurityEvent("rate_limit_unavailable", 503, req.path, req.requestId, req.userId);
       res.status(503).json({
@@ -243,11 +221,11 @@ export async function rateLimitMiddleware(
       return;
     }
     const ip = req.ip || (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
-    const lim = getLimiter(redis, RATE_LIMIT_BOOTSTRAP_MAX_IP, RATE_LIMIT_BOOTSTRAP_WINDOW_SEC, "bootstrap");
-    const bootstrapOutcome = await checkLimit(lim, ip, RATE_LIMIT_BOOTSTRAP_WINDOW_SEC);
+    const lim = getLimiter(redis, rl.bootstrapMaxIp, rl.bootstrapWindowSec, "bootstrap");
+    const bootstrapOutcome = await checkLimit(lim, ip, rl.bootstrapWindowSec);
     if (
       !sendLimitOrRedis(req, res, bootstrapOutcome, {
-        retryAfterSec: RATE_LIMIT_BOOTSTRAP_WINDOW_SEC,
+        retryAfterSec: rl.bootstrapWindowSec,
         event: "rate_limit_bootstrap",
         message: "Too many sign-in attempts. Try again later.",
       })
@@ -269,11 +247,11 @@ export async function rateLimitMiddleware(
     const userId = req.userId || "";
 
     if (userId) {
-      const lim = getLimiter(redis, RATE_LIMIT_LIGHT_MAX_USER, RATE_LIMIT_WINDOW_SEC, "light-user");
-      const userOutcome = await checkLimit(lim, userId, RATE_LIMIT_WINDOW_SEC);
+      const lim = getLimiter(redis, rl.lightMaxUser, rl.windowSec, "light-user");
+      const userOutcome = await checkLimit(lim, userId, rl.windowSec);
       if (
         !sendLimitOrRedis(req, res, userOutcome, {
-          retryAfterSec: RATE_LIMIT_WINDOW_SEC,
+          retryAfterSec: rl.windowSec,
           event: "rate_limit_light",
           message: "Config/networks rate limit exceeded. Try again later.",
         })
@@ -281,11 +259,11 @@ export async function rateLimitMiddleware(
         return;
       }
     } else {
-      const lim = getLimiter(redis, RATE_LIMIT_LIGHT_MAX_IP, RATE_LIMIT_WINDOW_SEC, "light-ip");
-      const lightOutcome = await checkLimit(lim, ip, RATE_LIMIT_WINDOW_SEC);
+      const lim = getLimiter(redis, rl.lightMaxIp, rl.windowSec, "light-ip");
+      const lightOutcome = await checkLimit(lim, ip, rl.windowSec);
       if (
         !sendLimitOrRedis(req, res, lightOutcome, {
-          retryAfterSec: RATE_LIMIT_WINDOW_SEC,
+          retryAfterSec: rl.windowSec,
           event: "rate_limit_light",
           message: "Config/networks rate limit exceeded. Try again later.",
         })
@@ -302,11 +280,11 @@ export async function rateLimitMiddleware(
 
   const isByokRoute = req.path.startsWith("/api/v1/byok");
   if (isByokRoute) {
-    const limIp = getLimiter(redis, RATE_LIMIT_BYOK_MAX_IP, RATE_LIMIT_WINDOW_SEC, "byok-ip");
-    const byokIp = await checkLimit(limIp, ip, RATE_LIMIT_WINDOW_SEC);
+    const limIp = getLimiter(redis, rl.byokMaxIp, rl.windowSec, "byok-ip");
+    const byokIp = await checkLimit(limIp, ip, rl.windowSec);
     if (
       !sendLimitOrRedis(req, res, byokIp, {
-        retryAfterSec: RATE_LIMIT_WINDOW_SEC,
+        retryAfterSec: rl.windowSec,
         event: "rate_limit_byok",
         message: "BYOK key management rate limit exceeded. Try again later.",
       })
@@ -314,11 +292,11 @@ export async function rateLimitMiddleware(
       return;
     }
     if (userId) {
-      const limU = getLimiter(redis, RATE_LIMIT_BYOK_MAX_USER, RATE_LIMIT_WINDOW_SEC, "byok-user");
-      const byokUser = await checkLimit(limU, userId, RATE_LIMIT_WINDOW_SEC);
+      const limU = getLimiter(redis, rl.byokMaxUser, rl.windowSec, "byok-user");
+      const byokUser = await checkLimit(limU, userId, rl.windowSec);
       if (
         !sendLimitOrRedis(req, res, byokUser, {
-          retryAfterSec: RATE_LIMIT_WINDOW_SEC,
+          retryAfterSec: rl.windowSec,
           event: "rate_limit_byok",
           message: "BYOK key management rate limit exceeded.",
         })
@@ -335,11 +313,11 @@ export async function rateLimitMiddleware(
   const isDeployPrepare = req.method === "POST" && /^\/api\/v1\/workflows\/[^/]+\/deploy\/prepare$/.test(req.path);
 
   if (isWorkflowGenerate) {
-    const limIp = getLimiter(redis, RATE_LIMIT_WORKFLOW_GENERATE_MAX_IP, RATE_LIMIT_WINDOW_SEC, "wf-ip");
-    const wfIp = await checkLimit(limIp, ip, RATE_LIMIT_WINDOW_SEC);
+    const limIp = getLimiter(redis, rl.workflowGenerateMaxIp, rl.windowSec, "wf-ip");
+    const wfIp = await checkLimit(limIp, ip, rl.windowSec);
     if (
       !sendLimitOrRedis(req, res, wfIp, {
-        retryAfterSec: RATE_LIMIT_WINDOW_SEC,
+        retryAfterSec: rl.windowSec,
         event: "rate_limit_workflow_generate",
         message: "Workflow start rate limit exceeded. Try again later.",
       })
@@ -347,11 +325,11 @@ export async function rateLimitMiddleware(
       return;
     }
     if (userId) {
-      const limU = getLimiter(redis, RATE_LIMIT_WORKFLOW_GENERATE_MAX_USER, RATE_LIMIT_WINDOW_SEC, "wf-user");
-      const wfUser = await checkLimit(limU, userId, RATE_LIMIT_WINDOW_SEC);
+      const limU = getLimiter(redis, rl.workflowGenerateMaxUser, rl.windowSec, "wf-user");
+      const wfUser = await checkLimit(limU, userId, rl.windowSec);
       if (
         !sendLimitOrRedis(req, res, wfUser, {
-          retryAfterSec: RATE_LIMIT_WINDOW_SEC,
+          retryAfterSec: rl.windowSec,
           event: "rate_limit_workflow_generate",
           message: "Workflow start rate limit exceeded.",
         })
@@ -362,11 +340,11 @@ export async function rateLimitMiddleware(
   }
 
   if (isDeployPrepare) {
-    const limIp = getLimiter(redis, RATE_LIMIT_DEPLOY_PREPARE_MAX_IP, RATE_LIMIT_WINDOW_SEC, "deploy-ip");
-    const dpIp = await checkLimit(limIp, ip, RATE_LIMIT_WINDOW_SEC);
+    const limIp = getLimiter(redis, rl.deployPrepareMaxIp, rl.windowSec, "deploy-ip");
+    const dpIp = await checkLimit(limIp, ip, rl.windowSec);
     if (
       !sendLimitOrRedis(req, res, dpIp, {
-        retryAfterSec: RATE_LIMIT_WINDOW_SEC,
+        retryAfterSec: rl.windowSec,
         event: "rate_limit_deploy_prepare",
         message: "Deploy prepare rate limit exceeded. Try again later.",
       })
@@ -374,11 +352,11 @@ export async function rateLimitMiddleware(
       return;
     }
     if (userId) {
-      const limU = getLimiter(redis, RATE_LIMIT_DEPLOY_PREPARE_MAX_USER, RATE_LIMIT_WINDOW_SEC, "deploy-user");
-      const dpUser = await checkLimit(limU, userId, RATE_LIMIT_WINDOW_SEC);
+      const limU = getLimiter(redis, rl.deployPrepareMaxUser, rl.windowSec, "deploy-user");
+      const dpUser = await checkLimit(limU, userId, rl.windowSec);
       if (
         !sendLimitOrRedis(req, res, dpUser, {
-          retryAfterSec: RATE_LIMIT_WINDOW_SEC,
+          retryAfterSec: rl.windowSec,
           event: "rate_limit_deploy_prepare",
           message: "Deploy prepare rate limit exceeded.",
         })
@@ -388,11 +366,11 @@ export async function rateLimitMiddleware(
     }
   }
 
-  const limIpMain = getLimiter(redis, RATE_LIMIT_MAX_IP, RATE_LIMIT_WINDOW_SEC, "ip");
-  const ipOutcome = await checkLimit(limIpMain, ip, RATE_LIMIT_WINDOW_SEC);
+  const limIpMain = getLimiter(redis, rl.maxIp, rl.windowSec, "ip");
+  const ipOutcome = await checkLimit(limIpMain, ip, rl.windowSec);
   if (
     !sendLimitOrRedis(req, res, ipOutcome, {
-      retryAfterSec: RATE_LIMIT_WINDOW_SEC,
+      retryAfterSec: rl.windowSec,
       event: "rate_limit",
       message: "Rate limit exceeded. Try again later.",
     })
@@ -401,11 +379,11 @@ export async function rateLimitMiddleware(
   }
 
   if (isLlmKeysPost) {
-    const limLlmIp = getLimiter(redis, RATE_LIMIT_LLM_KEYS_MAX_IP, RATE_LIMIT_WINDOW_SEC, "llm-ip");
-    const llmIp = await checkLimit(limLlmIp, ip, RATE_LIMIT_WINDOW_SEC);
+    const limLlmIp = getLimiter(redis, rl.llmKeysMaxIp, rl.windowSec, "llm-ip");
+    const llmIp = await checkLimit(limLlmIp, ip, rl.windowSec);
     if (
       !sendLimitOrRedis(req, res, llmIp, {
-        retryAfterSec: RATE_LIMIT_WINDOW_SEC,
+        retryAfterSec: rl.windowSec,
         event: "rate_limit_llm_keys",
         message: "LLM keys endpoint rate limit exceeded. Try again later.",
       })
@@ -415,13 +393,13 @@ export async function rateLimitMiddleware(
   }
 
   if (userId) {
-    const userMax = isLlmKeysPost ? RATE_LIMIT_LLM_KEYS_MAX_USER : RATE_LIMIT_MAX_USER;
+    const userMax = isLlmKeysPost ? rl.llmKeysMaxUser : rl.maxUser;
     const name = isLlmKeysPost ? "llm-user" : "user";
-    const limUser = getLimiter(redis, userMax, RATE_LIMIT_WINDOW_SEC, name);
-    const userOutcome = await checkLimit(limUser, userId, RATE_LIMIT_WINDOW_SEC);
+    const limUser = getLimiter(redis, userMax, rl.windowSec, name);
+    const userOutcome = await checkLimit(limUser, userId, rl.windowSec);
     if (
       !sendLimitOrRedis(req, res, userOutcome, {
-        retryAfterSec: RATE_LIMIT_WINDOW_SEC,
+        retryAfterSec: rl.windowSec,
         event: "rate_limit",
         message: "User rate limit exceeded.",
       })

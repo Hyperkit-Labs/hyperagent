@@ -1,11 +1,13 @@
 import type { Request, Response } from "express";
+import { getGatewayEnv } from "@hyperagent/config";
 import { getSupabaseAdmin } from "./authBootstrap.js";
 import { log } from "./logger.js";
 
 export function healthHandler(orchestratorUrl: string) {
   return async (_req: Request, res: Response): Promise<void> => {
-    const authJwtConfigured = Boolean(process.env.AUTH_JWT_SECRET);
-    const thirdwebSecretConfigured = Boolean(process.env.THIRDWEB_SECRET_KEY?.trim());
+    const gw = getGatewayEnv();
+    const authJwtConfigured = Boolean(gw.auth.jwtSecret);
+    const thirdwebSecretConfigured = Boolean(gw.bootstrap.thirdwebSecretKey);
     const supabase = getSupabaseAdmin();
     let dbOk = false;
     let dbError: string | null = null;

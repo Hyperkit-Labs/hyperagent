@@ -8,18 +8,9 @@ import { Request, Response } from "express";
 import { SiweMessage } from "siwe";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import jwt from "jsonwebtoken";
+import { getGatewayEnv } from "@hyperagent/config";
 import { log } from "./logger.js";
 import { emitAuditEvent } from "./audit.js";
-
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-const AUTH_JWT_SECRET = process.env.AUTH_JWT_SECRET;
-const THIRDWEB_SECRET_KEY = process.env.THIRDWEB_SECRET_KEY;
-const JWT_EXPIRES_IN_SEC = Number(process.env.AUTH_JWT_EXPIRES_IN) || 86400;
-const FREEMIUM_INITIAL_CREDITS = Number(process.env.FREEMIUM_INITIAL_CREDITS) || 100;
-
-const ENABLE_BOOTSTRAP_DEBUG_LOG =
-  process.env.NODE_ENV !== "production" && process.env.ENABLE_BOOTSTRAP_DEBUG_LOG === "1";
 
 function redactDebugData(data: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -35,7 +26,7 @@ function redactDebugData(data: Record<string, unknown>): Record<string, unknown>
 }
 
 function debugLog(location: string, message: string, data: Record<string, unknown>): void {
-  if (!ENABLE_BOOTSTRAP_DEBUG_LOG) return;
+  if (!getGatewayEnv().bootstrap.enableDebugLog) return;
   try {
     log.debug({ location, data: redactDebugData(data) }, message);
   } catch {
@@ -55,8 +46,9 @@ export function isMissingTableError(msg: string | undefined, code?: string): boo
 }
 
 export function getSupabaseAdmin(): SupabaseClient | null {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return null;
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+  const { supabase } = getGatewayEnv();
+  if (!supabase.url || !supabase.serviceKey) return null;
+  return createClient(supabase.url, supabase.serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }
@@ -76,12 +68,13 @@ export function isValidEip191SignatureHex(signature: string): boolean {
 }
 
 async function verifyThirdwebAuthToken(authToken: string): Promise<string | null> {
-  if (!THIRDWEB_SECRET_KEY) return null;
+  const secret = getGatewayEnv().bootstrap.thirdwebSecretKey;
+  if (!secret) return null;
   try {
     const res = await fetch("https://api.thirdweb.com/v1/wallets/me", {
       headers: {
         Authorization: `Bearer ${authToken}`,
-        "x-secret-key": THIRDWEB_SECRET_KEY,
+        "x-secret-key": secret,
       },
     });
     if (!res.ok) return null;
@@ -166,7 +159,7 @@ async function ensureWalletUserProvisioned(supabase: SupabaseClient, userId: str
     async () => {
       await supabase.rpc("bootstrap_user_credits", {
         p_user_id: userId,
-        p_initial_credits: FREEMIUM_INITIAL_CREDITS,
+        p_initial_credits: getGatewayEnv().bootstrap.freemiumInitialCredits,
       });
     },
     "bootstrap_user_credits"
@@ -218,13 +211,18 @@ export async function authBootstrapHandler(req: Request, res: Response): Promise
     return;
   }
 
+  const jwtSecret = getGatewayEnv().auth.jwtSecret;
   // #region agent log
-  const envJwtSecret = process.env.AUTH_JWT_SECRET;
-  debugLog("authBootstrap.ts:jwt-secret-check", "AUTH_JWT_SECRET availability", { topLevelConst: typeof AUTH_JWT_SECRET === "string" ? "SET(" + AUTH_JWT_SECRET.length + "chars)" : "UNSET", envDynamic: typeof envJwtSecret === "string" ? "SET(" + envJwtSecret.length + "chars)" : "UNSET", hypothesisId: "H1" });
+  debugLog("authBootstrap.ts:jwt-secret-check", "AUTH_JWT_SECRET availability", {
+    secretSet: typeof jwtSecret === "string" ? "SET(" + jwtSecret.length + "chars)" : "UNSET",
+    hypothesisId: "H1",
+  });
   // #endregion
-  if (!AUTH_JWT_SECRET) {
+  if (!jwtSecret) {
     // #region agent log
-    debugLog("authBootstrap.ts:503-auth-not-configured", "EXIT 503: Auth not configured", { topLevelConst: typeof AUTH_JWT_SECRET, envDynamic: typeof envJwtSecret, hypothesisId: "H1" });
+    debugLog("authBootstrap.ts:503-auth-not-configured", "EXIT 503: Auth not configured", {
+      hypothesisId: "H1",
+    });
     // #endregion
     res.status(503).json({
       error: "Service Unavailable",
@@ -237,7 +235,9 @@ export async function authBootstrapHandler(req: Request, res: Response): Promise
   const supabase = getSupabaseAdmin();
   if (!supabase) {
     // #region agent log
-    debugLog("authBootstrap.ts:503-supabase-not-configured", "EXIT 503: Supabase not configured", { SUPABASE_URL: typeof SUPABASE_URL === "string" ? "SET" : "UNSET", SUPABASE_SERVICE_KEY: typeof SUPABASE_SERVICE_KEY === "string" ? "SET(" + SUPABASE_SERVICE_KEY.length + "chars)" : "UNSET", hypothesisId: "H3" });
+    debugLog("authBootstrap.ts:503-supabase-not-configured", "EXIT 503: Supabase not configured", {
+      hypothesisId: "H3",
+    });
     // #endregion
     res.status(503).json({
       error: "Service Unavailable",
@@ -372,13 +372,19 @@ export async function authBootstrapHandler(req: Request, res: Response): Promise
   }
 
   // #region agent log
-  debugLog("authBootstrap.ts:jwt-sign-success", "issuing JWT, bootstrap success", { userId: result.userId, walletAddress: walletAddress.toLowerCase(), expiresIn: JWT_EXPIRES_IN_SEC, hypothesisId: "H1" });
+  const expSec = getGatewayEnv().bootstrap.jwtExpiresInSec;
+  debugLog("authBootstrap.ts:jwt-sign-success", "issuing JWT, bootstrap success", {
+    userId: result.userId,
+    walletAddress: walletAddress.toLowerCase(),
+    expiresIn: expSec,
+    hypothesisId: "H1",
+  });
   // #endregion
   const jti = `${result.userId}-${Date.now().toString(36)}`;
   const token = jwt.sign(
     { sub: result.userId, wallet_address: walletAddress.toLowerCase(), jti },
-    AUTH_JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN_SEC }
+    jwtSecret,
+    { expiresIn: expSec }
   );
 
   const isSecure = req.protocol === "https" || req.headers["x-forwarded-proto"] === "https";
@@ -388,7 +394,7 @@ export async function authBootstrapHandler(req: Request, res: Response): Promise
     "HttpOnly",
     isSecure ? "Secure" : "",
     "SameSite=Strict",
-    `Max-Age=${JWT_EXPIRES_IN_SEC}`,
+    `Max-Age=${expSec}`,
   ].filter(Boolean).join("; ");
   res.setHeader("Set-Cookie", cookieFlags);
 
@@ -396,6 +402,6 @@ export async function authBootstrapHandler(req: Request, res: Response): Promise
 
   res.status(200).json({
     access_token: token,
-    expires_in: JWT_EXPIRES_IN_SEC,
+    expires_in: expSec,
   });
 }

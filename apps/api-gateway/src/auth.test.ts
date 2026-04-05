@@ -34,6 +34,16 @@ describe("authMiddleware", () => {
     expect(res.status).toBe(200);
   });
 
+  it("GET /api/v1/config returns 200 without Authorization (Studio bootstrap)", async () => {
+    const app = express();
+    app.use(authMiddleware);
+    app.get("/api/v1/config", (_req, res) => {
+      res.status(200).json({ ok: true });
+    });
+    const res = await request(app).get("/api/v1/config");
+    expect(res.status).toBe(200);
+  });
+
   it("protected path returns 401 without Authorization", async () => {
     const app = express();
     app.use(authMiddleware);

@@ -5,11 +5,10 @@ from __future__ import annotations
 import logging
 import os
 
+from api.common import get_caller_id
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-
-from api.common import get_caller_id
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +33,11 @@ def _should_enforce_identity_hmac() -> bool:
         "yes",
     ):
         return False
-    if os.environ.get("ENFORCE_IDENTITY_HMAC", "").strip().lower() in ("1", "true", "yes"):
+    if os.environ.get("ENFORCE_IDENTITY_HMAC", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    ):
         return True
     return _is_production()
 

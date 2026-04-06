@@ -32,6 +32,9 @@ function NetworkLogo({ id }: { id: string }) {
 export default function NetworksPage() {
   const { networks, loading, error, refetch } = useNetworks();
   const list = networks ?? [];
+  const supportedList = list.filter((network) =>
+    network.id.toLowerCase().includes("skale"),
+  );
   const [testing, setTesting] = useState<string | null>(null);
   const [rpcResult, setRpcResult] = useState<
     Record<string, { ok: boolean; latency_ms?: number; error?: string }>
@@ -72,42 +75,52 @@ export default function NetworksPage() {
         <div className="max-w-[1200px] mx-auto space-y-6 animate-enter">
           <PageTitle
             title="Networks"
-            subtitle="Supported chains and network configuration."
+            subtitle="Supported v0.1.0 chains and network configuration."
           />
+
+          {!loading && list.length > supportedList.length && (
+            <div className="rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] px-4 py-3 text-xs text-[var(--color-text-tertiary)]">
+              Studio currently presents only the supported v0.1.0 SKALE Base
+              networks. Additional registry entries remain roadmap or internal
+              configuration.
+            </div>
+          )}
 
           <ApiErrorBanner error={error} onRetry={refetch} />
 
-          {list.length > 0 && (
+          {supportedList.length > 0 && (
             <div className="glass-panel rounded-xl p-6">
               <h3 className="text-sm font-medium text-[var(--color-text-primary)] mb-4">
                 Network Topology
               </h3>
               <NetworkTopologyMap
                 centralLabel="Orchestrator"
-                networks={list.map((n: { id: string; name?: string }) => ({
-                  id: n.id,
-                  name: n.name ?? n.id,
-                }))}
+                networks={supportedList.map(
+                  (n: { id: string; name?: string }) => ({
+                    id: n.id,
+                    name: n.name ?? n.id,
+                  }),
+                )}
               />
             </div>
           )}
 
           <DataTable
             headers={["Network", "Chain ID", "Currency", "Actions"]}
-            isEmpty={!loading && list.length === 0}
-            isLoading={loading && list.length === 0}
+            isEmpty={!loading && supportedList.length === 0}
+            isLoading={loading && supportedList.length === 0}
             loading={<ShimmerTableRows rows={5} cols={4} />}
             empty={
               <EmptyState
                 icon={
                   <Globe className="w-8 h-8 text-[var(--color-text-muted)]" />
                 }
-                title="No networks configured"
-                description="Network configuration is provided by the backend."
+                title="No supported networks configured"
+                description="Studio expects SKALE Base network configuration from the backend."
               />
             }
           >
-            {list.map(
+            {supportedList.map(
               (n: {
                 id: string;
                 name?: string;

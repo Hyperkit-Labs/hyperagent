@@ -12,6 +12,12 @@ const customJestConfig = {
   testEnvironment: "jest-environment-jsdom",
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
+    "^@hyperagent/config$": "<rootDir>/../../packages/config/dist/index.js",
+    "^react$": "<rootDir>/node_modules/react",
+    "^react-dom$": "<rootDir>/node_modules/react-dom",
+    "^react/jsx-runtime$": "<rootDir>/node_modules/react/jsx-runtime.js",
+    "^react/jsx-dev-runtime$":
+      "<rootDir>/node_modules/react/jsx-dev-runtime.js",
   },
   collectCoverageFrom: [
     "app/**/*.{js,jsx,ts,tsx}",

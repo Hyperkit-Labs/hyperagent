@@ -14,7 +14,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # x402 middleware tests
 # ---------------------------------------------------------------------------
@@ -42,6 +41,7 @@ class TestX402Middleware:
 
     def test_parse_payment_header_base64(self):
         import base64
+
         from x402_middleware import _parse_payment_header
 
         payload = json.dumps(
@@ -99,7 +99,7 @@ class TestX402Middleware:
         assert "expired" in err
 
     def test_validate_proof_replay(self):
-        from x402_middleware import _validate_proof_structure, _nonce_cache
+        from x402_middleware import _nonce_cache, _validate_proof_structure
 
         _nonce_cache.clear()
         nonce = f"replay_{int(time.time())}"
@@ -118,7 +118,7 @@ class TestX402Middleware:
         assert "replay" in err2
 
     def test_validate_proof_valid(self):
-        from x402_middleware import _validate_proof_structure, _nonce_cache
+        from x402_middleware import _nonce_cache, _validate_proof_structure
 
         _nonce_cache.clear()
         proof = {

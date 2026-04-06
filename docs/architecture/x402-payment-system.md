@@ -1,19 +1,16 @@
 # x402 payment system
 
-HyperAgent supports two related but distinct billing models:
+HyperAgent's v0.1.0 product contract is x402-backed billing on supported user flows for SKALE Base Mainnet and SKALE Base Sepolia.
 
-- internal credits for workflow runs
-- x402 for pay-per-call API and agent access
-
-This page is the overview for the x402 side.
+The repo still contains some credits-era language and env-gated enforcement paths. Those should be treated as launch-readiness gaps to close, not as parallel first-class billing models.
 
 ## What x402 is used for
 
-x402 is the external request-level payment lane. It is useful for metered API access and specific payment-gated actions without requiring a user to pre-fund a generic workflow balance first.
+x402 is the required payment wall for supported workflow and API access in the current release scope.
 
 ## What x402 is not
 
-x402 is not the same thing as the internal credit system used for most workflow runs. Both can coexist, but they serve different operational and product needs.
+x402 is not supposed to be framed as an optional add-on for v0.1.0. Any remaining credits-first wording or env-disabled x402 paths are repo gaps, not the intended product contract.
 
 ## Main pieces
 
@@ -31,4 +28,4 @@ x402 is not the same thing as the internal credit system used for most workflow 
 
 ## Production guidance
 
-x402 capability is configuration-dependent. Documentation and UI should present it as supported only on the networks and routes actually enforced by the current runtime configuration.
+Documentation and UI should present x402 as the required payment wall only for the currently supported SKALE Base routes. Any runtime path that still makes x402 optional or disabled by default should be tracked as an enforcement gap until removed.

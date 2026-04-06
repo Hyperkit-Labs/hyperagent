@@ -5,7 +5,11 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from agents.audit_agent import has_echidna_harness, severity_fails_gate
+from agents.audit_agent import (
+    compute_audit_deploy_blocked,
+    has_echidna_harness,
+    severity_fails_gate,
+)
 
 
 class TestHasEchidnaHarness:
@@ -54,3 +58,31 @@ class TestSeverityFailsGate:
 
     def test_unknown_severity_blocks(self):
         assert severity_fails_gate("unknown", "high") is True
+
+
+class TestComputeAuditDeployBlocked:
+    def test_audit_service_unavailable_blocks_deploy(self):
+        findings = [
+            {
+                "tool": "audit",
+                "severity": "high",
+                "title": "Audit service unavailable",
+                "description": "All contracts failed.",
+                "category": "service",
+            }
+        ]
+        blocked, blocking = compute_audit_deploy_blocked(findings)
+        assert blocked is True
+        assert len(blocking) == 1
+
+    def test_normal_finding_not_blocked_without_tier_match(self):
+        findings = [
+            {
+                "tool": "unknown_scanner",
+                "severity": "high",
+                "title": "Something",
+                "category": "other",
+            }
+        ]
+        blocked, _ = compute_audit_deploy_blocked(findings)
+        assert blocked is False

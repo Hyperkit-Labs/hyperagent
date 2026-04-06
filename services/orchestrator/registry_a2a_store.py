@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
 import db
@@ -277,13 +277,7 @@ def get_a2a_task(task_id: str) -> dict[str, Any] | None:
     if not client:
         return None
     try:
-        r = (
-            client.table("a2a_tasks")
-            .select("*")
-            .eq("id", task_id)
-            .limit(1)
-            .execute()
-        )
+        r = client.table("a2a_tasks").select("*").eq("id", task_id).limit(1).execute()
         return r.data[0] if r.data else None
     except Exception as e:
         logger.warning("[registry_a2a] get_a2a_task failed: %s", e)

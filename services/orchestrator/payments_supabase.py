@@ -192,6 +192,7 @@ def upsert_spending_control(
                     period,
                     alert_threshold_percent,
                 )
+    return None
 
 
 def _upsert_spending_control_fallback(

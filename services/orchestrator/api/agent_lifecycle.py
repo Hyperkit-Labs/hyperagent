@@ -9,11 +9,10 @@ from __future__ import annotations
 import logging
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
-
 import db
 import registry_a2a_store as store
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -201,9 +200,7 @@ def agents_for_capability(
     needle = name.strip().lower()
     if not needle:
         raise HTTPException(status_code=400, detail="invalid capability name")
-    rows = store.list_registry_agents(
-        capability=name, chain_id=chain_id, limit=limit
-    )
+    rows = store.list_registry_agents(capability=name, chain_id=chain_id, limit=limit)
     rows = [r for r in rows if r.get("status") not in _BAD_STATUSES]
     return {"capability": name, "agents": rows, "total": len(rows)}
 
@@ -266,9 +263,7 @@ def dispatch_task(task_id: str, body: DispatchBody) -> dict[str, Any]:
     if not task:
         raise HTTPException(status_code=404, detail="task not found")
     if task.get("status") not in ("queued",):
-        raise HTTPException(
-            status_code=409, detail="task is not queued for dispatch"
-        )
+        raise HTTPException(status_code=409, detail="task is not queued for dispatch")
     agent = store.get_registry_agent(aid)
     if not agent:
         raise HTTPException(status_code=404, detail="agent not found")
@@ -444,9 +439,7 @@ def checkpoint_task(task_id: str, body: CheckpointBody) -> dict[str, Any]:
     _require_db()
     if not store.get_a2a_task(task_id):
         raise HTTPException(status_code=404, detail="task not found")
-    row = store.insert_checkpoint(
-        task_id, body.checkpoint_cid, body.state_type
-    )
+    row = store.insert_checkpoint(task_id, body.checkpoint_cid, body.state_type)
     if not row:
         raise HTTPException(status_code=500, detail="failed to record checkpoint")
     store.update_a2a_task(task_id, {"status": "partial_result"})

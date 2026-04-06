@@ -90,7 +90,8 @@ async def write_trace(
         logger.warning("[trace_writer] IPFS pin failed: %s", e)
 
     try:
-        from da_client import is_configured as da_ok, submit_blob
+        from da_client import is_configured as da_ok
+        from da_client import submit_blob
 
         if da_ok():
             da_cert, ref_block = await submit_blob(blob_id, payload_str)

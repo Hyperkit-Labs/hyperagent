@@ -36,6 +36,10 @@ pnpm db:apply-migrations
 
 That runs `node scripts/apply-supabase-migrations.mjs`, which applies every `supabase/migrations/*.sql` file in sorted filename order against `DATABASE_URL`. See the script header in `scripts/apply-supabase-migrations.mjs` for pooler versus direct connection notes.
 
+**Idempotency:** The apply script does not use a migration version table; the same files are intended to be safe to re-run (for example `CREATE IF NOT EXISTS`, `DROP IF EXISTS`, and guarded `DO` blocks). Destructive one-off data fixes remain in dated files; review before re-running on a copy if unsure.
+
+**Architecture note:** Rationale for layering, advisory fixes, and what was **not** squashed into a single baseline is documented in `docs/database/SECURITY_AND_MIGRATIONS_AUDIT.md`.
+
 **Alternative:** Use the [Supabase CLI](https://supabase.com/docs/guides/cli) with your project linked, for example `supabase db push` or `supabase migration up`, if that is what your environment standardizes.
 
 **Hosted project:** Run the same migration pipeline you use for staging and production. Do not rely on application startup to create tables unless that is an explicit, documented exception.
@@ -55,6 +59,28 @@ psql "$DATABASE_URL" -f supabase/scripts/verify-rls-policies.sql
 On Windows shells without `psql` on `PATH`, use your SQL client or paste the file into the Supabase SQL Editor.
 
 For ad hoc checks, open any file under `supabase/scripts/` and run it the same way.
+
+**Security checks** (after `20260409120000_security_remediation_search_path_legacy_schema.sql`):
+
+```bash
+pnpm db:verify-security
+```
+
+Or run `supabase/scripts/verify-security-advisories.sql` with `psql` or the SQL Editor.
+
+## RLS integration tests (CI and local)
+
+Orchestrator pytest includes `tests/integration/test_rls_integration.py` when `RLS_INTEGRATION_TESTS=1`. CI sets this after applying migrations and `pnpm db:ci-setup-rls-test-users` (creates `rls_ci_service` / `rls_ci_anon` for non-superuser checks).
+
+Local:
+
+```bash
+pnpm db:apply-migrations
+pnpm db:ci-setup-rls-test-users
+cd services/orchestrator && RLS_INTEGRATION_TESTS=1 pytest tests/integration/test_rls_integration.py -v
+```
+
+Dashboard-only workflow expectations: `docs/database/DASHBOARD_AND_MIGRATIONS.md`.
 
 ## Rollback
 

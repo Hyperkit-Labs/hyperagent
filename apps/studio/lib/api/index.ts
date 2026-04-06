@@ -66,6 +66,9 @@ export {
   searchTemplates,
   contractRead,
   contractCall,
+  quarantineWorkflow,
+  rollbackWorkflow,
+  retryWorkflow,
   type WorkflowResponse,
   type NetworkConfig,
   type PresetItem,
@@ -136,3 +139,15 @@ export {
   completeDeployment,
   type PrepareDeployParams,
 } from "./deployments";
+
+export {
+  listUserTemplates,
+  createUserTemplate,
+  publishTemplateVersion,
+  getUserTemplate,
+  lookupArtifactByCid,
+  type UserTemplateRow,
+  type UserTemplateVersionSummary,
+  type UserTemplateSummaryResponse,
+  type PublishTemplateVersionResponse,
+} from "./userTemplates";

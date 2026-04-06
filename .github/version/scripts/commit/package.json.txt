@@ -1,9 +1,15 @@
-    "commit": "node scripts/parallel-commit.js",
-    "commit:dry": "node scripts/parallel-commit.js --dry-run",
-    "commit:sh": "bash scripts/parallel-commit.sh",
-    "commit:sh:dry": "bash scripts/parallel-commit.sh --dry-run",
-    "commit:all": "git add -A && git commit -m \"chore: update project files\"",
-    "commit:auto": "bash scripts/parallel-commit.sh --max 3",
+# Snippet: optional scripts to merge into the repository root `package.json`.
+# Primary commit entrypoints live under `.github/version/scripts/commit/` (CLI + parallel-commit.js).
+
+    "ci:preflight": "node scripts/ci-preflight.cjs",
+    "commit": "node .github/version/scripts/commit/cli/index.js commit",
+    "commit:dry": "node .github/version/scripts/commit/cli/index.js commit --dry-run",
+    "commit:sh": "bash .github/version/scripts/commit/parallel-commit.sh",
+    "commit:sh:dry": "bash .github/version/scripts/commit/parallel-commit.sh --dry-run",
+    "commit:all": "git add -A && git commit -m 'chore: update all changes'",
+    "commit:auto": "node .github/version/scripts/commit/cli/index.js commit --max 3",
+    "commit:cli": "node .github/version/scripts/commit/cli/index.js",
+    "security:check": "node .github/version/scripts/commit/cli/index.js security",
     "status": "git status",
     "changes": "git status --porcelain",
     "staged": "git diff --cached --name-only"

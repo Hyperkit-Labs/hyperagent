@@ -37,7 +37,7 @@ jobs:
         run: black --check services/orchestrator/
       
       - name: Check import sorting
-        run: isort --check-only services/orchestrator/
+        run: isort --check-only --profile black services/orchestrator/
 
   lint-typescript:
     name: Lint TypeScript/JavaScript

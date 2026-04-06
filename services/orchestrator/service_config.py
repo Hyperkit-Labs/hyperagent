@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
-from canonical_env import SERVICE_URL_MAP as SERVICES, get_service_url, is_production
+from canonical_env import SERVICE_URL_MAP as SERVICES
+from canonical_env import get_service_url, is_production
 
 IS_PRODUCTION = is_production()

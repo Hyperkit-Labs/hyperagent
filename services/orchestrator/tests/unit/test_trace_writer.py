@@ -101,7 +101,9 @@ def test_write_trace_sync_dev_returns_stub_on_inner_failure(monkeypatch):
 
     monkeypatch.setattr(m, "write_trace", _boom)
 
-    blob_id, da_cert, ref = m.write_trace_sync("run-1", "codegen", 0, "completed", "ok", None)
+    blob_id, da_cert, ref = m.write_trace_sync(
+        "run-1", "codegen", 0, "completed", "ok", None
+    )
     assert blob_id is not None
     assert str(blob_id).startswith("stub:")
     assert da_cert is None

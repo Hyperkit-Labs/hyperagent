@@ -55,7 +55,7 @@ def in_memory_store():
 
 def test_workflow_create_and_list(mock_providers, in_memory_store):
     """Create workflow and list; verify in-memory or DB path."""
-    from store import create_workflow, list_workflows, get_workflow
+    from store import create_workflow, get_workflow, list_workflows
 
     wf_id = "test-pipeline-integration-001"
     rec = create_workflow(

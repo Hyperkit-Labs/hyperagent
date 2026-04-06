@@ -294,11 +294,11 @@ def get_workflow(workflow_id: str) -> dict[str, Any] | None:
             rec["contracts"] = _ensure_contracts_dict(rec.get("contracts"))
             return rec
     with _lock:
-        rec = _workflows.get(workflow_id)
-        if rec:
-            rec = dict(rec)
-            rec["contracts"] = _ensure_contracts_dict(rec.get("contracts"))
-            return rec
+        cached = _workflows.get(workflow_id)
+        if cached:
+            out = dict(cached)
+            out["contracts"] = _ensure_contracts_dict(out.get("contracts"))
+            return out
         return None
 
 

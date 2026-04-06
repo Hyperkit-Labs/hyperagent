@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Awaitable
 from typing import Callable, TypeVar
 
 logger = logging.getLogger(__name__)
@@ -68,7 +69,9 @@ class CircuitBreaker:
             return False
         return True
 
-    async def call(self, fn: Callable[..., T], *args: object, **kwargs: object) -> T:
+    async def call(
+        self, fn: Callable[..., Awaitable[T]], *args: object, **kwargs: object
+    ) -> T:
         if not self.can_execute():
             raise CircuitOpenError(f"Circuit {self.name} is open")
         try:

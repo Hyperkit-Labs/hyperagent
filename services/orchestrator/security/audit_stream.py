@@ -52,7 +52,10 @@ def emit_security_audit_v1(
             event_type=event_type,
             service=service,
             event_category=event_category,
-            event_data={"payload": payload or {}, "schema_version": "security_audit_v1"},
+            event_data={
+                "payload": payload or {},
+                "schema_version": "security_audit_v1",
+            },
             run_id=run_id,
             user_id=user_id,
             request_id=request_id,

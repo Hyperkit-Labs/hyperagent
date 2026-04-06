@@ -152,6 +152,11 @@ def _finding_blocks_deploy(
     echidna_harness_available: bool = False,
 ) -> bool:
     """Apply tiered gate: return True if this finding blocks deploy."""
+    cat = (finding.get("category") or "").lower()
+    title = (finding.get("title") or "").lower()
+    if cat == "service" and "unavailable" in title:
+        return True
+
     tool = (finding.get("tool") or "").lower()
     severity = (finding.get("severity") or "info").lower()
     gate_key = _tool_to_gate_key(tool)

@@ -2,6 +2,7 @@
 Pipeline API: POST /generate - main workflow creation and pipeline entry.
 """
 
+import hashlib
 import logging
 import os
 import uuid
@@ -9,9 +10,15 @@ from typing import Any
 
 import credits_supabase
 import db
-from fastapi import APIRouter, HTTPException, Request
 import queue_client as _queue
+from fastapi import APIRouter, HTTPException, Request
+from input_guardrail import validate_input as guardrail_validate_input
+from llm_keys_store import DEFAULT_WORKSPACE
 from pydantic import BaseModel, Field
+from registries import DEFAULT_PIPELINE_ID, get_x402_enabled
+from store import MAX_INTENT_LENGTH, create_workflow, list_workflows, update_workflow
+from trace_context import set_request_id
+from workflow import run_pipeline
 
 from .common import (
     _create_agent_session_jwt_if_configured,
@@ -19,12 +26,6 @@ from .common import (
     _log_byok_event,
     _run_status_for_store,
 )
-from input_guardrail import validate_input as guardrail_validate_input
-from llm_keys_store import DEFAULT_WORKSPACE
-from registries import DEFAULT_PIPELINE_ID, get_x402_enabled
-from store import MAX_INTENT_LENGTH, create_workflow, update_workflow
-from trace_context import set_request_id
-from workflow import run_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,26 @@ import payments_supabase
 
 CREDITS_PER_RUN = float(os.environ.get("CREDITS_PER_RUN", "7"))
 CREDITS_PER_USD = float(os.environ.get("CREDITS_PER_USD", "10"))
+
+
+def _intent_sha256(intent: str) -> str:
+    """Return a stable digest for an intent string used in dedupe/provenance flows."""
+    return hashlib.sha256((intent or "").encode("utf-8")).hexdigest()
+
+
+def _find_idempotent_workflow(
+    user_id: str, idempotency_key: str | None
+) -> dict[str, Any] | None:
+    """Find an existing workflow for the same user and idempotency key."""
+    if not user_id or not idempotency_key:
+        return None
+    for row in list_workflows(limit=500):
+        if row.get("user_id") != user_id:
+            continue
+        metadata = row.get("metadata") or {}
+        if metadata.get("idempotency_key") == idempotency_key:
+            return row
+    return None
 
 
 def _run_workflow_pipeline_job(

@@ -4,18 +4,6 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { PipelineDemo } from "@/components/ui";
 
-const CHAIN_LOGOS = [
-  { src: "/arbitrum-white.png", alt: "Arbitrum" },
-  { src: "/AvalancheLogo_Horizontal_1C_Red.png", alt: "Avalanche" },
-  { src: "/Base_Logo.png", alt: "Base" },
-  { src: "/bnb-chain-logo.png", alt: "BNB Chain" },
-  { src: "/filecoin-logo.png", alt: "Filecoin" },
-  { src: "/KITE_AI.png", alt: "KITE AI" },
-  { src: "/MantleNetwork-White.png", alt: "Mantle Network" },
-  { src: "/skale-logo.png", alt: "SKALE" },
-  { src: "/Solana-Logo-white.png", alt: "Solana" },
-];
-
 export function LoginHero() {
   return (
     <div className="hidden lg:flex lg:w-1/2 flex-col items-start justify-center px-12 xl:px-20 py-12">
@@ -41,9 +29,9 @@ export function LoginHero() {
           transition={{ delay: 0.2, duration: 0.5 }}
           className="text-xl xl:text-2xl text-[var(--color-text-tertiary)] leading-relaxed"
         >
-          AI-powered smart contract development platform.{" "}
+          AI-powered smart contract development platform for SKALE Base.{" "}
           <span className="text-[var(--color-text-primary)] font-medium">
-            From spec to production in minutes.
+            From spec to checked deploy prep on the current supported network.
           </span>
         </motion.p>
         <motion.div
@@ -140,34 +128,29 @@ export function LoginHero() {
 
           <div className="flex flex-col items-start gap-2 w-full overflow-hidden">
             <span className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">
-              Multi-chain
+              Supported in v0.1.0
             </span>
-            <div
-              className="w-full relative"
-              style={{
-                maskImage:
-                  "linear-gradient(to right, transparent, black 5%, black 95%, transparent)",
-                WebkitMaskImage:
-                  "linear-gradient(to right, transparent, black 5%, black 95%, transparent)",
-              }}
-            >
-              <motion.div
-                className="flex items-center gap-8 pr-8 w-max"
-                animate={{ x: ["0%", "-50%"] }}
-                transition={{ repeat: Infinity, ease: "linear", duration: 20 }}
-              >
-                {[...CHAIN_LOGOS, ...CHAIN_LOGOS].map((chain, i) => (
-                  <Image
-                    key={`${chain.alt}-${i}`}
-                    src={chain.src}
-                    alt={chain.alt}
-                    width={80}
-                    height={24}
-                    className={`opacity-75 object-contain shrink-0 ${["SKALE", "KITE AI"].includes(chain.alt) ? "brightness-0 invert" : ""}`}
-                    style={{ height: 24, width: "auto", maxWidth: 80 }}
-                  />
-                ))}
-              </motion.div>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] px-3 py-2 text-xs text-[var(--color-text-secondary)]">
+                <Image
+                  src="/skale-logo.png"
+                  alt="SKALE"
+                  width={16}
+                  height={16}
+                  className="brightness-0 invert"
+                />
+                <span>SKALE Base Mainnet</span>
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] px-3 py-2 text-xs text-[var(--color-text-secondary)]">
+                <Image
+                  src="/skale-logo.png"
+                  alt="SKALE"
+                  width={16}
+                  height={16}
+                  className="brightness-0 invert"
+                />
+                <span>SKALE Base Sepolia</span>
+              </div>
             </div>
           </div>
         </motion.div>

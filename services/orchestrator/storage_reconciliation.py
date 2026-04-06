@@ -20,9 +20,10 @@ from ipfs_client import (
     STORAGE_STATUS_ARCHIVED,
     STORAGE_STATUS_FAILED,
     STORAGE_STATUS_PINNED,
-    canonical_ipfs_gateway_url,
+    STORAGE_STATUS_RECONCILED,
     _verify_gateway_retrieval_sync,
     _verify_strict,
+    canonical_ipfs_gateway_url,
 )
 
 logger = logging.getLogger(__name__)

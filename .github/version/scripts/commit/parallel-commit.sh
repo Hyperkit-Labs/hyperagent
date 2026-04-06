@@ -16,6 +16,7 @@ NC='\033[0m' # No Color
 MAX_CONCURRENT=5
 DRY_RUN=false
 STAGE_ALL=true
+PREFLIGHT=true
 COMMIT_PREFIX="feat"
 SECURITY_CHECK=true
 FAIL_ON_SENSITIVE=true
@@ -153,6 +154,7 @@ show_help() {
     print_color $CYAN "Options:"
     print_color $CYAN "  --dry-run              Show what would be committed without actually committing"
     print_color $CYAN "  --no-stage-all         Do not run git add -A before scanning (default: stage all)"
+    print_color $CYAN "  --skip-preflight       Skip pnpm ci:preflight (turbo + optional Python)"
     print_color $CYAN "  --no-security-check    Disable security checks (NOT RECOMMENDED)"
     print_color $CYAN "  --warn-only            Warn about sensitive files but don't fail"
     print_color $CYAN "  --help, -h             Show this help message"
@@ -278,6 +280,11 @@ while [[ $# -gt 0 ]]; do
             print_color $YELLOW "⏭️  Skipping git add -A"
             shift
             ;;
+        --skip-preflight)
+            PREFLIGHT=false
+            print_color $YELLOW "⏭️  Skipping CI preflight"
+            shift
+            ;;
         --no-security-check)
             SECURITY_CHECK=false
             print_color $YELLOW "⚠️  Security checks disabled - NOT RECOMMENDED!"
@@ -316,6 +323,15 @@ fi
 if ! git rev-parse --git-dir > /dev/null 2>&1; then
     print_color $RED "❌ Not in a git repository!"
     exit 1
+fi
+
+if [[ "$PREFLIGHT" == "true" ]]; then
+    print_color $BRIGHT ""
+    print_color $BRIGHT "🧪 CI preflight (pnpm run ci:preflight)..."
+    if ! pnpm run ci:preflight; then
+        print_color $RED "❌ CI preflight failed. Fix errors or use --skip-preflight (not recommended)."
+        exit 1
+    fi
 fi
 
 if [[ "$STAGE_ALL" == "true" && "$DRY_RUN" != "true" ]]; then

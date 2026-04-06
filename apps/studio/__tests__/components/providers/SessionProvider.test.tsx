@@ -4,7 +4,7 @@
  */
 
 import React from "react";
-import { render, act, waitFor } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 
 jest.mock("next/navigation", () => ({
   usePathname: jest.fn(() => "/dashboard"),

@@ -116,7 +116,7 @@ class SimulationHttpProvider:
     """HTTP client calling the simulation service (same URL as before)."""
 
     def __init__(self, base_url: str | None = None) -> None:
-        self.base_url = (
+        self.base_url = str(
             base_url
             or os.environ.get("SIMULATION_SERVICE_URL", "http://localhost:8002")
         ).rstrip("/")
@@ -253,7 +253,7 @@ class DeployHttpProvider:
     """HTTP client calling the deploy service."""
 
     def __init__(self, base_url: str | None = None) -> None:
-        self.base_url = (
+        self.base_url = str(
             base_url or os.environ.get("DEPLOY_SERVICE_URL", "http://localhost:8003")
         ).rstrip("/")
 
@@ -323,7 +323,7 @@ class StorageHttpProvider:
     """HTTP client calling the storage service."""
 
     def __init__(self, base_url: str | None = None) -> None:
-        self.base_url = (
+        self.base_url = str(
             base_url or os.environ.get("STORAGE_SERVICE_URL", "http://localhost:4005")
         ).rstrip("/")
 

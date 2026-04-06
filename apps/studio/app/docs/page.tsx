@@ -22,7 +22,7 @@ function buildGuides(apiDocsUrl: string | null) {
     {
       icon: Zap,
       title: "Quick start",
-      desc: "Create your first smart contract in under 2 minutes",
+      desc: "Create your first smart contract workflow on SKALE Base",
       href: ROUTES.HOME,
       external: false,
     },
@@ -49,8 +49,8 @@ function buildGuides(apiDocsUrl: string | null) {
     },
     {
       icon: Globe,
-      title: "Multi-chain deploy",
-      desc: "Deploy across EVM networks with one click",
+      title: "Supported networks",
+      desc: "Review the current SKALE Base support matrix for v0.1.0",
       href: ROUTES.NETWORKS,
       external: false,
     },

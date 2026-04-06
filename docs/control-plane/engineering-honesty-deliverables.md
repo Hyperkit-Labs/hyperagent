@@ -33,7 +33,7 @@ This file tracks the **required deliverables** from the principal-engineer manda
 | Simulation | Single matrix: chain × `TENDERLY_SIMULATION_REQUIRED` × deploy gate |
 | Registry sync | Implement indexer **or** keep 501 and remove hero claims |
 | Provenance | Remove Filecoin wording until path exists; enforce pin success |
-| Billing / x402 | Integration tests for paid vs unpaid; disable marketing if off |
+| Billing / x402 | Remove credits-first product copy, enforce x402 on supported SKALE Base flows, add paid vs unpaid integration tests, disable launch marketing while x402 can be off |
 | Supabase | RLS audits; migration hygiene per `supabase/README.md` |
 | Observability | Metric names for gate blocks; optional Grafana JSON |
 | Docs | README follows truth table; support matrix per chain |
@@ -69,12 +69,12 @@ This file tracks the **required deliverables** from the principal-engineer manda
 
 | Question | Answer |
 | -------- | ------ |
-| What is fully real now? | Pipeline, audit **when service is up**, simulation **when Tenderly is up**, deploy gates **where wired**, trace CIDs **when IPFS is up**, credits/x402 **when enabled**, registry DB rows **when migrated** |
-| What remains partial? | Audit availability guarantees, multi-chain “support” vs registry entries, Filecoin/durable claims, full observability dashboards, eval harness, some exception paths in trace writer |
-| What claims were removed or narrowed? | README “mandatory” security tooling wording; ERC-8004 **sync** no longer pretends to succeed |
-| What claims are now honest? | Security tooling depends on deploy; sync endpoint admits not implemented |
+| What is fully real now? | Pipeline, audit **when service is up**, simulation **when Tenderly is up**, deploy gates **where wired**, trace CIDs **when IPFS is up**, registry DB rows **when migrated**, and some x402 plumbing |
+| What remains partial? | Mandatory x402 enforcement on supported flows, legacy credits-first UI copy, multi-chain “support” vs SKALE-only launch scope, Filecoin/durable claims, full observability dashboards, eval harness, some exception paths in trace writer |
+| What claims were removed or narrowed? | README “mandatory” security tooling wording, multi-chain launch copy, optional-x402 wording, ERC-8004 **sync** no longer pretends to succeed |
+| What claims are now honest? | Security tooling depends on deploy; current launch scope is SKALE Base only; sync endpoint admits not implemented; x402 mismatch is called out as a gap |
 | Is the product production-grade? | **Not as a blanket label.** Production-grade is **per deployment** when env, services, and migrations match the truth table |
-| What still blocks that label? | End-to-end proof of gates on all deploy paths, audit service SLA, indexer or removal of ERC-8004 sync UX, evals in CI, dashboard coverage |
+| What still blocks that label? | End-to-end proof of mandatory x402 on supported flows, audit service SLA, indexer or removal of ERC-8004 sync UX, evals in CI, dashboard coverage |
 
 ---
 
@@ -88,8 +88,8 @@ This file tracks the **required deliverables** from the principal-engineer manda
 | 4 Simulation-first | **Partial** (code exists; matrix + UX TBD) |
 | 5 ERC-8004 sync real | **Not done** (501 until indexer) |
 | 6 Provenance | **Partial** (IPFS real; exceptions documented) |
-| 7 x402 real | **Partial** (middleware real; product TBD) |
-| 8 Multi-chain honesty | **Not done** (needs matrix + tests) |
+| 7 x402 real | **Not done** (middleware exists, but launch contract still not enforced end to end) |
+| 8 Multi-chain honesty | **Partial** (launch scope narrowed to SKALE Base in copy; runtime matrix still needs tests) |
 | 9 Observability | **Not done** (emission + dashboards TBD) |
 | 10 Evals | **Not done** |
 | 11 Product states | **Not done** |

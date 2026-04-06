@@ -78,7 +78,9 @@ def _anon_url() -> str:
     return f"postgresql://rls_ci_anon:rls_ci_anon@{host}:{port}{p.path or '/'}"
 
 
-@pytest.mark.skipif(not RUN, reason="Set RLS_INTEGRATION_TESTS=1 and apply ci-rls-test-users.sql")
+@pytest.mark.skipif(
+    not RUN, reason="Set RLS_INTEGRATION_TESTS=1 and apply ci-rls-test-users.sql"
+)
 class TestRLSPoliciesPublic:
     def test_service_role_sees_rows_after_seed(self) -> None:
         import psycopg
@@ -102,12 +104,16 @@ class TestRLSPoliciesPublic:
                         "SELECT count(*) FROM public.projects WHERE id = %s::uuid",
                         (seed_id,),
                     )
-                    n = cur.fetchone()[0]
+                    row = cur.fetchone()
+                    assert row is not None
+                    n = row[0]
                 assert n == 1
         finally:
             with psycopg.connect(owner, autocommit=True) as oc:
                 with oc.cursor() as cur:
-                    cur.execute("DELETE FROM public.projects WHERE id = %s::uuid", (seed_id,))
+                    cur.execute(
+                        "DELETE FROM public.projects WHERE id = %s::uuid", (seed_id,)
+                    )
 
     def test_non_service_role_select_returns_zero_projects(self) -> None:
         import psycopg
@@ -115,19 +121,27 @@ class TestRLSPoliciesPublic:
         with psycopg.connect(_anon_url()) as ac:
             with ac.cursor() as cur:
                 cur.execute("SELECT count(*) FROM public.projects")
-                n = cur.fetchone()[0]
+                row = cur.fetchone()
+                assert row is not None
+                n = row[0]
         assert n == 0
 
-    def test_service_role_without_set_role_sees_zero_for_strict_backend_tables(self) -> None:
+    def test_service_role_without_set_role_sees_zero_for_strict_backend_tables(
+        self,
+    ) -> None:
         """Policies are TO service_role; NOINHERIT user must SET ROLE to match."""
         import psycopg
 
         with psycopg.connect(_service_url()) as sc:
             with sc.cursor() as cur:
                 cur.execute("SELECT count(*) FROM public.projects")
-                n_without = cur.fetchone()[0]
+                row0 = cur.fetchone()
+                assert row0 is not None
+                n_without = row0[0]
                 cur.execute("SET ROLE service_role")
                 cur.execute("SELECT count(*) FROM public.projects")
-                n_with = cur.fetchone()[0]
+                row1 = cur.fetchone()
+                assert row1 is not None
+                n_with = row1[0]
         assert n_without == 0
         assert n_with >= 0

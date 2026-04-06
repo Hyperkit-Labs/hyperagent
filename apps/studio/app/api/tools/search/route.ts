@@ -14,7 +14,6 @@ import type {
   SearchMode,
   SearchRequest,
   SearchResponse,
-  SearchMatch,
 } from "@/lib/tools/search";
 import {
   SEARCH_MODES,

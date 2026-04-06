@@ -18,6 +18,8 @@ function parse(argv = process.argv.slice(2)) {
       opts.warnOnly = true;
     } else if (arg === '--max' && argv[i + 1]) {
       opts.max = parseInt(argv[++i], 10) || 5;
+    } else if (arg === '--no-stage-all') {
+      opts.noStageAll = true;
     } else if (arg === '--issue' && argv[i + 1]) {
       opts.issue = argv[++i];
     } else if (!arg.startsWith('-')) {

@@ -165,11 +165,13 @@ def test_complete_failure_without_cid(client: TestClient) -> None:
     assert r.json()["status"] == "failed"
 
 
-def test_erc8004_sync_stub(client: TestClient) -> None:
+def test_erc8004_sync_not_implemented(client: TestClient) -> None:
     with patch("api.agent_lifecycle.db.is_configured", return_value=True):
         r = client.post("/api/v1/erc8004/sync")
-    assert r.status_code == 200
-    assert r.json()["synced"] == 0
+    assert r.status_code == 501
+    body = r.json()
+    assert "detail" in body
+    assert "not implemented" in str(body["detail"]).lower()
 
 
 def test_artifact_rejected_when_task_failed(client: TestClient) -> None:

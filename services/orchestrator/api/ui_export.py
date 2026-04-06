@@ -4,17 +4,17 @@ Exports dApp as zip with React/Next.js scaffold.
 """
 
 import base64
-import os
 import io
 import json
 import logging
+import os
 import zipfile
 from typing import Any
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
+from ipfs_client import canonical_ipfs_gateway_url
 from pydantic import BaseModel, Field
-
 from registries import (
     get_chain,
     get_chain_rpc_explorer,
@@ -23,8 +23,6 @@ from registries import (
 )
 from store import get_workflow
 from trace_context import get_trace_headers
-
-from ipfs_client import canonical_ipfs_gateway_url
 
 from .common import _sanitize_ident, _sanitize_label, _sanitize_name
 

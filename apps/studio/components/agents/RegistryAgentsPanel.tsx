@@ -26,7 +26,15 @@ export function RegistryAgentsPanel() {
       await syncErc8004Registry();
       await refetch();
     } catch (e) {
-      setSyncError(getErrorMessage(e, "Sync request failed"));
+      const msg = getErrorMessage(e, "Sync request failed");
+      const status = (e as Error & { status?: number })?.status;
+      if (status === 501) {
+        setSyncError(
+          `${msg} On-chain registry sync is not deployed yet; this button will succeed only after the indexer ships.`,
+        );
+      } else {
+        setSyncError(msg);
+      }
     } finally {
       setSyncing(false);
     }

@@ -544,17 +544,24 @@ def list_artifacts(task_id: str) -> dict[str, Any]:
     return {"task_id": task_id, "artifacts": rows, "total": len(rows)}
 
 
-# --- ERC-8004 sync (stub) ---
+# --- ERC-8004 sync (not implemented: no on-chain indexer in this deployment) ---
 
 
 @erc8004_router.post("/sync")
 def erc8004_sync() -> dict[str, Any]:
+    """Registry mirror sync from chain is not shipped yet. Fail honestly (no fake synced count)."""
     _require_db()
-    logger.info("[erc8004] sync requested (stub — wire chain indexer)")
-    return {
-        "synced": 0,
-        "message": "stub: implement on-chain registry indexer to populate registry_agents",
-    }
+    logger.warning(
+        "[erc8004] sync requested but indexer is not implemented — returning 501"
+    )
+    raise HTTPException(
+        status_code=501,
+        detail=(
+            "ERC-8004 registry sync is not implemented. "
+            "There is no deployed indexer to reconcile on-chain IdentityRegistry state into "
+            "registry_agents. Do not treat sync as available until this ships."
+        ),
+    )
 
 
 @erc8004_router.get("/agents/{agent_id}")

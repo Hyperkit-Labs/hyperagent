@@ -86,7 +86,7 @@ def contract_call_build_tx(
             value_wei = w3.to_wei(value, "ether") if value else 0
         except Exception:
             value_wei = 0
-        tx_params = {"value": value_wei}
+        tx_params: dict[str, Any] = {"value": value_wei}
         from_addr = (
             caller_address
             if caller_address

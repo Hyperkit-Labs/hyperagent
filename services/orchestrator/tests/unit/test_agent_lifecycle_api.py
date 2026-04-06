@@ -20,9 +20,8 @@ TASK_ID = str(uuid.uuid4())
 
 @pytest.fixture
 def client():
-    from fastapi import FastAPI
-
     from api.agent_lifecycle import a2a_router, erc8004_router, registry_router
+    from fastapi import FastAPI
 
     app = FastAPI()
     app.include_router(registry_router)
@@ -52,9 +51,7 @@ def test_register_agent_ok(client: TestClient) -> None:
         "registry_cid": "bafytest",
     }
     with patch("api.agent_lifecycle.db.is_configured", return_value=True):
-        with patch(
-            "api.agent_lifecycle.store.insert_registry_agent", return_value=row
-        ):
+        with patch("api.agent_lifecycle.store.insert_registry_agent", return_value=row):
             r = client.post(
                 "/api/v1/agent-registry/agents",
                 json={
@@ -146,9 +143,7 @@ def test_complete_failure_without_cid(client: TestClient) -> None:
     task = {"id": TASK_ID, "status": "acknowledged"}
     with patch("api.agent_lifecycle.db.is_configured", return_value=True):
         with patch("api.agent_lifecycle.store.get_a2a_task", return_value=task):
-            with patch(
-                "api.agent_lifecycle.store.update_a2a_task", return_value=True
-            ):
+            with patch("api.agent_lifecycle.store.update_a2a_task", return_value=True):
                 with patch(
                     "api.agent_lifecycle.store.suppress_nonfinal_outputs_for_failed_task",
                     return_value=True,

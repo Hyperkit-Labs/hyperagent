@@ -4,6 +4,7 @@ describe("studio config environment", () => {
   beforeEach(() => {
     jest.resetModules();
     jest.restoreAllMocks();
+    jest.spyOn(console, "warn").mockImplementation(() => {});
     process.env = { ...OLD_ENV };
     delete process.env.NEXT_PUBLIC_API_URL;
     delete process.env.NEXT_PUBLIC_ENV;
@@ -69,7 +70,8 @@ describe("studio config environment", () => {
     process.env.NODE_ENV = "development";
     process.env.NEXT_PUBLIC_ENV = "development";
     process.env.NEXT_PUBLIC_API_URL = "https://api.hyperkitlabs.com";
-    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const warn = console.warn as jest.Mock;
+    warn.mockClear();
     const mod = await import("./environment");
     expect(mod.getServiceUrl("search")).toBe("http://localhost:4000/api/v1");
     expect(warn).toHaveBeenCalledWith(

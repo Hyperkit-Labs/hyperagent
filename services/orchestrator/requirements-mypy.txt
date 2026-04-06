@@ -1,0 +1,2 @@
+# Installed alongside mypy in CI and by scripts/ci-preflight.cjs so `import yaml` is typed.
+types-PyYAML>=6.0.12

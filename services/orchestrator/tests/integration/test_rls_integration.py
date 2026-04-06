@@ -53,17 +53,27 @@ def _base_url() -> str | None:
     return u or None
 
 
+def _netloc_part(value: object, default: str) -> str:
+    """String for URL fragments; satisfies mypy str-bytes-safe for urlparse results."""
+    if value is None:
+        return default
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
+
+
 def _service_url() -> str:
     base = _base_url()
     if not base:
         pytest.skip("DATABASE_URL not set")
     # Replace userinfo with rls_ci_service (password from ci-rls-test-users.sql)
-    from urllib.parse import urlparse, urlunparse
+    from urllib.parse import urlparse
 
     p = urlparse(base)
-    host = p.hostname or "localhost"
-    port = p.port or 5432
-    return f"postgresql://rls_ci_service:rls_ci_service@{host}:{port}{p.path or '/'}"
+    host = _netloc_part(p.hostname, "localhost")
+    port = p.port if p.port is not None else 5432
+    path = _netloc_part(p.path, "/") or "/"
+    return f"postgresql://rls_ci_service:rls_ci_service@{host}:{port}{path}"
 
 
 def _anon_url() -> str:
@@ -73,9 +83,10 @@ def _anon_url() -> str:
     from urllib.parse import urlparse
 
     p = urlparse(base)
-    host = p.hostname or "localhost"
-    port = p.port or 5432
-    return f"postgresql://rls_ci_anon:rls_ci_anon@{host}:{port}{p.path or '/'}"
+    host = _netloc_part(p.hostname, "localhost")
+    port = p.port if p.port is not None else 5432
+    path = _netloc_part(p.path, "/") or "/"
+    return f"postgresql://rls_ci_anon:rls_ci_anon@{host}:{port}{path}"
 
 
 @pytest.mark.skipif(

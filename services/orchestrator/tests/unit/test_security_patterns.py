@@ -1,11 +1,11 @@
 """Unit tests for security_patterns module (extracted from nodes.py security_gate_agent)."""
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from security_patterns import scan_contracts, SENSITIVE_PATTERNS
+from security_patterns import SENSITIVE_PATTERNS, scan_contracts
 
 
 def test_detects_private_key():

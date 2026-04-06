@@ -53,4 +53,6 @@ def assert_safe_for_ipfs(value: Any) -> None:
     raw = repr(scrubbed) if not isinstance(scrubbed, str) else scrubbed
     for rx, _ in _PATTERNS:
         if rx.search(raw):
-            raise ValueError("artifact_scrub: blocked pin due to suspected secret pattern")
+            raise ValueError(
+                "artifact_scrub: blocked pin due to suspected secret pattern"
+            )

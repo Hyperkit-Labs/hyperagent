@@ -14,10 +14,13 @@ This repository includes a CLI for git commit management with parallel processin
 | `COMMIT_SKIP_PREFLIGHT=1 pnpm run commit` | Same as `--skip-preflight` |
 | `PREFLIGHT_SKIP_PYTHON=1 pnpm run ci:preflight` | Skips Python quality checks but still runs Turbo |
 
+**Stronger parity with GitHub Actions** (before you push): `pnpm run ci:preflight:full` runs the same Turbo + Python steps as `ci:preflight`, then the gateway/middleware build chain and a Studio production build with CI-like `NEXT_PUBLIC_*` env (see `scripts/ci-preflight-full.cjs`). Preflight installs `services/orchestrator/requirements-mypy.txt` so mypy has `types-PyYAML`, matching the lint job. Jobs that need Postgres (migrations, RLS setup, integration pytest) still require a local DB or CI.
+
 Run preflight alone anytime:
 
 ```bash
 pnpm run ci:preflight
+pnpm run ci:preflight:full   # optional: add gateway + Studio build gates
 ```
 
 ### CLI (Recommended)

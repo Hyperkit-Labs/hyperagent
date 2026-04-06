@@ -13,6 +13,7 @@ async function run(opts = {}) {
   if (opts.dryRun) args.push('--dry-run');
   if (opts.noSecurityCheck) args.push('--no-security-check');
   if (opts.warnOnly) args.push('--warn-only');
+  if (opts.noStageAll) args.push('--no-stage-all');
   process.argv = args;
 
   const mod = require(parallelCommitPath);
@@ -29,6 +30,7 @@ function help() {
 
   Options:
     --dry-run              Preview what would be committed
+    --no-stage-all         Do not run git add -A before scanning (default stages everything)
     --no-security-check    Disable security checks (not recommended)
     --warn-only            Warn on sensitive files, do not fail
     --max <n>              Max concurrent commits (default: 5)
@@ -37,6 +39,7 @@ function help() {
   Examples:
     hyperagent commit --dry-run
     hyperagent commit --max 3
+    hyperagent commit --no-stage-all
 `);
 }
 

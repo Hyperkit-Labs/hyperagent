@@ -755,6 +755,136 @@ def cancel_workflow_api(workflow_id: str, request: Request = None) -> dict[str, 
     return {"workflow_id": workflow_id, "status": "cancelled"}
 
 
+class RecoveryReasonBody(BaseModel):
+    reason: str = ""
+
+
+@router.post("/{workflow_id}/quarantine")
+def quarantine_workflow_api(
+    workflow_id: str,
+    body: RecoveryReasonBody,
+    request: Request = None,
+) -> dict[str, Any]:
+    """Fail-closed: mark workflow failed and record quarantine reason."""
+    w = get_workflow(workflow_id)
+    if not w:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    if request:
+        assert_workflow_owner(w, request)
+    reason = (body.reason or "").strip() or "quarantined"
+    msg = f"Quarantined: {reason}"
+    update_workflow(
+        workflow_id,
+        status="failed",
+        error=msg,
+        metadata_merge={
+            "quarantine_reason": reason,
+            "quarantined_at": datetime.now(UTC).isoformat(),
+        },
+    )
+    if db.is_configured():
+        db.update_run(workflow_id, status="failed", error_message=msg)
+    return {"workflow_id": workflow_id, "status": "failed"}
+
+
+@router.post("/{workflow_id}/rollback")
+def rollback_workflow_api(
+    workflow_id: str,
+    body: RecoveryReasonBody,
+    request: Request = None,
+) -> dict[str, Any]:
+    """Record rollback request; workflow becomes cancelled."""
+    w = get_workflow(workflow_id)
+    if not w:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    if request:
+        assert_workflow_owner(w, request)
+    reason = (body.reason or "").strip() or "rollback_requested"
+    msg = f"Rollback: {reason}"
+    update_workflow(
+        workflow_id,
+        status="cancelled",
+        metadata_merge={
+            "rollback_reason": reason,
+            "rollback_at": datetime.now(UTC).isoformat(),
+        },
+    )
+    if db.is_configured():
+        db.update_run(workflow_id, status="cancelled", error_message=msg)
+    return {"workflow_id": workflow_id, "status": "cancelled"}
+
+
+@router.post("/{workflow_id}/retry")
+def retry_workflow_api(workflow_id: str, request: Request) -> dict[str, Any]:
+    """Re-enqueue pipeline for failed or cancelled workflows with stored intent."""
+    import queue_client as _queue
+
+    w = get_workflow(workflow_id)
+    if not w:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    assert_workflow_owner(w, request)
+    st = (w.get("status") or "").lower()
+    if st not in ("failed", "cancelled"):
+        raise HTTPException(
+            status_code=400,
+            detail="Retry is only allowed for failed or cancelled workflows",
+        )
+    nlp_input = (w.get("intent") or "").strip()
+    if not nlp_input:
+        raise HTTPException(
+            status_code=400,
+            detail="Workflow has no stored intent to retry",
+        )
+    user_id = w.get("user_id") or ""
+    project_id = w.get("project_id") or workflow_id
+    api_keys = _get_keys_for_run(user_id, DEFAULT_WORKSPACE)
+    if not api_keys:
+        raise HTTPException(
+            status_code=422,
+            detail="LLM API keys are required. Add keys in Settings.",
+        )
+    meta = w.get("metadata") or w.get("meta_data") or {}
+    pipeline_id = meta.get("pipeline_id") if isinstance(meta, dict) else None
+    if not pipeline_id:
+        pipeline_id = DEFAULT_PIPELINE_ID
+    template_id = w.get("template_id")
+    agent_session_jwt = _create_agent_session_jwt_if_configured(
+        user_id, workflow_id, api_keys
+    )
+    request_id = (
+        request.headers.get("x-request-id") or request.headers.get("X-Request-Id") or ""
+    ).strip() or None
+    prev_status = w.get("status") or "failed"
+    prev_error = w.get("error")
+    update_workflow(workflow_id, status="building", error=None)
+    job_payload = {
+        "workflow_id": workflow_id,
+        "user_id": user_id,
+        "project_id": project_id,
+        "nlp_input": nlp_input,
+        "api_keys": dict(api_keys),
+        "pipeline_id": pipeline_id,
+        "agent_session_jwt": agent_session_jwt,
+        "template_id": template_id,
+        "request_id": request_id,
+        "auto_approve": bool(w.get("auto_approve")),
+        "network": (w.get("network") or "") or "",
+    }
+    queued = _queue.enqueue(job_payload)
+    if not queued:
+        update_workflow(workflow_id, status=prev_status, error=prev_error)
+        if _queue.QUEUE_ENABLED:
+            raise HTTPException(
+                status_code=503,
+                detail="Pipeline queue unavailable. Try again shortly.",
+            )
+        raise HTTPException(
+            status_code=501,
+            detail="Pipeline queue not configured. Set QUEUE_ENABLED=1 and REDIS_URL.",
+        )
+    return {"workflow_id": workflow_id, "status": "running"}
+
+
 # Streaming router (separate prefix)
 streaming_router = APIRouter(
     prefix="/api/v1/streaming/workflows", tags=["workflows", "streaming"]

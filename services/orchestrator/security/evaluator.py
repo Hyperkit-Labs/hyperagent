@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, cast
 
 from .finding_correlation import correlate_findings
 from .finding_normalizers import (
@@ -61,9 +61,11 @@ def _has_echidna_prereqs(step_outputs: dict[str, Any]) -> bool:
     return False
 
 
-def _collect_findings_from_audit(audit_findings: list[dict]) -> list[dict]:
+def _collect_findings_from_audit(
+    audit_findings: list[dict],
+) -> list[NormalizedFinding]:
     """Convert audit agent findings into normalized shape for tool attribution."""
-    out: list[dict] = []
+    out: list[NormalizedFinding] = []
     for f in audit_findings or []:
         tool_raw = (f.get("tool") or "").lower()
         if "slither" in tool_raw:
@@ -143,7 +145,7 @@ def evaluate_security_policy(
                 )
             )
 
-    all_findings: list[dict[str, Any]] = []
+    all_findings: list[NormalizedFinding] = []
     all_findings.extend(slither_findings)
     all_findings.extend(mythril_findings)
     all_findings.extend(pashov_findings)
@@ -222,17 +224,17 @@ def evaluate_security_policy(
         )
 
     # Correlate
-    all_findings = correlate_findings(
-        all_findings,
+    correlated = correlate_findings(
+        [dict(f) for f in all_findings],
         ai_requires_deterministic=ai_corroboration,
     )
 
     blocking: list[NormalizedFinding] = []
     waived: list[NormalizedFinding] = []
-    for f in all_findings:
-        f = dict(f)
+    for raw in correlated:
+        f = dict(raw)
         if has_valid_waiver(f):
-            waived.append(f)
+            waived.append(cast(NormalizedFinding, f))
         elif f.get("blocking"):
             sev = (f.get("severity") or "").lower()
             if sev in BLOCKING_SEVERITIES:
@@ -241,20 +243,18 @@ def evaluate_security_policy(
                     if not (f.get("corroboratedBy") or []):
                         blocked = False
                 if blocked:
-                    blocking.append(f)
+                    blocking.append(cast(NormalizedFinding, f))
 
     mandatory_fail = any(
         tr.get("required") and tr.get("status") == "FAIL"
         for tr in tool_results
         if tr.get("tool") in mandatory
     )
-    tenderly_ok = (
-        next(
-            (tr for tr in tool_results if tr.get("tool") == "tenderly"),
-            {},
-        ).get("status")
-        == "PASS"
+    _tenderly: ToolResult | None = next(
+        (tr for tr in tool_results if tr.get("tool") == "tenderly"),
+        None,
     )
+    tenderly_ok = (_tenderly or {}).get("status") == "PASS"
 
     if mandatory_fail or not tenderly_ok or blocking:
         final_decision: FinalDecision = "REJECTED"

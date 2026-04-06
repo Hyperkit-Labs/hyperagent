@@ -15,6 +15,7 @@ NC='\033[0m' # No Color
 # Configuration
 MAX_CONCURRENT=5
 DRY_RUN=false
+STAGE_ALL=true
 COMMIT_PREFIX="feat"
 SECURITY_CHECK=true
 FAIL_ON_SENSITIVE=true
@@ -151,6 +152,7 @@ show_help() {
     print_color $CYAN "Usage: $0 [options]"
     print_color $CYAN "Options:"
     print_color $CYAN "  --dry-run              Show what would be committed without actually committing"
+    print_color $CYAN "  --no-stage-all         Do not run git add -A before scanning (default: stage all)"
     print_color $CYAN "  --no-security-check    Disable security checks (NOT RECOMMENDED)"
     print_color $CYAN "  --warn-only            Warn about sensitive files but don't fail"
     print_color $CYAN "  --help, -h             Show this help message"
@@ -271,6 +273,11 @@ while [[ $# -gt 0 ]]; do
             DRY_RUN=true
             shift
             ;;
+        --no-stage-all)
+            STAGE_ALL=false
+            print_color $YELLOW "⏭️  Skipping git add -A"
+            shift
+            ;;
         --no-security-check)
             SECURITY_CHECK=false
             print_color $YELLOW "⚠️  Security checks disabled - NOT RECOMMENDED!"
@@ -309,6 +316,15 @@ fi
 if ! git rev-parse --git-dir > /dev/null 2>&1; then
     print_color $RED "❌ Not in a git repository!"
     exit 1
+fi
+
+if [[ "$STAGE_ALL" == "true" && "$DRY_RUN" != "true" ]]; then
+    print_color $BLUE ""
+    print_color $BLUE "📥 Staging all changes (git add -A)..."
+    if ! git add -A; then
+        print_color $RED "❌ git add -A failed"
+        exit 1
+    fi
 fi
 
 # Get changed files

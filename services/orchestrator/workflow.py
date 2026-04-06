@@ -324,10 +324,12 @@ def run_pipeline(
     )
 
     inc_pipeline_runs_total()
+    _api_keys = initial.get("api_keys")
+    _provider_keys = list(_api_keys.keys()) if isinstance(_api_keys, dict) else []
     logging.getLogger(__name__).info(
         "[pipeline] run_pipeline start run_id=%s providers=%s agent_session_jwt=%s",
         run_id,
-        list(initial.get("api_keys") or {}).keys(),
+        _provider_keys,
         "yes" if initial.get("agent_session_jwt") else "no",
     )
     config = {"configurable": {"thread_id": run_id}}

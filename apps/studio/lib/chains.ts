@@ -1,6 +1,6 @@
 /**
- * Thirdweb chain definitions for Mantle, SKALE Base, Filecoin (not in thirdweb/chains package).
- * Supported networks and metadata from GET /api/v1/networks; use useNetworks() for UI.
+ * Thirdweb chain definitions kept in repo for current and roadmap networks.
+ * v0.1.0 user-facing support is limited to SKALE Base Mainnet and SKALE Base Sepolia.
  * Chain IDs and RPCs must match infra/registries/network/chains.yaml.
  */
 

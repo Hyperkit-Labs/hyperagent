@@ -539,19 +539,19 @@ def insert_project_artifact(
             if was_truncated:
                 meta["was_truncated"] = True
                 meta["truncated_at"] = ARTIFACT_CONTENT_LIMIT
+        effective_cid = (cid or ipfs_cid) or None
         row = {
             "project_id": project_id,
             "run_id": run_id if _is_uuid(run_id or "") else None,
             "artifact_type": kind or artifact_type,
             "name": name,
             "content": effective_content,
-            "ipfs_cid": cid or ipfs_cid,
             "metadata": meta,
         }
         if storage_backend:
             row["storage_backend"] = storage_backend
-        if cid:
-            row["cid"] = cid
+        if effective_cid:
+            row["cid"] = effective_cid
         r = client.table("project_artifacts").insert(row).execute()
         return str(r.data[0]["id"]) if r.data else None
     except Exception as e:

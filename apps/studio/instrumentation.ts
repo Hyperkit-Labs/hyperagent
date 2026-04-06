@@ -1,6 +1,10 @@
 import { captureRequestError } from "@sentry/nextjs";
+import { assertValidStudioPublicApiUrlIfPresent } from "@hyperagent/config";
 
 export async function register() {
+  assertValidStudioPublicApiUrlIfPresent(
+    process.env as Record<string, string | undefined>,
+  );
   if (process.env.NEXT_RUNTIME === "nodejs") {
     await import("./sentry.server.config");
   }

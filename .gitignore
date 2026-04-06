@@ -492,6 +492,7 @@ CLAUDE.md
 llm.txt
 skills-lock.json
 .omx
+.codex
 # Lock files (pnpm-lock.yaml at root for monorepo; package-lock.json in subdirs for npm-based services)
 /package-lock.json
 yarn.lock

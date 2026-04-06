@@ -3,9 +3,8 @@
 import os
 
 import httpx
-from registries import get_timeout
-
 from agents.agent_http import agent_runtime_headers
+from registries import get_timeout
 
 AGENT_RUNTIME_URL = os.environ.get("AGENT_RUNTIME_URL", "http://localhost:4001")
 

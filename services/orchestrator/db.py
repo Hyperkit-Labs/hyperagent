@@ -101,7 +101,7 @@ def ensure_project(project_id: str, user_id: str) -> bool:
     client = _client()
     if not client:
         return False
-    payload_base = {
+    payload_base: dict[str, Any] = {
         "id": project_id,
         "name": "Default",
         "description": "",
@@ -178,7 +178,7 @@ def update_run(
     client = _client()
     if not client:
         return False
-    payload = {}
+    payload: dict[str, Any] = {}
     if status is not None:
         payload["status"] = status
     if current_stage is not None:
@@ -396,7 +396,7 @@ def upsert_run_state(
     try:
         from datetime import UTC, datetime
 
-        payload = {
+        payload: dict[str, Any] = {
             "phase": phase,
             "status": status,
             "updated_at": datetime.now(UTC).isoformat(),
@@ -655,7 +655,7 @@ def update_step(
     try:
         from datetime import UTC, datetime
 
-        payload = {"status": status}
+        payload: dict[str, Any] = {"status": status}
         if output_json is not None:
             payload["output"] = output_json
         if output_summary is not None:

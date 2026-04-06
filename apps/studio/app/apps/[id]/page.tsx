@@ -39,18 +39,6 @@ import {
 import { getLogs } from "@/lib/api";
 import { hasAuditOrSimFailure, hasSecurityCheckFailure } from "@/lib/types";
 
-type ContractItem = {
-  bytecode?: string;
-  abi?: unknown;
-  contract_name?: string;
-  [key: string]: unknown;
-};
-type DeploymentItem = {
-  contract_address?: string;
-  network?: string;
-  [key: string]: unknown;
-};
-
 type AppTab = "overview" | "workflows" | "deployments" | "activity";
 
 export default function AppDetailPage() {

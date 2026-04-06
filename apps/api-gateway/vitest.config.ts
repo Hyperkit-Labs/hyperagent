@@ -27,6 +27,7 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
+    setupFiles: ["./src/vitest-setup.ts"],
     include: ["src/**/*.test.ts"],
     pool: "forks",
     coverage: {
@@ -36,6 +37,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": resolve(dir, "src"),
+      "@hyperagent/config": resolve(dir, "../../packages/config/src/index.ts"),
     },
   },
 });

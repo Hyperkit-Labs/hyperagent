@@ -3,10 +3,10 @@ Workflow CRUD, streaming, and deploy API routes.
 """
 
 import asyncio
-import os
 import io
 import json
 import logging
+import os
 import tarfile
 import time
 from datetime import UTC, datetime
@@ -16,8 +16,8 @@ import db
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
+from llm_keys_store import DEFAULT_WORKSPACE
 from pydantic import BaseModel, Field
-
 from registries import (
     DEFAULT_PIPELINE_ID,
     get_chain_rpc_explorer,
@@ -31,11 +31,10 @@ from workflow import run_pipeline
 from .common import (
     _create_agent_session_jwt_if_configured,
     _get_keys_for_run,
+    _run_status_for_store,
     assert_workflow_owner,
     get_caller_id,
-    _run_status_for_store,
 )
-from llm_keys_store import DEFAULT_WORKSPACE
 
 logger = logging.getLogger(__name__)
 
@@ -658,7 +657,7 @@ def prepare_deploy_api(
 def deploy_approve_api(
     workflow_id: str,
     background_tasks: BackgroundTasks,
-    body: DeployApproveBody = Body(DeployApproveBody()),
+    body: DeployApproveBody = DeployApproveBody(api_keys=None),
     request: Request = None,
 ) -> dict[str, Any]:
     """Approve deploy after Guardian; resume pipeline to create deploy plans."""
@@ -703,7 +702,7 @@ def complete_deploy_api(
         raise HTTPException(status_code=404, detail="Workflow not found")
     if request:
         assert_workflow_owner(w, request)
-    deployment = {
+    deployment: dict[str, Any] = {
         "contract_address": body.contractAddress,
         "transaction_hash": body.transactionHash,
         "deployer_address": body.walletAddress,

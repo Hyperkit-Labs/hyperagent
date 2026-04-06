@@ -5,19 +5,16 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any, Literal
 
+import db
 from fastapi import APIRouter, HTTPException, Request
+from ipfs_client import STORAGE_STATUS_PINNED, canonical_ipfs_gateway_url
+from ipfs_client import is_configured as ipfs_is_configured
+from ipfs_client import pin_json
 from pydantic import BaseModel, Field, field_validator
 
-import db
-from ipfs_client import (
-    STORAGE_STATUS_PINNED,
-    canonical_ipfs_gateway_url,
-    is_configured as ipfs_is_configured,
-    pin_json,
-)
 from .common import get_caller_id
 
 logger = logging.getLogger(__name__)
@@ -99,7 +96,9 @@ def list_my_templates(request: Request, limit: int = 50) -> dict[str, Any]:
 
 
 @router.post("")
-async def create_user_template(body: CreateTemplateBody, request: Request) -> dict[str, Any]:
+async def create_user_template(
+    body: CreateTemplateBody, request: Request
+) -> dict[str, Any]:
     caller = get_caller_id(request)
     if not caller:
         raise HTTPException(status_code=401, detail="authentication required")
@@ -150,7 +149,9 @@ async def publish_template_version(
     try:
         pkg = TemplatePackageV1.model_validate(raw)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"invalid template package: {e}") from e
+        raise HTTPException(
+            status_code=400, detail=f"invalid template package: {e}"
+        ) from e
 
     canonical = pkg.model_dump(mode="json")
     canonical_bytes = _canonical_json_bytes(canonical)
@@ -279,9 +280,7 @@ async def get_version_artifact_meta(
     if not vrow or str(vrow.get("template_id")) != template_id:
         raise HTTPException(status_code=404, detail="version not found")
     cid = vrow.get("cid")
-    gw = vrow.get("gateway_url") or (
-        canonical_ipfs_gateway_url(cid) if cid else None
-    )
+    gw = vrow.get("gateway_url") or (canonical_ipfs_gateway_url(cid) if cid else None)
     return {
         "cid": cid,
         "gateway_url": gw,
@@ -319,7 +318,9 @@ class FetchBody(BaseModel):
 
 
 @artifacts_router.post("/{cid}/fetch")
-async def fetch_artifact_json(cid: str, body: FetchBody, request: Request) -> dict[str, Any]:
+async def fetch_artifact_json(
+    cid: str, body: FetchBody, request: Request
+) -> dict[str, Any]:
     """Download JSON from gateway and optionally verify sha256(content) == validate_hash."""
     caller = get_caller_id(request)
     if not caller:

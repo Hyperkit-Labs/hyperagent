@@ -74,6 +74,8 @@ const ALLOWED_EXAMPLES = [
 
 // Configuration
 const config = {
+  /** Run `git add -A` before listing files so new/untracked paths are included (use --no-stage-all to skip). */
+  stageAllBeforeScan: true,
   maxConcurrentCommits: 1, // Sequential: each file must be added+committed before next (parallel would race)
   // Message generation: diff-parser (getSpecificMessage); messages are conventional-commit (type: subject)
   dryRun: false, // Set to true to see what would be committed without actually committing
@@ -389,11 +391,17 @@ async function main() {
     config.dryRun = true;
     log('🔍 DRY RUN MODE - No actual commits will be made', 'yellow');
   }
-  
+
+  if (args.includes('--no-stage-all')) {
+    config.stageAllBeforeScan = false;
+    log('⏭️  Skipping git add -A (only paths already visible to git will be listed)', 'yellow');
+  }
+
   if (args.includes('--help') || args.includes('-h')) {
     log('\nUsage: node parallel-commit.js [options]', 'cyan');
     log('Options:', 'cyan');
     log('  --dry-run              Show what would be committed without actually committing', 'cyan');
+    log('  --no-stage-all         Do not run git add -A first (default: stage all tracked + untracked)', 'cyan');
     log('  --no-security-check    Disable security checks (NOT RECOMMENDED)', 'cyan');
     log('  --warn-only            Warn about sensitive files but don\'t fail', 'cyan');
     log('  --help, -h             Show this help message', 'cyan');
@@ -402,6 +410,7 @@ async function main() {
     log('  Message style: diff-parser (extracts specific changes from git diff)', 'cyan');
     log(`  Security check: ${config.securityCheck ? 'enabled' : 'disabled'}`, 'cyan');
     log(`  Fail on sensitive: ${config.failOnSensitive ? 'yes' : 'no (warn only)'}`, 'cyan');
+    log(`  Stage all before scan: ${config.stageAllBeforeScan ? 'yes (git add -A)' : 'no'}`, 'cyan');
     log(`  Exclude patterns: ${config.excludePatterns.join(', ')}`, 'cyan');
     log('\nSecurity:', 'yellow');
     log('  The script automatically blocks commits of sensitive files:', 'yellow');
@@ -429,7 +438,17 @@ async function main() {
     log('❌ Not in a git repository!', 'red');
     process.exit(1);
   }
-  
+
+  if (config.stageAllBeforeScan && !config.dryRun) {
+    log('\n📥 Staging all changes (git add -A)...', 'blue');
+    try {
+      execSync('git add -A', { stdio: 'inherit', cwd: process.cwd() });
+    } catch (err) {
+      log(`❌ git add -A failed: ${err.message || err}`, 'red');
+      process.exit(1);
+    }
+  }
+
   // Get changed files
   log('\n🔍 Scanning for changed files...', 'blue');
   const changedFiles = getChangedFiles();

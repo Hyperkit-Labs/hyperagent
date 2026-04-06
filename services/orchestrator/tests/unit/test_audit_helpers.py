@@ -1,7 +1,7 @@
 """Unit tests for has_echidna_harness and severity_fails_gate (extracted to audit_agent)."""
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 

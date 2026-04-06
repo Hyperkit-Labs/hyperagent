@@ -38,11 +38,11 @@ Related docs:
 
 ## x402
 
-x402 is the external pay-per-call payment lane used for some API and agent requests. It is separate from internal prepaid credits used for workflow runs.
+x402 is the intended payment wall for supported v0.1.0 user flows on SKALE Base Mainnet and SKALE Base Sepolia. If the repo still exposes credits-first or env-disabled x402 behavior, that is an implementation gap rather than an intended product mode.
 
 ## Credits
 
-Credits are the internal prepaid balance model used for workflow execution. Credits are usually topped up via USDC or USDT and then consumed per run.
+Credits are legacy prepaid terminology that still appears in parts of the repo. Until billing surfaces are fully aligned, treat credits copy as transitional implementation residue rather than as a separate supported billing contract for v0.1.0.
 
 ## Chain registry
 

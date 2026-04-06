@@ -61,8 +61,8 @@ def register_on_chain(chain_id: int, agent_uri: str | None = None) -> dict[str, 
         or "https://hyperkitlabs.com/agent.json"
     ).strip()
     try:
-        from web3 import Web3
         from eth_account import Account
+        from web3 import Web3
 
         w3 = Web3(Web3.HTTPProvider(rpc_url))
         if not w3.is_connected():

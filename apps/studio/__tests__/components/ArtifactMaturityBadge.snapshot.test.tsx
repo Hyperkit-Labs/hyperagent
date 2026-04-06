@@ -22,7 +22,7 @@ describe("ArtifactMaturityBadge", () => {
     ["validated", "Validated"],
     ["production_ready", "Production-ready"],
     ["blocked", "Blocked"],
-  ] as const)("matches snapshot for %s", (maturity, label) => {
+  ] as const)("matches snapshot for %s", (maturity) => {
     const { container } = render(
       <ArtifactMaturityBadge workflow={wfWithMaturity(maturity)} />,
     );

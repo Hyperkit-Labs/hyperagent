@@ -13,9 +13,7 @@ sys.path.insert(
 def test_scrub_redacts_sensitive_key_names() -> None:
     from security.artifact_scrub import scrub_for_ipfs
 
-    d = scrub_for_ipfs(
-        {"name": "x", "api_key": "secret", "nested": {"password": "p"}}
-    )
+    d = scrub_for_ipfs({"name": "x", "api_key": "secret", "nested": {"password": "p"}})
     assert d["api_key"] == "[redacted]"
     assert d["nested"]["password"] == "[redacted]"
     assert d["name"] == "x"
@@ -24,9 +22,7 @@ def test_scrub_redacts_sensitive_key_names() -> None:
 def test_scrub_redacts_token_like_strings() -> None:
     from security.artifact_scrub import scrub_for_ipfs
 
-    out = scrub_for_ipfs(
-        {"t": "prefix sk-abcdefghijklmnopqrst suffix"}
-    )
+    out = scrub_for_ipfs({"t": "prefix sk-abcdefghijklmnopqrst suffix"})
     assert "sk-abc" not in out["t"]
     assert "redacted" in out["t"].lower()
 

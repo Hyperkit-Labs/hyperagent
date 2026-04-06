@@ -26,8 +26,8 @@ This document classifies major capabilities by **observed code behavior**, not m
 | BYOK LLM keys | REAL + enforced | Server paths expect user keys where designed |
 | Agents page (pipeline agents) | REAL | `getAgents` from orchestrator |
 | A2A registry panel | USER-VISIBLE NOT ENFORCED | Lists DB mirror; sync was stub-like; **POST /erc8004/sync now returns 501** (no fake success) |
-| Payments / credits UI | PARTIAL | Real when billing services + env configured |
-| x402 client UX | PARTIAL | Middleware and credits path; external x402 proof path env-gated |
+| Payments / credits UI | USER-VISIBLE NOT ENFORCED | Legacy credits-first UI still ships even though the v0.1.0 product contract is x402-first on SKALE Base |
+| x402 client UX | PARTIAL | Product contract says x402 is mandatory, but current UX is split between legacy credits surfaces and env-gated x402 proof paths |
 
 ---
 
@@ -38,7 +38,7 @@ This document classifies major capabilities by **observed code behavior**, not m
 | Proxy `/api/v1` → orchestrator | REAL + enforced | Primary API path |
 | Rate limit (Upstash REST) | REAL + optional | When env present |
 | Identity HMAC | REAL + optional | `ENFORCE` flags in docs |
-| x402 on protected routes | REAL + optional | `X402_ENABLED`; internal users skip |
+| x402 on protected routes | PARTIAL | v0.1.0 contract requires x402 on supported user flows, but repo behavior is still gated by `X402_ENABLED` and internal users can skip |
 
 ---
 
@@ -54,8 +54,8 @@ This document classifies major capabilities by **observed code behavior**, not m
 | ERC-8004 on-chain register (`erc8004_register.py`) | REAL + optional | Needs `ERC8004_REGISTER_PRIVATE_KEY` + chain in registry YAML |
 | **POST /api/v1/erc8004/sync** | **STUB → fixed** | **Was 200 + `synced: 0` (theater). Now 501 until indexer exists** |
 | Agent registry CRUD (Supabase mirror) | REAL + enforced | When DB migrated |
-| Credits / billing | REAL + optional | Supabase + product config |
-| x402 middleware | REAL + optional | Proof verification when enabled |
+| Credits / billing | PARTIAL | Legacy credits path remains in repo and conflicts with the intended x402-first launch contract |
+| x402 middleware | PARTIAL | Proof verification exists, but current behavior still treats x402 as env-gated instead of mandatory by default |
 
 ---
 
@@ -119,7 +119,7 @@ This document classifies major capabilities by **observed code behavior**, not m
 | Feature | Class | Notes |
 | ------- | ----- | ----- |
 | Chain registry YAML | REAL + optional | Not equal to “all chains production-ready” |
-| Multi-chain README bullets | CLAIMED NOT IMPLEMENTED | **Narrow to tested chains + config matrix** |
+| Multi-chain README bullets | CLAIMED NOT IMPLEMENTED | **Narrow to SKALE Base Mainnet and SKALE Base Sepolia for v0.1.0; other entries are roadmap** |
 
 ---
 
@@ -154,4 +154,4 @@ This document classifies major capabilities by **observed code behavior**, not m
 ## Summary counts (approximate)
 
 - **STUB** or **theater** addressed in this pass: ERC-8004 **sync** HTTP contract (was fake success).
-- **Largest remaining honesty gaps**: README “mandatory tools”, multi-chain readiness, full audit-service availability guarantees, trace exception path in `write_trace_sync`, eval harness, operational dashboards.
+- **Largest remaining honesty gaps**: x402-first contract drift versus current repo behavior, multi-chain readiness claims beyond SKALE Base, full audit-service availability guarantees, trace exception path in `write_trace_sync`, eval harness, operational dashboards.

@@ -111,6 +111,19 @@ def _validate_critical_services() -> None:
         supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
         if not supabase_url or not supabase_key:
             missing.append("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
+        byok_tee_strict = os.environ.get("BYOK_TEE_STRICT", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        if byok_tee_strict:
+            try:
+                from llm_keys_kms import _is_kms_configured
+            except ImportError:
+                _is_kms_configured = lambda: False  # type: ignore[misc,assignment]
+            if not _is_kms_configured():
+                missing.append("LLM_KEY_KMS_KEY_ARN (required when BYOK_TEE_STRICT=1)")
+
         if missing:
             _startup_degraded = True
             _startup_missing_vars = missing

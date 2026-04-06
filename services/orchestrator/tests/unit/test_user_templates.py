@@ -33,8 +33,6 @@ def test_template_package_rejects_too_many_files() -> None:
     from api.user_templates import TemplateFile, TemplatePackageV1
     from pydantic import ValidationError
 
-    files = [
-        TemplateFile(path=f"f{i}.sol", content="x") for i in range(201)
-    ]
+    files = [TemplateFile(path=f"f{i}.sol", content="x") for i in range(201)]
     with pytest.raises(ValidationError):
         TemplatePackageV1(name="x", files=files)

@@ -587,3 +587,31 @@ export async function contractCall(body: {
     body: JSON.stringify(body),
   });
 }
+
+export async function quarantineWorkflow(
+  workflowId: string,
+  body: { reason?: string },
+): Promise<{ workflow_id: string; status: string }> {
+  return fetchJsonAuthed(`/workflows/${workflowId}/quarantine`, {
+    method: "POST",
+    body: JSON.stringify({ reason: body.reason ?? "" }),
+  });
+}
+
+export async function rollbackWorkflow(
+  workflowId: string,
+  body: { reason?: string },
+): Promise<{ workflow_id: string; status: string }> {
+  return fetchJsonAuthed(`/workflows/${workflowId}/rollback`, {
+    method: "POST",
+    body: JSON.stringify({ reason: body.reason ?? "" }),
+  });
+}
+
+export async function retryWorkflow(
+  workflowId: string,
+): Promise<{ workflow_id: string; status: string }> {
+  return fetchJsonAuthed(`/workflows/${workflowId}/retry`, {
+    method: "POST",
+  });
+}

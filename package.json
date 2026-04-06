@@ -13,6 +13,7 @@
     "test:minimal:all": "node scripts/minimal-suite/run.mjs --all",
     "test:ai-tools": "pnpm turbo run build test --filter=@hyperagent/ai-tools",
     "format": "pnpm turbo format",
+    "ci:preflight": "node scripts/ci-preflight.cjs",
     "commit": "node .github/version/scripts/commit/cli/index.js commit",
     "commit:dry": "node .github/version/scripts/commit/cli/index.js commit --dry-run",
     "commit:sh": "bash .github/version/scripts/commit/parallel-commit.sh",

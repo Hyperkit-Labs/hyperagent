@@ -69,6 +69,13 @@ export interface Workflow {
   estimated_complexity?: string;
   estimated_token_cost?: number;
   design_rationale?: string;
+  /** Pipeline artifact maturity gate (UI badge). */
+  artifact_maturity?:
+    | "draft"
+    | "validated"
+    | "production_ready"
+    | "blocked"
+    | string;
 }
 
 /** True when workflow needs user to approve spec before pipeline continues. */

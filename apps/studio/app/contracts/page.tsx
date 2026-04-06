@@ -21,7 +21,7 @@ import {
 import Link from "next/link";
 import { ShimmerGrid } from "@/components/ai-elements";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
-import { EmptyState, GlassCard } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 import { PageTitle } from "@/components/layout/PageTitle";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";

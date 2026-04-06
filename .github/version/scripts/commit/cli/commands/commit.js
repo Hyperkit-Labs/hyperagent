@@ -14,6 +14,7 @@ async function run(opts = {}) {
   if (opts.noSecurityCheck) args.push('--no-security-check');
   if (opts.warnOnly) args.push('--warn-only');
   if (opts.noStageAll) args.push('--no-stage-all');
+  if (opts.skipPreflight) args.push('--skip-preflight');
   process.argv = args;
 
   const mod = require(parallelCommitPath);
@@ -31,6 +32,7 @@ function help() {
   Options:
     --dry-run              Preview what would be committed
     --no-stage-all         Do not run git add -A before scanning (default stages everything)
+    --skip-preflight       Skip pnpm ci:preflight (turbo lint/typecheck/test + Python)
     --no-security-check    Disable security checks (not recommended)
     --warn-only            Warn on sensitive files, do not fail
     --max <n>              Max concurrent commits (default: 5)

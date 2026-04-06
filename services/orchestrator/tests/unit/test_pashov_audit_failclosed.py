@@ -3,6 +3,7 @@ On HTTP errors or exceptions, run_pashov_audit must return success=False (not Tr
 
 import os
 import sys
+
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))

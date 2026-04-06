@@ -76,6 +76,8 @@ const ALLOWED_EXAMPLES = [
 const config = {
   /** Run `git add -A` before listing files so new/untracked paths are included (use --no-stage-all to skip). */
   stageAllBeforeScan: true,
+  /** Run `pnpm run ci:preflight` before staging/commits (turbo lint/typecheck/test + optional Python). */
+  runCiPreflight: true,
   maxConcurrentCommits: 1, // Sequential: each file must be added+committed before next (parallel would race)
   // Message generation: diff-parser (getSpecificMessage); messages are conventional-commit (type: subject)
   dryRun: false, // Set to true to see what would be committed without actually committing
@@ -397,11 +399,17 @@ async function main() {
     log('⏭️  Skipping git add -A (only paths already visible to git will be listed)', 'yellow');
   }
 
+  if (args.includes('--skip-preflight') || process.env.COMMIT_SKIP_PREFLIGHT === '1') {
+    config.runCiPreflight = false;
+    log('⏭️  Skipping CI preflight (--skip-preflight or COMMIT_SKIP_PREFLIGHT=1)', 'yellow');
+  }
+
   if (args.includes('--help') || args.includes('-h')) {
     log('\nUsage: node parallel-commit.js [options]', 'cyan');
     log('Options:', 'cyan');
     log('  --dry-run              Show what would be committed without actually committing', 'cyan');
     log('  --no-stage-all         Do not run git add -A first (default: stage all tracked + untracked)', 'cyan');
+    log('  --skip-preflight       Do not run pnpm ci:preflight (turbo lint/typecheck/test + Python)', 'cyan');
     log('  --no-security-check    Disable security checks (NOT RECOMMENDED)', 'cyan');
     log('  --warn-only            Warn about sensitive files but don\'t fail', 'cyan');
     log('  --help, -h             Show this help message', 'cyan');
@@ -411,6 +419,7 @@ async function main() {
     log(`  Security check: ${config.securityCheck ? 'enabled' : 'disabled'}`, 'cyan');
     log(`  Fail on sensitive: ${config.failOnSensitive ? 'yes' : 'no (warn only)'}`, 'cyan');
     log(`  Stage all before scan: ${config.stageAllBeforeScan ? 'yes (git add -A)' : 'no'}`, 'cyan');
+    log(`  CI preflight: ${config.runCiPreflight ? 'yes (pnpm ci:preflight)' : 'no'}`, 'cyan');
     log(`  Exclude patterns: ${config.excludePatterns.join(', ')}`, 'cyan');
     log('\nSecurity:', 'yellow');
     log('  The script automatically blocks commits of sensitive files:', 'yellow');
@@ -437,6 +446,28 @@ async function main() {
   } catch (error) {
     log('❌ Not in a git repository!', 'red');
     process.exit(1);
+  }
+
+  if (config.runCiPreflight) {
+    const pkgJson = path.join(process.cwd(), 'package.json');
+    if (!fs.existsSync(pkgJson)) {
+      log('⚠️  No package.json in cwd; skipping CI preflight', 'yellow');
+    } else {
+      log('\n🧪 CI preflight (pnpm run ci:preflight)...', 'bright');
+      try {
+        execSync('pnpm run ci:preflight', {
+          stdio: 'inherit',
+          cwd: process.cwd(),
+          env: process.env,
+        });
+      } catch (err) {
+        log(
+          '\n❌ CI preflight failed. Fix the errors above, or use --skip-preflight (not recommended for shared branches).',
+          'red',
+        );
+        process.exit(1);
+      }
+    }
   }
 
   if (config.stageAllBeforeScan && !config.dryRun) {

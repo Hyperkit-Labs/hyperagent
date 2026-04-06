@@ -7,14 +7,11 @@ import logging
 import os
 
 from langchain_core.messages import AIMessage
-
-from node_common import (
-    estimate_complexity as _estimate_complexity,
-    resolve_user_prompt as _resolve_user_prompt,
-    step_complete as _step_complete,
-    step_index as _step_index,
-    step_start as _step_start,
-)
+from node_common import estimate_complexity as _estimate_complexity
+from node_common import resolve_user_prompt as _resolve_user_prompt
+from node_common import step_complete as _step_complete
+from node_common import step_index as _step_index
+from node_common import step_start as _step_start
 from registries import (
     get_default_pipeline_id,
     get_high_severity_swc,
@@ -42,6 +39,7 @@ from agents.debate_agent import run_debate
 from agents.deploy_agent import deploy_contracts
 from agents.design_agent import generate_design
 from agents.exploit_simulation_agent import run_exploit_simulation
+from agents.monitor_agent import run_monitor
 from agents.oz_wizard_client import generate_contracts_oz
 from agents.pashov_audit_agent import run_pashov_audit
 from agents.scrubd_agent import run_scrubd_validation
@@ -50,7 +48,6 @@ from agents.simulation_agent import (
     run_tenderly_simulations_bundle,
 )
 from agents.test_generation_agent import generate_tests
-from agents.monitor_agent import run_monitor
 from agents.ui_scaffold_agent import generate_ui_schema
 from roma_inprocess import invoke_roma_spec
 from security_context import build_security_context

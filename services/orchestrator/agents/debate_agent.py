@@ -8,7 +8,6 @@ import os
 from typing import Any
 
 import httpx
-
 from agents.agent_http import agent_runtime_headers
 from agents.codegen_agent import generate_contracts
 from agents.scrubd_agent import get_scrubd_fix_hints
@@ -34,7 +33,7 @@ def _parse_audit_findings(text: str) -> list[dict[str, Any]]:
     """Parse pashov report into findings. Returns empty if no findings."""
     import re
 
-    findings = []
+    findings: list[dict[str, Any]] = []
     if not text or "No findings." in text.lower():
         return findings
     pattern = r"\[(\d+)\]\s+\*\*(\d+)\.\s+([^*]+)\*\*"

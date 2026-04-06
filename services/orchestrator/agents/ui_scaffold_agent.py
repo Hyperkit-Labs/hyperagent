@@ -92,7 +92,7 @@ def _abi_input_to_param(inp: dict[str, Any]) -> dict[str, Any]:
 
 
 def _build_actions_from_abi(abi: list[dict], chain_id: int) -> list[dict]:
-    actions = []
+    actions: list[dict[str, Any]] = []
     seen = set()
     for item in abi:
         if item.get("type") != "function":
@@ -194,12 +194,13 @@ async def generate_ui_schema(
             contract_names[idx] if idx < len(contract_names) else f"Contract{idx}"
         ).replace(".sol", "")
         if not abi and contracts:
+            fallback_key: str | None = None
+            for n in contracts:
+                if isinstance(contracts.get(n), str):
+                    fallback_key = n
+                    break
             src_name = (
-                contract_names[idx]
-                if idx < len(contract_names)
-                else next(
-                    (n for n in contracts if isinstance(contracts.get(n), str)), None
-                )
+                contract_names[idx] if idx < len(contract_names) else fallback_key
             )
             if src_name:
                 abi = await get_abi_from_compile(contracts[src_name])

@@ -50,36 +50,6 @@ const VIEW_LABELS: Record<
   security: { label: "Security", icon: Shield },
 };
 
-function BarSegment({
-  label,
-  value,
-  total,
-  color,
-}: {
-  label: string;
-  value: number;
-  total: number;
-  color: string;
-}) {
-  const pct = total > 0 ? Math.round((value / total) * 100) : 0;
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between text-xs">
-        <span className="text-[var(--color-text-tertiary)]">{label}</span>
-        <span className="font-mono text-[var(--color-text-primary)]">
-          {value} ({pct}%)
-        </span>
-      </div>
-      <div className="h-2 bg-[var(--color-bg-panel)] rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full ${color}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
 function MetricCard({
   label,
   value,

@@ -13,8 +13,11 @@ from typing import Any
 
 DEFAULT_PIPELINE_ID = "evm-default"
 
+yaml: Any
 try:
-    import yaml
+    import yaml as _yaml
+
+    yaml = _yaml
 except ImportError:
     yaml = None
 

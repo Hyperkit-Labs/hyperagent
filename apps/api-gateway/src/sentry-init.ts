@@ -1,17 +1,17 @@
 /**
- * Optional Sentry for the API gateway. Initialize before routes when SENTRY_DSN is set.
+ * Optional Sentry for the API gateway. Call initSentry() after load-env; no-op when DSN is unset.
  */
 import * as Sentry from "@sentry/node";
+import { getGatewayEnv } from "@hyperagent/config";
 
-const dsn = process.env.SENTRY_DSN?.trim();
-if (dsn) {
+export function initSentry(): void {
+  const { sentry, nodeEnv } = getGatewayEnv();
+  const dsn = sentry.dsn?.trim();
+  if (!dsn) return;
   Sentry.init({
     dsn,
-    environment:
-      process.env.SENTRY_ENVIRONMENT ??
-      process.env.NODE_ENV ??
-      "development",
-    tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? 0.1),
+    environment: sentry.environment ?? nodeEnv ?? "development",
+    tracesSampleRate: sentry.tracesSampleRate,
   });
 }
 

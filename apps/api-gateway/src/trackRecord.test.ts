@@ -1,3 +1,4 @@
+import { resetGatewayEnvForTests } from "@hyperagent/config";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fetchTrackRecordWithFallback, getTrackRecordFallback } from "./trackRecord.js";
 
@@ -15,6 +16,7 @@ describe("trackRecord fallback", () => {
     process.env.PLATFORM_VULNERABILITIES_FOUND = original.vulns;
     process.env.PLATFORM_SECURITY_RESEARCHERS = original.researchers;
     process.env.PLATFORM_CONTRACTS_DEPLOYED = original.contracts;
+    resetGatewayEnvForTests();
   });
 
   it("loads integer env defaults for fallback payload", () => {

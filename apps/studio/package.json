@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.0.0",
-    "@ai-sdk/google": "^1.0.0",
+    "@ai-sdk/google": "^3.0.58",
     "@ai-sdk/openai": "^1.0.0",
     "@ai-sdk/react": "^3.0.136",
     "@emotion/react": "^11.14.0",

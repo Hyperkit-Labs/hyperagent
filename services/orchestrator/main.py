@@ -20,19 +20,15 @@ import logging
 import os
 import time
 
-from fastapi import FastAPI, Request
-from structured_logging import TraceContextFilter
-from trace_context import set_request_id
-
 from api import (
     agents_router,
+    api_health_router,
     approve_spec_legacy_router,
     config_router,
     contracts_router,
     credits_router,
     debug_sandbox_router,
     health_router,
-    api_health_router,
     identity_router,
     llm_keys_router,
     logs_router,
@@ -50,7 +46,10 @@ from api import (
     workflows_router,
     workflows_streaming_router,
 )
+from fastapi import FastAPI, Request
 from observability import record_latency
+from structured_logging import TraceContextFilter
+from trace_context import set_request_id
 
 logger = logging.getLogger(__name__)
 

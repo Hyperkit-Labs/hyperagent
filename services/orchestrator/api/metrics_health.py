@@ -5,13 +5,15 @@ Metrics and health API: health, metrics, config, integrations-debug.
 import logging
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, cast
 
+import credits_supabase
 import db
 import httpx
 from fastapi import APIRouter, HTTPException
+from observability import p95_latency_ms
 from pydantic import BaseModel, Field
-
+from redis_util import effective_redis_url
 from registries import (
     ANCHOR_NETWORK_SLUG,
     get_a2a_agent_id,
@@ -24,11 +26,6 @@ from registries import (
     get_x402_enabled,
 )
 from store import count_workflows
-
-import credits_supabase
-
-from observability import p95_latency_ms
-from redis_util import effective_redis_url
 
 logger = logging.getLogger(__name__)
 
@@ -212,7 +209,7 @@ def _check_dead_letter_queue() -> dict[str, Any]:
         from redis import Redis
 
         r = Redis.from_url(effective_redis_url(url))
-        depth = r.llen("queue:hyperagent:dead")
+        depth = cast(int, r.llen("queue:hyperagent:dead"))
         result: dict[str, Any] = {"status": "ok", "depth": depth}
         if depth > 0:
             logger.warning(
@@ -464,7 +461,8 @@ def get_agent_identity() -> dict[str, Any]:
     reg_proof: dict[str, Any] | None = None
     if chain_id is not None:
         try:
-            from registries import _ERC8004, _ensure_loaded  # type: ignore[attr-defined]
+            from registries import _ERC8004  # type: ignore[attr-defined]
+            from registries import _ensure_loaded
 
             _ensure_loaded()
             for entry in (_ERC8004 or {}).get("spec", {}).get("hyperagent", {}).get(
@@ -506,8 +504,8 @@ def register_agent_identity(body: RegisterIdentityBody | None = None) -> dict[st
     """Register this HyperAgent instance on ERC-8004 IdentityRegistry for the given chain.
     Requires ERC8004_REGISTER_PRIVATE_KEY. Persists proof to agent_registrations. Returns agentId, txHash, persistedProof.
     """
-    from erc8004_register import is_configured, register_on_chain
     import db
+    from erc8004_register import is_configured, register_on_chain
 
     if not is_configured():
         raise HTTPException(

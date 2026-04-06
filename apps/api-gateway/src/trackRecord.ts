@@ -1,3 +1,5 @@
+import { getGatewayEnv } from "@hyperagent/config";
+
 export interface PlatformTrackRecord {
   audits_completed: number;
   vulnerabilities_found: number;
@@ -12,11 +14,12 @@ function toNonNegativeInt(value: string | undefined): number {
 }
 
 export function getTrackRecordFallback(): PlatformTrackRecord {
+  const p = getGatewayEnv().platform;
   return {
-    audits_completed: toNonNegativeInt(process.env.PLATFORM_AUDITS_COMPLETED),
-    vulnerabilities_found: toNonNegativeInt(process.env.PLATFORM_VULNERABILITIES_FOUND),
-    security_researchers: toNonNegativeInt(process.env.PLATFORM_SECURITY_RESEARCHERS),
-    contracts_deployed: toNonNegativeInt(process.env.PLATFORM_CONTRACTS_DEPLOYED),
+    audits_completed: toNonNegativeInt(p.auditsCompleted),
+    vulnerabilities_found: toNonNegativeInt(p.vulnerabilitiesFound),
+    security_researchers: toNonNegativeInt(p.securityResearchers),
+    contracts_deployed: toNonNegativeInt(p.contractsDeployed),
     source: "gateway_env_fallback",
   };
 }

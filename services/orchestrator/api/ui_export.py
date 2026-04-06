@@ -767,7 +767,7 @@ main().catch(console.error);
         ),
     }
     if ipfs_cid:
-        out["ipfs_cid"] = ipfs_cid
+        out["cid"] = ipfs_cid
         out["ipfs_gateway_url"] = ipfs_gateway_url
         out["message"] = (
             f"Bundle content-addressed on IPFS (pinning provider; not Filecoin archival proof): {ipfs_gateway_url}"

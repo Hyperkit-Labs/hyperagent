@@ -104,7 +104,9 @@ export function CreditsCard({
         {creditsPerRun != null && creditsPerRun > 0
           ? ` Each run costs ${creditsPerRun} credits.`
           : " Each workflow run consumes credits."}{" "}
-        x402 is used for external pay-per-call.
+        This repo still exposes legacy credits wording while v0.1.0 payment
+        surfaces are being aligned to x402-backed billing on supported SKALE
+        Base flows.
       </p>
       {error && <ApiErrorBanner error={error} onRetry={handleRefetch} />}
       {loading ? (

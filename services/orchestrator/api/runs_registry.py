@@ -13,8 +13,8 @@ from typing import Any
 import db
 import httpx
 from fastapi import APIRouter, Header, HTTPException, Request
+from llm_keys_store import DEFAULT_WORKSPACE
 from pydantic import BaseModel, Field
-
 from registries import (
     get_chain_id_by_network_slug,
     get_chain_rpc_explorer,
@@ -31,7 +31,6 @@ from .common import (
     _run_status_for_store,
     assert_workflow_owner,
 )
-from llm_keys_store import DEFAULT_WORKSPACE
 
 logger = logging.getLogger(__name__)
 
@@ -328,7 +327,9 @@ def get_platform_track_record_api() -> dict[str, Any]:
                         if total_findings > 0:
                             vulnerabilities = total_findings
                 except Exception as le:
-                    logger.warning("[track-record] legacy workflow_state merge failed: %s", le)
+                    logger.warning(
+                        "[track-record] legacy workflow_state merge failed: %s", le
+                    )
         except Exception as e:
             logger.warning("[track-record] database metrics failed: %s", e)
 
@@ -775,7 +776,7 @@ async def validate_llm_key(
     if not api_key:
         _require_user_id_for_byok(x_user_id)
         wid = x_workspace_id or DEFAULT_WORKSPACE
-        stored = {}
+        stored: dict[str, str] = {}
         if x_user_id and llm_keys_supabase._is_configured():
             stored = llm_keys_supabase.get_keys_for_user(x_user_id) or {}
         else:

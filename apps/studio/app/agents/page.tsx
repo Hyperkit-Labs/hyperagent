@@ -20,16 +20,10 @@ import {
 } from "lucide-react";
 import { useAgents } from "@/hooks/useAgents";
 import { useMetrics } from "@/hooks/useMetrics";
-import type { AgentStatus } from "@/lib/api";
 import { ROUTES } from "@/constants/routes";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { ShimmerGrid } from "@/components/ai-elements";
-import {
-  EmptyState,
-  GlowingBorder,
-  RadialProgress,
-  NetworkTopologyMap,
-} from "@/components/ui";
+import { EmptyState, RadialProgress } from "@/components/ui";
 import { PageTitle } from "@/components/layout/PageTitle";
 
 type AgentCategory = "all" | "generators" | "auditors" | "deployers";

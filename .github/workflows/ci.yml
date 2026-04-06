@@ -64,10 +64,10 @@ jobs:
         run: black --check services/orchestrator/
       
       - name: Run isort import check
-        run: isort --check-only services/orchestrator/
+        run: isort --check-only --profile black services/orchestrator/
       
       - name: Run MyPy type checking
-        run: mypy services/orchestrator/ --ignore-missing-imports
+        run: mypy services/orchestrator/ --config-file services/orchestrator/mypy.ini
 
   # ============================================================================
   # STAGE 2: SECURITY SCANNING
@@ -142,6 +142,7 @@ jobs:
 
       - name: pip-audit (orchestrator)
         run: pip-audit -r services/orchestrator/requirements.txt --desc --ignore-vuln PYSEC-2024-* || true
+        continue-on-error: true
 
   # ============================================================================
   # STAGE 2.5: GATEWAY BUILD GATE
@@ -212,7 +213,7 @@ jobs:
           python -m pip install --upgrade pip build
           pip install -e packages/execution-backend
           pip install -r services/orchestrator/requirements.txt
-          pip install pytest pytest-asyncio "psycopg[binary]>=3.1"
+          pip install pytest pytest-asyncio hypothesis "psycopg[binary]>=3.1"
         env:
           ENVIRONMENT: test
 
@@ -324,6 +325,8 @@ jobs:
         run: pnpm --filter hyperagent-studio run build
         env:
           NEXT_TELEMETRY_DISABLED: '1'
+          NEXT_PUBLIC_API_URL: 'http://127.0.0.1:4000'
+          NEXT_PUBLIC_THIRDWEB_CLIENT_ID: 'ci-test-client-id'
       
       - name: Install Playwright browsers
         run: pnpm --filter hyperagent-studio exec playwright install --with-deps chromium
@@ -369,7 +372,7 @@ jobs:
           python -m pip install --upgrade pip build
           pip install -e packages/execution-backend
           pip install -r services/orchestrator/requirements.txt
-          pip install pytest pytest-asyncio
+          pip install pytest pytest-asyncio hypothesis
         env:
           ENVIRONMENT: test
       

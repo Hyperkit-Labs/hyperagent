@@ -158,6 +158,10 @@ def write_trace_sync(
         raise
     except Exception as e:
         logger.warning("[trace_writer] write_trace_sync failed: %s", e)
+        if IS_PRODUCTION:
+            raise RuntimeError(
+                "Trace write failed in production. Stub traces are not allowed."
+            ) from e
         return _stub_trace_id(run_id, step_type, step_index), None, None
 
 

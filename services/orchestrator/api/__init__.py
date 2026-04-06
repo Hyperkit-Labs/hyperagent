@@ -33,6 +33,14 @@ from .billing import (
     pricing_router,
     reconciliation_router,
 )
+from .metrics_health import (
+    api_health_router,
+    config_router,
+    health_router,
+    identity_router,
+    metrics_router,
+)
+from .pipeline import router as pipeline_router
 from .runs_registry import (
     agents_router,
     approve_spec_legacy_router,
@@ -45,14 +53,6 @@ from .runs_registry import (
     sandbox_router,
     security_router,
 )
-from .metrics_health import (
-    api_health_router,
-    config_router,
-    health_router,
-    identity_router,
-    metrics_router,
-)
-from .pipeline import router as pipeline_router
 from .storage_webhooks import router as storage_webhooks_router
 from .ui_export import router as ui_export_router
 from .workflows import router as workflows_router

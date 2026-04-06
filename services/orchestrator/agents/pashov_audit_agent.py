@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-
 from agents.agent_http import agent_runtime_headers
 
 logger = logging.getLogger(__name__)
@@ -53,7 +52,7 @@ def _load_pashov_refs() -> tuple[str, str, str, str] | None:
             logger.warning("[pashov] missing %s", f)
             return None
         parts.append(f.read_text(encoding="utf-8", errors="replace"))
-    return tuple(parts)
+    return (parts[0], parts[1], parts[2], parts[3])
 
 
 def _build_bundle(

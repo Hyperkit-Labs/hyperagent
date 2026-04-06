@@ -9,7 +9,11 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from security.waiver_crypto import canonical_json_bytes, payload_sha256, verify_hmac_sha256
+from security.waiver_crypto import (
+    canonical_json_bytes,
+    payload_sha256,
+    verify_hmac_sha256,
+)
 
 
 def test_canonical_json_ordering_stable():

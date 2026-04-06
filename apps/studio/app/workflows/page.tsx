@@ -216,9 +216,8 @@ export default function WorkflowsPage() {
                   className="px-3 py-1.5 rounded-lg bg-[var(--color-bg-panel)] border border-[var(--color-border-subtle)] hover:bg-[var(--color-bg-hover)] text-xs text-[var(--color-text-secondary)] transition-colors"
                 >
                   <option value="">All Networks</option>
-                  <option value="mantle">Mantle</option>
-                  <option value="avalanche">Avalanche</option>
-                  <option value="base">Base</option>
+                  <option value="skale base">SKALE Base Mainnet</option>
+                  <option value="skale base sepolia">SKALE Base Sepolia</option>
                 </select>
                 <select
                   value={typeFilter}

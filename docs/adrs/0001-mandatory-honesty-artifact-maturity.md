@@ -20,7 +20,7 @@ Applies to README, project constitution text, Studio root metadata, hero or logi
 - Fixed time to production (for example “under two minutes”).
 - “Production-ready” as a blanket promise on generated output.
 - “Audited contracts” as if a professional audit or end-to-end security guarantee existed.
-- “x402-native” as if the protocol were always active in user flows (metering is optional and configuration-dependent).
+- “Optional x402 metering” for v0.1.0 if the intended product contract is x402-backed payment gating on supported user flows.
 - “Observability-first” or “secure by design” as absolute guarantees without qualification.
 
 **Required framing**
@@ -29,7 +29,7 @@ Applies to README, project constitution text, Studio root metadata, hero or logi
 - **Artifacts:** Default framing is **draft artifacts with checks**, not shipped production guarantees.
 - **Audit:** Use **audit workflow** or **security tooling in the pipeline**, not “audited” as a final certification.
 - **Deploy:** Use **prepare deploy** or **deploy when gates pass**, not unconditional “deploy in minutes.”
-- **Payments:** **Optional x402 metering** when enabled in registry and environment.
+- **Payments:** For v0.1.0, describe x402 as the required payment wall on supported SKALE Base user flows. If repo behavior still allows credits-first or x402-disabled paths, describe that as a gap, not as an intended product option.
 - **Telemetry:** **Metrics and tracing** where the deployment wires them, not a promise of full production SRE coverage.
 - **Storage:** Describe artifact storage in terms of configured providers and retention policies actually enforced by the product, not generic “IPFS/Filecoin” as if all paths used both.
 

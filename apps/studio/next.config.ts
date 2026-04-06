@@ -37,15 +37,6 @@ const nextConfig: NextConfig = {
   // MSW (tests) pulls in pure-ESM packages; Next/Jest only transpiles listed packages.
   transpilePackages: ["msw", "until-async"],
 
-  // Configure server external packages for Turbopack compatibility
-  serverExternalPackages: [
-    "pino",
-    "pino-pretty",
-    "thread-stream",
-    "pino-abstract-transport",
-    "sonic-boom",
-  ],
-
   // Faster dev: only bundle used modules from large packages (faster first compile and HMR)
   experimental: {
     optimizePackageImports: [
@@ -62,7 +53,7 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: !isProduction,
   },
 
-  // Force dynamic rendering to avoid SSG issues with pino
+  // Force dynamic rendering for the current Studio runtime path.
   output: "standalone",
 
   // Production optimizations
@@ -74,60 +65,26 @@ const nextConfig: NextConfig = {
     return [];
   },
 
-  // BYOK: strict CSP to limit XSS impact; only allow connections to gateway and known LLM providers
+  webpack(config) {
+    config.resolve = config.resolve || {};
+    config.resolve.alias = {
+      ...(config.resolve.alias || {}),
+      // thirdweb pulls pino's optional pretty-printer through walletconnect logging.
+      // Studio never uses that server-only formatter in the browser/runtime bundle.
+      "pino-pretty": false,
+    };
+    return config;
+  },
+
+  // CSP and connect-src live in proxy.ts (Edge, per-request nonce). Keep lightweight headers here
+  // for routes that skip the proxy matcher (e.g. some static assets).
   async headers() {
-    const apiUrl =
-      process.env.NEXT_PUBLIC_API_URL ??
-      (isProduction ? "" : "http://localhost:4000");
-    let apiOrigin = "";
-    try {
-      if (apiUrl && apiUrl.startsWith("http"))
-        apiOrigin = new URL(apiUrl).origin;
-      else if (apiUrl) apiOrigin = apiUrl;
-    } catch {
-      apiOrigin = "";
-    }
-    const connectSrc = [
-      "'self'",
-      apiOrigin,
-      "https://api.openai.com",
-      "https://api.anthropic.com",
-      "https://generativelanguage.googleapis.com",
-      "https://api.together.xyz",
-      "wss:",
-      "https://*.thirdweb.com",
-      "https://*.supabase.co",
-      // Chain RPCs: wallet connect and smart-account resolution
-      "https://base-sepolia-testnet.skalenodes.com",
-      "https://skale-base.skalenodes.com",
-      "https://sepolia.base.org",
-      // thirdweb bundler (AA)
-      "https://*.bundler.thirdweb.com",
-    ]
-      .filter(Boolean)
-      .join(" ");
-    const scriptSrc =
-      "'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com";
-    const csp = [
-      "default-src 'self'",
-      `connect-src ${connectSrc}`,
-      `script-src ${scriptSrc}`,
-      `script-src-elem 'self' 'unsafe-inline' https://va.vercel-scripts.com`,
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: https: blob:",
-      "font-src 'self' data:",
-      "form-action 'self'",
-      "frame-ancestors 'self'",
-      "base-uri 'self'",
-    ].join("; ");
+    // CSP is set per-request in proxy.ts (nonce + strict-dynamic). A static CSP here
+    // duplicated the policy and broke script execution when it disagreed with the middleware nonce.
     return [
       {
         source: "/:path*",
-        headers: [
-          { key: "Content-Security-Policy", value: csp },
-          { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "X-Frame-Options", value: "SAMEORIGIN" },
-        ],
+        headers: [{ key: "X-Content-Type-Options", value: "nosniff" }],
       },
     ];
   },

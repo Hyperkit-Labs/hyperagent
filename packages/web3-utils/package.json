@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@hyperagent/core-types": "workspace:*",
-    "thirdweb": "^5.119.1",
+    "thirdweb": "^5.119.4",
     "yaml": "^2.3.0"
   },
   "devDependencies": {

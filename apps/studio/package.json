@@ -57,7 +57,7 @@
     "sonner": "^1.5.0",
     "swr": "^2.4.1",
     "tailwind-merge": "^3.5.0",
-    "thirdweb": "^5.119.1",
+    "thirdweb": "^5.119.4",
     "zustand": "^5.0.11"
   },
   "devDependencies": {

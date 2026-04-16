@@ -10,7 +10,10 @@ import {
 } from "react";
 import { useConfig } from "@/components/providers/ConfigProvider";
 import { useNetworks } from "@/hooks/useNetworks";
-import { FALLBACK_DEFAULT_NETWORK_ID } from "@/constants/defaults";
+import {
+  FALLBACK_DEFAULT_NETWORK_ID,
+  getDefaultNetworkIdFromList,
+} from "@/constants/defaults";
 
 const STORAGE_KEY = "hyperkit_selected_network_id";
 
@@ -57,7 +60,6 @@ export function SelectedNetworkProvider({
 }) {
   const { defaultNetworkId: configDefault } = useConfig();
   const { networks } = useNetworks();
-  const testnets = (networks ?? []).filter((n) => n.is_mainnet === false);
   const [selectedNetworkId, setSelectedNetworkIdState] = useState<string>(
     FALLBACK_DEFAULT_NETWORK_ID,
   );
@@ -77,10 +79,13 @@ export function SelectedNetworkProvider({
       );
       if (found) return found.id;
     }
-    const first = testnets[0];
-    if (first) return first.id;
-    return FALLBACK_DEFAULT_NETWORK_ID;
-  }, [networks, configDefault, testnets]);
+    return getDefaultNetworkIdFromList(
+      (networks ?? []).map((n) => ({
+        id: n.id ?? n.network_id ?? "",
+        is_mainnet: n.is_mainnet,
+      })),
+    );
+  }, [networks, configDefault]);
 
   useEffect(() => {
     if (networks.length === 0) return;

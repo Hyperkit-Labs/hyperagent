@@ -15,9 +15,9 @@ from observability import p95_latency_ms
 from pydantic import BaseModel, Field
 from redis_util import effective_redis_url
 from registries import (
-    ANCHOR_NETWORK_SLUG,
     get_a2a_agent_id,
     get_a2a_default_chain_id,
+    get_anchor_network_slug,
     get_default_chain_id,
     get_erc8004_agent_identity,
     get_monitoring_enabled,
@@ -433,7 +433,7 @@ async def get_config_api() -> dict[str, Any]:
         "credits_enabled": credits_supabase.is_configured(),
         "credits_per_usd": CREDITS_PER_USD,
         "credits_per_run": CREDITS_PER_RUN,
-        "default_network_id": ANCHOR_NETWORK_SLUG,
+        "default_network_id": get_anchor_network_slug(),
         "default_chain_id": get_default_chain_id(),
         "a2a_agent_id": get_a2a_agent_id(),
         "a2a_default_chain_id": get_a2a_default_chain_id(),

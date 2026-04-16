@@ -18,6 +18,7 @@ export function NetworkSelector() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  const mainnets = networks.filter((n) => n.is_mainnet === true);
   const testnets = networks.filter((n) => n.is_mainnet === false);
   const selected =
     networks.find(
@@ -28,8 +29,10 @@ export function NetworkSelector() {
     setSelectedNetworkId(net.id ?? net.network_id ?? "");
     setOpen(false);
   };
-  const popular = testnets.filter(isPrimary);
-  const supported = testnets.filter((n) => !isPrimary(n));
+  const popularMain = mainnets.filter(isPrimary);
+  const supportedMain = mainnets.filter((n) => !isPrimary(n));
+  const popularTest = testnets.filter(isPrimary);
+  const supportedTest = testnets.filter((n) => !isPrimary(n));
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -68,13 +71,13 @@ export function NetworkSelector() {
 
       {open && !loading && !error && (
         <div className="absolute top-full right-0 mt-1.5 w-72 max-h-[360px] overflow-y-auto rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] shadow-xl z-50 py-2">
-          {popular.length > 0 && (
+          {popularMain.length > 0 && (
             <>
               <div className="px-3 py-1.5 text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-widest">
-                Primary Networks
+                Primary (mainnet)
               </div>
               <ul className="px-2 pb-2">
-                {popular.map((net) => (
+                {popularMain.map((net) => (
                   <li key={net.id}>
                     <button
                       type="button"
@@ -94,14 +97,14 @@ export function NetworkSelector() {
             </>
           )}
 
-          {supported.length > 0 && (
+          {supportedMain.length > 0 && (
             <>
               <div className="border-t border-[var(--color-border-subtle)] my-2" />
               <div className="px-3 py-1.5 text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-widest">
-                Supported Networks
+                Mainnet
               </div>
               <ul className="px-2 pb-2 max-h-[180px] overflow-y-auto">
-                {supported.map((net) => (
+                {supportedMain.map((net) => (
                   <li key={net.id}>
                     <button
                       type="button"
@@ -121,11 +124,65 @@ export function NetworkSelector() {
             </>
           )}
 
-          {testnets.length === 0 && !loading && (
+          {popularTest.length > 0 && (
+            <>
+              <div className="border-t border-[var(--color-border-subtle)] my-2" />
+              <div className="px-3 py-1.5 text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-widest">
+                Primary (testnet)
+              </div>
+              <ul className="px-2 pb-2">
+                {popularTest.map((net) => (
+                  <li key={net.id}>
+                    <button
+                      type="button"
+                      onClick={() => handleSelect(net)}
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-[13px] transition-colors ${
+                        selected?.id === net.id
+                          ? "bg-[var(--color-primary-alpha-10)] text-[var(--color-primary-light)] border border-[var(--color-primary-alpha-20)]"
+                          : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-panel)]"
+                      }`}
+                    >
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                      {net.name ?? net.id}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          {supportedTest.length > 0 && (
+            <>
+              <div className="border-t border-[var(--color-border-subtle)] my-2" />
+              <div className="px-3 py-1.5 text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-widest">
+                Testnet
+              </div>
+              <ul className="px-2 pb-2 max-h-[180px] overflow-y-auto">
+                {supportedTest.map((net) => (
+                  <li key={net.id}>
+                    <button
+                      type="button"
+                      onClick={() => handleSelect(net)}
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-[13px] transition-colors ${
+                        selected?.id === net.id
+                          ? "bg-[var(--color-primary-alpha-10)] text-[var(--color-primary-light)] border border-[var(--color-primary-alpha-20)]"
+                          : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-panel)]"
+                      }`}
+                    >
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                      {net.name ?? net.id}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          {networks.length === 0 && !loading && (
             <>
               <div className="border-t border-[var(--color-border-subtle)] my-2" />
               <div className="px-3 py-2 text-[12px] text-[var(--color-text-muted)]">
-                No testnets in registry.
+                No networks in registry.
               </div>
             </>
           )}

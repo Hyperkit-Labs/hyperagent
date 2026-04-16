@@ -1,8 +1,11 @@
 import type { NextConfig } from "next";
 import { config as dotenvConfig } from "dotenv";
 import path from "path";
+import { fileURLToPath } from "url";
 
-const root = path.resolve(__dirname, "../..");
+// ESM-safe: Jest/next compile next.config to ESM where `__dirname` is undefined.
+const configDir = path.dirname(fileURLToPath(import.meta.url));
+const root = path.resolve(configDir, "../..");
 dotenvConfig({ path: path.join(root, ".env") });
 dotenvConfig({
   path: path.join(
@@ -12,7 +15,7 @@ dotenvConfig({
       : ".env.development",
   ),
 });
-dotenvConfig({ path: path.resolve(__dirname, "../.env") });
+dotenvConfig({ path: path.join(configDir, ".env") });
 
 const isProduction = process.env.NODE_ENV === "production";
 const isStaging = (process.env.NODE_ENV as string) === "staging";

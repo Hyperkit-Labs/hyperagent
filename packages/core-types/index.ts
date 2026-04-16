@@ -188,6 +188,7 @@ export const ERC8004_ADDRESSES = {
 } as const;
 
 export const ERC8004_CHAIN_IDS = {
+  SKALE_BASE_MAINNET: 1187947933,
   SKALE_BASE_SEPOLIA: 324705682,
 } as const;
 

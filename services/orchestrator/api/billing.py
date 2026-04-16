@@ -13,7 +13,6 @@ import payments_supabase
 from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from registries import (
-    ANCHOR_NETWORK_SLUG,
     get_default_chain_id,
     get_erc8004_agent_identity,
     get_monitoring_enabled,

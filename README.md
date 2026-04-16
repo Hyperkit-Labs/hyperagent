@@ -8,6 +8,7 @@
 ![Node.js](https://img.shields.io/badge/node.js-18%2B-green)
 ![Next.js](https://img.shields.io/badge/next.js-16-black)
 ![Status](https://img.shields.io/badge/status-active-success)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Hyperkit-Labs/hyperagent)
 <!-- Badges: end -->
 
 HyperAgent is an AI-assisted smart contract development platform that turns natural language specifications into draft artifacts with automated checks, an audit workflow, simulation, and deploy preparation for SKALE Base Mainnet and SKALE Base Sepolia in the current release.

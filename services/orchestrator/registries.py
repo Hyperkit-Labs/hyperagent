@@ -605,8 +605,32 @@ def check_plan_limit(plan_id: str, resource_id: str, current_usage: int) -> bool
     return current_usage < int(limit)
 
 
-ANCHOR_NETWORK_SLUG = "skalebase-sepolia"
-FALLBACK_CHAIN_ID = 324705682
+# SKALE Base: mainnet for production deployments, Sepolia for dev/staging/local.
+ANCHOR_NETWORK_SLUG_PRODUCTION = "skalebase-mainnet"
+ANCHOR_NETWORK_SLUG_DEVELOPMENT = "skalebase-sepolia"
+# Backwards compatibility: historical anchor was Sepolia only.
+ANCHOR_NETWORK_SLUG = ANCHOR_NETWORK_SLUG_DEVELOPMENT
+FALLBACK_CHAIN_ID = 324705682  # SKALE Base Sepolia
+FALLBACK_CHAIN_ID_MAINNET = 1187947933  # SKALE Base
+
+
+def _is_production_deployment() -> bool:
+    """Align with main._is_production: prod-like orchestrator uses mainnet defaults."""
+    return (
+        os.environ.get("RENDER", "").strip().lower() in ("1", "true", "yes")
+        or os.environ.get("NODE_ENV", "").strip().lower() == "production"
+        or os.environ.get("ENVIRONMENT", "").strip().lower() == "production"
+    )
+
+
+def get_anchor_network_slug() -> str:
+    """Default network slug: mainnet in production, Sepolia otherwise. Override with HYPERAGENT_ANCHOR_NETWORK_SLUG."""
+    override = os.environ.get("HYPERAGENT_ANCHOR_NETWORK_SLUG", "").strip()
+    if override:
+        return override
+    if _is_production_deployment():
+        return ANCHOR_NETWORK_SLUG_PRODUCTION
+    return ANCHOR_NETWORK_SLUG_DEVELOPMENT
 
 
 # --- ERC-8004 (Trustless Agents) ---
@@ -694,14 +718,19 @@ def get_erc8004_agent_identity(chain_id: int | None = None) -> dict[str, Any] | 
 
 
 def get_default_chain_id() -> int:
-    """Return chain_id for anchor network from registry."""
-    cid = get_chain_id_by_network_slug(ANCHOR_NETWORK_SLUG)
-    return cid if cid is not None else FALLBACK_CHAIN_ID
+    """Return chain_id for environment-aware anchor network from registry."""
+    slug = get_anchor_network_slug()
+    cid = get_chain_id_by_network_slug(slug)
+    if cid is not None:
+        return cid
+    if slug == ANCHOR_NETWORK_SLUG_PRODUCTION:
+        return FALLBACK_CHAIN_ID_MAINNET
+    return FALLBACK_CHAIN_ID
 
 
 def get_networks_for_api(skale: bool = False) -> list[dict[str, Any]]:
     """Return chains as API network list: network_id, name, chain_id, currency, tier, category, is_mainnet.
-    Anchor testnet first among testnets so Studio default is live.
+    Environment anchor (mainnet in production, Sepolia otherwise) sorts first.
     When skale=True, return SKALE Base networks (slug starting with skalebase-)."""
     out = []
     for c in list_chains(enabled_only=True):
@@ -731,10 +760,12 @@ def get_networks_for_api(skale: bool = False) -> list[dict[str, Any]]:
             }
         )
 
+    anchor = get_anchor_network_slug()
+
     def order_key(item: dict[str, Any]) -> tuple[int, str]:
         slug = (item.get("network_id") or "").strip()
         is_mainnet = item.get("is_mainnet", True)
-        if slug == ANCHOR_NETWORK_SLUG:
+        if slug == anchor:
             return (0, slug)
         if not is_mainnet:
             return (1, slug)

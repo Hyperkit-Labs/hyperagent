@@ -7,7 +7,6 @@ import { useAppChat, hasActiveByokKey } from "@/hooks/useAppChat";
 import { useWorkflowProgress } from "@/hooks/useWorkflowProgress";
 import {
   createWorkflow,
-  DEFAULT_NETWORK,
   getErrorMessage,
   requireLLMKeys,
   LLM_KEYS_REQUIRED_MESSAGE,
@@ -21,6 +20,7 @@ import {
   loadHomeWorkflowDraft,
   saveHomeWorkflowDraft,
 } from "@/lib/workflowDraftStorage";
+import { getDefaultNetworkIdFromList } from "@/constants/defaults";
 import {
   getSessionOnlyLLMKey,
   SESSION_LLM_PASS_THROUGH_UPDATED_EVENT,
@@ -264,8 +264,13 @@ function ChatPageContent() {
     selectedNetworkId: buildNetwork,
     setSelectedNetworkId: setBuildNetwork,
   } = useSelectedNetwork();
+  const defaultNetwork = getDefaultNetworkIdFromList(
+    (networks ?? []).map((n) => ({
+      id: n.id ?? n.network_id ?? "",
+      is_mainnet: n.is_mainnet,
+    })),
+  );
   const testnets = (networks ?? []).filter((n) => n.is_mainnet === false);
-  const defaultNetwork = testnets[0]?.id ?? DEFAULT_NETWORK;
 
   const {
     messages: sdkMessages,

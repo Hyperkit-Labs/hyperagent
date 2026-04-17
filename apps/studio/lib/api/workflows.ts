@@ -5,8 +5,15 @@
 import { FALLBACK_DEFAULT_NETWORK_ID } from "@/constants/defaults";
 import type { Workflow } from "@/lib/types";
 import {
+  createFetchWithPayment,
+  createOfficialX402Fetch,
+} from "@/lib/thirdwebClient";
+import type { Account } from "thirdweb/wallets";
+import { getStoredSession } from "@/lib/session-store";
+import {
   fetchJson,
   fetchJsonAuthed,
+  normalizeApiError,
   reportApiError,
   getApiBase,
   type FetchJsonOptions,
@@ -187,6 +194,96 @@ export async function createWorkflow(
     body: JSON.stringify(body),
     ...options,
   });
+}
+
+/**
+ * Create a workflow with automatic x402 payment handling.
+ *
+ * When the orchestrator responds with a 402 + x402 challenge body, this
+ * function builds a signed payment proof and retries the request with the
+ * X-Payment header — matching the server contract in x402_middleware.py.
+ *
+ * Use this instead of createWorkflow when:
+ * - x402 is enabled (isFeatureEnabled("x402"))
+ * - A connected wallet is available for signing
+ */
+export async function createWorkflowWithX402(
+  body: CreateWorkflowBody,
+  wallet:
+    | { address?: string; signMessage?: (msg: string) => Promise<string> }
+    | null
+    | undefined,
+  options?: {
+    maxPaymentUsd?: number;
+    signal?: AbortSignal;
+    /** When set, uses ERC-3009 / @x402/fetch (Kite-aligned x402) instead of EIP-191 receipts. */
+    thirdwebAccount?: Account | null;
+    /** Chain id for x402 registration (default SKALE Base Mainnet). */
+    x402ChainId?: number;
+  },
+): Promise<{ workflow_id: string }> {
+  const fetchWithPayment =
+    options?.thirdwebAccount != null
+      ? await createOfficialX402Fetch(
+          options.thirdwebAccount,
+          options.x402ChainId ?? 1187947933,
+        )
+      : createFetchWithPayment(wallet, options?.maxPaymentUsd);
+  const base = getApiBase();
+  const path = "/workflows/generate";
+
+  let authHeaders: Record<string, string> = {};
+  try {
+    if (typeof window !== "undefined") {
+      const session = getStoredSession();
+      if (session?.access_token) {
+        authHeaders = { Authorization: `Bearer ${session.access_token}` };
+      }
+    }
+  } catch {
+    // auth header is best-effort; server will reject with 401 if required
+  }
+
+  let res: Response;
+  try {
+    res = await fetchWithPayment(`${base}${path}`, {
+      method: "POST",
+      credentials: "include",
+      signal: options?.signal,
+      headers: {
+        ...authHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    const msg = normalizeApiError(err);
+    reportApiError(err, { path });
+    throw new Error(msg);
+  }
+
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => res.statusText);
+    let message = `HTTP ${res.status}: ${res.statusText}`;
+    try {
+      const j = JSON.parse(errorText) as {
+        message?: string;
+        error?: string;
+        detail?: string;
+      };
+      if (typeof j.message === "string") message = j.message;
+      else if (typeof j.error === "string") message = j.error;
+      else if (typeof j.detail === "string") message = j.detail;
+    } catch {
+      // keep default
+    }
+    const err = new Error(message) as Error & { status?: number };
+    err.status = res.status;
+    reportApiError(err, { path, status: res.status });
+    throw err;
+  }
+
+  return res.json() as Promise<{ workflow_id: string }>;
 }
 
 export async function getWorkflowStatus(

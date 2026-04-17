@@ -21,7 +21,10 @@ export const workspaceHeaders = (
 export interface IntegrationsStatus {
   tenderly_configured?: boolean;
   pinata_configured?: boolean;
+  pinata_dedicated_gateway?: boolean;
   qdrant_configured?: boolean;
+  filecoin_configured?: boolean;
+  kite_chain_configured?: boolean;
 }
 
 export interface RuntimeConfig {

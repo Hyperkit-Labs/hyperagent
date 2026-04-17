@@ -544,6 +544,18 @@ async def audit_agent(state: AgentState) -> AgentState:
             )
         except Exception as pin_err:
             logger.warning("[pipeline] post-audit pin failed: %s", pin_err)
+        try:
+            import mlflow_tracker as _mlft
+            import rag_client as _rag
+
+            await _rag.index_audit_findings(
+                run_id, findings, audit_passed=state["audit_passed"]
+            )
+            _mlft.log_audit_findings(
+                run_id, findings, audit_passed=state["audit_passed"]
+            )
+        except Exception as rag_err:
+            logger.warning("[pipeline] post-audit rag/mlflow log failed: %s", rag_err)
         await _step_complete(
             run_id,
             "audit",
@@ -614,6 +626,29 @@ async def simulation_agent(state: AgentState) -> AgentState:
             )
         except Exception as pin_err:
             logger.warning("[pipeline] post-simulation pin failed: %s", pin_err)
+        try:
+            import mlflow_tracker as _mlft
+            import rag_client as _rag
+
+            _chain_id = (state.get("spec") or {}).get("chain_id") or ""
+            await _rag.index_simulation_outcome(
+                run_id,
+                results,
+                simulation_passed=state["simulation_passed"],
+                chain_id=_chain_id,
+                user_id=state.get("user_id"),
+            )
+            _mlft.log_simulation_result(
+                run_id,
+                chain_id=_chain_id,
+                simulation_passed=state["simulation_passed"],
+                gas_used=int(results.get("gas_used") or 0),
+                rpc_fallback=bool(results.get("rpc_simulated")),
+            )
+        except Exception as sim_rag_err:
+            logger.warning(
+                "[pipeline] post-simulation rag/mlflow log failed: %s", sim_rag_err
+            )
         from store import update_workflow
 
         sim_status = "completed" if state["simulation_passed"] else "failed"

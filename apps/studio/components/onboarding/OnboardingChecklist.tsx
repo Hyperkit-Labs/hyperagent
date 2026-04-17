@@ -206,6 +206,22 @@ export function OnboardingChecklist({
           </a>
         </div>
       )}
+      {isPaymentStep && (
+        <div className="mt-2 flex gap-3 text-[10px] text-[var(--color-text-muted)]">
+          <span>
+            Payments use x402 on{" "}
+            <a
+              href="https://skale.space/base"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-[var(--color-primary-light)] underline"
+            >
+              SKALE Base
+            </a>
+            . Gas is free — only a wallet signature is needed per request.
+          </span>
+        </div>
+      )}
     </div>
   );
 }

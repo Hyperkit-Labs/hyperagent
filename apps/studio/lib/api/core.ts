@@ -144,7 +144,11 @@ export function reportApiError(
   const isNetworkError =
     error instanceof TypeError &&
     (error.message === "Failed to fetch" || error.message === "Load failed");
-  if (path === "/config" && isNetworkError) return;
+  const optionalPublicPaths =
+    path === "/config" ||
+    path === "/platform/track-record" ||
+    path?.endsWith("/platform/track-record");
+  if (optionalPublicPaths && isNetworkError) return;
   const msg = error instanceof Error ? error.message : String(error);
   if (typeof console !== "undefined" && console.error) {
     console.error("[API]", msg, context);

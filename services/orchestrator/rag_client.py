@@ -224,6 +224,161 @@ async def index_fix(
         return False
 
 
+async def index_audit_findings(
+    run_id: str,
+    findings: list[dict[str, Any]],
+    *,
+    audit_passed: bool,
+    user_id: str | None = None,
+) -> bool:
+    """Index audit findings for cross-run learning (Pillar 3 feedback loop).
+
+    Stores a per-run audit summary so future codegen can retrieve patterns
+    like 'contracts with ERC-20 transfer had reentrancy; fix was ...'.
+    Only high/critical findings are stored to reduce noise.
+    """
+    if not is_configured():
+        return False
+    high_critical = [
+        f for f in findings if (f.get("severity") or "").lower() in {"high", "critical"}
+    ]
+    if not high_critical and audit_passed:
+        return False
+    try:
+        finding_texts = []
+        for f in high_critical[:10]:
+            parts = [f.get("title") or f.get("category") or ""]
+            if f.get("description"):
+                parts.append(f["description"][:300])
+            if f.get("location"):
+                parts.append(f"Location: {f['location']}")
+            finding_texts.append(" | ".join(p for p in parts if p))
+
+        summary_text = (
+            f"Audit run {run_id}: {'PASSED' if audit_passed else 'FAILED'}. "
+            f"{len(findings)} total findings, {len(high_critical)} high/critical. "
+            + " || ".join(finding_texts)
+        )
+        meta: dict[str, Any] = {
+            "type": "audit_finding",
+            "status": "verified",
+            "run_id": run_id,
+            "audit_passed": str(audit_passed),
+            "high_critical_count": len(high_critical),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        if user_id:
+            meta["user_id"] = user_id
+        payload: dict[str, Any] = {
+            "spec_id": f"audit-{run_id}",
+            "spec": {
+                "type": "audit_finding",
+                "findings": high_critical[:10],
+                "audit_passed": audit_passed,
+            },
+            "text": summary_text,
+            "metadata": meta,
+        }
+        async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
+            r = await client.post(f"{VECTORDB_URL}/index/spec", json=payload)
+            r.raise_for_status()
+            return r.json().get("ok", False)
+    except Exception as e:
+        logger.warning("[rag] index_audit_findings failed for run_id=%s: %s", run_id, e)
+        return False
+
+
+async def index_simulation_outcome(
+    run_id: str,
+    simulation_results: dict[str, Any],
+    *,
+    simulation_passed: bool,
+    chain_id: int | str | None = None,
+    user_id: str | None = None,
+) -> bool:
+    """Index simulation outcomes for feedback-loop learning.
+
+    Stores gas usage, failure reasons, and chain context so future runs
+    can retrieve 'similar contract deployed on SKALE had gas estimate X'.
+    Only indexes failures or high-gas results to avoid polluting the corpus.
+    """
+    if not is_configured():
+        return False
+    gas_used = int(
+        simulation_results.get("gas_used") or simulation_results.get("gasUsed") or 0
+    )
+    if simulation_passed and gas_used < 500_000:
+        return False
+    try:
+        failure_reason = (
+            simulation_results.get("error")
+            or simulation_results.get("revert_reason")
+            or ""
+        )
+        summary_text = (
+            f"Simulation run {run_id}: {'PASSED' if simulation_passed else 'FAILED'}. "
+            f"Chain: {chain_id or 'unknown'}. Gas: {gas_used}. "
+            + (f"Failure: {failure_reason[:300]}" if failure_reason else "")
+        )
+        meta: dict[str, Any] = {
+            "type": "simulation_outcome",
+            "status": "verified",
+            "run_id": run_id,
+            "simulation_passed": str(simulation_passed),
+            "chain_id": str(chain_id or ""),
+            "gas_used": gas_used,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        if user_id:
+            meta["user_id"] = user_id
+        payload: dict[str, Any] = {
+            "spec_id": f"sim-{run_id}",
+            "spec": {
+                "type": "simulation_outcome",
+                "simulation_passed": simulation_passed,
+                "gas_used": gas_used,
+                "chain_id": str(chain_id or ""),
+                "failure_reason": failure_reason[:500],
+            },
+            "text": summary_text,
+            "metadata": meta,
+        }
+        async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
+            r = await client.post(f"{VECTORDB_URL}/index/spec", json=payload)
+            r.raise_for_status()
+            return r.json().get("ok", False)
+    except Exception as e:
+        logger.warning(
+            "[rag] index_simulation_outcome failed for run_id=%s: %s", run_id, e
+        )
+        return False
+
+
+async def query_audit_patterns(
+    prompt: str, limit: int = 5, user_id: str | None = None
+) -> list[dict[str, Any]]:
+    """Query RAG for audit findings from past runs matching a code pattern.
+
+    Used by codegen agent to check 'did similar contracts have known issues'.
+    """
+    if not is_configured():
+        return []
+    try:
+        payload: dict[str, Any] = {
+            "query": prompt,
+            "collection": "specs",
+            "limit": limit,
+            "metadata_filter": {"type": "audit_finding", "status": "verified"},
+        }
+        async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
+            r = await client.post(f"{VECTORDB_URL}/query", json=payload)
+            r.raise_for_status()
+            return r.json().get("results", [])
+    except Exception as e:
+        logger.warning("[rag] query_audit_patterns failed: %s", e)
+        return []
+
+
 async def blacklist_entry(spec_id: str, reason: str = "economically unsafe") -> bool:
     """Soft-delete/blacklist a RAG entry by marking its status as deprecated.
     Ensures the DesignAgent excludes it from future queries."""

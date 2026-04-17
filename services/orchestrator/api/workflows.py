@@ -18,6 +18,7 @@ from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
 from llm_keys_store import DEFAULT_WORKSPACE
 from pydantic import BaseModel, Field
+from rate_limit import DEPLOY_LIMIT, limiter
 from registries import (
     DEFAULT_PIPELINE_ID,
     get_chain_rpc_explorer,
@@ -654,6 +655,7 @@ def prepare_deploy_api(
 
 
 @router.post("/{workflow_id}/deploy/approve")
+@limiter.limit(DEPLOY_LIMIT)
 def deploy_approve_api(
     workflow_id: str,
     background_tasks: BackgroundTasks,

@@ -54,8 +54,31 @@ spec:
       notes:
         - "Canonical mainnet Identity Registry address"
 
+    # Kite Chain (official network info: https://docs.gokite.ai/kite-chain/1-getting-started/network-information.md)
+    # ERC-8004 contract addresses on Kite are not tracked here yet. Agent identity and x402 settlement
+    # for Kite use Kite Agent Passport + Pieverse facilitator per service-provider guide.
+    - chainId: 2368
+      slug: kite-testnet
+      identityRegistry: null
+      reputationRegistry: null
+      validationRegistry: null
+      agentRegistry: null
+      notes:
+        - "KiteAI Testnet — chainId 2368, RPC https://rpc-testnet.gokite.ai/"
+        - "Register HyperAgent via Passport / on-chain when ERC-8004 is deployed; then fill registries and hyperagent.agentIds"
+    - chainId: 2366
+      slug: kite-mainnet
+      identityRegistry: null
+      reputationRegistry: null
+      validationRegistry: null
+      agentRegistry: null
+      notes:
+        - "KiteAI Mainnet — chainId 2366, RPC https://rpc.gokite.ai/"
+        - "Pair with KITE_X402_FACILITATOR_URL (Pieverse) for x402 verify/settle on this chain"
+
   # HyperAgent registration on this registry (agentId from Transfer event after register())
   # paymentWallet: set via setAgentWallet() on-chain; matches MERCHANT_WALLET_ADDRESS
+  # Kite Chain (2366/2368): add agentIds entries here after on-chain registration alongside Passport.
   hyperagent:
     paymentWallet: "0xcc6585FB00EE0769fD344f58f1f840319f2c2AF9"
     agentIds:

@@ -109,10 +109,21 @@ spec:
       source: custom
       defaultChains: [1187947933, 324705682]
       oracle:
-        default: chainlink
+        # CHAINLINK IS NOT DEPLOYED ON SKALE BASE. Addresses below are
+        # Ethereum mainnet feeds only — do not use on SKALE chains.
+        # For SKALE deployments use Solidity RNG (built-in) for randomness
+        # and a custom price aggregator or hardcoded prices for lending.
+        # See: https://docs.skale.network/learn/skale-features
+        default: none
+        chainOverrides:
+          1: chainlink           # Ethereum mainnet — Chainlink is available
+          8453: chainlink        # Base — Chainlink is available
+          42161: chainlink       # Arbitrum — Chainlink is available
         priceFeeds:
-          ETH_USD: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
-          BTC_USD: "0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c"
+          # These addresses are ONLY valid on Ethereum mainnet (chainId: 1).
+          # Remove them before deploying to SKALE chains.
+          ETH_USD_mainnet_only: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
+          BTC_USD_mainnet_only: "0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c"
     - id: marketplace-nft
       name: NFT Marketplace
       standards: ["ERC721", "custom"]

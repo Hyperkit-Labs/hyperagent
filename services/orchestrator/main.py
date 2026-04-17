@@ -41,13 +41,17 @@ from api import (
     runs_router,
     sandbox_router,
     security_router,
+    simulation_webhooks_router,
     storage_webhooks_router,
     ui_export_router,
     workflows_router,
     workflows_streaming_router,
+    x402_webhooks_router,
 )
 from fastapi import FastAPI, Request
 from observability import record_latency
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from structured_logging import TraceContextFilter
 from trace_context import set_request_id
 
@@ -66,6 +70,12 @@ AUDIT_SERVICE_URL = os.environ.get("AUDIT_SERVICE_URL", "http://localhost:8001")
 )
 
 app = FastAPI(title="HyperAgent Orchestrator", version="0.1.0")
+
+# slowapi: orchestrator-level rate limiting (second layer after API-gateway Upstash limits).
+from rate_limit import limiter
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Startup-validation state: when critical env vars are missing in production,
 # we set this instead of killing the process so the container stays alive,
@@ -307,6 +317,8 @@ app.include_router(credits_router)
 app.include_router(payments_router)
 app.include_router(pricing_router)
 app.include_router(reconciliation_router)
+app.include_router(x402_webhooks_router)
+app.include_router(simulation_webhooks_router)
 app.include_router(storage_webhooks_router)
 app.include_router(health_router)
 app.include_router(api_health_router)

@@ -19,7 +19,8 @@ export function LoginHero() {
             alt="Hyperkit"
             width={240}
             height={80}
-            className="h-14 xl:h-16 w-auto"
+            className="max-h-14 xl:max-h-16 w-auto"
+            style={{ width: "auto", height: "auto" }}
             priority
           />
         </div>
@@ -60,32 +61,32 @@ export function LoginHero() {
                   alt="Thirdweb"
                   width={120}
                   height={24}
-                  className="opacity-75 object-contain"
-                  style={{ height: 24, width: "auto" }}
+                  className="max-h-6 w-auto opacity-75 object-contain"
+                  style={{ width: "auto", height: "auto" }}
                 />
                 <Image
                   src="/tenderly-logo.png"
                   alt="Tenderly"
                   width={100}
                   height={24}
-                  className="opacity-75 object-contain brightness-0 invert"
-                  style={{ height: 24, width: "auto" }}
+                  className="max-h-6 w-auto opacity-75 object-contain brightness-0 invert"
+                  style={{ width: "auto", height: "auto" }}
                 />
                 <Image
                   src="/pinata-ipfs.png"
                   alt="Pinata"
                   width={80}
                   height={24}
-                  className="opacity-75 object-contain brightness-0 invert"
-                  style={{ height: 24, width: "auto" }}
+                  className="max-h-6 w-auto opacity-75 object-contain brightness-0 invert"
+                  style={{ width: "auto", height: "auto" }}
                 />
                 <Image
                   src="/SentientAGI.png"
                   alt="SentientAGI"
                   width={100}
                   height={24}
-                  className="opacity-75 object-contain brightness-0 invert"
-                  style={{ height: 24, width: "auto" }}
+                  className="max-h-6 w-auto opacity-75 object-contain brightness-0 invert"
+                  style={{ width: "auto", height: "auto" }}
                 />
               </div>
             </div>
@@ -100,8 +101,8 @@ export function LoginHero() {
                   alt="Slither"
                   width={160}
                   height={36}
-                  className="opacity-75 object-contain brightness-0 invert"
-                  style={{ height: 36, width: "auto", marginTop: "-4px" }}
+                  className="max-h-9 w-auto opacity-75 object-contain brightness-0 invert [-mt-1]"
+                  style={{ width: "auto", height: "auto" }}
                 />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -119,8 +120,8 @@ export function LoginHero() {
                   alt="Pashov Audit Group"
                   width={120}
                   height={24}
-                  className="opacity-75 object-contain"
-                  style={{ height: 24, width: "auto" }}
+                  className="max-h-6 w-auto opacity-75 object-contain"
+                  style={{ width: "auto", height: "auto" }}
                 />
               </div>
             </div>
@@ -130,27 +131,58 @@ export function LoginHero() {
             <span className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">
               Supported in v0.1.0
             </span>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] px-3 py-2 text-xs text-[var(--color-text-secondary)]">
-                <Image
-                  src="/skale-logo.png"
-                  alt="SKALE"
-                  width={16}
-                  height={16}
-                  className="brightness-0 invert"
-                />
-                <span>SKALE Base Mainnet</span>
-              </div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] px-3 py-2 text-xs text-[var(--color-text-secondary)]">
-                <Image
-                  src="/skale-logo.png"
-                  alt="SKALE"
-                  width={16}
-                  height={16}
-                  className="brightness-0 invert"
-                />
-                <span>SKALE Base Sepolia</span>
-              </div>
+            <div className="flex flex-col items-start gap-2">
+              <Image
+                src="/skale-logo.png"
+                alt="SKALE"
+                width={48}
+                height={48}
+                className="brightness-0 invert object-contain"
+                style={{ width: "auto", height: "auto", maxHeight: "3rem" }}
+              />
+              <span className="text-sm font-medium text-[var(--color-text-primary)]">
+                {`Base (Mainnet & Sepolia)`}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-start gap-3 w-full overflow-hidden">
+            <span className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">
+              Up next
+            </span>
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
+              <Image
+                src="/Base_Logo.png"
+                alt="Base"
+                width={120}
+                height={32}
+                className="max-h-8 w-auto object-contain"
+                style={{ width: "auto", height: "auto" }}
+              />
+              <Image
+                src="/Kite_LogoWhite.png"
+                alt="Kite"
+                width={120}
+                height={32}
+                className="max-h-8 w-auto object-contain"
+                style={{ width: "auto", height: "auto" }}
+              />
+              <Image
+                src="/filecoin-logo.png"
+                alt="Filecoin"
+                width={140}
+                height={32}
+                className="max-h-8 w-auto object-contain"
+                style={{ width: "auto", height: "auto" }}
+              />
+              <Image
+                src="/AvalancheLogo_Horizontal_1C_Red.png"
+                alt="Avalanche"
+                width={160}
+                height={32}
+                className="max-h-8 w-auto object-contain"
+                style={{ width: "auto", height: "auto" }}
+              />
             </div>
           </div>
         </motion.div>

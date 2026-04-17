@@ -87,9 +87,23 @@ app.post("/ipfs/unpin", safeHandler("storage-unpin", async (req, res) => {
 }));
 
 app.get("/health", (_req, res) => {
+  const pinataConfigured = Boolean(process.env.PINATA_JWT);
+  const gatewayDomain = (process.env.PINATA_GATEWAY_DOMAIN ?? "gateway.pinata.cloud").trim();
+  const isSharedGateway = gatewayDomain === "gateway.pinata.cloud" || !gatewayDomain;
+  const isDedicatedGateway = !isSharedGateway;
+
+  if (pinataConfigured && isSharedGateway && (process.env.NODE_ENV === "production" || process.env.ENVIRONMENT === "production")) {
+    log.warn(
+      "Pinata is using the shared gateway (gateway.pinata.cloud) in production. " +
+      "Set PINATA_GATEWAY_DOMAIN to a dedicated gateway for better rate limits and reliability.",
+    );
+  }
+
   res.json({
     status: "ok",
-    pinata_configured: Boolean(process.env.PINATA_JWT),
+    pinata_configured: pinataConfigured,
+    pinata_gateway_domain: gatewayDomain,
+    pinata_dedicated_gateway: isDedicatedGateway,
   });
 });
 

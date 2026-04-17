@@ -54,6 +54,8 @@ services:
       - .env
     environment:
       - PYTHONUNBUFFERED=1
+      # Writable path for prometheus-client multiproc (created on startup if missing).
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
       - REGISTRIES_PATH=/app/services/orchestrator/registries
       - AGENT_RUNTIME_URL=http://agent-runtime:4001
       - COMPILE_SERVICE_URL=http://compile:8004

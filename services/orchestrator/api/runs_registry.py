@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from registries import (
     get_chain_id_by_network_slug,
     get_chain_rpc_explorer,
+    get_chain_rpc_url_list,
     get_networks_for_api,
     get_stablecoins_by_chain,
     get_templates_for_api,
@@ -230,52 +231,57 @@ async def rpc_test_api(
         cid = get_chain_id_by_network_slug(network_id.strip())
     if cid is None:
         raise HTTPException(status_code=400, detail="Provide network_id or chain_id")
-    rpc_explorer = get_chain_rpc_explorer(cid)
-    if not rpc_explorer:
+    rpc_urls = get_chain_rpc_url_list(cid)
+    if not rpc_urls:
         raise HTTPException(status_code=404, detail=f"No RPC URL for chain_id={cid}")
-    rpc_url, _ = rpc_explorer
-    if not rpc_url:
-        raise HTTPException(status_code=404, detail=f"No RPC URL for chain_id={cid}")
-    start = time.perf_counter()
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            r = await client.post(
-                rpc_url,
-                json={
-                    "jsonrpc": "2.0",
-                    "method": "eth_blockNumber",
-                    "params": [],
-                    "id": 1,
-                },
-            )
-        latency_ms = int((time.perf_counter() - start) * 1000)
-        if r.status_code != 200:
-            return {
-                "ok": False,
-                "error": f"HTTP {r.status_code}",
-                "latency_ms": latency_ms,
-            }
-        try:
-            j = r.json()
-            if j.get("error"):
-                return {"ok": False, "error": str(j["error"]), "latency_ms": latency_ms}
-            if "result" in j:
-                return {"ok": True, "block": j["result"], "latency_ms": latency_ms}
-        except Exception as e:
-            return {"ok": False, "error": str(e)[:200], "latency_ms": latency_ms}
-        return {"ok": False, "error": "Unexpected response", "latency_ms": latency_ms}
-    except httpx.TimeoutException:
-        return {
-            "ok": False,
-            "error": "Request timed out",
-            "latency_ms": int((time.perf_counter() - start) * 1000),
-        }
-    except Exception as e:
-        return {
-            "ok": False,
-            "error": str(e)[:200],
-            "latency_ms": int((time.perf_counter() - start) * 1000),
-        }
+
+    errors: list[str] = []
+    overall_start = time.perf_counter()
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        for rpc_url in rpc_urls:
+            start = time.perf_counter()
+            try:
+                r = await client.post(
+                    rpc_url,
+                    json={
+                        "jsonrpc": "2.0",
+                        "method": "eth_blockNumber",
+                        "params": [],
+                        "id": 1,
+                    },
+                )
+                latency_ms = int((time.perf_counter() - start) * 1000)
+                if r.status_code != 200:
+                    errors.append(f"{rpc_url}: HTTP {r.status_code}")
+                    continue
+                try:
+                    j = r.json()
+                    if j.get("error"):
+                        errors.append(f"{rpc_url}: {j['error']}")
+                        continue
+                    if "result" in j:
+                        return {
+                            "ok": True,
+                            "block": j["result"],
+                            "latency_ms": latency_ms,
+                            "rpc_url": rpc_url,
+                            "attempts": len(errors) + 1,
+                        }
+                except Exception as e:
+                    errors.append(f"{rpc_url}: {str(e)[:120]}")
+                    continue
+                errors.append(f"{rpc_url}: unexpected JSON shape")
+            except httpx.TimeoutException:
+                errors.append(f"{rpc_url}: timeout")
+            except Exception as e:
+                errors.append(f"{rpc_url}: {str(e)[:120]}")
+
+    return {
+        "ok": False,
+        "error": "; ".join(errors) if errors else "All RPC endpoints failed",
+        "latency_ms": int((time.perf_counter() - overall_start) * 1000),
+        "attempts": len(rpc_urls),
+    }
 
 
 @registry_router.get("/tokens/stablecoins")

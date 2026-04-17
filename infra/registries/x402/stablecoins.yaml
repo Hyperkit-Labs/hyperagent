@@ -1,11 +1,15 @@
 # USDC/USDT network and address registry (GitOps). Canonical contract addresses per chain
 # for x402 payments, gasless paymaster, and merchant settlement. Update via PR; verify
-# addresses from Circle (USDC) and Tether (USDT) before changing.
+# addresses from Circle (USDC), Tether (USDT), and SKALE Bridge docs before changing.
+#
+# SKALE Base Mainnet (1187947933) tokens are IMA-bridged from Base mainnet.
+# SKALE Base Sepolia (324705682) tokens are IMA-bridged from Base Sepolia.
+# All SKALE token transfers are gasless (CREDIT is native, not charged for ERC-20 transfers).
 apiVersion: hyperkitlabs.com/v1
 kind: StablecoinRegistry
 metadata:
   name: usdc-usdt-addresses
-  version: "1"
+  version: "2"
 spec:
   tokens:
     - symbol: USDC
@@ -31,12 +35,18 @@ spec:
         - chainId: 56
           address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
           native: true
+        # SKALE Base Sepolia — IMA-bridged USDC.e from Base Sepolia (correct)
         - chainId: 324705682
           address: "0x2e08028E3C4c2356572E096d8EF835cD5C6030bD"
-          native: true
+          native: false
+          notes: "USDC.e bridged via SKALE IMA from Base Sepolia"
+        # SKALE Base Mainnet — IMA-bridged USDC.e from Base mainnet
+        # CORRECTED: was 0x036CbD... (Base mainnet USDC — wrong chain)
         - chainId: 1187947933
-          address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
-          native: true
+          address: "0x85889c8c714505E0c94b30fcfcF64fE3Ac8FCb20"
+          native: false
+          notes: "USDC.e bridged via SKALE IMA from Base mainnet"
+
     - symbol: USDT
       name: Tether USD
       decimals: 6
@@ -60,12 +70,87 @@ spec:
         - chainId: 56
           address: "0x55d398326f99059fF775485246999027B3197955"
           native: false
+        # SKALE Base Sepolia — IMA-bridged USDT from Base Sepolia (correct)
         - chainId: 324705682
           address: "0x3Ca0A49f511c2c89c4DCbbf1731120d8919050Bf"
           native: false
+          notes: "USDT bridged via SKALE IMA from Base Sepolia"
+        # SKALE Base Mainnet — IMA-bridged USDT from Base mainnet
+        # CORRECTED: was 0x0eda7d... (Base Sepolia USDT — wrong chain)
         - chainId: 1187947933
-          address: "0x0eda7df37785f570560dA74ceCFD435AB60D84a8"
+          address: "0x2bF5bF154b515EaA82C31a65ec11554fF5aF7fCA"
           native: false
+          notes: "USDT bridged via SKALE IMA from Base mainnet"
+
+    - symbol: WBTC
+      name: Wrapped Bitcoin
+      decimals: 8
+      issuer: BitGo
+      byChain:
+        - chainId: 1
+          address: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
+          native: false
+        - chainId: 8453
+          address: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf"
+          native: false
+        - chainId: 42161
+          address: "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f"
+          native: false
+        # SKALE Base Mainnet — IMA-bridged WBTC from Base mainnet
+        - chainId: 1187947933
+          address: "0x1aeeCFE5454c83B42D8A316246CAc9739E7f690e"
+          native: false
+          notes: "WBTC bridged via SKALE IMA from Base mainnet"
+        # SKALE Base Sepolia — verify address from SKALE IMA bridge explorer before use
+        - chainId: 324705682
+          address: ""
+          native: false
+          notes: "Pending — verify SKALE Base Sepolia WBTC bridge address from SKALE IMA explorer"
+
+    - symbol: WETH
+      name: Wrapped Ether
+      decimals: 18
+      issuer: Canonical
+      byChain:
+        - chainId: 1
+          address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+          native: false
+        - chainId: 8453
+          address: "0x4200000000000000000000000000000000000006"
+          native: false
+        - chainId: 42161
+          address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
+          native: false
+        - chainId: 137
+          address: "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619"
+          native: false
+        # SKALE Base Mainnet — IMA-bridged WETH from Base mainnet
+        - chainId: 1187947933
+          address: "0x7bD39ABBd0Dd13103542cAe3276C7fA332bCA486"
+          native: false
+          notes: "WETH bridged via SKALE IMA from Base mainnet"
+        # SKALE Base Sepolia — verify address from SKALE IMA bridge explorer before use
+        - chainId: 324705682
+          address: ""
+          native: false
+          notes: "Pending — verify SKALE Base Sepolia WETH bridge address from SKALE IMA explorer"
+
+    - symbol: ETHC
+      name: Ether Clone (SKALE native ETH-equivalent)
+      decimals: 18
+      issuer: SKALE
+      byChain:
+        # SKALE Base Mainnet — ETHC is the ETH-equivalent bridged asset on SKALE
+        - chainId: 1187947933
+          address: "0xD2Aaa00700000000000000000000000000000000"
+          native: false
+          notes: "SKALE-native ETHC; clone contract deployed by SKALE IMA at deterministic address"
+        # SKALE Base Sepolia — same deterministic address pattern
+        - chainId: 324705682
+          address: "0xD2Aaa00700000000000000000000000000000000"
+          native: false
+          notes: "SKALE-native ETHC on testnet; verify before production use"
+
   # Default payment token per chain for x402 (when not specified by client)
   defaultPaymentTokenByChain:
     1: USDC
@@ -74,3 +159,6 @@ spec:
     137: USDC
     43114: USDC
     56: USDC
+    # SKALE Base chains — USDC.e via IMA bridge, gasless transfers on SKALE
+    1187947933: USDC
+    324705682: USDC

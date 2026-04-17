@@ -1,8 +1,14 @@
 """
-Redis-protocol job queue for pipeline (Upstash TCP or other). Enqueue workflow runs; worker consumes and executes.
-Keys: queue:hyperagent:pipeline, queue:hyperagent:dead. Set REDIS_URL and QUEUE_ENABLED=1 to enable.
+Job queue bridge for HyperAgent pipeline.
 
-Queue and checkpointer both use REDIS_URL (same Upstash TCP URL).
+Dispatch modes (evaluated in order):
+  1. Celery  — when CELERY_ENABLED=1 and REDIS_URL is set. Provides retry backoff,
+               Flower visibility, priority routing, and true dead-letter queues.
+  2. Redis   — when QUEUE_ENABLED=1 and REDIS_URL is set. Hand-rolled BLPOP/RPUSH.
+               Kept for environments that can't install Celery.
+  3. Direct  — synchronous in-process call (no queue). Used for dev/low-volume.
+
+Set REDIS_URL (TCP) and CELERY_ENABLED=1 for production workers.
 """
 
 from __future__ import annotations
@@ -22,6 +28,11 @@ QUEUE_ENABLED = (os.environ.get("QUEUE_ENABLED") or "").strip().lower() in (
     "true",
     "yes",
 )
+CELERY_ENABLED = (os.environ.get("CELERY_ENABLED") or "").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+)
 QUEUE_MAX_RETRIES = int(os.environ.get("QUEUE_MAX_RETRIES", "3"))
 
 
@@ -36,14 +47,51 @@ def _get_redis():
 
         return redis.from_url(effective_redis_url(url), decode_responses=True)
     except Exception as e:
-        logger.warning("[queue] Upstash unavailable: %s", e)
+        logger.warning("[queue] Redis unavailable: %s", e)
         return None
 
 
+def _enqueue_celery(job: dict) -> bool:
+    """Dispatch job as a Celery task. Returns True on success."""
+    try:
+        from tasks import run_pipeline_task
+
+        run_pipeline_task.apply_async(
+            kwargs={
+                "run_id": job.get("run_id") or job.get("workflow_id", ""),
+                "user_prompt": job.get("nlp_input") or job.get("user_prompt", ""),
+                "user_id": job.get("user_id", ""),
+                "project_id": job.get("project_id", ""),
+                "api_keys": job.get("api_keys", {}),
+                "pipeline_id": job.get("pipeline_id"),
+                "checkpoint_id": job.get("checkpoint_id"),
+                "agent_session_jwt": job.get("agent_session_jwt"),
+                "template_id": job.get("template_id"),
+                "request_id": job.get("request_id"),
+                "initial_state": job.get("initial_state"),
+                "initial_state_override": job.get("initial_state_override"),
+                "resume_update": job.get("resume_update"),
+            },
+            # Route to the dedicated pipeline queue for priority control.
+            queue="pipeline",
+            # Task ID = run_id for idempotency and Flower lookup.
+            task_id=job.get("run_id") or job.get("workflow_id") or None,
+        )
+        logger.info("[celery] enqueued run_id=%s", job.get("run_id"))
+        return True
+    except Exception as e:
+        logger.warning("[celery] enqueue failed: %s", e)
+        return False
+
+
 def enqueue(job: dict) -> bool:
-    """Enqueue pipeline job. Returns True if queued."""
+    """Enqueue pipeline job. Returns True if queued via Celery or Redis."""
+    if CELERY_ENABLED:
+        return _enqueue_celery(job)
+
     if not QUEUE_ENABLED:
         return False
+
     r = _get_redis()
     if not r:
         return False
@@ -57,13 +105,20 @@ def enqueue(job: dict) -> bool:
 
 
 def dequeue(timeout: int = 5) -> dict | None:
-    """Blocking dequeue. Returns job dict or None."""
+    """Blocking dequeue for the Redis path. Not used when Celery is enabled."""
+    if CELERY_ENABLED:
+        logger.warning(
+            "[queue] dequeue() called but CELERY_ENABLED=1 — use Celery workers instead."
+        )
+        return None
+
     r = _get_redis()
     if not r:
         return None
     try:
-        _, raw = r.blpop(QUEUE_KEY, timeout=timeout)
-        if raw:
+        result = r.blpop(QUEUE_KEY, timeout=timeout)
+        if result:
+            _, raw = result
             return json.loads(raw)
     except Exception as e:
         logger.warning("[queue] dequeue failed: %s", e)
@@ -71,7 +126,11 @@ def dequeue(timeout: int = 5) -> dict | None:
 
 
 def send_to_dead(job: dict, error: str) -> None:
-    """Move failed job to dead-letter queue for inspection."""
+    """Move failed job to dead-letter queue for inspection (Redis path only)."""
+    if CELERY_ENABLED:
+        # Celery handles dead-letter via its own failure callbacks in tasks.py.
+        return
+
     r = _get_redis()
     if not r:
         return

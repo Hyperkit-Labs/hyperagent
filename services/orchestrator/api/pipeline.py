@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Request
 from input_guardrail import validate_input as guardrail_validate_input
 from llm_keys_store import DEFAULT_WORKSPACE
 from pydantic import BaseModel, Field
+from rate_limit import GENERATE_LIMIT, limiter
 from registries import DEFAULT_PIPELINE_ID, get_x402_enabled
 from store import MAX_INTENT_LENGTH, create_workflow, list_workflows, update_workflow
 from trace_context import set_request_id
@@ -25,6 +26,7 @@ from .common import (
     _get_keys_for_run,
     _log_byok_event,
     _run_status_for_store,
+    redact_error_for_storage,
 )
 
 logger = logging.getLogger(__name__)
@@ -246,7 +248,7 @@ def _run_workflow_pipeline_job(
                     pay_err,
                 )
     except Exception as e:
-        err_msg = str(e)
+        err_msg = redact_error_for_storage(str(e))
         update_workflow(workflow_id=workflow_id, status="failed", error=err_msg)
         if db.is_configured():
             db.update_run(workflow_id, status="failed", error_message=err_msg)
@@ -275,6 +277,7 @@ router = APIRouter(prefix="/api/v1/workflows", tags=["pipeline"])
 
 
 @router.post("/generate")
+@limiter.limit(GENERATE_LIMIT)
 def workflows_generate(
     body: CreateWorkflowBody,
     request: Request,
@@ -291,6 +294,28 @@ def workflows_generate(
     workflow_id = str(uuid.uuid4())
     user_id = x_user_id or "anonymous"
     project_id = body.project_id or workflow_id
+
+    # v0.1.0 launch contract: when X402_MANDATORY_V01 is set, pipeline start requires
+    # either a valid X-Payment proof (x402 path) or a credits balance (credits path).
+    # This runs before credits deduction so we fail fast without touching balances.
+    _x402_mandatory_v01 = os.environ.get("X402_MANDATORY_V01", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if _x402_mandatory_v01 and not credits_supabase.is_configured():
+        payment_header = (
+            request.headers.get("X-Payment") or request.headers.get("x-payment") or ""
+        ).strip()
+        if not payment_header:
+            raise HTTPException(
+                status_code=402,
+                detail=(
+                    "Payment required. Attach a valid X-Payment proof header "
+                    "(x402) or configure workspace credits."
+                ),
+            )
+
     if credits_supabase.is_configured() and user_id and db._is_uuid(user_id):
         if not credits_supabase.has_sufficient_credits(user_id, CREDITS_PER_RUN):
             bal = credits_supabase.get_balance(user_id)

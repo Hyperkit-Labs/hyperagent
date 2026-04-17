@@ -17,13 +17,13 @@ sys.path.insert(
 
 def test_pinata_signature_roundtrip(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PINATA_WEBHOOK_SECRET", "testsecret")
-    from api.storage_webhooks import _verify_pinata_signature
+    from webhook_utils import verify_hmac_sha256
 
     body = b'{"type":"pinning","data":{"cid":"QmX"}}'
     digest = hmac.new(b"testsecret", body, hashlib.sha256).hexdigest()
-    assert _verify_pinata_signature(body, digest, "testsecret") is True
-    assert _verify_pinata_signature(body, f"sha256={digest}", "testsecret") is True
-    assert _verify_pinata_signature(body, "deadbeef", "testsecret") is False
+    assert verify_hmac_sha256(body, digest, "testsecret") is True
+    assert verify_hmac_sha256(body, f"sha256={digest}", "testsecret") is True
+    assert verify_hmac_sha256(body, "deadbeef", "testsecret") is False
 
 
 def test_extract_cid() -> None:

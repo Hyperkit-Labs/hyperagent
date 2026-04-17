@@ -98,10 +98,7 @@ export async function getPlatformTrackRecord(
   // Public endpoint: use unauthenticated fetch so missing session never forces zeros on the login page.
   return fetchJson<PlatformTrackRecord>("/platform/track-record", {
     signal,
-  }).catch((e) => {
-    reportApiError(e, { path: "/platform/track-record" });
-    return TRACK_RECORD_DEFAULTS;
-  });
+  }).catch(() => TRACK_RECORD_DEFAULTS);
 }
 
 export interface BlueprintItem {

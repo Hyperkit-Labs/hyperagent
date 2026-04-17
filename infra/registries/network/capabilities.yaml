@@ -52,8 +52,12 @@ spec:
       rpcUrl: https://skale-base.skalenodes.com/v1/base
       explorerUrl: https://skale-base-explorer.skalenodes.com/
       nativeCurrency:
+        # CREDIT is the native gas token on SKALE Base. Users need CREDIT for
+        # transactions. Direct new users to https://base.skale.space/ for the faucet.
+        # Transactions are type-0 (legacy) only — no EIP-1559 gas fields.
         symbol: CREDIT
         decimals: 18
+        faucetUrl: https://base.skale.space/
       capabilities:
         tenderly: false
         x402: true
@@ -62,6 +66,35 @@ spec:
         accountAbstraction:
           erc4337: true
           eip7702: false
+        # SKALE-native capabilities — exclusive advantages vs other chains
+        # Simulation note: Tenderly does not support SKALE Base. The pipeline uses
+        # eth_estimateGas RPC fallback when SIMULATION_RPC_FALLBACK=1 (default).
+        # For full state simulation, use a Tenderly Virtual TestNet (manual setup required).
+        simulationFallback: rpc_estimateGas
+        skaleNative:
+          # Legacy (Type 0) transactions only — SKALE does not support EIP-1559.
+          transactionType: legacy
+          # BITE protocol: native encrypted transaction pool (MEV protection).
+          # Set to true once BITE is enabled on SKALE Base.
+          biteProtocol: false
+          # SKALE native distributed file storage — free alternative to IPFS.
+          # Each SKALE chain has 1TB ephemeral storage. Use for deployment artifacts.
+          nativeFileStorage: true
+          nativeFileStorageMaxSizeMb: 100
+          # Solidity RNG: native secure randomness without external oracle.
+          # Use precompile at 0x18 for on-chain randomness in contracts.
+          solidityRNG: true
+          solidityRNGPrecompile: "0x0000000000000000000000000000000000000018"
+          # Gasless proof-of-work transactions via SKALE PoW faucet.
+          gaslessPoW: true
+          # Chainlink price feeds are NOT deployed on SKALE Base.
+          # Use Solidity RNG or custom price aggregators for oracle-dependent contracts.
+          chainlinkOracle: false
+          # Native IMA bridge for token transfers from Base mainnet.
+          imaBridge:
+            enabled: true
+            bridgeContractBase: "0xd2aaa00500000000000000000000000000000000"
+            portalUrl: https://portal.skale.space/bridge
       defaults:
         framework: foundry
         gasStrategy: low
@@ -77,6 +110,7 @@ spec:
       nativeCurrency:
         symbol: CREDIT
         decimals: 18
+        faucetUrl: https://base-sepolia-faucet.skale.space/
       capabilities:
         tenderly: false
         x402: true
@@ -85,6 +119,20 @@ spec:
         accountAbstraction:
           erc4337: true
           eip7702: false
+        simulationFallback: rpc_estimateGas
+        skaleNative:
+          transactionType: legacy
+          biteProtocol: false
+          nativeFileStorage: true
+          nativeFileStorageMaxSizeMb: 100
+          solidityRNG: true
+          solidityRNGPrecompile: "0x0000000000000000000000000000000000000018"
+          gaslessPoW: true
+          chainlinkOracle: false
+          imaBridge:
+            enabled: true
+            bridgeContractBase: "0xd2aaa00500000000000000000000000000000000"
+            portalUrl: https://portal.skale.space/bridge
       aa:
         provider: thirdweb
         factoryMode: custom

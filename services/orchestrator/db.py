@@ -1249,8 +1249,9 @@ def get_recent_activity_logs(limit: int = 50) -> list[dict[str, Any]]:
             rows2 = list(r2.data) if r2.data else []
             entries.extend(_agent_logs_to_log_entries(rows2))
         except Exception as e:
-            logger.warning("[db] get_recent_activity_logs failed: %s", e)
-            pass
+            logger.warning(
+                "[db] get_recent_activity_logs agent_logs query failed: %s", e
+            )
         entries.sort(key=lambda e: (e.get("timestamp") or ""), reverse=True)
         return entries[:limit]
     except Exception as e:

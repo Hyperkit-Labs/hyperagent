@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 import json
 import logging
 import os
@@ -13,6 +11,7 @@ import db
 import observability
 from fastapi import APIRouter, Header, HTTPException, Request
 from ipfs_client import STORAGE_STATUS_RECONCILED
+from webhook_utils import verify_hmac_sha256
 
 logger = logging.getLogger(__name__)
 
@@ -34,18 +33,6 @@ def _extract_cid(payload: dict[str, Any]) -> str | None:
     return None
 
 
-def _verify_pinata_signature(
-    body: bytes, signature_header: str | None, secret: str
-) -> bool:
-    if not secret or not signature_header:
-        return False
-    digest = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
-    sig = signature_header.strip()
-    if sig.lower().startswith("sha256="):
-        sig = sig.split("=", 1)[1].strip()
-    return hmac.compare_digest(digest, sig)
-
-
 @router.post("/pinata")
 async def pinata_pin_webhook(
     request: Request,
@@ -60,7 +47,7 @@ async def pinata_pin_webhook(
     body = await request.body()
     sig = x_pinata_signature or x_pinata_hmac_sha256
     if secret:
-        if not _verify_pinata_signature(body, sig, secret):
+        if not verify_hmac_sha256(body, sig, secret):
             logger.warning("[storage_webhook] Pinata signature verification failed")
             observability.inc_storage_webhook_sig_fail()
             raise HTTPException(status_code=401, detail="invalid signature")

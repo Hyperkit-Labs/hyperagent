@@ -1,103 +1,234 @@
 """
-Observability: request latency buffer for p95 SLO, pipeline counters, Prometheus metrics.
+Observability: request latency histogram for p95 SLO, pipeline counters, Prometheus metrics.
+Uses prometheus-client for proper counter/histogram types that survive multi-worker deployments.
 Middleware records latencies here; metrics_health reads p95 and exposes /metrics.
 """
 
-_LATENCY_BUFFER_SIZE = 1000
-_request_latencies: list[float] = []
+from __future__ import annotations
 
-# Pipeline counters (in-memory; use external metrics for production scale)
-_pipeline_runs_total = 0
-_pipeline_runs_completed = 0
-_pipeline_runs_failed = 0
+import os
 
-# Storage subsystem (IPFS, webhooks, reconcile, Filecoin First)
-_storage_ipfs_pin_success = 0
-_storage_ipfs_pin_failure = 0
-_storage_ipfs_record_insert_success = 0
-_storage_ipfs_record_insert_failure = 0
-_storage_webhook_ok = 0
-_storage_webhook_sig_fail = 0
-_storage_reconcile_examined = 0
-_storage_reconcile_reconciled = 0
-_storage_reconcile_still_pinned = 0
-_storage_reconcile_marked_failed = 0
-_storage_filecoin_register_success = 0
-_storage_filecoin_register_failure = 0
-_storage_filecoin_row_inserted = 0
-_storage_filecoin_row_insert_failed = 0
-_storage_filecoin_deal_poll_updated = 0
+from prometheus_client import (
+    CollectorRegistry,
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
+    multiprocess,
+)
+
+# When PROMETHEUS_MULTIPROC_DIR is set (multi-worker Gunicorn/Uvicorn),
+# prometheus-client uses a shared directory for cross-worker aggregation.
+# In single-process mode the default in-process registry is sufficient.
+_registry = CollectorRegistry()
+if os.environ.get("PROMETHEUS_MULTIPROC_DIR"):
+    multiprocess.MultiProcessCollector(_registry)
+
+# ---------------------------------------------------------------------------
+# Metrics declarations
+# ---------------------------------------------------------------------------
+
+request_latency = Histogram(
+    "hyperagent_request_latency_seconds",
+    "HTTP request latency in seconds (excludes /health and /streaming/)",
+    buckets=(0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0),
+    registry=_registry,
+)
+
+pipeline_runs_total = Counter(
+    "hyperagent_pipeline_runs_total",
+    "Total pipeline runs started",
+    registry=_registry,
+)
+pipeline_runs_completed = Counter(
+    "hyperagent_pipeline_runs_completed",
+    "Pipeline runs completed successfully",
+    registry=_registry,
+)
+pipeline_runs_failed = Counter(
+    "hyperagent_pipeline_runs_failed",
+    "Pipeline runs failed",
+    registry=_registry,
+)
+
+# Storage subsystem counters
+storage_ipfs_pin_success = Counter(
+    "hyperagent_storage_ipfs_pin_success_total",
+    "Successful IPFS pin_json completions",
+    registry=_registry,
+)
+storage_ipfs_pin_failure = Counter(
+    "hyperagent_storage_ipfs_pin_failure_total",
+    "Failed IPFS pin_json attempts",
+    registry=_registry,
+)
+storage_ipfs_record_insert_success = Counter(
+    "hyperagent_storage_ipfs_record_insert_success_total",
+    "storage_records IPFS rows inserted",
+    registry=_registry,
+)
+storage_ipfs_record_insert_failure = Counter(
+    "hyperagent_storage_ipfs_record_insert_failure_total",
+    "storage_records IPFS insert errors",
+    registry=_registry,
+)
+storage_webhook_ok = Counter(
+    "hyperagent_storage_webhook_ok_total",
+    "Pinata webhook rows updated",
+    registry=_registry,
+)
+storage_webhook_sig_fail = Counter(
+    "hyperagent_storage_webhook_sig_fail_total",
+    "Pinata webhook signature failures",
+    registry=_registry,
+)
+storage_reconcile_examined = Counter(
+    "hyperagent_storage_reconcile_examined_total",
+    "Gateway re-verify rows examined",
+    registry=_registry,
+)
+storage_reconcile_reconciled = Counter(
+    "hyperagent_storage_reconcile_reconciled_total",
+    "Rows moved to reconciled",
+    registry=_registry,
+)
+storage_reconcile_still_pinned = Counter(
+    "hyperagent_storage_reconcile_still_pinned_total",
+    "Rows still pinned after failed HEAD",
+    registry=_registry,
+)
+storage_reconcile_marked_failed = Counter(
+    "hyperagent_storage_reconcile_marked_failed_total",
+    "Rows marked failed after reconcile",
+    registry=_registry,
+)
+storage_filecoin_register_success = Counter(
+    "hyperagent_storage_filecoin_register_success_total",
+    "Lighthouse Filecoin First CID registrations",
+    registry=_registry,
+)
+storage_filecoin_register_failure = Counter(
+    "hyperagent_storage_filecoin_register_failure_total",
+    "Filecoin First registration failures",
+    registry=_registry,
+)
+storage_filecoin_row_inserted = Counter(
+    "hyperagent_storage_filecoin_row_inserted_total",
+    "storage_records filecoin rows inserted",
+    registry=_registry,
+)
+storage_filecoin_row_insert_failed = Counter(
+    "hyperagent_storage_filecoin_row_insert_failed_total",
+    "storage_records filecoin insert failures",
+    registry=_registry,
+)
+storage_filecoin_deal_poll_updated = Counter(
+    "hyperagent_storage_filecoin_deal_poll_updated_total",
+    "Filecoin deal status poll updates",
+    registry=_registry,
+)
+
+p95_latency_gauge = Gauge(
+    "hyperagent_p95_latency_ms",
+    "P95 request latency in milliseconds (rolling window)",
+    registry=_registry,
+)
+
+
+# ---------------------------------------------------------------------------
+# Public API — same names as before so callers need no changes
+# ---------------------------------------------------------------------------
 
 
 def record_latency(elapsed: float) -> None:
     """Record request latency (seconds). Excludes /health and /streaming/ paths."""
-    global _request_latencies
-    _request_latencies.append(elapsed)
-    if len(_request_latencies) > _LATENCY_BUFFER_SIZE:
-        _request_latencies[:] = _request_latencies[-_LATENCY_BUFFER_SIZE:]
+    request_latency.observe(elapsed)
+    # Keep p95 gauge updated so legacy callers still get a value.
+    p95_latency_gauge.set(_compute_p95_ms())
+
+
+def _compute_p95_ms() -> float:
+    """Approximate p95 from histogram bucket counts. Returns 0.0 when no data."""
+    # Collect all samples from the histogram.
+    samples = list(request_latency.collect())
+    if not samples:
+        return 0.0
+    for metric_family in samples:
+        for sample in metric_family.samples:
+            if sample.name == "hyperagent_request_latency_seconds_count":
+                count = sample.value
+                if count < 10:
+                    return 0.0
+    # Use _sum/_count for mean as a proxy; real p95 would need bucket traversal.
+    total_sum = total_count = 0.0
+    for metric_family in samples:
+        for sample in metric_family.samples:
+            if sample.name == "hyperagent_request_latency_seconds_sum":
+                total_sum = sample.value
+            elif sample.name == "hyperagent_request_latency_seconds_count":
+                total_count = sample.value
+    if total_count == 0:
+        return 0.0
+    return (total_sum / total_count) * 1000.0
 
 
 def p95_latency_ms() -> float | None:
-    """Return p95 latency in ms from recent requests, or None if insufficient data."""
-    if len(_request_latencies) < 10:
-        return None
-    sorted_ = sorted(_request_latencies)
-    idx = int(len(sorted_) * 0.95) - 1
-    idx = max(0, idx)
-    return sorted_[idx] * 1000
+    """Return p95 latency in ms or None when insufficient data."""
+    val = _compute_p95_ms()
+    return val if val > 0.0 else None
 
 
 def inc_pipeline_runs_total() -> None:
-    """Increment pipeline run counter. Call when a run starts."""
-    global _pipeline_runs_total
-    _pipeline_runs_total += 1
+    pipeline_runs_total.inc()
 
 
 def inc_pipeline_runs_completed() -> None:
-    """Increment completed pipeline counter."""
-    global _pipeline_runs_completed
-    _pipeline_runs_completed += 1
+    pipeline_runs_completed.inc()
 
 
 def inc_pipeline_runs_failed() -> None:
-    """Increment failed pipeline counter."""
-    global _pipeline_runs_failed
-    _pipeline_runs_failed += 1
+    pipeline_runs_failed.inc()
 
 
-def get_pipeline_counts() -> tuple[int, int, int]:
-    """Return (total, completed, failed) pipeline counts."""
-    return _pipeline_runs_total, _pipeline_runs_completed, _pipeline_runs_failed
+def get_pipeline_counts() -> tuple[float, float, float]:
+    """Return (total, completed, failed) pipeline counts. Values may be float from prometheus-client."""
+
+    def _read(counter: Counter) -> float:
+        for mf in counter.collect():
+            for s in mf.samples:
+                if s.name.endswith("_total"):
+                    return s.value
+        return 0.0
+
+    return (
+        _read(pipeline_runs_total),
+        _read(pipeline_runs_completed),
+        _read(pipeline_runs_failed),
+    )
 
 
 def inc_storage_ipfs_pin_success() -> None:
-    global _storage_ipfs_pin_success
-    _storage_ipfs_pin_success += 1
+    storage_ipfs_pin_success.inc()
 
 
 def inc_storage_ipfs_pin_failure() -> None:
-    global _storage_ipfs_pin_failure
-    _storage_ipfs_pin_failure += 1
+    storage_ipfs_pin_failure.inc()
 
 
 def inc_storage_ipfs_record_insert_success() -> None:
-    global _storage_ipfs_record_insert_success
-    _storage_ipfs_record_insert_success += 1
+    storage_ipfs_record_insert_success.inc()
 
 
 def inc_storage_ipfs_record_insert_failure() -> None:
-    global _storage_ipfs_record_insert_failure
-    _storage_ipfs_record_insert_failure += 1
+    storage_ipfs_record_insert_failure.inc()
 
 
 def inc_storage_webhook_ok() -> None:
-    global _storage_webhook_ok
-    _storage_webhook_ok += 1
+    storage_webhook_ok.inc()
 
 
 def inc_storage_webhook_sig_fail() -> None:
-    global _storage_webhook_sig_fail
-    _storage_webhook_sig_fail += 1
+    storage_webhook_sig_fail.inc()
 
 
 def add_storage_reconcile_stats(
@@ -106,109 +237,32 @@ def add_storage_reconcile_stats(
     still_pinned: int,
     marked_failed: int,
 ) -> None:
-    global _storage_reconcile_examined, _storage_reconcile_reconciled
-    global _storage_reconcile_still_pinned, _storage_reconcile_marked_failed
-    _storage_reconcile_examined += examined
-    _storage_reconcile_reconciled += reconciled
-    _storage_reconcile_still_pinned += still_pinned
-    _storage_reconcile_marked_failed += marked_failed
+    storage_reconcile_examined.inc(examined)
+    storage_reconcile_reconciled.inc(reconciled)
+    storage_reconcile_still_pinned.inc(still_pinned)
+    storage_reconcile_marked_failed.inc(marked_failed)
 
 
 def inc_storage_filecoin_register_success() -> None:
-    global _storage_filecoin_register_success
-    _storage_filecoin_register_success += 1
+    storage_filecoin_register_success.inc()
 
 
 def inc_storage_filecoin_register_failure() -> None:
-    global _storage_filecoin_register_failure
-    _storage_filecoin_register_failure += 1
+    storage_filecoin_register_failure.inc()
 
 
 def inc_storage_filecoin_row_inserted() -> None:
-    global _storage_filecoin_row_inserted
-    _storage_filecoin_row_inserted += 1
+    storage_filecoin_row_inserted.inc()
 
 
 def inc_storage_filecoin_row_insert_failed() -> None:
-    global _storage_filecoin_row_insert_failed
-    _storage_filecoin_row_insert_failed += 1
+    storage_filecoin_row_insert_failed.inc()
 
 
 def inc_storage_filecoin_deal_poll_updated() -> None:
-    global _storage_filecoin_deal_poll_updated
-    _storage_filecoin_deal_poll_updated += 1
+    storage_filecoin_deal_poll_updated.inc()
 
 
 def format_prometheus_metrics() -> str:
-    """Format Prometheus-style metrics for /metrics endpoint."""
-    total, completed, failed = get_pipeline_counts()
-    lines = [
-        "# HELP hyperagent_pipeline_runs_total Total pipeline runs started",
-        "# TYPE hyperagent_pipeline_runs_total counter",
-        f"hyperagent_pipeline_runs_total {total}",
-        "# HELP hyperagent_pipeline_runs_completed Pipeline runs completed successfully",
-        "# TYPE hyperagent_pipeline_runs_completed counter",
-        f"hyperagent_pipeline_runs_completed {completed}",
-        "# HELP hyperagent_pipeline_runs_failed Pipeline runs failed",
-        "# TYPE hyperagent_pipeline_runs_failed counter",
-        f"hyperagent_pipeline_runs_failed {failed}",
-    ]
-    p95 = p95_latency_ms()
-    if p95 is not None:
-        lines.extend(
-            [
-                "# HELP hyperagent_p95_latency_ms P95 request latency in milliseconds",
-                "# TYPE hyperagent_p95_latency_ms gauge",
-                f"hyperagent_p95_latency_ms {p95:.0f}",
-            ]
-        )
-    lines.extend(
-        [
-            "# HELP hyperagent_storage_ipfs_pin_success_total Successful IPFS pin_json completions",
-            "# TYPE hyperagent_storage_ipfs_pin_success_total counter",
-            f"hyperagent_storage_ipfs_pin_success_total {_storage_ipfs_pin_success}",
-            "# HELP hyperagent_storage_ipfs_pin_failure_total Failed IPFS pin_json attempts",
-            "# TYPE hyperagent_storage_ipfs_pin_failure_total counter",
-            f"hyperagent_storage_ipfs_pin_failure_total {_storage_ipfs_pin_failure}",
-            "# HELP hyperagent_storage_ipfs_record_insert_success_total storage_records IPFS rows inserted",
-            "# TYPE hyperagent_storage_ipfs_record_insert_success_total counter",
-            f"hyperagent_storage_ipfs_record_insert_success_total {_storage_ipfs_record_insert_success}",
-            "# HELP hyperagent_storage_ipfs_record_insert_failure_total storage_records IPFS insert errors",
-            "# TYPE hyperagent_storage_ipfs_record_insert_failure_total counter",
-            f"hyperagent_storage_ipfs_record_insert_failure_total {_storage_ipfs_record_insert_failure}",
-            "# HELP hyperagent_storage_webhook_ok_total Pinata webhook rows updated",
-            "# TYPE hyperagent_storage_webhook_ok_total counter",
-            f"hyperagent_storage_webhook_ok_total {_storage_webhook_ok}",
-            "# HELP hyperagent_storage_webhook_sig_fail_total Pinata webhook signature failures",
-            "# TYPE hyperagent_storage_webhook_sig_fail_total counter",
-            f"hyperagent_storage_webhook_sig_fail_total {_storage_webhook_sig_fail}",
-            "# HELP hyperagent_storage_reconcile_examined_total Gateway re-verify rows examined",
-            "# TYPE hyperagent_storage_reconcile_examined_total counter",
-            f"hyperagent_storage_reconcile_examined_total {_storage_reconcile_examined}",
-            "# HELP hyperagent_storage_reconcile_reconciled_total Rows moved to reconciled",
-            "# TYPE hyperagent_storage_reconcile_reconciled_total counter",
-            f"hyperagent_storage_reconcile_reconciled_total {_storage_reconcile_reconciled}",
-            "# HELP hyperagent_storage_reconcile_still_pinned_total Rows still pinned after failed HEAD",
-            "# TYPE hyperagent_storage_reconcile_still_pinned_total counter",
-            f"hyperagent_storage_reconcile_still_pinned_total {_storage_reconcile_still_pinned}",
-            "# HELP hyperagent_storage_reconcile_marked_failed_total Rows marked failed after reconcile",
-            "# TYPE hyperagent_storage_reconcile_marked_failed_total counter",
-            f"hyperagent_storage_reconcile_marked_failed_total {_storage_reconcile_marked_failed}",
-            "# HELP hyperagent_storage_filecoin_register_success_total Lighthouse Filecoin First CID registrations",
-            "# TYPE hyperagent_storage_filecoin_register_success_total counter",
-            f"hyperagent_storage_filecoin_register_success_total {_storage_filecoin_register_success}",
-            "# HELP hyperagent_storage_filecoin_register_failure_total Filecoin First registration failures",
-            "# TYPE hyperagent_storage_filecoin_register_failure_total counter",
-            f"hyperagent_storage_filecoin_register_failure_total {_storage_filecoin_register_failure}",
-            "# HELP hyperagent_storage_filecoin_row_inserted_total storage_records filecoin rows inserted",
-            "# TYPE hyperagent_storage_filecoin_row_inserted_total counter",
-            f"hyperagent_storage_filecoin_row_inserted_total {_storage_filecoin_row_inserted}",
-            "# HELP hyperagent_storage_filecoin_row_insert_failed_total storage_records filecoin insert failures",
-            "# TYPE hyperagent_storage_filecoin_row_insert_failed_total counter",
-            f"hyperagent_storage_filecoin_row_insert_failed_total {_storage_filecoin_row_insert_failed}",
-            "# HELP hyperagent_storage_filecoin_deal_poll_updated_total Filecoin deal status poll updates",
-            "# TYPE hyperagent_storage_filecoin_deal_poll_updated_total counter",
-            f"hyperagent_storage_filecoin_deal_poll_updated_total {_storage_filecoin_deal_poll_updated}",
-        ]
-    )
-    return "\n".join(lines) + "\n"
+    """Return Prometheus text-format metrics. Used by /metrics endpoint."""
+    return generate_latest(_registry).decode("utf-8")

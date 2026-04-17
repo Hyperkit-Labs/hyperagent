@@ -23,6 +23,66 @@ from typing import Any
 
 import billing
 import db
+
+# ---------------------------------------------------------------------------
+# PayAI facilitator — settles ERC-3009 TransferWithAuthorization on-chain
+# ---------------------------------------------------------------------------
+_FACILITATOR_URL = os.environ.get(
+    "X402_FACILITATOR_URL", "https://facilitator.payai.network"
+).rstrip("/")
+_FACILITATOR_ENABLED = os.environ.get(
+    "X402_FACILITATOR_ENABLED", "1"
+).strip().lower() in ("1", "true", "yes")
+
+
+def _call_facilitator(
+    proof: dict[str, Any], payment_requirements: dict[str, Any]
+) -> tuple[bool, str]:
+    """Submit the ERC-3009 payment proof to the PayAI facilitator for on-chain settlement.
+
+    Returns (settled, tx_hash_or_error).
+    Requires X402_FACILITATOR_ENABLED=1 (default) and X402_FACILITATOR_URL.
+
+    The facilitator verifies the ERC-3009 TransferWithAuthorization signature
+    and submits the USDC transfer on SKALE Base, so no gas is required from
+    the payer or the server.
+    """
+    if not _FACILITATOR_ENABLED:
+        return True, "facilitator_disabled"
+    try:
+        import httpx
+
+        with httpx.Client(timeout=10.0) as client:
+            resp = client.post(
+                f"{_FACILITATOR_URL}/settle",
+                json={
+                    "payment": proof,
+                    "paymentRequirements": payment_requirements,
+                },
+                headers={"Content-Type": "application/json"},
+            )
+            if resp.status_code in (200, 201):
+                body = (
+                    resp.json()
+                    if resp.headers.get("content-type", "").startswith(
+                        "application/json"
+                    )
+                    else {}
+                )
+                tx_hash = body.get("txHash") or body.get("tx_hash") or "settled"
+                logger.info("[x402] facilitator settled payment: %s", tx_hash)
+                return True, tx_hash
+            logger.warning(
+                "[x402] facilitator returned %d: %s", resp.status_code, resp.text[:200]
+            )
+            return False, f"facilitator_error_{resp.status_code}"
+    except Exception as exc:
+        logger.warning("[x402] facilitator call failed: %s", exc)
+        # Non-fatal: if facilitator is unreachable, allow the request through
+        # but log prominently so ops can investigate settlement gaps.
+        return True, f"facilitator_unreachable:{exc}"
+
+
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
@@ -30,6 +90,11 @@ logger = logging.getLogger(__name__)
 
 X402_ENABLED_ENV = os.environ.get("X402_ENABLED", "0")
 REPLAY_WINDOW_SECONDS = int(os.environ.get("X402_REPLAY_WINDOW", "300"))
+_X402_MANDATORY_V01 = os.environ.get("X402_MANDATORY_V01", "").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 _nonce_cache: dict[str, float] = {}
 _NONCE_CACHE_MAX = 10_000
@@ -67,6 +132,9 @@ def _redis_client() -> Any | None:
 
 
 def _is_x402_enabled() -> bool:
+    """x402 gate: X402_MANDATORY_V01 (hard enforcement), X402_ENABLED env, or registry flag."""
+    if _X402_MANDATORY_V01:
+        return True
     if X402_ENABLED_ENV.lower() in ("1", "true", "yes"):
         return True
     try:
@@ -75,6 +143,15 @@ def _is_x402_enabled() -> bool:
         return get_x402_enabled()
     except ImportError:
         return False
+
+
+def _x402_enforce_internal() -> bool:
+    """When true, Studio callers (X-User-Id) cannot bypass priced routes; must send X-Payment."""
+    return os.environ.get("X402_ENFORCE_INTERNAL", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
 
 
 def _prune_nonce_cache() -> None:
@@ -117,6 +194,19 @@ def _check_replay(nonce: str) -> bool:
         return True
     _nonce_cache[nonce] = time.time()
     return False
+
+
+def _v2_authorization_replay_key(proof: dict[str, Any]) -> str:
+    """Stable replay key for x402 v2 exact payloads (ERC-3009 authorization nonce)."""
+    try:
+        pl = proof.get("payload")
+        if isinstance(pl, dict):
+            auth = pl.get("authorization")
+            if isinstance(auth, dict) and auth.get("nonce") is not None:
+                return f"v2:{proof.get('network', '')}:{auth.get('nonce')}"
+    except Exception:
+        pass
+    return f"v2:{proof.get('network', '')}:{proof.get('payload', {})!s}"[:512]
 
 
 def _parse_payment_header(raw: str) -> dict[str, Any] | None:
@@ -206,7 +296,13 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
         ).strip() or None
 
         headers_dict = dict(request.headers)
-        if billing.is_internal_caller(headers_dict, user_id):
+        # X402_MANDATORY_V01 disables the internal-caller bypass so Studio users
+        # must also present a valid payment proof on priced routes.
+        if (
+            billing.is_internal_caller(headers_dict, user_id)
+            and not _x402_enforce_internal()
+            and not _X402_MANDATORY_V01
+        ):
             return await call_next(request)
 
         payment_header = request.headers.get("X-Payment") or request.headers.get(
@@ -236,12 +332,193 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
                 media_type="application/json",
             )
 
+        import x402_kite_facilitator
+        import x402_verifier
+
+        # --- x402 v2 "exact" (EIP-3009): @x402/fetch + facilitator verify/settle ---
+        # Kite docs recommend Pieverse for verify/settle on supported CAIP networks.
+        # SKALE Base is not on Pieverse; PayAI settle validates and executes there.
+        if x402_kite_facilitator.is_exact_x402_v2_payload(proof):
+            rkey = _v2_authorization_replay_key(proof)
+            if _check_replay(rkey):
+                _log_x402_event("proof_rejected", path, extra={"reason": "v2 replay"})
+                return Response(
+                    content=json.dumps(
+                        {
+                            "error": "payment_rejected",
+                            "message": "authorization nonce already used (replay detected)",
+                            "erc1066_code": x402_verifier.ERC1066_REPLAY,
+                            "action": x402_verifier.erc1066_to_action(
+                                x402_verifier.ERC1066_REPLAY
+                            ),
+                        }
+                    ),
+                    status_code=402,
+                    media_type="application/json",
+                )
+
+            challenge = billing.x402_challenge_response(path, price)
+            payment_requirements = challenge.get("paymentRequirements", {})
+            net = proof.get("network")
+
+            if x402_kite_facilitator.facilitator_supports_network(net):
+                v_ok, v_err = x402_kite_facilitator.verify_payment(
+                    proof, payment_requirements
+                )
+                if not v_ok:
+                    _log_x402_event(
+                        "facilitator_verify_failed",
+                        path,
+                        extra={"network": net, "detail": v_err},
+                    )
+                    return Response(
+                        content=json.dumps(
+                            {
+                                "error": "payment_rejected",
+                                "message": f"Facilitator verify failed: {v_err}",
+                                "erc1066_code": x402_verifier.ERC1066_DISALLOWED,
+                                "action": x402_verifier.erc1066_to_action(
+                                    x402_verifier.ERC1066_DISALLOWED
+                                ),
+                            }
+                        ),
+                        status_code=402,
+                        media_type="application/json",
+                    )
+                settled, tx_ref = x402_kite_facilitator.settle_payment(
+                    proof, payment_requirements
+                )
+            else:
+                settled, tx_ref = _call_facilitator(proof, payment_requirements)
+
+            if not settled:
+                _log_x402_event(
+                    "settlement_failed",
+                    path,
+                    extra={"tx_ref": tx_ref, "network": net},
+                )
+                return Response(
+                    content=json.dumps(
+                        {
+                            "error": "payment_settlement_failed",
+                            "message": "Payment proof valid but on-chain settlement failed. Retry or contact support.",
+                            "erc1066_code": x402_verifier.ERC1066_FAILURE,
+                            "action": "retry",
+                        }
+                    ),
+                    status_code=402,
+                    media_type="application/json",
+                )
+
+            pl = proof.get("payload") if isinstance(proof.get("payload"), dict) else {}
+            auth = pl.get("authorization") if isinstance(pl, dict) else {}
+            payer_addr = (
+                auth.get("from") if isinstance(auth, dict) else None
+            ) or proof.get("payer")
+
+            _log_x402_event(
+                "proof_accepted",
+                path,
+                user_id=str(payer_addr) if payer_addr else None,
+                extra={
+                    "erc1066_code": x402_verifier.ERC1066_SUCCESS,
+                    "tx_ref": tx_ref,
+                    "x402_version": 2,
+                },
+            )
+            request.state.x402_proof = proof
+            request.state.x402_price = price
+            request.state.erc1066_code = x402_verifier.ERC1066_SUCCESS
+            request.state.x402_tx_ref = tx_ref
+            return await call_next(request)
+
         validation_error = _validate_proof_structure(proof, path, price)
         if validation_error:
-            _log_x402_event("proof_rejected", path, extra={"reason": validation_error})
+            # Map structural validation errors to ERC-1066 codes for consistent client handling.
+            from x402_verifier import (
+                ERC1066_EXPIRED,
+                ERC1066_INSUFFICIENT,
+                ERC1066_REPLAY,
+                erc1066_to_action,
+            )
+
+            if "expired" in validation_error:
+                erc_code = ERC1066_EXPIRED
+            elif (
+                "replay" in validation_error or "nonce already used" in validation_error
+            ):
+                erc_code = ERC1066_REPLAY
+            elif "amount" in validation_error and "below" in validation_error:
+                erc_code = ERC1066_INSUFFICIENT
+            else:
+                from x402_verifier import ERC1066_DISALLOWED
+
+                erc_code = ERC1066_DISALLOWED
+
+            _log_x402_event(
+                "proof_rejected",
+                path,
+                extra={"reason": validation_error, "erc1066_code": erc_code},
+            )
             return Response(
                 content=json.dumps(
-                    {"error": "payment_rejected", "message": validation_error}
+                    {
+                        "error": "payment_rejected",
+                        "message": validation_error,
+                        "erc1066_code": erc_code,
+                        "action": erc1066_to_action(erc_code),
+                    }
+                ),
+                status_code=402,
+                media_type="application/json",
+            )
+
+        # Cryptographic verification: ECDSA/EIP-191 signature check.
+        # Validates that `payer` actually signed the canonical receipt string.
+        sig_ok, erc1066_code = x402_verifier.verify_signature(proof)
+        if not sig_ok:
+            _log_x402_event(
+                "signature_rejected",
+                path,
+                user_id=proof.get("payer"),
+                extra={"erc1066_code": erc1066_code, "nonce": proof.get("nonce")},
+            )
+            return Response(
+                content=json.dumps(
+                    {
+                        "error": "payment_rejected",
+                        "message": "Invalid payment signature",
+                        "erc1066_code": erc1066_code,
+                        "action": x402_verifier.erc1066_to_action(erc1066_code),
+                    }
+                ),
+                status_code=402,
+                media_type="application/json",
+            )
+
+        # On-chain settlement via PayAI facilitator.
+        # The facilitator submits the ERC-3009 TransferWithAuthorization
+        # transaction on SKALE Base (gasless for the payer).
+        payment_requirements = billing.x402_challenge_response(path, price).get(
+            "paymentRequirements", {}
+        )
+        settled, tx_ref = _call_facilitator(proof, payment_requirements)
+        if not settled:
+            _log_x402_event(
+                "settlement_failed",
+                path,
+                user_id=proof.get("payer"),
+                extra={"tx_ref": tx_ref, "nonce": proof.get("nonce")},
+            )
+
+            return Response(
+                content=json.dumps(
+                    {
+                        "error": "payment_settlement_failed",
+                        "message": "Payment proof valid but on-chain settlement failed. Retry or contact support.",
+                        "erc1066_code": x402_verifier.ERC1066_FAILURE,
+                        "action": "retry",
+                    }
                 ),
                 status_code=402,
                 media_type="application/json",
@@ -254,10 +531,14 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
             extra={
                 "amount": proof.get("amount"),
                 "nonce": proof.get("nonce"),
+                "erc1066_code": erc1066_code,
+                "tx_ref": tx_ref,
             },
         )
 
         request.state.x402_proof = proof
         request.state.x402_price = price
+        request.state.erc1066_code = erc1066_code
+        request.state.x402_tx_ref = tx_ref
 
         return await call_next(request)

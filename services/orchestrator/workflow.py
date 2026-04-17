@@ -222,9 +222,20 @@ def create_workflow():
 
 
 def _get_checkpointer():
-    """Return Redis-backed checkpointer if REDIS_URL is set, else MemorySaver."""
+    """Return the best available checkpointer in priority order:
+
+    1. Redis (RedisSaver) — when REDIS_URL is set and langgraph-checkpoint-redis is installed.
+    2. Postgres (PostgresSaver) — when SUPABASE_DB_URL or DATABASE_URL is set and
+       langgraph-checkpoint-postgres is installed. Uses the existing Supabase Postgres
+       connection; no extra infrastructure required.
+    3. MemorySaver — last resort; pipeline state is lost on restart.
+    """
+    import logging
     import os
 
+    _log = logging.getLogger(__name__)
+
+    # --- 1. Redis checkpointer ---
     from redis_util import effective_redis_url
 
     redis_url = effective_redis_url(
@@ -238,11 +249,33 @@ def _get_checkpointer():
 
             return RedisSaver(redis_url)
         except (ImportError, Exception) as e:
-            import logging
+            _log.warning("[checkpointer] Redis unavailable (%s), trying Postgres.", e)
 
-            logging.getLogger(__name__).warning(
-                "Redis checkpointer unavailable, falling back to MemorySaver: %s", e
+    # --- 2. Postgres checkpointer (Supabase connection) ---
+    db_url = (
+        os.environ.get("SUPABASE_DB_URL") or os.environ.get("DATABASE_URL") or ""
+    ).strip()
+    if db_url:
+        try:
+            from langgraph.checkpoint.postgres import PostgresSaver
+
+            saver = PostgresSaver.from_conn_string(db_url)
+            # Create tables if they don't exist yet (idempotent).
+            saver.setup()
+            _log.info("[checkpointer] using PostgresSaver (Supabase DB).")
+            return saver
+        except (ImportError, Exception) as e:
+            _log.warning(
+                "[checkpointer] PostgresSaver unavailable (%s), falling back to MemorySaver.",
+                e,
             )
+
+    # --- 3. MemorySaver fallback ---
+    _log.warning(
+        "[checkpointer] No durable checkpointer configured. "
+        "Pipeline state will be lost on restart. "
+        "Set REDIS_URL or SUPABASE_DB_URL to enable persistence."
+    )
     return MemorySaver()
 
 

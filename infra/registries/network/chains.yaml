@@ -96,6 +96,7 @@ spec:
         chainId: 1187947933
         rpcUrls:
           - https://skale-base.skalenodes.com/v1/base
+          - wss://skale-base.skalenodes.com/v1/ws/base
         blockExplorerUrls:
           - https://skale-base-explorer.skalenodes.com/
         nativeCurrency:
@@ -135,6 +136,7 @@ spec:
         chainId: 324705682
         rpcUrls:
           - https://base-sepolia-testnet.skalenodes.com/v1/jubilant-horrible-ancha
+          - wss://base-sepolia-testnet.skalenodes.com/v1/ws/jubilant-horrible-ancha
         blockExplorerUrls:
           - https://base-sepolia-testnet-explorer.skalenodes.com/
         nativeCurrency:

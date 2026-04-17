@@ -16,10 +16,36 @@ function generateNonce(): string {
 const NONCE_HEADER = "x-nonce";
 const CSP_NONCE_HEADER = "x-csp-nonce";
 
+/**
+ * Single CSP string for response and mirrored request header.
+ * Next.js reads `Content-Security-Policy` on the *incoming request* during SSR to
+ * extract `nonce-*` for framework and bundle script tags. The response header * alone is not enough; mirror the policy on forwarded request headers.
+ * @see https://nextjs.org/docs/app/guides/content-security-policy
+ */
+function buildContentSecurityPolicy(nonce: string): string {
+  const scriptSrc =
+    process.env.NODE_ENV === "production"
+      ? `'self' 'nonce-${nonce}' 'strict-dynamic'`
+      : `'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval'`;
+  return [
+    "default-src 'self'",
+    `script-src ${scriptSrc}`,
+    "style-src 'self' 'unsafe-inline'",
+    `connect-src ${buildStudioConnectSrcDirective(process.env as Record<string, string | undefined>)}`,
+    "img-src 'self' data: https:",
+    "font-src 'self' data:",
+    "frame-src 'self' https://embedded-wallet.thirdweb.com https://*.thirdweb.com",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join("; ");
+}
+
 function requestHeadersWithNonce(request: NextRequest, nonce: string): Headers {
   const h = new Headers(request.headers);
   h.set(NONCE_HEADER, nonce);
   h.set(CSP_NONCE_HEADER, nonce);
+  h.set("Content-Security-Policy", buildContentSecurityPolicy(nonce));
   return h;
 }
 
@@ -38,24 +64,7 @@ function nextWithCsp(request: NextRequest, nonce: string): NextResponse {
 }
 
 function applySecurityHeaders(res: NextResponse, nonce: string): void {
-  const scriptSrc =
-    process.env.NODE_ENV === "production"
-      ? `'self' 'nonce-${nonce}' 'strict-dynamic'`
-      : `'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval'`;
-  const csp = [
-    "default-src 'self'",
-    `script-src ${scriptSrc}`,
-    "style-src 'self' 'unsafe-inline'",
-    `connect-src ${buildStudioConnectSrcDirective(process.env as Record<string, string | undefined>)}`,
-    "img-src 'self' data: https:",
-    "font-src 'self' data:",
-    "frame-src 'self' https://embedded-wallet.thirdweb.com https://*.thirdweb.com",
-    "frame-ancestors 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-  ].join("; ");
-
-  res.headers.set("Content-Security-Policy", csp);
+  res.headers.set("Content-Security-Policy", buildContentSecurityPolicy(nonce));
   res.headers.set("X-Frame-Options", "DENY");
   res.headers.set("X-Content-Type-Options", "nosniff");
   res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");

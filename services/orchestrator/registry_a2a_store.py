@@ -57,6 +57,31 @@ def insert_registry_agent(
         return None
 
 
+def upsert_registry_agent(row: dict[str, Any]) -> dict[str, Any] | None:
+    """Upsert a registry agent row keyed on agent_id (string slug, not UUID).
+
+    Used by the ERC-8004 sync endpoint to mirror YAML-backed registrations.
+    Merges on the `agent_id` unique column so repeated syncs are idempotent.
+    """
+    if not db.is_configured():
+        return None
+    client = db._client()
+    if not client:
+        return None
+    upsert_row = dict(row)
+    upsert_row["updated_at"] = _now()
+    try:
+        r = (
+            client.table("registry_agents")
+            .upsert(upsert_row, on_conflict="agent_id")
+            .execute()
+        )
+        return r.data[0] if r.data else upsert_row
+    except Exception as e:
+        logger.warning("[registry_a2a] upsert_registry_agent failed: %s", e)
+        return None
+
+
 def get_registry_agent(agent_id: str) -> dict[str, Any] | None:
     if not db.is_uuid(agent_id):
         return None

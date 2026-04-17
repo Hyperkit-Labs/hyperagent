@@ -10,8 +10,6 @@ import {
   skaleBaseMainnet,
   filecoinMainnet,
   filecoinCalibration,
-} from "@/lib/chains";
-import {
   mainnet,
   sepolia,
   avalanche,
@@ -22,7 +20,7 @@ import {
   baseSepolia,
   bsc,
   bscTestnet,
-} from "thirdweb/chains";
+} from "@/lib/chains";
 
 const NETWORK_TO_CHAIN: Record<string, Chain> = {
   mantle: mantleMainnet,

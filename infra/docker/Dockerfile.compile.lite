@@ -1,9 +1,25 @@
 # Lite compile: py-solc-x only (~300MB vs >2GB full). Context: services/compile
+#
+# Requires outbound HTTPS during build for:
+#   - PyPI (pip)
+#   - solc binaries (py-solc-x → binaries.soliditylang.org / mirrors)
+# python:3.11-slim omits a full CA bundle in some paths; install ca-certificates
+# before pip/solcx to avoid TLS failures on Coolify/Docker BuildKit hosts.
+
 FROM python:3.11-slim
 WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt && \
-    python -c "import solcx; solcx.install_solc('0.8.24')"
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Separate layer: clearer logs if PyPI vs solc download fails
+RUN python -c "import solcx; solcx.install_solc('0.8.24')"
+
 COPY . .
 EXPOSE 8004
 ENV COMPILE_MODE=lite

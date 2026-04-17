@@ -1,16 +1,78 @@
 """
 Supabase persistence for runs, deployments, simulations, security_findings.
 Uses service role key; RLS still applies to user reads via anon key.
+
+Realtime broadcast: after each step insert/update, a lightweight event is
+published to the `run:{run_id}` Supabase Realtime broadcast channel so the
+frontend can receive push notifications without polling.
+Broadcast uses the service-role bearer token and the Realtime REST API, which
+bypasses RLS entirely (server-to-server). No table reads on the client side.
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import threading
 import uuid
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Realtime broadcast helper
+# ---------------------------------------------------------------------------
+
+
+def _broadcast_step_event(run_id: str, payload: dict) -> None:
+    """Fire-and-forget broadcast of a step event to the Supabase Realtime channel.
+
+    Channel: ``run:{run_id}``
+    Event:   ``step_update``
+
+    Uses the Supabase REST broadcast endpoint with the service-role key so RLS
+    policies on run_steps are irrelevant. The frontend subscribes via:
+        supabase.channel('run:{run_id}').on('broadcast', {event: 'step_update'}, cb)
+    """
+    url = os.environ.get("SUPABASE_URL", "").rstrip("/")
+    key = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get(
+        "SUPABASE_SERVICE_ROLE_KEY", ""
+    )
+    if not url or not key:
+        return
+
+    def _send():
+        try:
+            import json
+
+            import httpx
+
+            broadcast_url = f"{url}/realtime/v1/api/broadcast"
+            body = {
+                "messages": [
+                    {
+                        "topic": f"run:{run_id}",
+                        "event": "step_update",
+                        "payload": payload,
+                    }
+                ]
+            }
+            httpx.post(
+                broadcast_url,
+                headers={
+                    "Authorization": f"Bearer {key}",
+                    "apikey": key,
+                    "Content-Type": "application/json",
+                },
+                content=json.dumps(body),
+                timeout=3.0,
+            )
+        except Exception as e:
+            logger.debug("[db] realtime broadcast failed (non-fatal): %s", e)
+
+    threading.Thread(target=_send, daemon=True).start()
+
 
 _supabase = None
 
@@ -630,7 +692,18 @@ def insert_step(
             .upsert(row, on_conflict="run_id,step_type")
             .execute()
         )
-        return r.data[0] if r.data else None
+        result = r.data[0] if r.data else None
+        _broadcast_step_event(
+            run_id,
+            {
+                "type": "step",
+                "stage": step_type,
+                "status": status,
+                "message": input_summary or status,
+                "done": False,
+            },
+        )
+        return result
     except Exception as e:
         logger.warning("[db] insert_step failed: %s", e)
         return None
@@ -678,6 +751,18 @@ def update_step(
         client.table("run_steps").update(payload).eq("run_id", run_id).eq(
             "step_type", step_type
         ).execute()
+        is_terminal = status in ("completed", "failed")
+        _broadcast_step_event(
+            run_id,
+            {
+                "type": "step",
+                "stage": step_type,
+                "status": status,
+                "message": output_summary or error_message or status,
+                "done": is_terminal
+                and step_type in ("ui_scaffold", "deploy", "monitor"),
+            },
+        )
         return True
     except Exception as e:
         logger.warning("[db] unknown failed: %s", e)
@@ -1301,3 +1386,152 @@ def reconcile_storage_records_webhook(
     except Exception as e:
         logger.warning("[db] reconcile_storage_records_webhook failed: %s", e)
         return 0
+
+
+def update_x402_settlement(
+    nonce: str,
+    status: str,
+    payload: dict[str, Any] | None = None,
+) -> int:
+    """Match payment_history by metadata.nonce or idempotency_key; merge settlement payload.
+
+    Returns the number of rows updated.
+    """
+    client = _client()
+    if not client or not nonce:
+        return 0
+    raw = (status or "").strip().lower()
+    if raw in ("settled", "success", "succeeded", "completed"):
+        pay_status = "completed"
+    elif raw in ("failed", "error", "rejected"):
+        pay_status = "failed"
+    else:
+        pay_status = "pending"
+
+    meta_patch: dict[str, Any] = {
+        "x402_settlement": dict(payload) if payload else {"status": status}
+    }
+
+    rows: list[tuple[str, Any]] = []
+    try:
+        seen: set[str] = set()
+        r_meta = (
+            client.table("payment_history")
+            .select("id,metadata")
+            .contains("metadata", {"nonce": nonce})
+            .execute()
+        )
+        for row in r_meta.data or []:
+            rid = row.get("id")
+            if rid and str(rid) not in seen:
+                seen.add(str(rid))
+                rows.append((str(rid), row.get("metadata")))
+        r_idem = (
+            client.table("payment_history")
+            .select("id,metadata")
+            .eq("idempotency_key", nonce)
+            .execute()
+        )
+        for row in r_idem.data or []:
+            rid = row.get("id")
+            if rid and str(rid) not in seen:
+                seen.add(str(rid))
+                rows.append((str(rid), row.get("metadata")))
+    except Exception as e:
+        logger.warning("[db] update_x402_settlement select failed: %s", e)
+        return 0
+
+    n = 0
+    for rid, meta in rows:
+        try:
+            merged = merge_metadata_dict(meta, meta_patch)
+            client.table("payment_history").update(
+                {"status": pay_status, "metadata": merged}
+            ).eq("id", rid).execute()
+            n += 1
+        except Exception as e:
+            logger.warning(
+                "[db] update_x402_settlement update id=%s failed: %s", rid, e
+            )
+    return n
+
+
+def update_simulation_result(
+    simulation_id: str,
+    status: str,
+    payload: dict[str, Any] | None = None,
+) -> int:
+    """Update simulations by row id, run_id (when UUID), or results.simulation_id.
+
+    Merges payload under results.tenderly_webhook. Returns rows updated.
+    """
+    client = _client()
+    if not client or not simulation_id:
+        return 0
+    raw = (status or "").strip().lower()
+    if raw in ("success", "succeeded", "ok"):
+        row_status = "succeeded"
+    elif raw in ("reverted", "failed", "error", "fail"):
+        row_status = "failed"
+    else:
+        row_status = "pending"
+
+    patch_results: dict[str, Any] = {
+        "tenderly_webhook": dict(payload) if payload else {},
+        "external_status": status,
+    }
+
+    rows: list[tuple[str, Any]] = []
+    try:
+        seen: set[str] = set()
+        if _is_uuid(simulation_id):
+            rid_q = (
+                client.table("simulations")
+                .select("id,results")
+                .eq("id", simulation_id)
+                .execute()
+            )
+            for row in rid_q.data or []:
+                rid = row.get("id")
+                if rid and str(rid) not in seen:
+                    seen.add(str(rid))
+                    rows.append((str(rid), row.get("results")))
+            run_q = (
+                client.table("simulations")
+                .select("id,results")
+                .eq("run_id", simulation_id)
+                .execute()
+            )
+            for row in run_q.data or []:
+                rid = row.get("id")
+                if rid and str(rid) not in seen:
+                    seen.add(str(rid))
+                    rows.append((str(rid), row.get("results")))
+        ext_q = (
+            client.table("simulations")
+            .select("id,results")
+            .contains("results", {"simulation_id": simulation_id})
+            .execute()
+        )
+        for row in ext_q.data or []:
+            rid = row.get("id")
+            if rid and str(rid) not in seen:
+                seen.add(str(rid))
+                rows.append((str(rid), row.get("results")))
+    except Exception as e:
+        logger.warning("[db] update_simulation_result select failed: %s", e)
+        return 0
+
+    n = 0
+    for rid, results in rows:
+        try:
+            merged = merge_metadata_dict(results, patch_results)
+            client.table("simulations").update(
+                {"status": row_status, "results": merged}
+            ).eq("id", rid).execute()
+            n += 1
+        except Exception as e:
+            logger.warning(
+                "[db] update_simulation_result update id=%s failed: %s", rid, e
+            )
+    return n

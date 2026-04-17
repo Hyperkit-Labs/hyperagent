@@ -10,8 +10,25 @@ pyyaml>=6.0
 PyJWT>=2.8.0
 cryptography>=42.0.0
 web3>=6.0.0
+# eth-account: ECDSA/EIP-191 signature verification for x402_verifier.py.
+# Already a transitive dependency of web3; listed explicitly so removals don't break x402_verifier.
+eth-account>=0.10.0
 redis>=5.0.0
 datasets>=2.14.0
+# Celery: replaces hand-rolled Redis BLPOP queue with retry/backoff/Flower visibility.
+# Set CELERY_ENABLED=1 and REDIS_URL. Run: celery -A celery_app worker -Q pipeline
+celery[redis]>=5.3.0
+# Celery Flower monitoring dashboard (optional)
+flower>=2.0.0
+# LangGraph Postgres checkpointer: durable pipeline state in Supabase DB.
+# Set SUPABASE_DB_URL (PostgreSQL connection string). Falls back to Redis, then MemorySaver.
+langgraph-checkpoint-postgres>=2.0.0
+# Prometheus metrics: persistent counters and histograms across workers.
+# Set PROMETHEUS_MULTIPROC_DIR for multi-worker aggregation.
+prometheus-client>=0.19.0
+# slowapi: orchestrator-level rate limiting (second layer after API-gateway Upstash).
+# Tune via RATE_LIMIT_ORCHESTRATOR_GENERATE and RATE_LIMIT_ORCHESTRATOR_DEPLOY env vars.
+slowapi>=0.1.9
 # Execution backend (Local + OpenSandbox); optional opensandbox-sdk for OPENSANDBOX_ENABLED
 # Installed separately: in Docker via explicit pip install, in CI via "pip install -e packages/execution-backend"
 # Do NOT add an -e line here; the relative path breaks when pip runs from repo root.
@@ -23,3 +40,6 @@ opentelemetry-exporter-otlp-proto-http>=1.20.0
 vercel>=0.4.0
 # EigenDA blob anchoring (optional): set EIGENDA_ENABLED=1 and EIGENDA_PRIVATE_KEY
 powerloom-eigenda>=0.1.0
+# MLflow: model routing experiments and pipeline run tracking.
+# Set MLFLOW_TRACKING_URI to enable. No-op when unset.
+mlflow>=2.12.0

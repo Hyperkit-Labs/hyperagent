@@ -7,12 +7,24 @@ Does not replace GET /api/v1/agents (pipeline agents) — use prefix /api/v1/age
 from __future__ import annotations
 
 import logging
+import os
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Literal
 
 import db
 import registry_a2a_store as store
+import yaml
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
+
+_ERC8004_YAML = (
+    Path(__file__).parent.parent.parent.parent
+    / "infra"
+    / "registries"
+    / "erc8004"
+    / "erc8004.yaml"
+)
 
 logger = logging.getLogger(__name__)
 
@@ -537,24 +549,101 @@ def list_artifacts(task_id: str) -> dict[str, Any]:
     return {"task_id": task_id, "artifacts": rows, "total": len(rows)}
 
 
-# --- ERC-8004 sync (not implemented: no on-chain indexer in this deployment) ---
+# --- ERC-8004 sync: YAML-backed registry mirror ---
+# Phase-1 implementation: reads infra/registries/erc8004/erc8004.yaml (the authoritative
+# list of HyperAgent on-chain registrations with real txHashes and agentIds) and upserts
+# each entry into the Supabase `registry_agents` table so the frontend can display live data.
+#
+# A full on-chain indexer (listening to IdentityRegistry Transfer events) is a later-phase
+# concern. This implementation is honest: it reflects what was actually registered on-chain
+# per the YAML, not a live index of all third-party agents.
+
+
+def _load_erc8004_yaml() -> dict[str, Any]:
+    try:
+        with open(_ERC8004_YAML) as f:
+            return yaml.safe_load(f) or {}
+    except Exception as exc:
+        logger.warning("[erc8004] could not load registry YAML: %s", exc)
+        return {}
+
+
+def _upsert_agent_entry(
+    chain_cfg: dict[str, Any], registration: dict[str, Any]
+) -> dict[str, Any]:
+    """Build a registry_agents row from YAML data."""
+    agent_id_str = str(registration.get("agentId", ""))
+    chain_id = chain_cfg.get("chainId")
+    slug = chain_cfg.get("slug", "")
+    return {
+        "agent_id": f"hyperagent-{slug}-{agent_id_str}",
+        "name": "HyperAgent",
+        "owner_address": chain_cfg.get("identityRegistry", ""),
+        "chain_id": chain_id,
+        "chain_slug": slug,
+        "on_chain_agent_id": agent_id_str,
+        "register_tx_hash": registration.get("registerTxHash", ""),
+        "identity_registry": chain_cfg.get("identityRegistry", ""),
+        "reputation_registry": chain_cfg.get("reputationRegistry", ""),
+        "status": "active",
+        "source": "yaml_registry",
+        "synced_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @erc8004_router.post("/sync")
 def erc8004_sync() -> dict[str, Any]:
-    """Registry mirror sync from chain is not shipped yet. Fail honestly (no fake synced count)."""
+    """Sync ERC-8004 registry from YAML into Supabase.
+
+    Phase-1: reads infra/registries/erc8004/erc8004.yaml and upserts the
+    HyperAgent on-chain registrations (real agentIds and txHashes) into
+    registry_agents. A live on-chain event indexer is a Phase-2 item.
+    """
     _require_db()
-    logger.warning(
-        "[erc8004] sync requested but indexer is not implemented — returning 501"
+    data = _load_erc8004_yaml()
+    chains: list[dict] = (data.get("spec") or {}).get("chains") or []
+    hyperagent_cfg: dict = (data.get("spec") or {}).get("hyperagent") or {}
+    known_agent_ids: list[dict] = hyperagent_cfg.get("agentIds") or []
+
+    chain_map: dict[int, dict] = {c["chainId"]: c for c in chains if c.get("chainId")}
+    synced: list[dict] = []
+    errors: list[str] = []
+
+    for reg in known_agent_ids:
+        chain_id = reg.get("chainId")
+        if not chain_id or chain_id not in chain_map:
+            errors.append(f"chainId {chain_id} not in registry chains")
+            continue
+        row = _upsert_agent_entry(chain_map[chain_id], reg)
+        try:
+            store.upsert_registry_agent(row)
+            synced.append(
+                {
+                    "agent_id": row["agent_id"],
+                    "chain_id": chain_id,
+                    "chain_slug": row["chain_slug"],
+                    "on_chain_agent_id": row["on_chain_agent_id"],
+                    "register_tx_hash": row["register_tx_hash"],
+                }
+            )
+        except Exception as exc:
+            errors.append(f"upsert failed for chainId={chain_id}: {exc}")
+            logger.warning("[erc8004] upsert failed chain=%s: %s", chain_id, exc)
+
+    logger.info(
+        "[erc8004] sync complete: synced=%d errors=%d", len(synced), len(errors)
     )
-    raise HTTPException(
-        status_code=501,
-        detail=(
-            "ERC-8004 registry sync is not implemented. "
-            "There is no deployed indexer to reconcile on-chain IdentityRegistry state into "
-            "registry_agents. Do not treat sync as available until this ships."
+    return {
+        "synced_count": len(synced),
+        "synced": synced,
+        "errors": errors,
+        "source": "yaml_registry",
+        "note": (
+            "Phase-1 sync from infra/registries/erc8004/erc8004.yaml. "
+            "Reflects HyperAgent's own on-chain registrations with real txHashes. "
+            "Full live indexer for all third-party agents is Phase-2."
         ),
-    )
+    }
 
 
 @erc8004_router.get("/agents/{agent_id}")

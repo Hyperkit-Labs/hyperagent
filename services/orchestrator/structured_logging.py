@@ -19,8 +19,8 @@ class TraceContextFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         if not hasattr(record, "request_id"):
             rid = get_request_id()
-            if rid:
-                record.request_id = rid
+            # Always set so custom Formatters using %(request_id)s never raise.
+            record.request_id = rid or ""
         return True
 
 

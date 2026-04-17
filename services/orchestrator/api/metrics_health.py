@@ -136,11 +136,14 @@ def _check_tools_health() -> dict[str, Any]:
         return {"status": "offline", "url": TOOLS_BASE_URL, "error": str(e)}
 
 
-async def _fetch_integrations() -> dict[str, bool]:
-    """Fetch integration status from simulation, storage, and vectordb health endpoints."""
+async def _fetch_integrations() -> dict[str, Any]:
+    """Fetch integration status from simulation, storage, vectordb, and local env checks."""
     tenderly = False
     pinata = False
+    pinata_dedicated_gateway = False
+    filecoin = False
     qdrant = False
+
     async with httpx.AsyncClient(timeout=INTEGRATIONS_TIMEOUT) as client:
         try:
             r = await client.get(f"{SIMULATION_SERVICE_URL}/health")
@@ -158,6 +161,7 @@ async def _fetch_integrations() -> dict[str, bool]:
             if r.status_code == 200:
                 data = r.json()
                 pinata = data.get("pinata_configured", False)
+                pinata_dedicated_gateway = data.get("pinata_dedicated_gateway", False)
         except Exception as e:
             logger.warning(
                 "[integrations] storage unreachable url=%s: %s", STORAGE_SERVICE_URL, e
@@ -171,9 +175,23 @@ async def _fetch_integrations() -> dict[str, bool]:
             logger.warning(
                 "[integrations] vectordb unreachable url=%s: %s", VECTORDB_URL, e
             )
+
+    # Filecoin archival — checked locally (Lighthouse runs in-process, not a separate service)
+    filecoin = bool(
+        os.environ.get("FILECOIN_ARCHIVAL_ENABLED", "").strip() in ("1", "true", "yes")
+        and os.environ.get("LIGHTHOUSE_API_KEY", "").strip()
+    )
+
+    # Kite Chain — check RPC reachability for the configured mainnet RPC
+    kite_rpc = os.environ.get("KITE_CHAIN_RPC_MAINNET", "").strip()
+    kite_configured = bool(kite_rpc)
+
     return {
         "tenderly_configured": tenderly,
         "pinata_configured": pinata,
+        "pinata_dedicated_gateway": pinata_dedicated_gateway,
+        "filecoin_configured": filecoin,
+        "kite_chain_configured": kite_configured,
         "qdrant_configured": qdrant,
     }
 

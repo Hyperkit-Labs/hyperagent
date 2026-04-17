@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     "playwright-report/**",
     ".playwright-cache/**",
     "e2e/**",
+    // CommonJS; uses require() by design (see comment in file).
+    "jest.config.cjs",
   ]),
   // Severity overrides: must use `files` so ESLint merges these with Next's plugin blocks for the same paths.
   {

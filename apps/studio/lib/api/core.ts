@@ -104,7 +104,7 @@ export interface NormalizeApiErrorOptions {
 const STATUS_MESSAGES: Record<number, string> = {
   400: "Invalid request. Check your input and try again.",
   401: AUTH_ERROR_MESSAGE,
-  402: "Insufficient credits. Add budget in Payments to continue.",
+  402: "Payment required. Connect a wallet or add budget in Settings to continue.",
   403: "Access denied. You may not have permission for this action.",
   404: "Resource not found. It may have been removed or the link is outdated.",
   408: "Request timed out. Try again when the server is less busy.",

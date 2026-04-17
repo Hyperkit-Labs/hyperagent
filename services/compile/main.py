@@ -145,7 +145,9 @@ def _compile_solcx(contract_name: str, contract_code: str) -> tuple[bool, str | 
     except ImportError:
         return False, None, None, ["py-solc-x not installed; set COMPILE_MODE=full or pip install py-solc-x"]
     try:
-        solcx.install_solc("0.8.24")
+        installed = {str(v) for v in solcx.get_installed_solc_versions()}
+        if "0.8.24" not in installed:
+            solcx.install_solc("0.8.24")
     except Exception as e:
         return False, None, None, [f"solc install failed: {e}"]
     if "pragma solidity" not in contract_code.strip().lower():

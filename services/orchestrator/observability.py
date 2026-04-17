@@ -6,6 +6,7 @@ Middleware records latencies here; metrics_health reads p95 and exposes /metrics
 
 from __future__ import annotations
 
+import logging
 import os
 
 from prometheus_client import (
@@ -17,12 +18,32 @@ from prometheus_client import (
     multiprocess,
 )
 
+logger = logging.getLogger(__name__)
+
 # When PROMETHEUS_MULTIPROC_DIR is set (multi-worker Gunicorn/Uvicorn),
 # prometheus-client uses a shared directory for cross-worker aggregation.
 # In single-process mode the default in-process registry is sufficient.
+# Coolify/k8s often set the env from .env.example while the path does not exist
+# yet; MultiProcessCollector raises at import time and prevents the app from
+# starting (Docker health checks fail with no useful application logs).
 _registry = CollectorRegistry()
-if os.environ.get("PROMETHEUS_MULTIPROC_DIR"):
-    multiprocess.MultiProcessCollector(_registry)
+_mpdir = (
+    os.environ.get("PROMETHEUS_MULTIPROC_DIR")
+    or os.environ.get("prometheus_multiproc_dir")
+    or ""
+).strip()
+if _mpdir:
+    try:
+        if not os.path.isdir(_mpdir):
+            os.makedirs(_mpdir, mode=0o755, exist_ok=True)
+        multiprocess.MultiProcessCollector(_registry)
+    except (ValueError, OSError) as e:
+        logger.warning(
+            "[observability] PROMETHEUS_MULTIPROC_DIR=%r unusable (%s); "
+            "using in-process metrics only",
+            _mpdir,
+            e,
+        )
 
 # ---------------------------------------------------------------------------
 # Metrics declarations

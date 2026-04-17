@@ -51,6 +51,16 @@ export function normalizeToBackendApiV1(urlish: string): string {
   return origin.endsWith("/api/v1") ? origin : `${origin}/api/v1`;
 }
 
+let developmentNonLoopbackApiWarned = false;
+
+/**
+ * Reset warning dedupe (Vitest only).
+ * @internal
+ */
+export function resetStudioPublicEnvDevWarningsForTests(): void {
+  developmentNonLoopbackApiWarned = false;
+}
+
 /**
  * In `next dev`, a remote `NEXT_PUBLIC_API_URL` (from root `.env`) forces the browser to call prod;
  * use local gateway unless `NEXT_PUBLIC_ENV` is `staging` | `stage` (explicit remote API testing).
@@ -78,10 +88,13 @@ export function applyDevelopmentLocalGatewayRule(
   } catch {
     return resolvedApiV1;
   }
-  console.warn(
-    `[${Env.NEXT_PUBLIC_API_URL}] Development points at a non-loopback API; using ${STUDIO_LOCAL_GATEWAY_API_V1}. ` +
-      `Set ${Env.NEXT_PUBLIC_ENV}=staging to keep the configured URL, or set ${Env.NEXT_PUBLIC_API_URL} to a loopback gateway.`,
-  );
+  if (!developmentNonLoopbackApiWarned) {
+    developmentNonLoopbackApiWarned = true;
+    console.warn(
+      `[${Env.NEXT_PUBLIC_API_URL}] Development points at a non-loopback API; using ${STUDIO_LOCAL_GATEWAY_API_V1}. ` +
+        `Set ${Env.NEXT_PUBLIC_ENV}=staging to keep the configured URL, or set ${Env.NEXT_PUBLIC_API_URL} to a loopback gateway.`,
+    );
+  }
   return STUDIO_LOCAL_GATEWAY_API_V1;
 }
 

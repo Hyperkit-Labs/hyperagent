@@ -392,6 +392,31 @@ importers:
       typescript:
         specifier: ^5
         version: 5.9.3
+    optionalDependencies:
+      '@next/swc-darwin-arm64':
+        specifier: 16.2.2
+        version: 16.2.2
+      '@next/swc-darwin-x64':
+        specifier: 16.2.2
+        version: 16.2.2
+      '@next/swc-linux-arm64-gnu':
+        specifier: 16.2.2
+        version: 16.2.2
+      '@next/swc-linux-arm64-musl':
+        specifier: 16.2.2
+        version: 16.2.2
+      '@next/swc-linux-x64-gnu':
+        specifier: 16.2.2
+        version: 16.2.2
+      '@next/swc-linux-x64-musl':
+        specifier: 16.2.2
+        version: 16.2.2
+      '@next/swc-win32-arm64-msvc':
+        specifier: 16.2.2
+        version: 16.2.2
+      '@next/swc-win32-x64-msvc':
+        specifier: 16.2.2
+        version: 16.2.2
 
   packages/agent-os:
     devDependencies:

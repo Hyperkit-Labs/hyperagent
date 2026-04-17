@@ -29,6 +29,7 @@
     "@headlessui/react": "^2.2.9",
     "@heroicons/react": "^2.2.0",
     "@hyperagent/config": "workspace:*",
+    "@hyperagent/frontend-data": "workspace:*",
     "@sentry/nextjs": "^10.47.0",
     "@supabase/supabase-js": "^2.47.0",
     "@tanstack/react-query": "^5.96.2",

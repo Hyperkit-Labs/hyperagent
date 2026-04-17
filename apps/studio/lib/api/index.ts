@@ -34,6 +34,7 @@ export {
   getWorkflowContracts,
   getWorkflowDeployments,
   createWorkflow,
+  createWorkflowWithX402,
   submitClarification,
   cancelWorkflow,
   getAgentDiscussionStreamUrl,

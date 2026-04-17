@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, afterEach } from "vitest";
+import { describe, expect, it, vi, afterEach, beforeEach } from "vitest";
 import {
   applyDevelopmentLocalGatewayRule,
   buildStudioConnectSrcDirective,
@@ -6,6 +6,7 @@ import {
   normalizeToBackendApiV1,
   resolveStudioBackendApiV1FromEnv,
   assertValidStudioPublicApiUrlIfPresent,
+  resetStudioPublicEnvDevWarningsForTests,
   STUDIO_LOCAL_GATEWAY_API_V1,
 } from "./studio-public-env.js";
 import { Env } from "./keys.js";
@@ -52,6 +53,10 @@ describe("normalizeToBackendApiV1", () => {
 });
 
 describe("applyDevelopmentLocalGatewayRule", () => {
+  beforeEach(() => {
+    resetStudioPublicEnvDevWarningsForTests();
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -63,6 +68,17 @@ describe("applyDevelopmentLocalGatewayRule", () => {
       "https://api.hyperkitlabs.com/api/v1",
     );
     expect(resolved).toBe(STUDIO_LOCAL_GATEWAY_API_V1);
+  });
+
+  it("warns at most once when development rewrites a non-loopback API repeatedly", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const dev = {
+      NODE_ENV: "development" as const,
+      [Env.NEXT_PUBLIC_ENV]: "development",
+    };
+    applyDevelopmentLocalGatewayRule(dev, "https://api.one.com/api/v1");
+    applyDevelopmentLocalGatewayRule(dev, "https://api.two.com/api/v1");
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 
   it("keeps remote URL when NEXT_PUBLIC_ENV is staging", () => {

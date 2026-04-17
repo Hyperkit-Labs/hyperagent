@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useActiveAccount } from "thirdweb/react";
-import { getConfiguredLLMProviders, getCreditsBalance } from "@/lib/api";
+import { useActiveAccount, useActiveWalletChain } from "thirdweb/react";
+import { getConfiguredLLMProviders } from "@/lib/api";
 import { useWorkflows } from "@/hooks/useWorkflows";
 import { useSession } from "@/hooks/useSession";
 import { ROUTES } from "@/constants/routes";
@@ -20,65 +20,61 @@ export interface OnboardingStep {
   cta: string;
 }
 
+/**
+ * Chain IDs where x402 payment is supported for v0.1.0.
+ * Source of truth: infra/registries/network/chains.yaml (hyperagent.capabilities.x402: true)
+ * and docs/architecture/networks.md (v0.1.0 launch targets).
+ */
+const X402_SUPPORTED_CHAIN_IDS = new Set([
+  1187947933, // SKALE Base Mainnet
+  324705682, // SKALE Base Sepolia
+]);
+
 function hasSessionKey(): boolean {
   if (typeof window === "undefined") return false;
   const k = getSessionOnlyLLMKey();
   return Boolean(k?.provider && k?.apiKey?.trim());
 }
 
-/** Single batched fetch for LLM config + credits. Reduces parallel calls on mount. */
-async function fetchByokAndCredits(
-  hasSession: boolean,
-): Promise<{ llmConfigured: boolean; hasCredits: boolean }> {
-  const [llmRes, creditsRes] = await Promise.all([
-    getConfiguredLLMProviders()
-      .then(
-        (r) =>
-          Array.isArray(r?.configured_providers) &&
-          r.configured_providers.length > 0,
-      )
-      .catch(() => false),
-    hasSession
-      ? getCreditsBalance()
-          .then((r) => (r.balance ?? 0) > 0)
-          .catch(() => false)
-      : Promise.resolve(false),
-  ]);
-  return { llmConfigured: llmRes, hasCredits: creditsRes };
+async function fetchLlmConfig(): Promise<boolean> {
+  return getConfiguredLLMProviders()
+    .then(
+      (r) =>
+        Array.isArray(r?.configured_providers) &&
+        r.configured_providers.length > 0,
+    )
+    .catch(() => false);
 }
 
 export function useOnboarding() {
   const account = useActiveAccount();
+  const activeChain = useActiveWalletChain();
   const { hasSession } = useSession();
   const { workflows } = useWorkflows({ filters: { limit: 1 } });
   const [llmConfigured, setLlmConfigured] = useState<boolean | null>(null);
   const [sessionKeyActive, setSessionKeyActive] = useState(false);
-  const [hasCredits, setHasCredits] = useState(false);
 
-  const refetchByokAndCredits = useCallback(() => {
-    fetchByokAndCredits(!!hasSession).then(
-      ({ llmConfigured: l, hasCredits: c }) => {
-        setLlmConfigured(l);
-        setHasCredits(c);
-      },
-    );
-  }, [hasSession]);
+  const refetchLlm = useCallback(() => {
+    fetchLlmConfig().then(setLlmConfigured);
+  }, []);
 
   const refreshSessionKey = useCallback(() => {
     setSessionKeyActive(hasSessionKey());
   }, []);
 
+  // Expose a stable refetch handle (previously called refetchCredits; name kept for
+  // backward compat with any consumers that destructure it).
   const refetchCredits = useCallback(() => {
-    refetchByokAndCredits();
-  }, [refetchByokAndCredits]);
+    refetchLlm();
+  }, [refetchLlm]);
 
   useEffect(() => {
-    refetchByokAndCredits();
+    if (hasSession) refetchLlm();
     refreshSessionKey();
-  }, [refetchByokAndCredits, refreshSessionKey]);
+  }, [hasSession, refetchLlm, refreshSessionKey]);
 
   useEffect(() => {
-    const onByok = () => refetchByokAndCredits();
+    const onByok = () => refetchLlm();
     const onSession = () => refreshSessionKey();
     window.addEventListener(BYOK_UPDATED_EVENT, onByok);
     window.addEventListener(SESSION_LLM_PASS_THROUGH_UPDATED_EVENT, onSession);
@@ -89,11 +85,15 @@ export function useOnboarding() {
         onSession,
       );
     };
-  }, [refetchByokAndCredits, refreshSessionKey]);
+  }, [refetchLlm, refreshSessionKey]);
 
   const step1 = !!account;
   const step2 = llmConfigured === true || sessionKeyActive;
-  const step3 = hasCredits;
+  // x402 payment is automatic via wallet signature on supported networks.
+  // Step 3 is complete once the wallet is connected on a SKALE Base network
+  // (mainnet or sepolia) — the two v0.1.0 launch targets defined in the
+  // chain registry. No separate credit deposit is required.
+  const step3 = !!account && X402_SUPPORTED_CHAIN_IDS.has(activeChain?.id ?? 0);
   const step4 = (workflows?.length ?? 0) > 0;
 
   const steps: OnboardingStep[] = [
@@ -113,10 +113,10 @@ export function useOnboarding() {
     },
     {
       id: "payment",
-      label: "Add budget (USDC/USDT)",
+      label: "Switch to SKALE Base",
       done: step3,
-      href: ROUTES.PAYMENTS,
-      cta: "Add budget in Payment",
+      href: ROUTES.NETWORKS,
+      cta: "Switch network",
     },
     {
       id: "workflow",

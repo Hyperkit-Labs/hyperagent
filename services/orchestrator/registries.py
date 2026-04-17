@@ -438,6 +438,24 @@ def get_chain_rpc_explorer(chain_id: int) -> tuple[str, str] | None:
     return (rpc, explorer)
 
 
+def get_chain_rpc_url_list(chain_id: int) -> list[str]:
+    """Ordered unique RPC HTTP URLs for chain_id (chainlist first, then static metadata)."""
+    out: list[str] = []
+    c = get_chain(chain_id)
+    if c:
+        cl = c.get("chainlist") or {}
+        for u in cl.get("rpcUrls") or []:
+            s = (u or "").strip()
+            if s and s not in out:
+                out.append(s)
+    static = _CHAIN_ID_METADATA.get(chain_id)
+    if static:
+        r = (static.get("rpc") or "").strip()
+        if r and r not in out:
+            out.append(r)
+    return out
+
+
 def _normalize_slug(s: str) -> str:
     """Strip dashes, underscores, spaces for fuzzy slug matching."""
     return s.strip().lower().replace("-", "").replace("_", "").replace(" ", "")

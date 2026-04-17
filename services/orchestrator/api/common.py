@@ -12,6 +12,12 @@ from fastapi import HTTPException, Request
 
 _SAFE_IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
 _SAFE_NAME = re.compile(r"^[A-Za-z0-9 _\-]{1,64}$")
+_SECRET_LIKE = re.compile(
+    r"(sk-[a-zA-Z0-9]{10,}|xox[baprs]-[a-zA-Z0-9-]{10,}|"
+    r"api[_-]?key\s*[=:]\s*\S+|Bearer\s+[a-zA-Z0-9._-]{20,}|"
+    r"OPENAI_API_KEY|ANTHROPIC_API_KEY|AIza[0-9A-Za-z_-]{20,})",
+    re.I,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +46,25 @@ def _verify_user_id_hmac(user_id: str, sig_header: str) -> bool:
         return False
 
 
+def redact_error_for_storage(msg: str, max_len: int = 2000) -> str:
+    """Strip possible secrets before persisting workflow/run error text."""
+    if not msg:
+        return ""
+    head = msg[:768]
+    if _SECRET_LIKE.search(head):
+        return "Pipeline error (redacted: possible secret in message)."
+    return msg[:max_len]
+
+
+def redact_error_for_logs(msg: str, max_len: int = 240) -> str:
+    """Short log line without echoing key material."""
+    if not msg:
+        return ""
+    if _SECRET_LIKE.search(msg[:512]):
+        return "[redacted]"
+    return msg[:max_len]
+
+
 def _log_byok_event(event: str, user_id: str, action: str) -> None:
     """Structured security log for BYOK access (no key values)."""
     logger.warning(
@@ -49,15 +74,28 @@ def _log_byok_event(event: str, user_id: str, action: str) -> None:
 
 
 def _get_keys_for_run(user_id: str, workspace_id: str) -> dict[str, str]:
-    """Resolve BYOK keys: Supabase by user_id when configured; else in-memory by workspace for dev only."""
+    """Resolve BYOK keys: Supabase by user_id when configured; else in-memory by workspace for dev only.
+
+    Exceptions are caught and redacted so that key material in error messages
+    never propagates into logs or caller exception handlers.
+    """
     import llm_keys_supabase
     from llm_keys_store import DEFAULT_WORKSPACE, get_keys_for_pipeline
 
-    if llm_keys_supabase._is_configured():
-        if user_id:
-            return llm_keys_supabase.get_keys_for_user(user_id)
+    try:
+        if llm_keys_supabase._is_configured():
+            if user_id:
+                return llm_keys_supabase.get_keys_for_user(user_id)
+            return {}
+        return get_keys_for_pipeline(workspace_id or DEFAULT_WORKSPACE)
+    except Exception as exc:
+        logger.error(
+            "[byok] key resolution failed user_id=%s workspace=%s: %s",
+            (user_id[:8] + "…") if user_id else "anon",
+            workspace_id[:8] if workspace_id else "none",
+            redact_error_for_logs(str(exc)),
+        )
         return {}
-    return get_keys_for_pipeline(workspace_id or DEFAULT_WORKSPACE)
 
 
 def _create_agent_session_jwt_if_configured(
@@ -81,8 +119,7 @@ def _create_agent_session_jwt_if_configured(
             "[agent-session] JWT creation failed user_id=%s run_id=%s: %s",
             user_id,
             run_id,
-            e,
-            exc_info=True,
+            redact_error_for_logs(str(e)),
         )
         return None
 

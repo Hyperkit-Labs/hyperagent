@@ -53,10 +53,12 @@ from .runs_registry import (
     sandbox_router,
     security_router,
 )
+from .simulation_webhooks import router as simulation_webhooks_router
 from .storage_webhooks import router as storage_webhooks_router
 from .ui_export import router as ui_export_router
 from .workflows import router as workflows_router
 from .workflows import streaming_router as workflows_streaming_router
+from .x402_webhooks import router as x402_webhooks_router
 
 __all__ = [
     "agents_router",
@@ -79,8 +81,10 @@ __all__ = [
     "runs_router",
     "sandbox_router",
     "security_router",
+    "simulation_webhooks_router",
     "storage_webhooks_router",
     "ui_export_router",
     "workflows_router",
     "workflows_streaming_router",
+    "x402_webhooks_router",
 ]

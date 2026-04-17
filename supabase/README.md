@@ -48,6 +48,8 @@ That runs `node scripts/apply-supabase-migrations.mjs`, which applies every `sup
 
 **Schema drift (common):** `00000000000000_baseline.sql` uses `CREATE TABLE IF NOT EXISTS wallet_users (...)`. If `wallet_users` already existed **without** `auth_method`, PostgreSQL does not add missing columns; baseline is a no-op for that table. Forward migrations such as `20260407100000_wallet_users_ensure_auth_method.sql` use `ADD COLUMN IF NOT EXISTS` to repair older databases.
 
+The same pattern applies to **`credit_transactions`**: if the table was created before `amount` / `balance_after` existed, `20260418100000_credit_transactions_amount_balance_after.sql` adds them, backfills nulls with `0`, and enforces `NOT NULL` so billing RPCs and `billing_reconciliation.py` match the baseline.
+
 ## Verification scripts
 
 After apply, you can confirm RLS coverage with the helper SQL (not a migration):

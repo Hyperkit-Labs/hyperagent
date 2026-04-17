@@ -17,6 +17,7 @@ import { byokRouter } from "./byok.js";
 import { createProxyOptions } from "./proxy.js";
 import { healthHandler } from "./health.js";
 import { meteringMiddleware } from "./metering.js";
+import { x402GatewayMiddleware } from "./x402.js";
 import { Env, getGatewayEnv } from "@hyperagent/config";
 import { initOtel } from "./otel-sdk.js";
 import { initSentry } from "./sentry-init.js";
@@ -91,6 +92,12 @@ app.use((req, res, next) => {
 
 app.use((req, res, next) => {
   void meteringMiddleware(req as RequestWithUser, res, next).catch(next);
+});
+
+// x402 payment gate — must run after auth (needs X-User-Id from JWT) but
+// before the proxy so external agents get 402 challenges, not a proxy 401.
+app.use((req, res, next) => {
+  x402GatewayMiddleware(req, res, next);
 });
 
 // --- Routes ---

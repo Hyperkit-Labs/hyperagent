@@ -6,19 +6,48 @@ import { fileURLToPath } from "url";
 // ESM-safe: Jest/next compile next.config to ESM where `__dirname` is undefined.
 const configDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(configDir, "../..");
-dotenvConfig({ path: path.join(root, ".env") });
-dotenvConfig({
-  path: path.join(
-    root,
-    process.env.NODE_ENV === "production"
-      ? ".env.production"
-      : ".env.development",
-  ),
-});
-dotenvConfig({ path: path.join(configDir, ".env") });
+
+// Vercel injects env before `next build`; loading repo `.env` / `.env.production` here can overwrite
+// dashboard values if those files exist in the clone (e.g. CI artifact) or if tooling merges env oddly.
+// Skip file-based dotenv on Vercel unless explicitly opted in (local `vercel build` debugging).
+const isVercelBuild = Boolean(process.env.VERCEL);
+const loadRepoDotenv =
+  !isVercelBuild || process.env.ALLOW_REPO_DOTENV_ON_VERCEL === "1";
+
+if (loadRepoDotenv) {
+  dotenvConfig({ path: path.join(root, ".env") });
+  dotenvConfig({
+    path: path.join(
+      root,
+      process.env.NODE_ENV === "production"
+        ? ".env.production"
+        : ".env.development",
+    ),
+  });
+  dotenvConfig({ path: path.join(configDir, ".env") });
+}
 
 const isProduction = process.env.NODE_ENV === "production";
 const isStaging = (process.env.NODE_ENV as string) === "staging";
+
+function assertNextPublicApiUrlSafeForVercel(): void {
+  if (!isProduction || !isVercelBuild) return;
+  const raw = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (!raw) return;
+  let u: URL;
+  try {
+    u = new URL(raw.startsWith("http") ? raw : `https://${raw}`);
+  } catch {
+    return;
+  }
+  const h = u.hostname.toLowerCase();
+  if (h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "[::1]") {
+    throw new Error(
+      "NEXT_PUBLIC_API_URL must not be loopback on Vercel production. Set the variable for the Production scope in the Vercel project, then redeploy without build cache.",
+    );
+  }
+}
+assertNextPublicApiUrlSafeForVercel();
 
 // Validate required environment variables in production (fail build if missing)
 if (isProduction || isStaging) {

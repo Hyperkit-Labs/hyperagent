@@ -9,6 +9,10 @@ from web3 import Web3
 
 logger = logging.getLogger(__name__)
 
+# SKALE chains use legacy (Type 0) transactions only.
+# EIP-1559 fields (maxFeePerGas, maxPriorityFeePerGas) cause reverts on SKALE.
+_SKALE_CHAIN_IDS: frozenset[int] = frozenset({1187947933, 324705682})
+
 
 def _normalize_address(addr: str) -> str:
     if not addr or not isinstance(addr, str):
@@ -97,18 +101,37 @@ def contract_call_build_tx(
             tx_params["gas"] = gas_limit
         if chain_id is not None:
             tx_params["chainId"] = chain_id
+        is_skale = chain_id is not None and chain_id in _SKALE_CHAIN_IDS
+        if is_skale:
+            # SKALE only supports legacy (Type 0) transactions. Forcing type=0
+            # prevents web3.py from adding EIP-1559 gas fields that cause reverts.
+            # SKALE transactions are gasless (gasPrice=0), so set it explicitly.
+            tx_params["type"] = 0
+            tx_params["gasPrice"] = 0
+            # Strip any EIP-1559 fields that may have been set by the caller.
+            tx_params.pop("maxFeePerGas", None)
+            tx_params.pop("maxPriorityFeePerGas", None)
+
         if args:
             built = fn(*args).build_transaction(tx_params)
         else:
             built = fn().build_transaction(tx_params)
-        out = {
+
+        out: dict[str, Any] = {
             "to": built.get("to"),
             "data": built.get("data"),
             "value": hex(built.get("value", 0)),
             "gas": built.get("gas"),
-            "gasPrice": built.get("gasPrice"),
             "chainId": built.get("chainId"),
         }
+        if is_skale:
+            # Return gasPrice=0 for SKALE; omit EIP-1559 fields entirely.
+            out["gasPrice"] = "0x0"
+            out["type"] = "0x0"
+        else:
+            gas_price = built.get("gasPrice")
+            if gas_price is not None:
+                out["gasPrice"] = gas_price
         return (True, {k: v for k, v in out.items() if v is not None}, "")
     except Exception as e:
         logger.warning("contract_call_build_tx failed: %s", e)

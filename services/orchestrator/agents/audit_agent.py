@@ -13,13 +13,34 @@ from registries import get_deterministic_tools, get_timeout, get_tool_deploy_rul
 from trace_context import get_trace_headers
 
 _AUDIT_BREAKER_NAME = "audit_service"
+_DEFAULT_AUDIT_URL = "http://localhost:8001"
 
 logger = logging.getLogger(__name__)
-AUDIT_SERVICE_URL = os.environ.get("AUDIT_SERVICE_URL", "http://localhost:8001")
+AUDIT_SERVICE_URL = os.environ.get("AUDIT_SERVICE_URL", _DEFAULT_AUDIT_URL)
 AUDIT_TOOLS = ["slither", "mythril", "echidna"]
 OPENSANDBOX_ENABLED = os.environ.get(
     "OPENSANDBOX_ENABLED", "false"
 ).strip().lower() in ("1", "true", "yes")
+
+# When true (default), pipeline fails-closed: deploy is blocked whenever all contracts
+# fail to reach the audit service. Matches the tiered gate model in SECURITY.md.
+AUDIT_MANDATORY = os.environ.get("AUDIT_MANDATORY", "true").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
+if (
+    AUDIT_MANDATORY
+    and not OPENSANDBOX_ENABLED
+    and AUDIT_SERVICE_URL == _DEFAULT_AUDIT_URL
+):
+    logger.warning(
+        "[audit] AUDIT_MANDATORY=true but AUDIT_SERVICE_URL is not set (using default %s). "
+        "Set AUDIT_SERVICE_URL or OPENSANDBOX_ENABLED=1. "
+        "Pipeline will fail-closed when service is unreachable.",
+        _DEFAULT_AUDIT_URL,
+    )
 
 TOOL_WEIGHTS: dict[str, float] = {
     "slither": 0.6,
@@ -154,8 +175,9 @@ def _finding_blocks_deploy(
     """Apply tiered gate: return True if this finding blocks deploy."""
     cat = (finding.get("category") or "").lower()
     title = (finding.get("title") or "").lower()
+    # Audit service unavailable: only block when AUDIT_MANDATORY (default: true).
     if cat == "service" and "unavailable" in title:
-        return True
+        return AUDIT_MANDATORY
 
     tool = (finding.get("tool") or "").lower()
     severity = (finding.get("severity") or "info").lower()
@@ -350,16 +372,27 @@ async def run_security_audits(
             continue
 
     if audit_succeeded_count == 0 and contracts_to_audit:
+        mandatory_note = (
+            " Pipeline is fail-closed: deploy is blocked until audit passes."
+            if AUDIT_MANDATORY
+            else " AUDIT_MANDATORY=false: this finding will NOT block deploy."
+        )
         logger.error(
-            "[audit] All %d contract(s) failed to audit (service unreachable or error)",
+            "[audit] All %d contract(s) failed to reach the audit service (AUDIT_MANDATORY=%s).%s",
             len(contracts_to_audit),
+            AUDIT_MANDATORY,
+            mandatory_note,
         )
         findings.append(
             {
                 "tool": "audit",
                 "severity": "high",
                 "title": "Audit service unavailable",
-                "description": "All contracts failed to reach the audit service. Check AUDIT_SERVICE_URL and that Slither/Mythril are installed.",
+                "description": (
+                    "All contracts failed to reach the audit service. "
+                    "Check AUDIT_SERVICE_URL and that Slither/Mythril are running."
+                    + mandatory_note
+                ),
                 "location": None,
                 "category": "service",
             }

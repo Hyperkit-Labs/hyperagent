@@ -12,6 +12,7 @@ import { WalletAuthProvider } from "@/components/providers/WalletAuthContext";
 import { LayoutSwitcher } from "@/components/layout/LayoutSwitcher";
 import { Toaster } from "sonner";
 import { Analytics } from "@vercel/analytics/next";
+import { DatadogRumInit } from "@/components/providers/DatadogRumInit";
 
 /**
  * Single client boundary for all providers. Ensures ThirdwebProvider wraps
@@ -37,6 +38,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
                 </SelectedNetworkProvider>
               </NetworksProvider>
               <Toaster position="top-right" richColors />
+              <DatadogRumInit />
               <Analytics />
             </ApiAuthProvider>
           </ConfigProvider>

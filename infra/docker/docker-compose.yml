@@ -429,6 +429,12 @@ services:
       - DD_APM_INSTRUMENTATION_LIBRARIES=${DD_APM_INSTRUMENTATION_LIBRARIES:-java:1,python:4,js:5,php:1,dotnet:3,ruby:2}
       - DD_LOGS_ENABLED=true
       - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true
+      # Upstash and other managed Redis require auth; autoconf redisdb pings without a password and spams errors.
+      - DD_IGNORE_AUTOCONF=redisdb
+      # Ingest OTLP over HTTP so apps use OTEL_EXPORTER_OTLP_ENDPOINT=http://dd-agent:4318 (same Docker network).
+      - DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_HTTP_ENDPOINT=0.0.0.0:4318
+      # Agent 7.61+: OTLP pipeline can fail when /host/proc is mounted; HOST_PROC fixes process metrics registration.
+      - HOST_PROC=/proc
       # Exclude the agent itself from log collection
       - DD_CONTAINER_EXCLUDE=name:hyperagent-dd-agent
     volumes:

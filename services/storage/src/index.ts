@@ -86,16 +86,34 @@ app.post("/ipfs/unpin", safeHandler("storage-unpin", async (req, res) => {
   res.json({ success: true, cid });
 }));
 
+function isDedicatedPinataGateway(): boolean {
+  const shared = "gateway.pinata.cloud";
+  const baseRaw = (process.env.PINATA_GATEWAY_BASE ?? "").trim();
+  if (baseRaw) {
+    try {
+      const host = new URL(baseRaw).hostname.toLowerCase();
+      if (host && host !== shared) return true;
+    } catch {
+      /* invalid PINATA_GATEWAY_BASE */
+    }
+  }
+  const domain = (process.env.PINATA_GATEWAY_DOMAIN ?? shared).trim();
+  return Boolean(domain) && domain !== shared;
+}
+
 app.get("/health", (_req, res) => {
   const pinataConfigured = Boolean(process.env.PINATA_JWT);
   const gatewayDomain = (process.env.PINATA_GATEWAY_DOMAIN ?? "gateway.pinata.cloud").trim();
-  const isSharedGateway = gatewayDomain === "gateway.pinata.cloud" || !gatewayDomain;
-  const isDedicatedGateway = !isSharedGateway;
+  const isDedicatedGateway = isDedicatedPinataGateway();
 
-  if (pinataConfigured && isSharedGateway && (process.env.NODE_ENV === "production" || process.env.ENVIRONMENT === "production")) {
+  if (
+    pinataConfigured &&
+    !isDedicatedGateway &&
+    (process.env.NODE_ENV === "production" || process.env.ENVIRONMENT === "production")
+  ) {
     log.warn(
       "Pinata is using the shared gateway (gateway.pinata.cloud) in production. " +
-      "Set PINATA_GATEWAY_DOMAIN to a dedicated gateway for better rate limits and reliability.",
+        "Set PINATA_GATEWAY_DOMAIN (or PINATA_GATEWAY_BASE with a non-shared host) for better rate limits and reliability.",
     );
   }
 

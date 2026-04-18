@@ -1,6 +1,6 @@
 -- RLS Verification: Ensure every public table has at least one policy.
 -- Expected: All public tables have policies (typically service_role_all).
--- deployments must NOT have owner_read_own_deployments (dropped in 20260321000001).
+-- deployments must NOT have owner_read_own_deployments (removed in consolidated schema).
 -- Run: psql "$DATABASE_URL" -f supabase/scripts/verify-rls-policies.sql
 -- Or paste into Supabase SQL Editor.
 

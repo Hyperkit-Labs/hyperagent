@@ -66,9 +66,18 @@ services:
       - VECTORDB_URL=http://vectordb:8080
       - ROMA_URL=http://roma-service:8080
       - TOOLS_BASE_URL=http://hyperagent-tools:9000
+      # Datadog APM – send traces + metrics via Unix socket
+      - DD_SERVICE=hyperagent-orchestrator
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_TRACE_AGENT_URL=unix:///var/run/datadog/apm.socket
+      - DD_DOGSTATSD_URL=unix:///var/run/datadog/dsd.socket
     volumes:
       - ./infra/registries:/app/services/orchestrator/registries:ro
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+      - datadog-run:/var/run/datadog:ro
+    labels:
+      com.datadoghq.tags.env: "${DD_ENV:-prod}"
+      com.datadoghq.tags.service: "hyperagent-orchestrator"
+    command: ["ddtrace-run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
       interval: 15s
@@ -111,8 +120,17 @@ services:
       - SIMULATION_SERVICE_URL=http://simulation:8002
       - DEPLOY_SERVICE_URL=http://deploy:8003
       - STORAGE_SERVICE_URL=http://storage:4005
+      # Datadog APM
+      - DD_SERVICE=hyperagent-agent-runtime
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_TRACE_AGENT_URL=unix:///var/run/datadog/apm.socket
+      - DD_DOGSTATSD_URL=unix:///var/run/datadog/dsd.socket
     volumes:
       - ./infra/registries:/app/registries:ro
+      - datadog-run:/var/run/datadog:ro
+    labels:
+      com.datadoghq.tags.env: "${DD_ENV:-prod}"
+      com.datadoghq.tags.service: "hyperagent-agent-runtime"
     networks:
       - hyperagent
     healthcheck:
@@ -132,6 +150,15 @@ services:
       - .env
     environment:
       - PORT=8002
+      - DD_SERVICE=hyperagent-simulation
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_TRACE_AGENT_URL=unix:///var/run/datadog/apm.socket
+      - DD_DOGSTATSD_URL=unix:///var/run/datadog/dsd.socket
+    volumes:
+      - datadog-run:/var/run/datadog:ro
+    labels:
+      com.datadoghq.tags.env: "${DD_ENV:-prod}"
+      com.datadoghq.tags.service: "hyperagent-simulation"
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8002/health"]
       interval: 15s
@@ -152,8 +179,16 @@ services:
     environment:
       - PORT=8003
       - CHAIN_REGISTRY_PATH=/app/registries/network/chains.yaml
+      - DD_SERVICE=hyperagent-deploy
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_TRACE_AGENT_URL=unix:///var/run/datadog/apm.socket
+      - DD_DOGSTATSD_URL=unix:///var/run/datadog/dsd.socket
     volumes:
       - ./infra/registries:/app/registries:ro
+      - datadog-run:/var/run/datadog:ro
+    labels:
+      com.datadoghq.tags.env: "${DD_ENV:-prod}"
+      com.datadoghq.tags.service: "hyperagent-deploy"
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8003/health"]
       interval: 15s
@@ -173,6 +208,15 @@ services:
       - .env
     environment:
       - PORT=4005
+      - DD_SERVICE=hyperagent-storage
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_TRACE_AGENT_URL=unix:///var/run/datadog/apm.socket
+      - DD_DOGSTATSD_URL=unix:///var/run/datadog/dsd.socket
+    volumes:
+      - datadog-run:/var/run/datadog:ro
+    labels:
+      com.datadoghq.tags.env: "${DD_ENV:-prod}"
+      com.datadoghq.tags.service: "hyperagent-storage"
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:4005/health"]
       interval: 15s
@@ -190,7 +234,17 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8004"]
+    environment:
+      - DD_SERVICE=hyperagent-compile
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_TRACE_AGENT_URL=unix:///var/run/datadog/apm.socket
+      - DD_DOGSTATSD_URL=unix:///var/run/datadog/dsd.socket
+    volumes:
+      - datadog-run:/var/run/datadog:ro
+    labels:
+      com.datadoghq.tags.env: "${DD_ENV:-prod}"
+      com.datadoghq.tags.service: "hyperagent-compile"
+    command: ["ddtrace-run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8004"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8004/health')"]
       interval: 15s
@@ -208,7 +262,17 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+    environment:
+      - DD_SERVICE=hyperagent-audit
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_TRACE_AGENT_URL=unix:///var/run/datadog/apm.socket
+      - DD_DOGSTATSD_URL=unix:///var/run/datadog/dsd.socket
+    volumes:
+      - datadog-run:/var/run/datadog:ro
+    labels:
+      com.datadoghq.tags.env: "${DD_ENV:-prod}"
+      com.datadoghq.tags.service: "hyperagent-audit"
+    command: ["ddtrace-run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health')"]
       interval: 15s
@@ -226,7 +290,17 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "9000"]
+    environment:
+      - DD_SERVICE=hyperagent-tools
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_TRACE_AGENT_URL=unix:///var/run/datadog/apm.socket
+      - DD_DOGSTATSD_URL=unix:///var/run/datadog/dsd.socket
+    volumes:
+      - datadog-run:/var/run/datadog:ro
+    labels:
+      com.datadoghq.tags.env: "${DD_ENV:-prod}"
+      com.datadoghq.tags.service: "hyperagent-tools"
+    command: ["ddtrace-run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "9000"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/health')"]
       interval: 15s
@@ -246,7 +320,16 @@ services:
       - .env
     environment:
       - AGENT_RUNTIME_URL=http://agent-runtime:4001
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+      - DD_SERVICE=hyperagent-roma
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_TRACE_AGENT_URL=unix:///var/run/datadog/apm.socket
+      - DD_DOGSTATSD_URL=unix:///var/run/datadog/dsd.socket
+    volumes:
+      - datadog-run:/var/run/datadog:ro
+    labels:
+      com.datadoghq.tags.env: "${DD_ENV:-prod}"
+      com.datadoghq.tags.service: "hyperagent-roma"
+    command: ["ddtrace-run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
       interval: 15s
@@ -278,9 +361,18 @@ services:
       - .env
     environment:
       - QDRANT_URL=http://qdrant:6333
+      - DD_SERVICE=hyperagent-vectordb
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_TRACE_AGENT_URL=unix:///var/run/datadog/apm.socket
+      - DD_DOGSTATSD_URL=unix:///var/run/datadog/dsd.socket
+    volumes:
+      - datadog-run:/var/run/datadog:ro
+    labels:
+      com.datadoghq.tags.env: "${DD_ENV:-prod}"
+      com.datadoghq.tags.service: "hyperagent-vectordb"
     depends_on:
       - qdrant
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+    command: ["ddtrace-run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
       interval: 15s
@@ -316,6 +408,38 @@ services:
     networks:
       - hyperagent
 
+  # ---------------------------------------------------------------------------
+  # Datadog Agent — APM + DogStatsD + log collection via Unix socket
+  # Shared volume datadog-run is mounted :ro by each service that sends traces.
+  # ---------------------------------------------------------------------------
+  dd-agent:
+    image: registry.datadoghq.com/agent:7
+    container_name: hyperagent-dd-agent
+    restart: unless-stopped
+    environment:
+      - DD_API_KEY=${DD_API_KEY}
+      - DD_SITE=${DD_SITE:-us5.datadoghq.com}
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_APM_ENABLED=true
+      - DD_APM_NON_LOCAL_TRAFFIC=true
+      - DD_APM_RECEIVER_SOCKET=/var/run/datadog/apm.socket
+      - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
+      - DD_DOGSTATSD_SOCKET=/var/run/datadog/dsd.socket
+      - DD_APM_INSTRUMENTATION_ENABLED=docker
+      - DD_APM_INSTRUMENTATION_LIBRARIES=${DD_APM_INSTRUMENTATION_LIBRARIES:-java:1,python:4,js:5,php:1,dotnet:3,ruby:2}
+      - DD_LOGS_ENABLED=true
+      - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true
+      # Exclude the agent itself from log collection
+      - DD_CONTAINER_EXCLUDE=name:hyperagent-dd-agent
+    volumes:
+      - datadog-run:/var/run/datadog
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    networks:
+      - hyperagent
+
 networks:
   hyperagent:
     driver: bridge
@@ -325,3 +449,7 @@ volumes:
     name: hyperagent_sandbox-data
   qdrant_data:
     name: hyperagent_qdrant-data
+  # Shared dir for dd-agent Unix sockets (APM + DogStatsD).
+  # dd-agent writes; all Python services mount :ro to send traces.
+  datadog-run:
+    name: hyperagent_datadog-run

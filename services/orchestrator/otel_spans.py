@@ -21,6 +21,22 @@ _OTEL_ENABLED = os.environ.get("OPENTELEMETRY_ENABLED", "").strip().lower() in (
 _tracer = None
 
 
+def _otlp_http_traces_endpoint() -> str:
+    """Resolve OTLP/HTTP traces URL (must end with /v1/traces for the HTTP exporter)."""
+    raw = (
+        os.environ.get("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "").strip()
+        or os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "").strip()
+    )
+    if not raw:
+        return ""
+    u = raw.rstrip("/")
+    if "/v1/traces" in u:
+        return u
+    if "/v1/metrics" in u:
+        return u.replace("/v1/metrics", "/v1/traces")
+    return f"{u}/v1/traces"
+
+
 def _get_tracer():  # type: ignore[no-untyped-def]
     global _tracer
     if _tracer is not None:
@@ -32,7 +48,7 @@ def _get_tracer():  # type: ignore[no-untyped-def]
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-        endpoint = (os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT") or "").strip()
+        endpoint = _otlp_http_traces_endpoint()
         if endpoint:
             try:
                 from opentelemetry.exporter.otlp.proto.http.trace_exporter import (

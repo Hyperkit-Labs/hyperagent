@@ -30,8 +30,11 @@ if (loadRepoDotenv) {
 const isProduction = process.env.NODE_ENV === "production";
 const isStaging = (process.env.NODE_ENV as string) === "staging";
 
-function assertNextPublicApiUrlSafeForVercel(): void {
-  if (!isProduction || !isVercelBuild) return;
+// Guard fires on ANY production build (Vercel, CI, Docker, local next build).
+// The earlier guard was Vercel-only, which meant a local/CI `next build` with a
+// localhost value loaded from repo `.env` would silently bundle that address.
+function assertNextPublicApiUrlSafeForProduction(): void {
+  if (!isProduction) return;
   const raw = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (!raw) return;
   let u: URL;
@@ -42,12 +45,17 @@ function assertNextPublicApiUrlSafeForVercel(): void {
   }
   const h = u.hostname.toLowerCase();
   if (h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "[::1]") {
+    const where = isVercelBuild
+      ? "Vercel production"
+      : "production build (CI / Docker / local next build)";
     throw new Error(
-      "NEXT_PUBLIC_API_URL must not be loopback on Vercel production. Set the variable for the Production scope in the Vercel project, then redeploy without build cache.",
+      `NEXT_PUBLIC_API_URL must not be loopback in ${where}. ` +
+        "Remove the localhost value from your repo .env file and set the " +
+        "correct URL for the target environment, then redeploy without build cache.",
     );
   }
 }
-assertNextPublicApiUrlSafeForVercel();
+assertNextPublicApiUrlSafeForProduction();
 
 // Validate required environment variables in production (fail build if missing)
 if (isProduction || isStaging) {
@@ -127,15 +135,35 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_THIRDWEB_CLIENT_ID:
       process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || "",
-    NEXT_PUBLIC_API_URL:
-      process.env.NEXT_PUBLIC_API_URL ??
-      (isProduction ? "" : "http://localhost:4000"),
-    NEXT_PUBLIC_WS_URL:
-      process.env.NEXT_PUBLIC_WS_URL ||
-      (isProduction ? "" : "ws://localhost:4000"),
-    NEXT_PUBLIC_X402_VERIFIER_URL:
-      process.env.NEXT_PUBLIC_X402_VERIFIER_URL ||
-      (isProduction ? "" : "http://localhost:3001"),
+    // Never bundle a localhost value in production. If the env var is not set
+    // or resolves to a loopback string (e.g. loaded from repo .env), default to
+    // empty string so the required-var check above fails fast with a clear message.
+    NEXT_PUBLIC_API_URL: isProduction
+      ? (() => {
+          const v = process.env.NEXT_PUBLIC_API_URL?.trim() ?? "";
+          try {
+            const h = new URL(
+              v.startsWith("http") ? v : `https://${v}`,
+            ).hostname.toLowerCase();
+            if (
+              h === "localhost" ||
+              h === "127.0.0.1" ||
+              h === "::1" ||
+              h === "[::1]"
+            )
+              return "";
+          } catch {
+            // non-parseable → fall through and let required-var check handle it
+          }
+          return v;
+        })()
+      : (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"),
+    NEXT_PUBLIC_WS_URL: isProduction
+      ? (process.env.NEXT_PUBLIC_WS_URL?.trim() ?? "")
+      : process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:4000",
+    NEXT_PUBLIC_X402_VERIFIER_URL: isProduction
+      ? (process.env.NEXT_PUBLIC_X402_VERIFIER_URL?.trim() ?? "")
+      : process.env.NEXT_PUBLIC_X402_VERIFIER_URL || "http://localhost:3001",
     NEXT_PUBLIC_ENV:
       process.env.NEXT_PUBLIC_ENV || process.env.NODE_ENV || "development",
     NEXT_PUBLIC_SUPABASE_URL:

@@ -9,6 +9,8 @@ This folder holds **PostgreSQL migrations** for the project database (Supabase).
 | `migrations/` | Ordered SQL files applied in filename order |
 | `scripts/` | Optional SQL helpers (for example policy checks), not auto-applied as migrations |
 
+**Consolidated schema:** The full application schema lives in `migrations/00000000000000_initial_schema.sql`. That file is a single ordered merge of the former per-change migrations (section headers inside the file name the original source). Add **new** DDL as additional files with a later timestamp so history stays clear.
+
 ## Naming
 
 Use a timestamp prefix so files sort in apply order:
@@ -21,7 +23,7 @@ Use lowercase with underscores. One logical change per file when possible.
 
 ## Authoring a new migration
 
-1. Add a new file under `migrations/` with the next timestamp (after the latest file).
+1. Add a new file under `migrations/` with the next timestamp (lexicographically after `00000000000000_initial_schema.sql` and any other deltas).
 2. Prefer idempotent DDL where it helps operations, for example `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, and `DO $$ ... IF NOT EXISTS` blocks for policies.
 3. Enable **RLS** on user-facing tables and add policies that match how services connect (often `service_role` for backend jobs; adjust if you use authenticated users or other roles).
 4. Keep destructive changes (drops, renames) explicit and documented in the migration comment at the top of the file.
@@ -38,7 +40,7 @@ That runs `node scripts/apply-supabase-migrations.mjs`, which applies every `sup
 
 **Idempotency:** The apply script does not use a migration version table; the same files are intended to be safe to re-run (for example `CREATE IF NOT EXISTS`, `DROP IF EXISTS`, and guarded `DO` blocks). Destructive one-off data fixes remain in dated files; review before re-running on a copy if unsure.
 
-**Architecture note:** Rationale for layering, advisory fixes, and what was **not** squashed into a single baseline is documented in `docs/database/SECURITY_AND_MIGRATIONS_AUDIT.md`.
+**Architecture note:** Security findings, RLS expectations, and validation commands are documented in `docs/database/SECURITY_AND_MIGRATIONS_AUDIT.md`.
 
 **Alternative:** Use the [Supabase CLI](https://supabase.com/docs/guides/cli) with your project linked, for example `supabase db push` or `supabase migration up`, if that is what your environment standardizes.
 
@@ -46,9 +48,16 @@ That runs `node scripts/apply-supabase-migrations.mjs`, which applies every `sup
 
 **Docker / Coolify / app deploy:** Building and starting the API does **not** run SQL migrations. If production sign-in fails with PostgREST **`PGRST204`** on `wallet_users.auth_method`, the database was never fully migrated or predates a column the gateway expects. Apply migrations against the **same** `DATABASE_URL` as Supabase (or run the SQL in the Supabase SQL Editor).
 
-**Schema drift (common):** `00000000000000_baseline.sql` uses `CREATE TABLE IF NOT EXISTS wallet_users (...)`. If `wallet_users` already existed **without** `auth_method`, PostgreSQL does not add missing columns; baseline is a no-op for that table. Forward migrations such as `20260407100000_wallet_users_ensure_auth_method.sql` use `ADD COLUMN IF NOT EXISTS` to repair older databases.
+**Schema drift (common):** The consolidated file still uses `CREATE TABLE IF NOT EXISTS` in places. If a table already existed without a column the app expects, PostgreSQL does not add that column from the `CREATE TABLE` text. Later sections in the same file (for example wallet `auth_method`, billing `credit_transactions` columns) use `ADD COLUMN IF NOT EXISTS` and backfills so a **full** apply on a messy database repairs shape. For a **known** bad state, prefer a deliberate reset (below) then a single clean apply.
 
-The same pattern applies to **`credit_transactions`**: if the table was created before `amount` / `balance_after` existed, `20260418100000_credit_transactions_amount_balance_after.sql` adds them, backfills nulls with `0`, and enforces `NOT NULL` so billing RPCs and `billing_reconciliation.py` match the baseline.
+## Fresh database (reset public, then migrate)
+
+To avoid carrying legacy partial schema in `public`, wipe `public` and re-apply all migration files:
+
+1. Run `supabase/scripts/reset-public-schema.sql` as a superuser or `postgres` (Supabase SQL Editor is fine).
+2. From the repo root: `pnpm db:apply-migrations`.
+
+This **destroys all application data** in `public`. Do not run against production unless that data loss is intended. For production, use backups, maintenance windows, or a new Supabase project when you need a greenfield schema.
 
 ## Verification scripts
 
@@ -62,7 +71,7 @@ On Windows shells without `psql` on `PATH`, use your SQL client or paste the fil
 
 For ad hoc checks, open any file under `supabase/scripts/` and run it the same way.
 
-**Security checks** (after `20260409120000_security_remediation_search_path_legacy_schema.sql`):
+**Security checks** (after migrations define pinned `search_path` and related hardening):
 
 ```bash
 pnpm db:verify-security

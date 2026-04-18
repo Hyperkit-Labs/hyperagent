@@ -123,6 +123,9 @@ const CONNECT_SRC_EXTRA = [
   "https://generativelanguage.googleapis.com",
   "https://api.together.xyz",
   "wss:",
+  // Datadog Browser RUM + Session Replay intakes (site-specific subdomains, e.g. us5)
+  "https://*.datadoghq.com",
+  "https://*.datadoghq.eu",
   "https://*.thirdweb.com",
   "https://*.supabase.co",
   "wss://*.supabase.co",

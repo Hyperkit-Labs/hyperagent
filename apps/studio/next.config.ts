@@ -172,6 +172,20 @@ const nextConfig: NextConfig = {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
       process.env.SUPABASE_ANON_KEY ||
       "",
+    NEXT_PUBLIC_DD_RUM_APPLICATION_ID:
+      process.env.NEXT_PUBLIC_DD_RUM_APPLICATION_ID ?? "",
+    NEXT_PUBLIC_DD_RUM_CLIENT_TOKEN:
+      process.env.NEXT_PUBLIC_DD_RUM_CLIENT_TOKEN ?? "",
+    NEXT_PUBLIC_DD_SITE: process.env.NEXT_PUBLIC_DD_SITE ?? "us5.datadoghq.com",
+    NEXT_PUBLIC_DD_SERVICE_NAME:
+      process.env.NEXT_PUBLIC_DD_SERVICE_NAME ?? "hyperagent-studio",
+    NEXT_PUBLIC_DD_ENV: process.env.NEXT_PUBLIC_DD_ENV ?? "",
+    NEXT_PUBLIC_DD_VERSION: process.env.NEXT_PUBLIC_DD_VERSION ?? "",
+    NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION ?? "",
+    NEXT_PUBLIC_DD_SESSION_SAMPLE_RATE:
+      process.env.NEXT_PUBLIC_DD_SESSION_SAMPLE_RATE ?? "",
+    NEXT_PUBLIC_DD_SESSION_REPLAY_SAMPLE_RATE:
+      process.env.NEXT_PUBLIC_DD_SESSION_REPLAY_SAMPLE_RATE ?? "",
   },
 };
 

@@ -43,6 +43,16 @@ describe("studio config environment", () => {
     );
   });
 
+  it("keeps remote API in development when NEXT_PUBLIC_ENV is production (matches next.config inlining from .env NODE_ENV)", async () => {
+    process.env.NODE_ENV = "development";
+    process.env.NEXT_PUBLIC_ENV = "production";
+    process.env.NEXT_PUBLIC_API_URL = "https://api.hyperkitlabs.com";
+    const mod = await import("./environment");
+    expect(mod.getServiceUrl("backend")).toBe(
+      "https://api.hyperkitlabs.com/api/v1",
+    );
+  });
+
   it("derives orchestrator URL from backend URL", async () => {
     process.env.NODE_ENV = "production";
     process.env.NEXT_PUBLIC_API_URL = "https://api.hyperkitlabs.com/api/v1";

@@ -37,9 +37,14 @@ export function initDatadogBrowserRum(): void {
 
   const applicationId = process.env.NEXT_PUBLIC_DD_RUM_APPLICATION_ID?.trim();
   const clientToken = process.env.NEXT_PUBLIC_DD_RUM_CLIENT_TOKEN?.trim();
-  if (!applicationId || !clientToken) return;
-
-  w[INIT_FLAG] = true;
+  if (!applicationId || !clientToken) {
+    if (process.env.NEXT_PUBLIC_DD_RUM_DEBUG === "1") {
+      console.warn(
+        "[Datadog RUM] skipped: NEXT_PUBLIC_DD_RUM_APPLICATION_ID or NEXT_PUBLIC_DD_RUM_CLIENT_TOKEN empty at build time",
+      );
+    }
+    return;
+  }
 
   const site = process.env.NEXT_PUBLIC_DD_SITE?.trim() || "us5.datadoghq.com";
   const service =
@@ -53,25 +58,33 @@ export function initDatadogBrowserRum(): void {
     process.env.NEXT_PUBLIC_APP_VERSION?.trim() ||
     "";
 
-  datadogRum.init({
-    applicationId,
-    clientToken,
-    site,
-    service,
-    env,
-    ...(version ? { version } : {}),
-    sessionSampleRate: parseSampleRate(
-      process.env.NEXT_PUBLIC_DD_SESSION_SAMPLE_RATE,
-      100,
-    ),
-    sessionReplaySampleRate: parseSampleRate(
-      process.env.NEXT_PUBLIC_DD_SESSION_REPLAY_SAMPLE_RATE,
-      20,
-    ),
-    trackUserInteractions: true,
-    trackResources: true,
-    trackLongTasks: true,
-    defaultPrivacyLevel: "mask-user-input",
-    allowedTracingUrls: tracingMatchers(),
-  });
+  try {
+    datadogRum.init({
+      applicationId,
+      clientToken,
+      site,
+      service,
+      env,
+      ...(version ? { version } : {}),
+      sessionSampleRate: parseSampleRate(
+        process.env.NEXT_PUBLIC_DD_SESSION_SAMPLE_RATE,
+        100,
+      ),
+      sessionReplaySampleRate: parseSampleRate(
+        process.env.NEXT_PUBLIC_DD_SESSION_REPLAY_SAMPLE_RATE,
+        20,
+      ),
+      trackUserInteractions: true,
+      trackResources: true,
+      trackLongTasks: true,
+      defaultPrivacyLevel: "mask-user-input",
+      allowedTracingUrls: tracingMatchers(),
+    });
+    w[INIT_FLAG] = true;
+    if (process.env.NEXT_PUBLIC_DD_RUM_DEBUG === "1") {
+      console.info("[Datadog RUM] initialized", { site, service, env });
+    }
+  } catch (e) {
+    console.error("[Datadog RUM] init failed", e);
+  }
 }

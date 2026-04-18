@@ -32,6 +32,8 @@ function buildContentSecurityPolicy(nonce: string): string {
     `script-src ${scriptSrc}`,
     "style-src 'self' 'unsafe-inline'",
     `connect-src ${buildStudioConnectSrcDirective(process.env as Record<string, string | undefined>)}`,
+    // Datadog Browser RUM Session Replay (deflate worker is often loaded as blob:)
+    "worker-src 'self' blob:",
     "img-src 'self' data: https:",
     "font-src 'self' data:",
     "frame-src 'self' https://embedded-wallet.thirdweb.com https://*.thirdweb.com",

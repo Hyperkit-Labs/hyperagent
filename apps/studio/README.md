@@ -5,7 +5,7 @@ Next.js frontend application for HyperAgent - AI Agent Platform for On-Chain Sma
 ## Features
 
 - **Workflow Management**: Create, view, and monitor smart contract generation workflows
-- **Real-time Updates**: WebSocket integration for live workflow progress
+- **Real-time Updates**: Supabase Realtime with SSE fallback for live workflow progress
 - **Contract Viewer**: Syntax-highlighted Solidity code display with ABI viewer
 - **Deployment Tracking**: View deployment details with explorer links
 - **Template Browser**: Browse and search contract templates
@@ -39,7 +39,6 @@ NEXT_PUBLIC_THIRDWEB_CLIENT_ID=your_thirdweb_client_id
 
 # API URLs (Optional - defaults shown)
 NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_WS_URL=ws://localhost:8000
 NEXT_PUBLIC_X402_VERIFIER_URL=http://localhost:3001
 ```
 
@@ -88,7 +87,6 @@ frontend/
 │   ├── api.ts           # API client functions
 │   ├── types.ts         # TypeScript type definitions
 │   ├── utils.ts         # Utility functions
-│   └── websocket.ts     # WebSocket client
 └── public/              # Static assets
 ```
 
@@ -97,7 +95,7 @@ frontend/
 The frontend communicates with the HyperAgent API through:
 
 - **REST API**: HTTP requests via `lib/api.ts`
-- **WebSocket**: Real-time updates via `lib/websocket.ts`
+- **Realtime + SSE**: Push updates via Supabase Realtime with an SSE fallback stream
 
 ### Key API Endpoints
 
@@ -137,7 +135,6 @@ The frontend communicates with the HyperAgent API through:
 ## Hooks
 
 - `useWorkflow` - Fetch and poll workflow status
-- `useWebSocket` - WebSocket connection for real-time updates
 - `usePolling` - Generic polling hook
 - `useHealth` - System health status
 

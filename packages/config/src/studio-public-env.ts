@@ -22,6 +22,24 @@ export function isLoopbackHostname(hostname: string): boolean {
 }
 
 /**
+ * When `NODE_ENV === "development"` (e.g. `next dev`), Studio may still inline
+ * `NEXT_PUBLIC_ENV` from `next.config` using repo `.env` where `NODE_ENV=production`.
+ * In that case the browser must keep `NEXT_PUBLIC_API_URL` instead of rewriting to
+ * localhost unless the developer explicitly runs a local gateway-only workflow.
+ */
+export function shouldPreserveConfiguredApiGatewayInDev(
+  e: Record<string, string | undefined>,
+): boolean {
+  const raw = (e[Env.NEXT_PUBLIC_ENV] ?? "").trim().toLowerCase();
+  return (
+    raw === "staging" ||
+    raw === "stage" ||
+    raw === "production" ||
+    raw === "prod"
+  );
+}
+
+/**
  * Mirrors `next.config.ts` `env.NEXT_PUBLIC_API_URL` fallback so Edge and Node see the same effective value.
  */
 export function getEffectiveNextPublicApiUrl(
@@ -62,8 +80,10 @@ export function resetStudioPublicEnvDevWarningsForTests(): void {
 }
 
 /**
- * In `next dev`, a remote `NEXT_PUBLIC_API_URL` (from root `.env`) forces the browser to call prod;
- * use local gateway unless `NEXT_PUBLIC_ENV` is `staging` | `stage` (explicit remote API testing).
+ * In `next dev`, a remote `NEXT_PUBLIC_API_URL` (from root `.env`) would otherwise force
+ * unintended prod traffic; rewrite to the local gateway unless the deployment channel
+ * (`NEXT_PUBLIC_ENV`) is a non-local stack: `staging` | `stage` | `production` | `prod`
+ * (case-insensitive), matching `next.config` inlining when `NODE_ENV` is set in `.env`.
  */
 export function applyDevelopmentLocalGatewayRule(
   e: Record<string, string | undefined>,
@@ -72,8 +92,7 @@ export function applyDevelopmentLocalGatewayRule(
   if (e.NODE_ENV !== "development") {
     return resolvedApiV1;
   }
-  const channel = e[Env.NEXT_PUBLIC_ENV] ?? "";
-  if (channel === "staging" || channel === "stage") {
+  if (shouldPreserveConfiguredApiGatewayInDev(e)) {
     return resolvedApiV1;
   }
   try {
@@ -92,7 +111,7 @@ export function applyDevelopmentLocalGatewayRule(
     developmentNonLoopbackApiWarned = true;
     console.warn(
       `[${Env.NEXT_PUBLIC_API_URL}] Development points at a non-loopback API; using ${STUDIO_LOCAL_GATEWAY_API_V1}. ` +
-        `Set ${Env.NEXT_PUBLIC_ENV}=staging to keep the configured URL, or set ${Env.NEXT_PUBLIC_API_URL} to a loopback gateway.`,
+        `Set ${Env.NEXT_PUBLIC_ENV} to staging, stage, production, or prod to keep the configured URL, or set ${Env.NEXT_PUBLIC_API_URL} to a loopback gateway.`,
     );
   }
   return STUDIO_LOCAL_GATEWAY_API_V1;
@@ -123,9 +142,11 @@ const CONNECT_SRC_EXTRA = [
   "https://generativelanguage.googleapis.com",
   "https://api.together.xyz",
   "wss:",
-  // Datadog Browser RUM + Session Replay intakes (site-specific subdomains, e.g. us5)
+  // Datadog Browser RUM + Session Replay intakes (wildcard + common US5 hostnames)
   "https://*.datadoghq.com",
   "https://*.datadoghq.eu",
+  "https://browser-intake-us5-datadoghq.com",
+  "https://rum.browser-intake-us5-datadoghq.com",
   "https://*.thirdweb.com",
   "https://*.supabase.co",
   "wss://*.supabase.co",

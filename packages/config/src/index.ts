@@ -21,6 +21,7 @@ export {
   isLoopbackHostname,
   normalizeToBackendApiV1,
   resolveStudioBackendApiV1FromEnv,
+  shouldPreserveConfiguredApiGatewayInDev,
   STUDIO_DEV_GATEWAY_ORIGIN_DEFAULT,
   STUDIO_LOCAL_GATEWAY_API_V1,
 } from "./studio-public-env.js";

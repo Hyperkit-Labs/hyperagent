@@ -91,6 +91,22 @@ describe("applyDevelopmentLocalGatewayRule", () => {
     ).toBe(url);
   });
 
+  it("keeps remote URL when NEXT_PUBLIC_ENV is production (case-insensitive)", () => {
+    const url = "https://api.hyperkitlabs.com/api/v1";
+    expect(
+      applyDevelopmentLocalGatewayRule(
+        { NODE_ENV: "development", [Env.NEXT_PUBLIC_ENV]: "Production" },
+        url,
+      ),
+    ).toBe(url);
+    expect(
+      applyDevelopmentLocalGatewayRule(
+        { NODE_ENV: "development", [Env.NEXT_PUBLIC_ENV]: "PROD" },
+        url,
+      ),
+    ).toBe(url);
+  });
+
   it("does not rewrite in production", () => {
     const url = "https://api.hyperkitlabs.com/api/v1";
     expect(

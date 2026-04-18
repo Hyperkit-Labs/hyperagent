@@ -158,9 +158,6 @@ const nextConfig: NextConfig = {
           return v;
         })()
       : (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"),
-    NEXT_PUBLIC_WS_URL: isProduction
-      ? (process.env.NEXT_PUBLIC_WS_URL?.trim() ?? "")
-      : process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:4000",
     NEXT_PUBLIC_X402_VERIFIER_URL: isProduction
       ? (process.env.NEXT_PUBLIC_X402_VERIFIER_URL?.trim() ?? "")
       : process.env.NEXT_PUBLIC_X402_VERIFIER_URL || "http://localhost:3001",
@@ -186,6 +183,7 @@ const nextConfig: NextConfig = {
       process.env.NEXT_PUBLIC_DD_SESSION_SAMPLE_RATE ?? "",
     NEXT_PUBLIC_DD_SESSION_REPLAY_SAMPLE_RATE:
       process.env.NEXT_PUBLIC_DD_SESSION_REPLAY_SAMPLE_RATE ?? "",
+    NEXT_PUBLIC_DD_RUM_DEBUG: process.env.NEXT_PUBLIC_DD_RUM_DEBUG ?? "",
   },
 };
 

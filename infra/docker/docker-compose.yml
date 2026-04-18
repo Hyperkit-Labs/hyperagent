@@ -71,6 +71,8 @@ services:
       - DD_ENV=${DD_ENV:-prod}
       - DD_TRACE_AGENT_URL=unix:///var/run/datadog/apm.socket
       - DD_DOGSTATSD_URL=unix:///var/run/datadog/dsd.socket
+      # Orchestrator does not ship openai-agents; ddtrace would try to patch it and log ModuleNotFoundError.
+      - DD_TRACE_OPENAI_AGENTS_ENABLED=false
     volumes:
       - ./infra/registries:/app/services/orchestrator/registries:ro
       - datadog-run:/var/run/datadog:ro
@@ -239,6 +241,7 @@ services:
       - DD_ENV=${DD_ENV:-prod}
       - DD_TRACE_AGENT_URL=unix:///var/run/datadog/apm.socket
       - DD_DOGSTATSD_URL=unix:///var/run/datadog/dsd.socket
+      - DD_TRACE_OPENAI_AGENTS_ENABLED=false
     volumes:
       - datadog-run:/var/run/datadog:ro
     labels:
@@ -267,6 +270,7 @@ services:
       - DD_ENV=${DD_ENV:-prod}
       - DD_TRACE_AGENT_URL=unix:///var/run/datadog/apm.socket
       - DD_DOGSTATSD_URL=unix:///var/run/datadog/dsd.socket
+      - DD_TRACE_OPENAI_AGENTS_ENABLED=false
     volumes:
       - datadog-run:/var/run/datadog:ro
     labels:
@@ -295,6 +299,7 @@ services:
       - DD_ENV=${DD_ENV:-prod}
       - DD_TRACE_AGENT_URL=unix:///var/run/datadog/apm.socket
       - DD_DOGSTATSD_URL=unix:///var/run/datadog/dsd.socket
+      - DD_TRACE_OPENAI_AGENTS_ENABLED=false
     volumes:
       - datadog-run:/var/run/datadog:ro
     labels:
@@ -324,6 +329,7 @@ services:
       - DD_ENV=${DD_ENV:-prod}
       - DD_TRACE_AGENT_URL=unix:///var/run/datadog/apm.socket
       - DD_DOGSTATSD_URL=unix:///var/run/datadog/dsd.socket
+      - DD_TRACE_OPENAI_AGENTS_ENABLED=false
     volumes:
       - datadog-run:/var/run/datadog:ro
     labels:
@@ -365,6 +371,7 @@ services:
       - DD_ENV=${DD_ENV:-prod}
       - DD_TRACE_AGENT_URL=unix:///var/run/datadog/apm.socket
       - DD_DOGSTATSD_URL=unix:///var/run/datadog/dsd.socket
+      - DD_TRACE_OPENAI_AGENTS_ENABLED=false
     volumes:
       - datadog-run:/var/run/datadog:ro
     labels:

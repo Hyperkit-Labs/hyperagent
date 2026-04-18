@@ -114,13 +114,14 @@ describe("resolveStudioBackendApiV1FromEnv", () => {
 });
 
 describe("buildStudioConnectSrcDirective", () => {
-  it("includes loopback and thirdweb hosts", () => {
+  it("includes loopback, Datadog RUM intakes, and thirdweb hosts", () => {
     const csp = buildStudioConnectSrcDirective({
       NODE_ENV: "development",
       [Env.NEXT_PUBLIC_API_URL]: "http://localhost:4000",
     });
     expect(csp).toContain("'self'");
     expect(csp).toContain("http://localhost:4000");
+    expect(csp).toContain("https://*.datadoghq.com");
     expect(csp).toContain("https://*.thirdweb.com");
   });
 

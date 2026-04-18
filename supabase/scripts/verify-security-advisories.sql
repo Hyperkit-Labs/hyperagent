@@ -1,4 +1,4 @@
--- Post-migration checks for security remediation (20260409120000 + related).
+-- Post-migration checks for security remediation (search_path pin, hyperagent drop, etc.; see consolidated migration).
 -- Run after: pnpm db:apply-migrations
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/scripts/verify-security-advisories.sql
 -- Or paste into Supabase SQL Editor.

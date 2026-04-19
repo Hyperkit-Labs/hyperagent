@@ -13,6 +13,7 @@ import {
   BYOK_SAVE_AGAIN_HINT,
 } from "@/lib/api";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
+import { DenseFormField, SwitchButton } from "@/components/ui";
 import { useWalletAuth } from "@/components/providers/WalletAuthContext";
 import { useActiveAccountFromContext } from "@/components/providers/ActiveAccountContext";
 import { getSupabaseBrowserClient } from "@/lib/supabase-client";
@@ -393,30 +394,14 @@ export function LLMKeysCard() {
             <span className="text-xs text-[var(--color-text-muted)]">
               Storage mode
             </span>
-            <div className="inline-flex rounded-full bg-[var(--color-bg-elevated)] p-0.5 text-[11px]">
-              <button
-                type="button"
-                onClick={() => setStorageMode("persisted")}
-                className={`px-2 py-0.5 rounded-full transition-colors ${
-                  storageMode === "persisted"
-                    ? "bg-[var(--color-bg-panel)] text-[var(--color-text-primary)]"
-                    : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
-                }`}
-              >
-                Persisted
-              </button>
-              <button
-                type="button"
-                onClick={() => setStorageMode("session")}
-                className={`px-2 py-0.5 rounded-full transition-colors ${
-                  storageMode === "session"
-                    ? "bg-[var(--color-bg-panel)] text-[var(--color-text-primary)]"
-                    : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
-                }`}
-              >
-                Session only
-              </button>
-            </div>
+            <SwitchButton
+              options={[
+                { id: "persisted", label: "Persisted" },
+                { id: "session", label: "Session" },
+              ]}
+              value={storageMode}
+              onChange={(v) => setStorageMode(v as StorageMode)}
+            />
           </div>
 
           {configured.length > 0 && (
@@ -436,32 +421,28 @@ export function LLMKeysCard() {
             {BYOK_PROVIDERS.map((provider) => (
               <div key={provider}>
                 <div className="flex items-center justify-between mb-1">
-                  <label
-                    htmlFor={`key-${provider}-card`}
-                    className="text-sm font-medium text-[var(--color-text-secondary)] flex items-center gap-2"
-                  >
+                  <div className="flex items-center gap-2 text-sm font-medium text-[var(--color-text-secondary)]">
                     {provider === "openai" && (
-                      <span className="w-4 h-4 bg-white rounded-full flex items-center justify-center shrink-0">
-                        <span className="w-2 h-2 bg-black rounded-full block" />
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-white">
+                        <span className="block h-2 w-2 rounded-full bg-black" />
                       </span>
                     )}
                     {provider === "google" && (
-                      <span className="w-4 h-4 bg-blue-500 rounded flex items-center justify-center shrink-0 text-white text-[8px] font-bold">
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-blue-500 text-[8px] font-bold text-white">
                         G
                       </span>
                     )}
                     {provider === "anthropic" && (
-                      <span className="w-4 h-4 bg-orange-200 rounded flex items-center justify-center shrink-0">
-                        <span className="w-2 h-2 bg-orange-600 rounded-sm block" />
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-orange-200">
+                        <span className="block h-2 w-2 rounded-sm bg-orange-600" />
                       </span>
                     )}
-                    {PROVIDER_LABELS[provider] ?? provider}
                     {PROVIDER_TAGS[provider] && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-primary-alpha-20)] text-[var(--color-primary-light)]">
+                      <span className="rounded bg-[var(--color-primary-alpha-20)] px-1.5 py-0.5 text-[10px] text-[var(--color-primary-light)]">
                         {PROVIDER_TAGS[provider]}
                       </span>
                     )}
-                  </label>
+                  </div>
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
@@ -498,9 +479,16 @@ export function LLMKeysCard() {
                     )}
                   </div>
                 </div>
-                <div>
+                <DenseFormField
+                  id={`key-${provider}-card`}
+                  label={`${PROVIDER_LABELS[provider] ?? provider} API key`}
+                  hint={
+                    configured.includes(provider)
+                      ? "Leave blank to keep current. Enter a new key to replace."
+                      : "Stored encrypted for this workspace."
+                  }
+                >
                   <input
-                    id={`key-${provider}-card`}
                     type="password"
                     value={keys[provider] ?? ""}
                     onChange={(e) => handleKeyChange(provider, e.target.value)}
@@ -517,7 +505,7 @@ export function LLMKeysCard() {
                       Key looks valid
                     </span>
                   )}
-                </div>
+                </DenseFormField>
               </div>
             ))}
           </div>

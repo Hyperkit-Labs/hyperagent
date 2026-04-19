@@ -25,6 +25,11 @@ import {
   GripVertical,
 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const SIDEBAR_MIN = 64;
 const SIDEBAR_MAX = 280;
@@ -102,7 +107,7 @@ function NavItem({
     pathname === href ||
     (href !== ROUTES.DASHBOARD && pathname.startsWith(href));
 
-  return (
+  const link = (
     <Link
       href={href}
       className={`group relative flex h-10 items-center gap-3 rounded-xl transition-colors ${
@@ -112,19 +117,26 @@ function NavItem({
           ? "bg-violet-500/20 text-violet-400"
           : "text-slate-400 hover:text-slate-50 hover:bg-white/5"
       }`}
-      title={!expanded ? label : undefined}
     >
       <Icon className="w-5 h-5 shrink-0" />
       {expanded && (
         <span className="text-[13px] font-medium truncate">{label}</span>
       )}
-      {!expanded && (
-        <span className="pointer-events-none absolute left-11 z-50 rounded-md bg-slate-900/90 px-2 py-1 text-[11px] text-slate-100 opacity-0 shadow-lg backdrop-blur group-hover:opacity-100 transition-opacity whitespace-nowrap">
-          {label}
-        </span>
-      )}
     </Link>
   );
+
+  if (!expanded) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{link}</TooltipTrigger>
+        <TooltipContent side="right" className="border-white/10">
+          {label}
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return link;
 }
 
 export function SlimNav() {

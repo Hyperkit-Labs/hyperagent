@@ -4,6 +4,11 @@
 
 import { generateText } from "ai";
 import type { LanguageModelV1 } from "ai";
+
+/** Enables OpenTelemetry-style spans for Datadog LLM Observability when the AI SDK is instrumented. */
+const AI_SDK_TELEMETRY = {
+  experimental_telemetry: { isEnabled: true },
+} as const;
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -69,6 +74,7 @@ export async function specAgent(prompt: string, context: AgentContext): Promise<
   const { provider, modelId, apiKey } = resolveModel(context, "anthropic");
   const model = getModel(provider, modelId, apiKey);
   const result = await generateText({
+    ...AI_SDK_TELEMETRY,
     model,
     system: `You are a smart contract specification agent. Parse the user's natural language into a structured JSON spec.
 Output only valid JSON with: version, token_type (ERC20|ERC721|ERC1155|custom), template_id (optional; use when request matches: erc20-standard, erc20-upgradeable, erc721-standard, erc721-community, erc4626-vault, lending-basic, marketplace-nft, governance-basic, multisig-gnosis, amm-uniswap-style), app_type (token|lending|marketplace|governance|multisig|amm), multi_contract (boolean; true when design requires multiple contracts e.g. lending pool + collateral token, marketplace + NFT, governor + token, multisig, AMM factory + pair), chains ([{chain_id, network_name}]), features (array), roles (array), invariants (array), risk_profile (low|medium|high), oracles (optional; array of price feed or oracle requirements when Chainlink or price feeds mentioned), frontend_actions (optional; array of user actions: deposit, withdraw, borrow, repay, liquidate, list, buy, cancelListing, propose, vote, queue, execute, submitTransaction, confirmTransaction, swap, addLiquidity, removeLiquidity), wizard_options (optional; merge into OZ wizard when using templates: name, symbol, premint/initialSupply as string e.g. "1000000", mintable, burnable, pausable). Extract token name/symbol and initial supply from the prompt when specified.`,
@@ -109,6 +115,7 @@ export async function designAgent(
     system += `\n\nSECURITY CONSTRAINTS (mandatory):\n- Avoid: ${securityContext.threatsSummary || "N/A"}\n- OWASP Top 10 2025: ${securityContext.owaspConstraints || "Access Control, Reentrancy, Oracle Manipulation, Unchecked External Calls, Front-Running, Signature Replay, Integer Overflow, DoS, Weak Randomness, Upgradeable Risks"}\n- Known SCV patterns to avoid: ${securityContext.scvPatterns || "N/A"}`;
   }
   const result = await generateText({
+    ...AI_SDK_TELEMETRY,
     model,
     system,
     prompt: `Spec: ${JSON.stringify(spec)}\nTarget chains: ${JSON.stringify(targetChains)}`,
@@ -177,6 +184,7 @@ MANDATORY NatSpec documentation: Add high-level documentation comments to every 
     ? `Spec: ${JSON.stringify(spec)}\nDesign: ${JSON.stringify(design)}\nGenerate all contracts needed for the design (${components.join(", ")}). Use // FILE: Name.sol before each contract.`
     : `Spec: ${JSON.stringify(spec)}\nDesign: ${JSON.stringify(design)}\nGenerate one main contract.`;
   const result = await generateText({
+    ...AI_SDK_TELEMETRY,
     model,
     system,
     prompt,
@@ -197,6 +205,7 @@ export async function testAgent(
     .map(([name, code]) => `// ${name}\n${typeof code === "string" ? code.slice(0, 4000) : ""}`)
     .join("\n\n");
   const result = await generateText({
+    ...AI_SDK_TELEMETRY,
     model,
     system: `You are a Solidity test agent. Generate Foundry (forge test) or Hardhat tests for the given contracts.
 Output only test code. Use forge-std for Foundry or Hardhat's expect. Include:
@@ -235,6 +244,7 @@ export async function autofixAgent(input: AutofixInput, context: AgentContext): 
     .join("\n\n");
 
   const result = await generateText({
+    ...AI_SDK_TELEMETRY,
     model,
     system: `You are a Solidity autofix agent. You receive contracts that failed security audit or simulation.
 Your task: fix ALL identified vulnerabilities while preserving the contract's purpose.
@@ -275,6 +285,7 @@ export async function pashovAuditAgent(input: PashovAuditInput): Promise<{ text:
   const model = getModel(provider, modelId, apiKey);
 
   const result = await generateText({
+    ...AI_SDK_TELEMETRY,
     model,
     system: input.systemPrompt,
     prompt: input.userPrompt,
@@ -289,6 +300,7 @@ export async function estimateAgent(prompt: string, context: AgentContext): Prom
   const model = getModel(provider, modelId, apiKey);
 
   const result = await generateText({
+    ...AI_SDK_TELEMETRY,
     model,
     system: `You are a complexity estimation agent. Analyze the user's smart contract request and estimate:
 1. complexity: "low" | "medium" | "high"

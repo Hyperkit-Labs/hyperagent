@@ -9,6 +9,8 @@ import { useServerStatus } from "@/hooks/useServerStatus";
 import { CryptoUnavailableBanner } from "@/components/CryptoUnavailableBanner";
 import { LoginHero } from "./LoginHero";
 import { LoginAuthPanel } from "./LoginAuthPanel";
+import Aurora from "@/components/backgrounds/Aurora";
+import { GridBeam } from "@/components/ui/GridBeam";
 
 function LoginContent() {
   const router = useRouter();
@@ -37,7 +39,7 @@ function LoginContent() {
   }, [isReady, hasSession, walletAddress, router, nextParam]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[var(--color-bg-base)] bg-web3">
+    <div className="relative flex h-dvh max-h-dvh flex-col overflow-hidden bg-[var(--color-bg-base)] bg-web3">
       <div className="fixed top-4 left-4 right-4 z-20 max-w-md mx-auto">
         <CryptoUnavailableBanner />
       </div>
@@ -71,22 +73,30 @@ function LoginContent() {
         </span>
       </div>
 
-      <div className="absolute inset-0 grid-pattern bg-grid" aria-hidden />
-      <div
-        className="absolute left-0 top-1/2 -translate-y-1/2 w-[50vw] h-[60vh] max-w-[600px] pointer-events-none hidden lg:block"
-        aria-hidden
-      >
-        <div
-          className="absolute inset-0 opacity-40"
-          style={{
-            background:
-              "radial-gradient(ellipse 80% 80% at 20% 50%, rgba(124, 58, 237, 0.25) 0%, transparent 60%)",
-          }}
+      <div className="pointer-events-none fixed inset-0 z-0" aria-hidden>
+        <Aurora
+          amplitude={1.05}
+          blend={0.55}
+          speed={0.82}
+          className="h-full w-full opacity-[0.88] mix-blend-screen"
         />
       </div>
+      <div
+        className="pointer-events-none absolute inset-0 z-[1] grid-pattern bg-grid"
+        aria-hidden
+      />
 
-      <div className="relative flex-1 flex flex-col lg:flex-row min-h-screen items-center justify-center">
+      <div className="relative z-[2] flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden lg:flex-row lg:items-stretch lg:justify-center lg:gap-0">
         <LoginHero />
+        <div
+          className="hidden lg:flex lg:items-stretch lg:justify-center lg:px-4 xl:px-6"
+          aria-hidden
+        >
+          <GridBeam
+            orientation="vertical"
+            className="my-auto max-h-[min(76dvh,520px)] min-h-[min(52dvh,360px)] self-center"
+          />
+        </div>
         <LoginAuthPanel />
       </div>
     </div>

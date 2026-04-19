@@ -20,13 +20,15 @@ const anon =
 let client: SupabaseClient | null = null;
 
 /**
- * Returns a Supabase client for configuration checks only (truthiness test).
+ * Single browser Supabase client (shared storage key). Use for config checks and Realtime only.
  * Do NOT use .from(), .rpc(), or .storage — RLS will deny all access.
  */
 export function getSupabaseBrowserClient(): SupabaseClient | null {
   if (!url || !anon) return null;
   if (!client) {
-    client = createClient(url, anon);
+    client = createClient(url, anon, {
+      realtime: { params: { eventsPerSecond: 10 } },
+    });
   }
   return client;
 }

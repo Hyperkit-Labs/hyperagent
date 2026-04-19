@@ -342,6 +342,12 @@ jobs:
           tags: hyperagent-frontend:pr-${{ github.event.pull_request.number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://api.example.test/api/v1
+            NEXT_PUBLIC_THIRDWEB_CLIENT_ID=pr-validation-client-id
+            NEXT_PUBLIC_ENV=staging
+            NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=pr-validation-anon-key
 
   label-pr:
     name: Auto-label PR

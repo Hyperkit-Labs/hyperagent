@@ -25,7 +25,7 @@ import type { Workflow } from "@/lib/types";
 import { hasAuditOrSimFailure } from "@/lib/types";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { ShimmerGrid } from "@/components/ai-elements";
-import { EmptyState } from "@/components/ui";
+import { EmptyState, ScrollStack, ScrollStackCard } from "@/components/ui";
 
 function formatUpdatedAt(updated_at?: string): string {
   if (!updated_at) return "Unknown";
@@ -368,6 +368,7 @@ export default function WorkflowsPage() {
                     ? undefined
                     : ["Deploy an ERC20 token", "Create a simple NFT contract"]
                 }
+                emphasis
                 action={
                   <Link
                     href={ROUTES.CHAT}
@@ -383,7 +384,7 @@ export default function WorkflowsPage() {
             {!loading && filtered.length > 0 ? (
               <div className="space-y-4">
                 {viewMode === "grid" && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-10">
+                  <div className="workflows-dense-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-10 text-[13px] leading-snug">
                     {filtered.map((w, i) => {
                       const isSelected = selectedWorkflows.has(w.workflow_id);
                       const wRecord = w as unknown as Record<string, unknown>;
@@ -600,7 +601,10 @@ contract ${w.name?.replace(/\s/g, "") || "MyContract"} {
                 )}
 
                 {viewMode === "kanban" && (
-                  <div className="flex gap-4 overflow-x-auto pb-6">
+                  <ScrollStack
+                    className="pb-6"
+                    title="Pipeline stages (scroll)"
+                  >
                     {["pending", "running", "completed", "failed"].map(
                       (statusGroup) => {
                         const statusWorkflows = filtered.filter((w) => {
@@ -618,40 +622,40 @@ contract ${w.name?.replace(/\s/g, "") || "MyContract"} {
                           return s === "pending" || s === "created" || !s;
                         });
                         return (
-                          <div
+                          <ScrollStackCard
                             key={statusGroup}
-                            className="w-80 shrink-0 bg-[var(--color-bg-base)] rounded-xl border border-[var(--color-border-subtle)] p-4 flex flex-col h-[600px]"
+                            className="flex h-[600px] w-80 flex-col bg-[var(--color-bg-base)] p-4"
                           >
-                            <div className="flex items-center justify-between mb-4">
-                              <h3 className="text-xs font-medium text-[var(--color-text-primary)] uppercase tracking-wider capitalize">
+                            <div className="mb-4 flex items-center justify-between">
+                              <h3 className="text-xs font-medium uppercase tracking-wider text-[var(--color-text-primary)] capitalize">
                                 {statusGroup}
                               </h3>
-                              <span className="text-[10px] bg-[var(--color-bg-panel)] px-2 py-0.5 rounded-full text-[var(--color-text-muted)]">
+                              <span className="rounded-full bg-[var(--color-bg-panel)] px-2 py-0.5 text-[10px] text-[var(--color-text-muted)]">
                                 {statusWorkflows.length}
                               </span>
                             </div>
-                            <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                            <div className="custom-scrollbar flex-1 space-y-3 overflow-y-auto pr-2">
                               {statusWorkflows.map((w) => (
                                 <div
                                   key={w.workflow_id}
-                                  className="glass-panel p-3 rounded-lg border border-[var(--color-border-subtle)] hover:border-[var(--color-primary-alpha-50)] cursor-pointer transition-colors"
+                                  className="glass-panel cursor-pointer rounded-lg border border-[var(--color-border-subtle)] p-3 transition-colors hover:border-[var(--color-primary-alpha-50)]"
                                   onClick={() =>
                                     router.push(
                                       ROUTES.WORKFLOW_ID(w.workflow_id),
                                     )
                                   }
                                 >
-                                  <div className="flex items-center justify-between mb-2">
-                                    <span className="text-xs font-medium text-[var(--color-text-primary)] truncate block w-full">
+                                  <div className="mb-2 flex items-center justify-between">
+                                    <span className="block w-full truncate text-xs font-medium text-[var(--color-text-primary)]">
                                       {w.name ||
                                         w.intent?.slice(0, 20) ||
                                         "Untitled"}
                                     </span>
                                   </div>
-                                  <div className="text-[10px] text-[var(--color-text-muted)] flex items-center justify-between">
+                                  <div className="flex items-center justify-between text-[10px] text-[var(--color-text-muted)]">
                                     <span>{formatUpdatedAt(w.updated_at)}</span>
                                     <span
-                                      className={`px-1.5 py-0.5 rounded border ${networkBadgeClass(w.network)}`}
+                                      className={`rounded border px-1.5 py-0.5 ${networkBadgeClass(w.network)}`}
                                     >
                                       {w.network || "Default"}
                                     </span>
@@ -659,11 +663,11 @@ contract ${w.name?.replace(/\s/g, "") || "MyContract"} {
                                 </div>
                               ))}
                             </div>
-                          </div>
+                          </ScrollStackCard>
                         );
                       },
                     )}
-                  </div>
+                  </ScrollStack>
                 )}
                 <Link
                   href={ROUTES.CHAT}

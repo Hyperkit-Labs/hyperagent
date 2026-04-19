@@ -10,7 +10,7 @@
  *      The backend SSE endpoint polls Supabase every 250ms internally.
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getAgentDiscussionStreamUrl } from "@/lib/api";
 import { getStoredSession } from "@/lib/session-store";
 import { useRunStepsRealtime } from "@/hooks/useRunStepsRealtime";
@@ -28,8 +28,13 @@ function useSSEDiscussion(workflowId: string | null, enabled: boolean) {
   const [streaming, setStreaming] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
 
-  const connect = useCallback(() => {
-    if (!workflowId || !enabled) return;
+  useEffect(() => {
+    if (!workflowId || !enabled) {
+      setStreaming(false);
+      return;
+    }
+
+    setEvents([]);
 
     const session = getStoredSession();
     const token = session?.access_token;
@@ -37,6 +42,8 @@ function useSSEDiscussion(workflowId: string | null, enabled: boolean) {
     const url = `${baseUrl}?token=${encodeURIComponent(token || "")}`;
 
     const es = new EventSource(url, { withCredentials: true });
+    eventSourceRef.current = es;
+    setStreaming(true);
 
     es.onmessage = (e: MessageEvent) => {
       try {
@@ -44,6 +51,7 @@ function useSSEDiscussion(workflowId: string | null, enabled: boolean) {
         setEvents((prev) => [...prev, data]);
         if (data.done) {
           es.close();
+          eventSourceRef.current = null;
           setStreaming(false);
         }
       } catch {
@@ -53,23 +61,16 @@ function useSSEDiscussion(workflowId: string | null, enabled: boolean) {
 
     es.onerror = () => {
       es.close();
+      eventSourceRef.current = null;
       setStreaming(false);
     };
 
-    eventSourceRef.current = es;
-    setStreaming(true);
-  }, [workflowId, enabled]);
-
-  useEffect(() => {
-    if (workflowId && enabled) {
-      setEvents([]);
-      connect();
-    }
     return () => {
-      eventSourceRef.current?.close();
+      es.close();
       eventSourceRef.current = null;
+      setStreaming(false);
     };
-  }, [workflowId, enabled, connect]);
+  }, [workflowId, enabled]);
 
   return { events, streaming };
 }

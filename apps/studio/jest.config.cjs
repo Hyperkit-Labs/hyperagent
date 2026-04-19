@@ -16,6 +16,9 @@ const transpiledPathRegex = transpiled.replace(/\//g, "[\\\\/]");
 /** @type {import("jest").Config} */
 module.exports = {
   rootDir: studioDir,
+  // Windows: avoid EPERM when the `jest` shim lives under Program Files and the
+  // default cache path is next to that binary.
+  cacheDirectory: path.join(studioDir, ".jest-cache"),
   setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
   testEnvironment: "jest-environment-jsdom",
   // `next build` can leave `.next/standalone/**/package.json` with the same `name` as this app,

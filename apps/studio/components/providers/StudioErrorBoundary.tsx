@@ -17,6 +17,12 @@ export class StudioErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(err: Error, info: ErrorInfo): void {
     console.error("[StudioErrorBoundary]", err, info.componentStack);
+    void import("@/lib/datadogRumCapture").then((m) =>
+      m.addDatadogRumError(err, {
+        source: "StudioErrorBoundary",
+        componentStack: info.componentStack,
+      }),
+    );
   }
 
   render(): ReactNode {

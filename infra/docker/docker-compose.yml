@@ -87,6 +87,9 @@ services:
       - DD_DOGSTATSD_URL=unix:///var/run/datadog/dsd.socket
       # Orchestrator does not ship openai-agents; ddtrace would try to patch it and log ModuleNotFoundError.
       - DD_TRACE_OPENAI_AGENTS_ENABLED=false
+      # LLM Observability (Python ddtrace): set DD_LLMOBS_ENABLED=1 in .env when product is enabled in Datadog.
+      - DD_LLMOBS_ENABLED=${DD_LLMOBS_ENABLED:-0}
+      - DD_LLMOBS_ML_APP=${DD_LLMOBS_ML_APP:-hyperagent-orchestrator}
     volumes:
       - ./infra/registries:/app/services/orchestrator/registries:ro
       - datadog-run:/var/run/datadog:ro

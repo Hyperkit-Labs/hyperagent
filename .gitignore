@@ -238,6 +238,7 @@ out/
 .nuxt/
 .cache/
 **/.vitest-cache/
+**/.jest-cache/
 **/.vitest-temp/
 .parcel-cache/
 .vuepress/dist/

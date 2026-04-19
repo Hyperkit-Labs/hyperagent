@@ -1,5 +1,14 @@
 FROM node:20-alpine AS base
 WORKDIR /app
+# Monorepo: Studio uses pnpm workspace (workspace:*). Copy root and workspace members.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/studio ./apps/studio
+COPY packages ./packages
+RUN corepack enable pnpm && pnpm install --frozen-lockfile
+WORKDIR /app/apps/studio
+
+# Build-time public env (Coolify / CI: pass as build-args so Next inlines real URLs, not localhost).
+# Placed after install so changing only NEXT_PUBLIC_* does not invalidate the pnpm install layer.
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_THIRDWEB_CLIENT_ID
 ARG NEXT_PUBLIC_ENV
@@ -38,12 +47,7 @@ ENV NEXT_PUBLIC_DD_SESSION_REPLAY_SAMPLE_RATE=$NEXT_PUBLIC_DD_SESSION_REPLAY_SAM
 ENV NEXT_PUBLIC_DD_RUM_DEBUG=$NEXT_PUBLIC_DD_RUM_DEBUG
 ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
 ENV NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE=$NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE
-# Monorepo: Studio uses pnpm workspace (workspace:*). Copy root and workspace members.
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/studio ./apps/studio
-COPY packages ./packages
-RUN corepack enable pnpm && pnpm install --frozen-lockfile
-WORKDIR /app/apps/studio
+
 RUN node ./scripts/assert-public-build-env.cjs
 RUN pnpm run build
 EXPOSE 3000

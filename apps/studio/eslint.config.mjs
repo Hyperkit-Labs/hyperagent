@@ -17,6 +17,7 @@ const eslintConfig = defineConfig([
     "e2e/**",
     // CommonJS; uses require() by design (see comment in file).
     "jest.config.cjs",
+    "scripts/run-jest.cjs",
   ]),
   // Severity overrides: must use `files` so ESLint merges these with Next's plugin blocks for the same paths.
   {

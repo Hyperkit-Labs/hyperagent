@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
-import { LayoutTemplate, Loader2, Rocket } from "lucide-react";
+import { LayoutTemplate, Loader2, Rocket, Search } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import {
   createWorkflow,
@@ -19,6 +19,7 @@ import { useTemplatesData } from "@/hooks/useTemplatesData";
 import { useSelectedNetwork } from "@/components/providers/SelectedNetworkProvider";
 import { ShimmerGrid } from "@/components/ai-elements";
 import { PageTitle } from "@/components/layout/PageTitle";
+import { TableFilterBar } from "@/components/ui";
 
 export default function MarketplacePage() {
   const router = useRouter();
@@ -26,6 +27,19 @@ export default function MarketplacePage() {
   const { selectedNetworkId } = useSelectedNetwork();
   const networkId = selectedNetworkId || DEFAULT_NETWORK;
   const [deployingId, setDeployingId] = useState<string | null>(null);
+  const [marketplaceSearch, setMarketplaceSearch] = useState("");
+
+  const filteredTemplates = useMemo(() => {
+    const q = marketplaceSearch.trim().toLowerCase();
+    if (!q) return templates;
+    return templates.filter((item) => {
+      const text = [item.name, item.id, item.description, item.source]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return text.includes(q);
+    });
+  }, [templates, marketplaceSearch]);
 
   async function handleOneClickDeploy(
     templateId: string,
@@ -91,51 +105,79 @@ export default function MarketplacePage() {
           {loading && <ShimmerGrid count={6} />}
 
           {!loading && templates.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {templates.map((item) => {
-                const isDeploying = deployingId === item.id;
-                return (
-                  <div
-                    key={item.id}
-                    className="glass-panel rounded-xl p-5 transition-all hover:border-[var(--color-primary-alpha-30)]"
+            <>
+              <TableFilterBar>
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--color-text-muted)] pointer-events-none" />
+                  <input
+                    type="search"
+                    value={marketplaceSearch}
+                    onChange={(e) => setMarketplaceSearch(e.target.value)}
+                    placeholder="Search templates by name or description…"
+                    className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] pl-8 pr-3 py-2 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-primary-alpha-50)]"
+                    aria-label="Search marketplace templates"
+                  />
+                </div>
+              </TableFilterBar>
+              {filteredTemplates.length === 0 ? (
+                <div className="glass-panel rounded-xl p-8 text-center text-xs text-[var(--color-text-tertiary)]">
+                  No templates match your search.{" "}
+                  <button
+                    type="button"
+                    onClick={() => setMarketplaceSearch("")}
+                    className="text-[var(--color-primary-light)] underline"
                   >
-                    <div className="flex items-start gap-3 mb-4">
-                      <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center shrink-0">
-                        <LayoutTemplate className="w-5 h-5 text-[var(--color-primary-light)]" />
+                    Clear search
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredTemplates.map((item) => {
+                    const isDeploying = deployingId === item.id;
+                    return (
+                      <div
+                        key={item.id}
+                        className="glass-panel rounded-xl p-5 transition-all hover:border-[var(--color-primary-alpha-30)]"
+                      >
+                        <div className="flex items-start gap-3 mb-4">
+                          <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center shrink-0">
+                            <LayoutTemplate className="w-5 h-5 text-[var(--color-primary-light)]" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-medium text-white truncate text-sm">
+                              {item.name || item.id}
+                            </h3>
+                            {item.source && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded border border-[var(--color-border-subtle)] text-[var(--color-text-muted)] bg-[var(--color-bg-hover)]">
+                                {item.source}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-xs text-[var(--color-text-tertiary)] line-clamp-2 h-8 mb-4">
+                          {item.description || "No description"}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleOneClickDeploy(item.id, item.name || item.id)
+                          }
+                          disabled={isDeploying}
+                          className="w-full btn-primary-gradient text-xs py-2 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          {isDeploying ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Rocket className="w-3.5 h-3.5" />
+                          )}
+                          One-Click Deploy
+                        </button>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-medium text-white truncate text-sm">
-                          {item.name || item.id}
-                        </h3>
-                        {item.source && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded border border-[var(--color-border-subtle)] text-[var(--color-text-muted)] bg-[var(--color-bg-hover)]">
-                            {item.source}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <p className="text-xs text-[var(--color-text-tertiary)] line-clamp-2 h-8 mb-4">
-                      {item.description || "No description"}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleOneClickDeploy(item.id, item.name || item.id)
-                      }
-                      disabled={isDeploying}
-                      className="w-full btn-primary-gradient text-xs py-2 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      {isDeploying ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <Rocket className="w-3.5 h-3.5" />
-                      )}
-                      One-Click Deploy
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
 
           {!loading && templates.length === 0 && !error && (

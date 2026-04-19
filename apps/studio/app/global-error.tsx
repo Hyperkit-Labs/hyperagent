@@ -2,6 +2,7 @@
 
 import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
+import { addDatadogRumError } from "@/lib/datadogRumCapture";
 
 export default function GlobalError({
   error,
@@ -12,6 +13,10 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     Sentry.captureException(error);
+    void addDatadogRumError(error, {
+      source: "global-error",
+      digest: error.digest,
+    });
   }, [error]);
 
   return (

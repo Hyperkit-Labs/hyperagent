@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { Shimmer, Terminal } from "@/components/ai-elements";
+import { FaultyTerminal } from "@/components/ui";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { PageTitle } from "@/components/layout/PageTitle";
 import {
@@ -247,20 +248,22 @@ function MonitoringContent() {
             </div>
           )}
           {!logsLoading && logList.length > 0 && (
-            <Terminal
-              lines={logList.map(
-                (entry: {
-                  message?: string;
-                  level?: string;
-                  timestamp?: string;
-                }) => ({
-                  timestamp: entry.timestamp ?? "",
-                  level: entry.level ?? "info",
-                  message: entry.message ?? "",
-                }),
-              )}
-              className="rounded-none border-0 border-t border-[var(--color-border-subtle)] max-h-[500px]"
-            />
+            <FaultyTerminal className="max-h-[500px] border-t border-[var(--color-border-subtle)]">
+              <Terminal
+                lines={logList.map(
+                  (entry: {
+                    message?: string;
+                    level?: string;
+                    timestamp?: string;
+                  }) => ({
+                    timestamp: entry.timestamp ?? "",
+                    level: entry.level ?? "info",
+                    message: entry.message ?? "",
+                  }),
+                )}
+                className="rounded-none border-0 max-h-[500px]"
+              />
+            </FaultyTerminal>
           )}
         </div>
       </div>

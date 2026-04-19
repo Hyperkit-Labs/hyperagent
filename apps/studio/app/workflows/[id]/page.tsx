@@ -31,8 +31,10 @@ export default function WorkflowIdRedirectPage() {
   return (
     <RequireApiSession>
       <div className="flex items-center justify-center min-h-[200px] gap-2 text-[var(--color-text-tertiary)]">
-        <Loader2 className="w-5 h-5 animate-spin" />
-        <span className="text-sm">Opening workflow...</span>
+        <Loader2 className="w-5 h-5 animate-spin" aria-hidden />
+        <span className="text-sm" aria-live="polite">
+          Opening workflow...
+        </span>
       </div>
     </RequireApiSession>
   );

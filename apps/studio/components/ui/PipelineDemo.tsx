@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 import {
   Terminal,
   ShieldCheck,
@@ -10,7 +11,11 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-export function PipelineDemo() {
+export interface PipelineDemoProps {
+  className?: string;
+}
+
+export function PipelineDemo({ className = "" }: PipelineDemoProps) {
   const [step, setStep] = useState(0); // 0: spec, 1: codegen, 2: audit, 3: deploy
   const [typing, setTyping] = useState("");
   const fullText = "Build a secure vault contract";
@@ -87,7 +92,12 @@ export function PipelineDemo() {
   }, []);
 
   return (
-    <div className="relative w-full max-w-[445px] h-[160px] rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] overflow-hidden shadow-[10px_10px_30px_#000000,-10px_-10px_30px_#1a1a24] transition-all">
+    <div
+      className={cn(
+        "relative h-[132px] w-full max-w-[380px] rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] overflow-hidden shadow-[10px_10px_30px_#000000,-10px_-10px_30px_#1a1a24] transition-all",
+        className,
+      )}
+    >
       {/* macOS dots */}
       <div className="absolute top-0 inset-x-0 h-8 bg-transparent flex items-center px-3 gap-1.5 z-10">
         <div className="w-2.5 h-2.5 rounded-full bg-[var(--color-semantic-error)]/60 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.2),1px_1px_2px_rgba(0,0,0,0.5)]" />

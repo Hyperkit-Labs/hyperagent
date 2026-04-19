@@ -6,7 +6,7 @@ export async function tagActiveRootSpanWithRumSession(
 ): Promise<void> {
   if (!rumSessionId || rumSessionId.length > 256) return;
   try {
-    const tracer = (await import("dd-trace")).default;
+    const tracer = (await import(/* webpackIgnore: true */ "dd-trace")).default;
     const span = tracer.scope().active();
     if (span) {
       span.setTag("session_id", rumSessionId);

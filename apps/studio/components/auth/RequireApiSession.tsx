@@ -34,16 +34,26 @@ export function RequireApiSession({ children }: RequireApiSessionProps) {
 
   if (!isReady || !hasSession) {
     return (
-      <div className="p-6 lg:p-8 flex items-center justify-center min-h-[60vh]">
+      <div className="p-6 lg:p-8 flex flex-col items-center justify-center min-h-[60vh] gap-3">
         <Loader2 className="w-8 h-8 text-[var(--color-text-muted)] animate-spin" />
+        <p className="text-sm text-[var(--color-text-tertiary)]">
+          Preparing your session…
+        </p>
       </div>
     );
   }
 
   if (bootstrapStatus === "pending") {
     return (
-      <div className="p-6 lg:p-8 flex items-center justify-center min-h-[60vh]">
+      <div className="p-6 lg:p-8 flex flex-col items-center justify-center min-h-[60vh] gap-3 max-w-sm mx-auto text-center">
         <Loader2 className="w-8 h-8 text-[var(--color-text-muted)] animate-spin" />
+        <p className="text-sm text-[var(--color-text-secondary)]">
+          Loading workspace settings…
+        </p>
+        <p className="text-xs text-[var(--color-text-tertiary)]">
+          First load after deploy can take up to a minute if the API is warming
+          up.
+        </p>
       </div>
     );
   }

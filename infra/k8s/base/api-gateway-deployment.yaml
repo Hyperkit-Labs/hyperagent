@@ -35,11 +35,11 @@ spec:
                 optional: true
           resources:
             requests:
-              memory: "128Mi"
-              cpu: "100m"
-            limits:
               memory: "256Mi"
-              cpu: "500m"
+              cpu: "150m"
+            limits:
+              memory: "512Mi"
+              cpu: "750m"
           livenessProbe:
             httpGet:
               path: /health/live

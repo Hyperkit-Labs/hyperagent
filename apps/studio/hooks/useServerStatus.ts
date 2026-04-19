@@ -66,7 +66,18 @@ export function useServerStatus(pollIntervalMs = 30_000) {
           data = {};
         }
         setStatus(interpretHealthResponse(res, data));
-      } catch {
+      } catch (err) {
+        if (
+          process.env.NODE_ENV === "development" &&
+          typeof console !== "undefined"
+        ) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(
+            "[useServerStatus] health check failed",
+            { healthUrl, message: msg },
+            "If the URL is localhost:4000 but you use a remote API, set NEXT_PUBLIC_ENV=staging (or production) during next dev, or run a local gateway. If Studio is on port 3001+, ensure CORS_ORIGINS on the gateway includes that origin.",
+          );
+        }
         if (isMounted) setStatus("down");
       }
     };

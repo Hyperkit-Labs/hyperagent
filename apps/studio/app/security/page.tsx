@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import {
+  ElectricBorder,
   EmptyState,
   NetworkTopologyMap,
   RadialProgress,
@@ -205,50 +206,64 @@ export default function SecurityPage() {
                   </h3>
                   <div className="space-y-3">
                     {hasFindings ? (
-                      findings.map((vuln) => (
-                        <div
-                          key={
-                            vuln.id ??
-                            vuln.run_id ??
-                            `vuln-${findings.indexOf(vuln)}`
-                          }
-                          className="bg-[var(--color-bg-base)] border border-[var(--color-border-subtle)] rounded-lg p-3"
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
+                      findings.map((vuln) => {
+                        const sev = (vuln.severity ?? "").toLowerCase();
+                        const isHigh =
+                          sev === "high" ||
+                          sev === "critical" ||
+                          sev === "blocker";
+                        const key =
+                          vuln.id ??
+                          vuln.run_id ??
+                          `vuln-${findings.indexOf(vuln)}`;
+                        const block = (
+                          <div className="rounded-lg bg-[var(--color-bg-base)] p-3">
+                            <div className="mb-2 flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`rounded px-2 py-0.5 text-[10px] font-medium ${(vuln.severity ?? "").toLowerCase() === "high" || (vuln.severity ?? "").toLowerCase() === "critical" ? "border border-red-500/20 bg-red-500/10 text-red-400" : (vuln.severity ?? "").toLowerCase() === "medium" ? "border border-amber-500/20 bg-amber-500/10 text-amber-400" : "border border-blue-500/20 bg-blue-500/10 text-blue-400"}`}
+                                >
+                                  {vuln.severity ?? "Info"}
+                                </span>
+                                <span className="text-xs font-medium text-[var(--color-text-primary)]">
+                                  {vuln.category ??
+                                    vuln.title ??
+                                    vuln.tool ??
+                                    "Finding"}
+                                </span>
+                              </div>
                               <span
-                                className={`px-2 py-0.5 rounded text-[10px] font-medium ${(vuln.severity ?? "").toLowerCase() === "high" || (vuln.severity ?? "").toLowerCase() === "critical" ? "bg-red-500/10 text-red-400 border border-red-500/20" : (vuln.severity ?? "").toLowerCase() === "medium" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : "bg-blue-500/10 text-blue-400 border border-blue-500/20"}`}
+                                className={`text-[10px] ${(vuln.status ?? "open").toLowerCase() === "open" || (vuln.status ?? "").toLowerCase() === "fixed" ? ((vuln.status ?? "").toLowerCase() === "fixed" ? "text-emerald-400" : "text-amber-400") : "text-[var(--color-text-tertiary)]"}`}
                               >
-                                {vuln.severity ?? "Info"}
-                              </span>
-                              <span className="text-xs font-medium text-[var(--color-text-primary)]">
-                                {vuln.category ??
-                                  vuln.title ??
-                                  vuln.tool ??
-                                  "Finding"}
+                                {vuln.status ?? "Open"}
                               </span>
                             </div>
-                            <span
-                              className={`text-[10px] ${(vuln.status ?? "open").toLowerCase() === "open" || (vuln.status ?? "").toLowerCase() === "fixed" ? ((vuln.status ?? "").toLowerCase() === "fixed" ? "text-emerald-400" : "text-amber-400") : "text-[var(--color-text-tertiary)]"}`}
-                            >
-                              {vuln.status ?? "Open"}
-                            </span>
+                            {(vuln.location ?? vuln.title) && (
+                              <div className="mb-2 font-mono text-[10px] text-[var(--color-text-tertiary)]">
+                                {vuln.location ?? vuln.title}
+                              </div>
+                            )}
+                            {vuln.description && (
+                              <div className="rounded bg-[var(--color-bg-panel)] p-2 text-[11px] text-[var(--color-text-secondary)]">
+                                <span className="mr-1 font-medium text-[var(--color-semantic-violet)]">
+                                  Fix:
+                                </span>{" "}
+                                {vuln.description}
+                              </div>
+                            )}
                           </div>
-                          {(vuln.location ?? vuln.title) && (
-                            <div className="text-[10px] text-[var(--color-text-tertiary)] mb-2 font-mono">
-                              {vuln.location ?? vuln.title}
-                            </div>
-                          )}
-                          {vuln.description && (
-                            <div className="bg-[var(--color-bg-panel)] p-2 rounded text-[11px] text-[var(--color-text-secondary)]">
-                              <span className="text-[var(--color-semantic-violet)] font-medium mr-1">
-                                Fix:
-                              </span>{" "}
-                              {vuln.description}
-                            </div>
-                          )}
-                        </div>
-                      ))
+                        );
+                        return isHigh ? (
+                          <ElectricBorder key={key}>{block}</ElectricBorder>
+                        ) : (
+                          <div
+                            key={key}
+                            className="rounded-lg border border-[var(--color-border-subtle)]"
+                          >
+                            {block}
+                          </div>
+                        );
+                      })
                     ) : (
                       <p className="text-xs text-[var(--color-text-muted)]">
                         No security findings yet. Run an audit pipeline to see

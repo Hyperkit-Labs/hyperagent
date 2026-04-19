@@ -13,6 +13,11 @@
 #   - Set env vars in Shared Env
 #
 # External: Supabase (DB). Gateway: Upstash REST in .env. Orchestrator TCP: REDIS_URL (e.g. Upstash redis:// / rediss://).
+#
+# Traefik (manual compose + Traefik on Docker): api-gateway labels below set Host(), TLS (letsencrypt), port 4000,
+# and HTTP→HTTPS redirect without matching /.well-known/acme-challenge (Let’s Encrypt HTTP-01 stays on Traefik’s path).
+# Coolify also injects Traefik labels when you attach a domain: avoid duplicate Host() rules (use Coolify UI custom
+# labels mirroring these, or disable auto labels for this service if you manage routing only from compose).
 
 services:
   api-gateway:
@@ -36,6 +41,20 @@ services:
         condition: service_healthy
     networks:
       - hyperagent
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.hyperagent-api.loadbalancer.server.port=4000"
+      - "traefik.http.routers.hyperagent-api-https.rule=Host(`${API_GATEWAY_DOMAIN:-api.hyperkitlabs.com}`)"
+      - "traefik.http.routers.hyperagent-api-https.entrypoints=https"
+      - "traefik.http.routers.hyperagent-api-https.tls=true"
+      - "traefik.http.routers.hyperagent-api-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.hyperagent-api-https.service=hyperagent-api"
+      - "traefik.http.routers.hyperagent-api-http.rule=Host(`${API_GATEWAY_DOMAIN:-api.hyperkitlabs.com}`) && !PathPrefix(`/.well-known/acme-challenge`)"
+      - "traefik.http.routers.hyperagent-api-http.entrypoints=http"
+      - "traefik.http.routers.hyperagent-api-http.middlewares=hyperagent-api-redirect-https"
+      - "traefik.http.routers.hyperagent-api-http.service=hyperagent-api"
+      - "traefik.http.middlewares.hyperagent-api-redirect-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.hyperagent-api-redirect-https.redirectscheme.permanent=true"
     # Liveness only: full /health calls Supabase + orchestrator and can flap when upstreams are slow.
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:4000/health/live"]

@@ -80,6 +80,9 @@ if (isProduction || isStaging) {
 const nextConfig: NextConfig = {
   ...(assetPrefix ? { assetPrefix } : {}),
 
+  // Datadog tracer + Vercel AI SDK: keep Node-native / instrumented deps out of the server bundle.
+  serverExternalPackages: ["dd-trace", "ai"],
+
   // MSW (tests) pulls in pure-ESM packages; Next/Jest only transpiles listed packages.
   transpilePackages: ["msw", "until-async"],
 

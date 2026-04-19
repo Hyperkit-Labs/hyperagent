@@ -10,7 +10,7 @@ import { SpendingControlCard } from "@/components/settings/SpendingControlCard";
 import { PaymentTopUpCard } from "@/components/settings/PaymentTopUpCard";
 import { ROUTES } from "@/constants/routes";
 import { ArrowRight, TrendingUp } from "lucide-react";
-import { NumberTicker } from "@/components/ui";
+import { HoldButton, NumberTicker } from "@/components/ui";
 import { usePaymentsDashboard } from "@/hooks/usePaymentsDashboard";
 import { cn } from "@/lib/utils";
 
@@ -246,6 +246,12 @@ export default function PaymentsPage() {
                   controlFromParent={control}
                   onRefetch={refetch}
                 />
+                <HoldButton
+                  onHoldComplete={() => void refetch()}
+                  className="mt-3 w-full text-xs font-medium"
+                >
+                  Hold to refresh billing snapshot
+                </HoldButton>
               </div>
             </div>
           </div>

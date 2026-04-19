@@ -32,7 +32,17 @@ export function getRuntimeConfig<K = unknown>(key: string): K | undefined {
 }
 
 function getEnvMap(): Record<string, string | undefined> {
-  return process.env as Record<string, string | undefined>;
+  const base = process.env as Record<string, string | undefined>;
+  // Next.js inlines `process.env.NEXT_PUBLIC_*` only where the compiler sees direct
+  // member access. Passing the raw `process.env` object into `@hyperagent/config`
+  // uses dynamic keys, so the client bundle often had empty NEXT_PUBLIC_API_URL and
+  // fell back to http://localhost:4000 (see studio-public-env.getEffectiveNextPublicApiUrl).
+  return {
+    ...base,
+    [Env.NEXT_PUBLIC_API_URL]: process.env.NEXT_PUBLIC_API_URL,
+    [Env.NEXT_PUBLIC_ENV]: process.env.NEXT_PUBLIC_ENV,
+    [Env.NODE_ENV]: process.env.NODE_ENV,
+  };
 }
 
 function getAppEnv(): string {

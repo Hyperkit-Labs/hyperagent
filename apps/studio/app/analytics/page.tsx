@@ -27,7 +27,7 @@ import {
   Cell,
 } from "recharts";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
-import { EmptyState, NumberTicker } from "@/components/ui";
+import { EmptyState, LiquidGlass, NumberTicker } from "@/components/ui";
 import {
   TimeRangeFilter,
   type TimeRangeKey,
@@ -229,7 +229,7 @@ function AnalyticsContent() {
                 <TrendingUp className="w-4 h-4 text-[var(--color-semantic-info)]" />
                 Workflow breakdown
               </h3>
-              <div className="h-48">
+              <LiquidGlass className="h-48 p-3">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={[
@@ -272,7 +272,7 @@ function AnalyticsContent() {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-              </div>
+              </LiquidGlass>
             </div>
 
             <div className="glass-panel rounded-xl p-6">

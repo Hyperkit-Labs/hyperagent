@@ -10,7 +10,7 @@
 #   - Custom Build: docker compose -f infra/docker/docker-compose.yml build
 #   - Custom Start: docker compose -f infra/docker/docker-compose.yml up -d
 #   - Disable Git submodules and LFS in Advanced > Git (Coolify #4746)
-#   - Set env vars in Shared Env
+#   - Set env vars in Shared Env (include DD_API_KEY for a working dd-agent; compose uses ${DD_API_KEY:-} so build does not warn when unset)
 #
 # External: Supabase (DB). Gateway: Upstash REST in .env. Orchestrator TCP: REDIS_URL (e.g. Upstash redis:// / rediss://).
 #
@@ -451,7 +451,7 @@ services:
     container_name: hyperagent-dd-agent
     restart: unless-stopped
     environment:
-      - DD_API_KEY=${DD_API_KEY}
+      - DD_API_KEY=${DD_API_KEY:-}
       - DD_SITE=${DD_SITE:-us5.datadoghq.com}
       - DD_ENV=${DD_ENV:-prod}
       - DD_APM_ENABLED=true

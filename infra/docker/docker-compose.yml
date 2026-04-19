@@ -34,6 +34,9 @@ services:
       - ORCHESTRATOR_URL=http://orchestrator:8000
       - AGENT_RUNTIME_URL=http://agent-runtime:4001
       - STORAGE_SERVICE_URL=http://storage:4005
+      # OpenTelemetry → Datadog Agent OTLP HTTP (same Docker network as dd-agent).
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://dd-agent:4318
+      - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://dd-agent:4318/v1/metrics
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.api-gateway.rule=Host(`api.hyperkitlabs.com`)"
@@ -90,6 +93,9 @@ services:
       # LLM Observability (Python ddtrace): set DD_LLMOBS_ENABLED=1 in .env when product is enabled in Datadog.
       - DD_LLMOBS_ENABLED=${DD_LLMOBS_ENABLED:-0}
       - DD_LLMOBS_ML_APP=${DD_LLMOBS_ML_APP:-hyperagent-orchestrator}
+      # Pipeline OTLP spans (otel_spans.py) → Agent, not localhost / external collector (fixes missing trace data in US5).
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://dd-agent:4318
+      - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://dd-agent:4318/v1/metrics
     volumes:
       - ./infra/registries:/app/services/orchestrator/registries:ro
       - datadog-run:/var/run/datadog:ro
@@ -259,6 +265,8 @@ services:
       - DD_TRACE_AGENT_URL=unix:///var/run/datadog/apm.socket
       - DD_DOGSTATSD_URL=unix:///var/run/datadog/dsd.socket
       - DD_TRACE_OPENAI_AGENTS_ENABLED=false
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://dd-agent:4318
+      - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://dd-agent:4318/v1/metrics
     volumes:
       - datadog-run:/var/run/datadog:ro
     labels:
@@ -288,6 +296,8 @@ services:
       - DD_TRACE_AGENT_URL=unix:///var/run/datadog/apm.socket
       - DD_DOGSTATSD_URL=unix:///var/run/datadog/dsd.socket
       - DD_TRACE_OPENAI_AGENTS_ENABLED=false
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://dd-agent:4318
+      - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://dd-agent:4318/v1/metrics
     volumes:
       - datadog-run:/var/run/datadog:ro
     labels:
@@ -461,6 +471,9 @@ services:
       - HOST_PROC=/proc
       # Exclude the agent itself from log collection
       - DD_CONTAINER_EXCLUDE=name:hyperagent-dd-agent
+    ports:
+      # OTLP HTTP for processes on the host (e.g. local orchestrator/gateway with .env pointing at 127.0.0.1:4318).
+      - "127.0.0.1:4318:4318"
     volumes:
       - datadog-run:/var/run/datadog
       - /var/run/docker.sock:/var/run/docker.sock:ro

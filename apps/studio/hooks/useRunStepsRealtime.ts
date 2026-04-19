@@ -16,21 +16,9 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { createClient, type RealtimeChannel } from "@supabase/supabase-js";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { AgentDiscussionEvent } from "@/hooks/useAgentDiscussion";
-
-function getRealtimeClient() {
-  const url =
-    typeof process !== "undefined" ? process.env.NEXT_PUBLIC_SUPABASE_URL : "";
-  const anon =
-    typeof process !== "undefined"
-      ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      : "";
-  if (!url || !anon) return null;
-  return createClient(url, anon, {
-    realtime: { params: { eventsPerSecond: 10 } },
-  });
-}
+import { getSupabaseBrowserClient } from "@/lib/supabase-client";
 
 export function useRunStepsRealtime(runId: string | null): {
   events: AgentDiscussionEvent[];
@@ -40,7 +28,7 @@ export function useRunStepsRealtime(runId: string | null): {
   const [events, setEvents] = useState<AgentDiscussionEvent[]>([]);
   const [connected, setConnected] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
-  const clientRef = useRef(getRealtimeClient());
+  const clientRef = useRef(getSupabaseBrowserClient());
 
   const supported = Boolean(clientRef.current);
 

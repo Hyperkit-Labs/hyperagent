@@ -90,7 +90,16 @@ async def _simulate_via_rpc(chain_id: int, bytecode: str) -> dict:
             "rpc_simulated": True,
         }
 
-    try:
+    breaker = get_breaker("simulation_rpc")
+    if not breaker.can_execute():
+        return {
+            "success": False,
+            "error": "RPC simulation circuit open",
+            "gasUsed": 0,
+            "rpc_simulated": True,
+        }
+
+    async def _do_rpc() -> dict:
         async with httpx.AsyncClient(timeout=20.0) as client:
             resp = await client.post(
                 rpc_url,
@@ -129,6 +138,16 @@ async def _simulate_via_rpc(chain_id: int, bytecode: str) -> dict:
                 "gasUsed": 0,
                 "rpc_simulated": True,
             }
+
+    try:
+        return await breaker.call(_do_rpc)
+    except CircuitOpenError:
+        return {
+            "success": False,
+            "error": "RPC simulation circuit open",
+            "gasUsed": 0,
+            "rpc_simulated": True,
+        }
     except Exception as exc:
         logger.warning(
             "[simulation] RPC fallback exception: chain=%d %s", chain_id, exc

@@ -2,8 +2,10 @@
 Metrics and health API: health, metrics, config, integrations-debug.
 """
 
+import asyncio
 import logging
 import os
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, cast
 
@@ -45,7 +47,36 @@ STORAGE_SERVICE_URL = os.environ.get(
     "STORAGE_SERVICE_URL", "http://localhost:4005"
 ).rstrip("/")
 VECTORDB_URL = os.environ.get("VECTORDB_URL", "http://localhost:8010").rstrip("/")
-INTEGRATIONS_TIMEOUT = float(os.environ.get("INTEGRATIONS_TIMEOUT", "15.0"))
+# Parallel /health probes for GET /api/v1/config integration flags. Prefer INTEGRATIONS_HEALTH_TIMEOUT;
+# else legacy INTEGRATIONS_TIMEOUT; default 5s per upstream so config stays responsive when a dep is down.
+INTEGRATIONS_HEALTH_TIMEOUT = float(
+    os.environ.get(
+        "INTEGRATIONS_HEALTH_TIMEOUT",
+        os.environ.get("INTEGRATIONS_TIMEOUT", "5.0"),
+    )
+)
+# Upper bound for entire _fetch_integrations() in GET /config (parallel probes + local env flags).
+INTEGRATIONS_FETCH_BUDGET_SEC = float(
+    os.environ.get(
+        "INTEGRATIONS_FETCH_BUDGET_SEC",
+        str(max(INTEGRATIONS_HEALTH_TIMEOUT + 5.0, 12.0)),
+    )
+)
+# In-process cache for GET /config integration flags (0 disables).
+INTEGRATIONS_CACHE_TTL_SEC = float(os.environ.get("INTEGRATIONS_CACHE_TTL_SEC", "45"))
+# After this many consecutive budget timeouts, skip probes for INTEGRATIONS_CIRCUIT_COOLDOWN_SEC.
+INTEGRATIONS_CIRCUIT_FAILURE_THRESHOLD = int(
+    os.environ.get("INTEGRATIONS_CIRCUIT_FAILURE_THRESHOLD", "3")
+)
+INTEGRATIONS_CIRCUIT_COOLDOWN_SEC = float(
+    os.environ.get("INTEGRATIONS_CIRCUIT_COOLDOWN_SEC", "90")
+)
+
+_integrations_cache_payload: dict[str, Any] | None = None
+_integrations_cache_mono: float = 0.0
+_integrations_consecutive_budget_timeouts: int = 0
+_integrations_circuit_open_until: float = 0.0
+
 CREDITS_PER_RUN = float(os.environ.get("CREDITS_PER_RUN", "7"))
 CREDITS_PER_USD = float(os.environ.get("CREDITS_PER_USD", "10"))
 TOOLS_BASE_URL = (os.environ.get("TOOLS_BASE_URL") or "").rstrip("/")
@@ -137,44 +168,61 @@ def _check_tools_health() -> dict[str, Any]:
 
 
 async def _fetch_integrations() -> dict[str, Any]:
-    """Fetch integration status from simulation, storage, vectordb, and local env checks."""
+    """Build integration flags from simulation, storage, and vectordb /health (parallel probes)."""
     tenderly = False
     pinata = False
     pinata_dedicated_gateway = False
     filecoin = False
     qdrant = False
 
-    async with httpx.AsyncClient(timeout=INTEGRATIONS_TIMEOUT) as client:
-        try:
-            r = await client.get(f"{SIMULATION_SERVICE_URL}/health")
-            if r.status_code == 200:
-                data = r.json()
-                tenderly = data.get("tenderly_configured", False)
-        except Exception as e:
-            logger.warning(
-                "[integrations] simulation unreachable url=%s: %s",
-                SIMULATION_SERVICE_URL,
-                e,
-            )
-        try:
-            r = await client.get(f"{STORAGE_SERVICE_URL}/health")
-            if r.status_code == 200:
-                data = r.json()
-                pinata = data.get("pinata_configured", False)
-                pinata_dedicated_gateway = data.get("pinata_dedicated_gateway", False)
-        except Exception as e:
-            logger.warning(
-                "[integrations] storage unreachable url=%s: %s", STORAGE_SERVICE_URL, e
-            )
-        try:
-            r = await client.get(f"{VECTORDB_URL}/health")
-            if r.status_code == 200:
-                data = r.json()
-                qdrant = data.get("qdrant_configured", False)
-        except Exception as e:
-            logger.warning(
-                "[integrations] vectordb unreachable url=%s: %s", VECTORDB_URL, e
-            )
+    async with httpx.AsyncClient(timeout=INTEGRATIONS_HEALTH_TIMEOUT) as client:
+
+        async def probe_simulation() -> None:
+            nonlocal tenderly
+            try:
+                r = await client.get(f"{SIMULATION_SERVICE_URL}/health")
+                if r.status_code == 200:
+                    data = r.json()
+                    tenderly = data.get("tenderly_configured", False)
+            except Exception as e:
+                logger.warning(
+                    "[integrations] simulation unreachable url=%s: %s",
+                    SIMULATION_SERVICE_URL,
+                    e,
+                )
+
+        async def probe_storage() -> None:
+            nonlocal pinata, pinata_dedicated_gateway
+            try:
+                r = await client.get(f"{STORAGE_SERVICE_URL}/health")
+                if r.status_code == 200:
+                    data = r.json()
+                    pinata = data.get("pinata_configured", False)
+                    pinata_dedicated_gateway = data.get(
+                        "pinata_dedicated_gateway", False
+                    )
+            except Exception as e:
+                logger.warning(
+                    "[integrations] storage unreachable url=%s: %s",
+                    STORAGE_SERVICE_URL,
+                    e,
+                )
+
+        async def probe_vectordb() -> None:
+            nonlocal qdrant
+            try:
+                r = await client.get(f"{VECTORDB_URL}/health")
+                if r.status_code == 200:
+                    data = r.json()
+                    qdrant = data.get("qdrant_configured", False)
+            except Exception as e:
+                logger.warning(
+                    "[integrations] vectordb unreachable url=%s: %s",
+                    VECTORDB_URL,
+                    e,
+                )
+
+        await asyncio.gather(probe_simulation(), probe_storage(), probe_vectordb())
 
     # Filecoin archival — checked locally (Lighthouse runs in-process, not a separate service)
     filecoin = bool(
@@ -194,6 +242,70 @@ async def _fetch_integrations() -> dict[str, Any]:
         "kite_chain_configured": kite_configured,
         "qdrant_configured": qdrant,
     }
+
+
+def _integrations_fallback() -> dict[str, Any]:
+    """Remote integration flags false; local env-only flags preserved (filecoin, kite)."""
+    filecoin = bool(
+        os.environ.get("FILECOIN_ARCHIVAL_ENABLED", "").strip() in ("1", "true", "yes")
+        and os.environ.get("LIGHTHOUSE_API_KEY", "").strip()
+    )
+    kite_rpc = os.environ.get("KITE_CHAIN_RPC_MAINNET", "").strip()
+    return {
+        "tenderly_configured": False,
+        "pinata_configured": False,
+        "pinata_dedicated_gateway": False,
+        "filecoin_configured": filecoin,
+        "kite_chain_configured": bool(kite_rpc),
+        "qdrant_configured": False,
+    }
+
+
+async def _fetch_integrations_bounded(*, skip_cache: bool = False) -> dict[str, Any]:
+    """Integration flags for /config. Uses TTL cache unless skip_cache (e.g. integrations-debug)."""
+    global _integrations_cache_payload, _integrations_cache_mono
+    global _integrations_consecutive_budget_timeouts, _integrations_circuit_open_until
+
+    now = time.monotonic()
+    if now < _integrations_circuit_open_until:
+        return _integrations_fallback()
+
+    if (
+        not skip_cache
+        and INTEGRATIONS_CACHE_TTL_SEC > 0
+        and _integrations_cache_payload is not None
+        and (now - _integrations_cache_mono) < INTEGRATIONS_CACHE_TTL_SEC
+    ):
+        return _integrations_cache_payload
+
+    try:
+        result = await asyncio.wait_for(
+            _fetch_integrations(),
+            timeout=INTEGRATIONS_FETCH_BUDGET_SEC,
+        )
+        _integrations_consecutive_budget_timeouts = 0
+    except TimeoutError:
+        logger.warning(
+            "[integrations] fetch exceeded budget=%ss; returning fallback flags",
+            INTEGRATIONS_FETCH_BUDGET_SEC,
+        )
+        _integrations_consecutive_budget_timeouts += 1
+        if (
+            _integrations_consecutive_budget_timeouts
+            >= INTEGRATIONS_CIRCUIT_FAILURE_THRESHOLD
+        ):
+            _integrations_circuit_open_until = now + INTEGRATIONS_CIRCUIT_COOLDOWN_SEC
+            logger.warning(
+                "[integrations] circuit open %ss after %d budget timeouts",
+                INTEGRATIONS_CIRCUIT_COOLDOWN_SEC,
+                _integrations_consecutive_budget_timeouts,
+            )
+        result = _integrations_fallback()
+
+    if not skip_cache and INTEGRATIONS_CACHE_TTL_SEC > 0:
+        _integrations_cache_payload = result
+        _integrations_cache_mono = time.monotonic()
+    return result
 
 
 def _metrics_since_from_time_range(time_range: str) -> str | None:
@@ -424,14 +536,19 @@ config_router = APIRouter(prefix="/api/v1/config", tags=["config"])
 @config_router.get("/integrations-debug")
 async def get_integrations_debug_api() -> dict[str, Any]:
     """Debug endpoint: raw integration health. Use to diagnose Settings > Integrations 'Not configured'."""
-    integrations = await _fetch_integrations()
+    integrations = await _fetch_integrations_bounded(skip_cache=True)
     networks = get_networks_for_api()
     return {
         "agent_runtime_url": AGENT_RUNTIME_URL,
         "simulation_service_url": SIMULATION_SERVICE_URL,
         "storage_service_url": STORAGE_SERVICE_URL,
         "vectordb_url": VECTORDB_URL,
-        "integrations_timeout": INTEGRATIONS_TIMEOUT,
+        "integrations_cache_ttl_sec": INTEGRATIONS_CACHE_TTL_SEC,
+        "integrations_circuit_cooldown_sec": INTEGRATIONS_CIRCUIT_COOLDOWN_SEC,
+        "integrations_circuit_failure_threshold": INTEGRATIONS_CIRCUIT_FAILURE_THRESHOLD,
+        "integrations_fetch_budget_sec": INTEGRATIONS_FETCH_BUDGET_SEC,
+        "integrations_health_timeout": INTEGRATIONS_HEALTH_TIMEOUT,
+        "integrations_timeout": INTEGRATIONS_HEALTH_TIMEOUT,
         "integrations": integrations,
         "networks_count": len(networks),
         "hint": "Tenderly needs TENDERLY_API_KEY on simulation service. Pinata needs PINATA_JWT on storage service. Qdrant needs QDRANT_URL on vectordb.",
@@ -442,7 +559,7 @@ async def get_integrations_debug_api() -> dict[str, Any]:
 async def get_config_api() -> dict[str, Any]:
     """Return public runtime config (x402, monitoring, payment, integrations, A2A identity) from registries."""
     merchant = os.environ.get("MERCHANT_WALLET_ADDRESS", "").strip()
-    integrations = await _fetch_integrations()
+    integrations = await _fetch_integrations_bounded()
     a2a_identity = get_erc8004_agent_identity()
     return {
         "x402_enabled": get_x402_enabled(),

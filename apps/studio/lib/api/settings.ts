@@ -11,6 +11,7 @@ import {
   fetchJsonAuthed,
   reportApiError,
   BYOK_REQUEST_TIMEOUT_MS,
+  CONFIG_BOOTSTRAP_TIMEOUT_MS,
 } from "./core";
 
 export const workspaceHeaders = (
@@ -42,8 +43,22 @@ export interface RuntimeConfig {
   a2a_identity?: Record<string, unknown> | null;
 }
 
+/** One in-flight GET /config so SessionProvider and ConfigProvider (SWR) share a single request. */
+let configFetchInflight: Promise<RuntimeConfig> | null = null;
+
+function fetchConfigShared(): Promise<RuntimeConfig> {
+  if (!configFetchInflight) {
+    configFetchInflight = fetchJson<RuntimeConfig>("/config", {
+      timeoutMs: CONFIG_BOOTSTRAP_TIMEOUT_MS,
+    }).finally(() => {
+      configFetchInflight = null;
+    });
+  }
+  return configFetchInflight;
+}
+
 export async function getConfig(): Promise<RuntimeConfig> {
-  return fetchJson<RuntimeConfig>("/config").catch((e) => {
+  return fetchConfigShared().catch((e) => {
     reportApiError(e, { path: "/config" });
     return {
       x402_enabled: false,
@@ -62,7 +77,7 @@ export async function getConfig(): Promise<RuntimeConfig> {
 }
 
 export async function fetchConfigStrict(): Promise<RuntimeConfig> {
-  return fetchJson<RuntimeConfig>("/config");
+  return fetchConfigShared();
 }
 
 export async function getConfiguredLLMProviders(

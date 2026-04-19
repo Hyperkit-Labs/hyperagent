@@ -2,31 +2,17 @@
  * Shared wallet list for connect modal and AutoConnect.
  * Using the same list in both places ensures the last-connected wallet
  * can be restored after a page refresh.
- * Includes: MetaMask, Coinbase, WalletConnect, inAppWallet (all thirdweb auth options).
+ * Includes: MetaMask, Coinbase, WalletConnect, inAppWallet (curated auth options).
  */
 import { createWallet, inAppWallet } from "thirdweb/wallets";
 import { getAccountAbstractionConfig } from "@/lib/smartWallet";
 
-/** All thirdweb-supported in-app wallet auth options (social, passkey, email, phone, etc.) */
+/** In-app wallet: social limited to Google, GitHub, Coinbase; plus passkey, email, phone, guest, external wallet. */
 const IN_APP_AUTH_OPTIONS = [
   "google",
-  "apple",
-  "facebook",
-  "discord",
   "github",
-  "twitch",
-  "x",
-  "telegram",
-  "line",
   "coinbase",
-  "tiktok",
-  "epic",
-  "farcaster",
-  "steam",
-  "passkey",
   "email",
-  "phone",
-  "guest",
   "wallet",
 ] as const;
 
@@ -37,7 +23,8 @@ export const CONNECT_WALLETS = [
   inAppWallet({
     auth: {
       options: [...IN_APP_AUTH_OPTIONS],
-      mode: "popup",
+      // Avoid popup OAuth: blocked popups throw "Failed to open login window" in thirdweb.
+      mode: "redirect",
     },
   }),
 ];

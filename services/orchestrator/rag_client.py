@@ -1,6 +1,7 @@
 """RAG client: query vectordb service for spec/template context. Used by spec and codegen nodes.
 Set VECTORDB_URL (default http://localhost:8010) to enable RAG. No-op when unconfigured.
-Supports versioned metadata fields (library_version, status, timestamp) for filtered retrieval."""
+Supports versioned metadata fields (library_version, status, timestamp) for filtered retrieval.
+All vectordb HTTP calls share the ``rag`` circuit breaker (see circuit_breaker.py)."""
 
 from __future__ import annotations
 
@@ -10,17 +11,57 @@ from datetime import datetime, timezone
 from typing import Any
 
 import httpx
+from circuit_breaker import CircuitOpenError, get_breaker
 
 logger = logging.getLogger(__name__)
 
 VECTORDB_URL = os.environ.get("VECTORDB_URL", "http://localhost:8010").rstrip("/")
 RAG_TIMEOUT = float(os.environ.get("RAG_TIMEOUT_SEC", "5"))
+RAG_BREAKER_NAME = "rag"
 
 
 def is_configured() -> bool:
     return bool(VECTORDB_URL and VECTORDB_URL != "http://localhost:8010") or bool(
         os.environ.get("VECTORDB_ENABLED")
     )
+
+
+async def _vectordb_post(path: str, json_body: dict[str, Any]) -> dict[str, Any] | None:
+    breaker = get_breaker(RAG_BREAKER_NAME)
+    if not breaker.can_execute():
+        logger.warning("[rag] circuit open, skip POST %s", path)
+        return None
+
+    async def _do() -> dict[str, Any]:
+        async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
+            r = await client.post(f"{VECTORDB_URL}{path}", json=json_body)
+            r.raise_for_status()
+            return r.json()
+
+    try:
+        return await breaker.call(_do)
+    except CircuitOpenError:
+        return None
+
+
+async def _vectordb_patch(
+    path: str, json_body: dict[str, Any]
+) -> dict[str, Any] | None:
+    breaker = get_breaker(RAG_BREAKER_NAME)
+    if not breaker.can_execute():
+        logger.warning("[rag] circuit open, skip PATCH %s", path)
+        return None
+
+    async def _do() -> dict[str, Any]:
+        async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
+            r = await client.patch(f"{VECTORDB_URL}{path}", json=json_body)
+            r.raise_for_status()
+            return r.json()
+
+    try:
+        return await breaker.call(_do)
+    except CircuitOpenError:
+        return None
 
 
 async def query_specs(
@@ -47,10 +88,9 @@ async def query_specs(
                 payload_user["metadata_filter"]["library_version"] = library_version
             if status_filter:
                 payload_user["metadata_filter"]["status"] = status_filter
-            async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
-                r = await client.post(f"{VECTORDB_URL}/query", json=payload_user)
-                r.raise_for_status()
-                for item in r.json().get("results", []):
+            data_u = await _vectordb_post("/query", payload_user)
+            if data_u:
+                for item in data_u.get("results", []):
                     sid = item.get("id") or item.get("payload", {}).get("spec_id", "")
                     if sid and sid not in seen:
                         seen.add(sid)
@@ -69,10 +109,9 @@ async def query_specs(
             metadata_filter["status"] = "verified"
         if metadata_filter:
             payload_global["metadata_filter"] = metadata_filter
-        async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
-            r = await client.post(f"{VECTORDB_URL}/query", json=payload_global)
-            r.raise_for_status()
-            for item in r.json().get("results", []):
+        data_g = await _vectordb_post("/query", payload_global)
+        if data_g:
+            for item in data_g.get("results", []):
                 sid = item.get("id") or item.get("payload", {}).get("spec_id", "")
                 if sid and sid not in seen:
                     seen.add(sid)
@@ -96,10 +135,8 @@ async def query_security_advisories(
             "limit": limit,
             "metadata_filter": {"type": "security_advisory", "status": "verified"},
         }
-        async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
-            r = await client.post(f"{VECTORDB_URL}/query", json=payload)
-            r.raise_for_status()
-            return r.json().get("results", [])
+        data = await _vectordb_post("/query", payload)
+        return data.get("results", []) if data else []
     except Exception as e:
         logger.warning("[rag] query_security_advisories failed: %s", e)
         return []
@@ -118,10 +155,8 @@ async def query_scv_patterns(
             "limit": limit,
             "metadata_filter": {"type": "scv_pattern", "status": "verified"},
         }
-        async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
-            r = await client.post(f"{VECTORDB_URL}/query", json=payload)
-            r.raise_for_status()
-            return r.json().get("results", [])
+        data = await _vectordb_post("/query", payload)
+        return data.get("results", []) if data else []
     except Exception as e:
         logger.warning("[rag] query_scv_patterns failed: %s", e)
         return []
@@ -144,10 +179,8 @@ async def query_templates(
         }
         if library_version:
             payload["metadata_filter"] = {"library_version": library_version}
-        async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
-            r = await client.post(f"{VECTORDB_URL}/query", json=payload)
-            r.raise_for_status()
-            return r.json().get("results", [])
+        data = await _vectordb_post("/query", payload)
+        return data.get("results", []) if data else []
     except Exception as e:
         logger.warning("[rag] query_templates failed: %s", e)
         return []
@@ -177,10 +210,8 @@ async def index_spec(
             "text": text,
             "metadata": meta,
         }
-        async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
-            r = await client.post(f"{VECTORDB_URL}/index/spec", json=payload)
-            r.raise_for_status()
-            return r.json().get("ok", False)
+        data = await _vectordb_post("/index/spec", payload)
+        return bool(data and data.get("ok"))
     except Exception as e:
         logger.warning("[rag] index_spec failed: %s", e)
         return False
@@ -215,10 +246,8 @@ async def index_fix(
         }
         if user_id:
             payload["metadata"]["user_id"] = user_id
-        async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
-            r = await client.post(f"{VECTORDB_URL}/index/spec", json=payload)
-            r.raise_for_status()
-            return r.json().get("ok", False)
+        data = await _vectordb_post("/index/spec", payload)
+        return bool(data and data.get("ok"))
     except Exception as e:
         logger.warning("[rag] index_fix failed: %s", e)
         return False
@@ -231,7 +260,7 @@ async def index_audit_findings(
     audit_passed: bool,
     user_id: str | None = None,
 ) -> bool:
-    """Index audit findings for cross-run learning (Pillar 3 feedback loop).
+    """Index audit findings for cross-run learning (Pillar 3 feedback loop.
 
     Stores a per-run audit summary so future codegen can retrieve patterns
     like 'contracts with ERC-20 transfer had reentrancy; fix was ...'.
@@ -279,10 +308,8 @@ async def index_audit_findings(
             "text": summary_text,
             "metadata": meta,
         }
-        async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
-            r = await client.post(f"{VECTORDB_URL}/index/spec", json=payload)
-            r.raise_for_status()
-            return r.json().get("ok", False)
+        data = await _vectordb_post("/index/spec", payload)
+        return bool(data and data.get("ok"))
     except Exception as e:
         logger.warning("[rag] index_audit_findings failed for run_id=%s: %s", run_id, e)
         return False
@@ -343,10 +370,8 @@ async def index_simulation_outcome(
             "text": summary_text,
             "metadata": meta,
         }
-        async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
-            r = await client.post(f"{VECTORDB_URL}/index/spec", json=payload)
-            r.raise_for_status()
-            return r.json().get("ok", False)
+        data = await _vectordb_post("/index/spec", payload)
+        return bool(data and data.get("ok"))
     except Exception as e:
         logger.warning(
             "[rag] index_simulation_outcome failed for run_id=%s: %s", run_id, e
@@ -370,10 +395,8 @@ async def query_audit_patterns(
             "limit": limit,
             "metadata_filter": {"type": "audit_finding", "status": "verified"},
         }
-        async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
-            r = await client.post(f"{VECTORDB_URL}/query", json=payload)
-            r.raise_for_status()
-            return r.json().get("results", [])
+        data = await _vectordb_post("/query", payload)
+        return data.get("results", []) if data else []
     except Exception as e:
         logger.warning("[rag] query_audit_patterns failed: %s", e)
         return []
@@ -385,13 +408,11 @@ async def blacklist_entry(spec_id: str, reason: str = "economically unsafe") -> 
     if not is_configured():
         return False
     try:
-        async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
-            r = await client.patch(
-                f"{VECTORDB_URL}/metadata/{spec_id}",
-                json={"status": "deprecated", "deprecation_reason": reason},
-            )
-            r.raise_for_status()
-            return r.json().get("ok", False)
+        data = await _vectordb_patch(
+            f"/metadata/{spec_id}",
+            {"status": "deprecated", "deprecation_reason": reason},
+        )
+        return bool(data and data.get("ok"))
     except Exception as e:
         logger.warning("[rag] blacklist_entry failed: %s", e)
         return False

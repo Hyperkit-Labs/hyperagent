@@ -2,8 +2,11 @@
 
 import { useChat } from "ai/react";
 import { useCallback } from "react";
+import { getDatadogRumSessionIdForRequest } from "@/lib/datadogRumSession";
 import { getSessionOnlyLLMKey } from "@/lib/session-store";
 import { getStoredSession } from "@/lib/session-store";
+
+const DD_RUM_SESSION_HEADER = "x-datadog-rum-session-id";
 
 export interface UseAppChatOptions {
   network?: string;
@@ -52,7 +55,23 @@ export function useAppChat(options: UseAppChatOptions = {}) {
         });
       }
 
-      const merged = { ...existing, ...byokHeaders };
+      const merged: Record<string, string> = { ...existing, ...byokHeaders };
+
+      const ddSession = await getDatadogRumSessionIdForRequest();
+      if (ddSession) {
+        merged[DD_RUM_SESSION_HEADER] = ddSession;
+      }
+
+      let nextBody: BodyInit | null | undefined = init?.body;
+      if (ddSession && typeof nextBody === "string" && nextBody.length > 0) {
+        try {
+          const parsed = JSON.parse(nextBody) as Record<string, unknown>;
+          parsed.datadogRumSessionId = ddSession;
+          nextBody = JSON.stringify(parsed);
+        } catch {
+          /* keep original body */
+        }
+      }
 
       if (process.env.NODE_ENV === "development") {
         console.debug("[useAppChat] sending headers", {
@@ -62,10 +81,15 @@ export function useAppChat(options: UseAppChatOptions = {}) {
         });
       }
 
-      const res = await fetch(input, {
+      const fetchInit: RequestInit = {
         ...init,
         headers: merged,
-      });
+      };
+      if (typeof nextBody !== "undefined") {
+        fetchInit.body = nextBody;
+      }
+
+      const res = await fetch(input, fetchInit);
 
       if (res.ok) return res;
 

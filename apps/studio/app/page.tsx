@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense, useRef } from "react";
+import { useEffect, useState, Suspense, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useActiveAccountFromContext } from "@/components/providers/ActiveAccountContext";
 import { useAppChat, hasActiveByokKey } from "@/hooks/useAppChat";
@@ -27,7 +27,15 @@ import {
 } from "@/lib/session-store";
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
 import { StarterGrid } from "@/components/chat/StarterGrid";
-import { NumberTicker, ConfettiBurst, ShinyText } from "@/components/ui";
+import {
+  NumberTicker,
+  ConfettiBurst,
+  ShinyText,
+  GridBeam,
+  FileTreeNav,
+  type FileTreeNode,
+  DotGridBackground,
+} from "@/components/ui";
 import { PipelineStepper } from "@/components/chat/PipelineStepper";
 import { ChatCommandBar } from "@/components/chat/ChatCommandBar";
 import { WorkflowActivityList } from "@/components/chat/WorkflowActivityList";
@@ -41,11 +49,7 @@ import type {
   ChatMessage,
   ToolInvocation,
 } from "@/components/chat/ChatMessageList";
-import {
-  needsSpecApproval,
-  needsDeployApproval,
-  hasAuditOrSimFailure,
-} from "@/lib/types";
+import { needsSpecApproval, needsDeployApproval } from "@/lib/types";
 import type { Workflow } from "@/lib/types";
 import { useNetworks } from "@/hooks/useNetworks";
 import { useSelectedNetwork } from "@/components/providers/SelectedNetworkProvider";
@@ -68,8 +72,8 @@ import {
 import Image from "next/image";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
-import { LLMKeysCard } from "@/components/settings/LLMKeysCard";
+import { ChatSettingsFamilyDrawer } from "@/components/chat/ChatSettingsFamilyDrawer";
+import { CanvasFractalGrid } from "@/components/cult-ui/CanvasFractalGrid";
 import { ConnectWalletNav } from "@/components/wallet/ConnectWalletNav";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import { useSession } from "@/hooks/useSession";
@@ -429,6 +433,24 @@ function ChatPageContent() {
   const selectedContract = contracts[selectedContractIndex];
   const displayCode = contractCode || selectedContract?.source_code || "";
 
+  const artifactFileTree = useMemo((): FileTreeNode[] => {
+    if (!contracts.length) return [];
+    return [
+      {
+        id: "contracts-root",
+        name: "contracts",
+        type: "folder",
+        children: contracts.map((c, idx) => ({
+          id: `contract-${idx}`,
+          name: String(
+            (c as { name?: string }).name ?? `Contract_${idx + 1}.sol`,
+          ),
+          type: "file" as const,
+        })),
+      },
+    ];
+  }, [contracts]);
+
   useEffect(() => {
     if (displayCode && !celebrationShownRef.current) {
       const FIRST_CONTRACT_KEY = "hyperagent_first_contract_seen";
@@ -510,40 +532,10 @@ function ChatPageContent() {
         active={showCelebration}
         onComplete={() => setShowCelebration(false)}
       />
-      <Dialog
+      <ChatSettingsFamilyDrawer
+        onOpenChange={setSettingsOpen}
         open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        className="relative z-[100]"
-      >
-        <div className="fixed inset-0 bg-black/60" aria-hidden="true" />
-        <div className="fixed inset-0 flex items-center justify-center p-4">
-          <DialogPanel className="mx-auto w-full max-w-lg rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] shadow-xl p-6 max-h-[85vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <DialogTitle className="text-lg font-semibold text-[var(--color-text-primary)]">
-                API keys for chat
-              </DialogTitle>
-              <button
-                type="button"
-                onClick={() => setSettingsOpen(false)}
-                className="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)] transition-colors"
-                aria-label="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <LLMKeysCard />
-            <p className="mt-4 pt-4 border-t border-[var(--color-border-subtle)]">
-              <Link
-                href={ROUTES.SETTINGS}
-                className="text-sm text-[var(--color-text-tertiary)] hover:text-[var(--color-primary-light)]"
-                onClick={() => setSettingsOpen(false)}
-              >
-                Open full Settings
-              </Link>
-            </p>
-          </DialogPanel>
-        </div>
-      </Dialog>
+      />
       <header className="h-12 border-b border-[var(--color-border-subtle)] flex items-center justify-between px-4 bg-[var(--color-bg-base)] shrink-0 z-50">
         <div className="flex items-center gap-4">
           <Link href={ROUTES.HOME} className="flex items-center gap-2 shrink-0">
@@ -648,176 +640,256 @@ function ChatPageContent() {
                   No contracts yet
                 </div>
               ) : (
-                <div className="space-y-0.5">
-                  {contracts.map((contract, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setSelectedContractIndex(idx)}
-                      className={`w-full flex items-center gap-2 px-2 py-1.5 text-left rounded-md transition-colors text-[12px] ${
-                        selectedContractIndex === idx
-                          ? "text-[var(--color-text-primary)] bg-[var(--color-bg-panel)]"
-                          : "text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)]"
-                      }`}
-                    >
-                      <FileCode className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate">
-                        {String(contract.name ?? `Contract ${idx + 1}`)}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+                <FileTreeNav
+                  nodes={artifactFileTree}
+                  selectedId={`contract-${selectedContractIndex}`}
+                  onSelect={(id) => {
+                    const m = /^contract-(\d+)$/.exec(id);
+                    if (m) setSelectedContractIndex(Number(m[1]));
+                  }}
+                  className="px-1"
+                />
               )}
             </div>
           )}
         </aside>
 
-        <main className="flex-1 flex flex-col overflow-hidden bg-[var(--color-bg-base)] min-w-0">
-          <div className="flex-1 overflow-y-auto min-h-0">
-            <div className="px-6 py-4">
-              <ChatMessageList
-                messages={allMessages}
-                isLoading={isLoading}
-                streamingContent={streamingContent}
-                discussionEvents={discussionEvents}
-                workflowIdForApproval={selectedWorkflowId}
-                onApproveSpec={
-                  selectedWorkflowId && fetchWorkflow
-                    ? async () => {
-                        const { approveSpec } = await import("@/lib/api");
-                        await approveSpec(selectedWorkflowId);
-                        await fetchWorkflow();
-                      }
-                    : undefined
-                }
-              />
-            </div>
-            {selectedWorkflowId && workflow && (
-              <div className="shrink-0 px-4 pt-2">
-                <PipelineStepper
-                  workflow={workflow}
-                  onErrorClick={(stageName, error) => {
-                    setInput(
-                      `Explain why the ${stageName} step failed. Error: ${error ?? "unknown"}`,
-                    );
-                  }}
+        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--color-bg-base)]">
+          <div className="pointer-events-none absolute inset-0 z-0">
+            <DotGridBackground
+              className="opacity-25 mix-blend-screen"
+              gap={22}
+              dotSize={1}
+            />
+            <CanvasFractalGrid
+              dotColor="rgba(139, 92, 246, 0.45)"
+              dotOpacity={0.18}
+              dotSize={2}
+              dotSpacing={24}
+              enableGradient={false}
+              enableMouseGlow
+              enableNoise
+              glowColor="rgba(167, 139, 250, 1)"
+              noiseOpacity={0.035}
+              waveIntensity={18}
+              waveRadius={160}
+            />
+          </div>
+          <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto min-h-0">
+              <div className="px-6 py-4">
+                <ChatMessageList
+                  messages={allMessages}
+                  isLoading={isLoading}
+                  streamingContent={streamingContent}
+                  discussionEvents={discussionEvents}
+                  workflowIdForApproval={selectedWorkflowId}
+                  onApproveSpec={
+                    selectedWorkflowId && fetchWorkflow
+                      ? async () => {
+                          const { approveSpec } = await import("@/lib/api");
+                          await approveSpec(selectedWorkflowId);
+                          await fetchWorkflow();
+                        }
+                      : undefined
+                  }
                 />
               </div>
-            )}
-            <div className="p-6">
-              <div className="max-w-5xl mx-auto space-y-6">
-                {!selectedWorkflowId ? (
-                  <div className="flex flex-col items-center justify-center py-16 gap-8">
-                    <motion.div
-                      className="text-center space-y-3"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.4 }}
-                    >
-                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--color-primary-alpha-20)] bg-[var(--color-primary-alpha-10)] text-xs font-medium text-[var(--color-primary-light)] mb-2">
-                        <Bot className="w-3.5 h-3.5" />
-                        HyperAgent Engine Active
-                      </div>
-                      <h2 className="text-3xl font-semibold text-[var(--color-text-primary)] tracking-tight">
-                        <ShinyText
-                          text="From idea to production in "
-                          className="text-[var(--color-text-primary)]"
-                        />
-                        <span className="text-[var(--color-primary-light)]">
-                          <NumberTicker value={2} />
-                        </span>{" "}
-                        minutes
-                      </h2>
-                      <p className="text-sm text-[var(--color-text-tertiary)] max-w-lg mx-auto">
-                        Describe your smart contract, and I&apos;ll generate,
-                        audit, and prepare it for deployment on any EVM chain.
-                      </p>
-                    </motion.div>
-                    <StarterGrid
-                      onSelect={(prompt) => {
-                        if (!hasActiveByokKey()) {
-                          setSettingsOpen(true);
-                          setInput(prompt);
-                          return;
-                        }
-                        setInput(prompt);
+              {selectedWorkflowId && workflow && (
+                <>
+                  <div className="shrink-0 px-6 pt-1">
+                    <GridBeam orientation="horizontal" className="opacity-50" />
+                  </div>
+                  <div className="shrink-0 px-4 pt-2">
+                    <PipelineStepper
+                      workflow={workflow}
+                      onErrorClick={(stageName, error) => {
+                        setInput(
+                          `Explain why the ${stageName} step failed. Error: ${error ?? "unknown"}`,
+                        );
                       }}
                     />
                   </div>
-                ) : workflowError && !workflow ? (
-                  <div className="flex flex-col items-center justify-center py-24 text-[var(--color-text-muted)] gap-3">
-                    <div className="w-10 h-10 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                      <X className="w-5 h-5 text-amber-400" />
-                    </div>
-                    <p className="text-sm font-medium text-amber-400">
-                      {workflowError.includes("404") ||
-                      workflowError.includes("not found")
-                        ? "Workflow not found"
-                        : "Failed to load workflow"}
-                    </p>
-                    <p className="text-xs text-[var(--color-text-tertiary)] max-w-md text-center">
-                      {workflowError}
-                    </p>
-                    <div className="flex gap-2 mt-2">
-                      <button
-                        type="button"
-                        onClick={() => fetchWorkflow()}
-                        className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)]"
+                </>
+              )}
+              <div className="p-6">
+                <div className="max-w-5xl mx-auto space-y-6">
+                  {!selectedWorkflowId ? (
+                    <div className="flex flex-col items-center justify-center py-16 gap-8">
+                      <motion.div
+                        className="text-center space-y-3"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.4 }}
                       >
-                        Retry
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedWorkflowId(null);
-                          window.history.replaceState(null, "", ROUTES.HOME);
-                        }}
-                        className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)]"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        New workflow
-                      </button>
-                    </div>
-                  </div>
-                ) : shellView === "code" ? (
-                  <div className="space-y-4">
-                    {selectedWorkflowId &&
-                      workflow &&
-                      (workflow.status === "running" ||
-                        workflow.status === "building" ||
-                        workflow.status === "spec_review" ||
-                        workflow.status === "design_review") && (
-                        <div className="rounded-xl border border-[var(--color-semantic-warning)]/20 bg-[var(--color-semantic-warning)]/5 px-4 py-3 mb-2">
-                          <p className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
-                            Pipeline in progress
-                          </p>
-                          <WorkflowStages
-                            workflow={workflow}
-                            contractData={contractData}
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--color-primary-alpha-20)] bg-[var(--color-primary-alpha-10)] text-xs font-medium text-[var(--color-primary-light)] mb-2">
+                          <Bot className="w-3.5 h-3.5" />
+                          HyperAgent Engine Active
+                        </div>
+                        <h2 className="text-3xl font-semibold text-[var(--color-text-primary)] tracking-tight">
+                          <ShinyText
+                            text="From idea to production in "
+                            className="text-[var(--color-text-primary)]"
                           />
+                          <span className="text-[var(--color-primary-light)]">
+                            <NumberTicker value={2} />
+                          </span>{" "}
+                          minutes
+                        </h2>
+                        <p className="text-sm text-[var(--color-text-tertiary)] max-w-lg mx-auto">
+                          Describe your smart contract, and I&apos;ll generate,
+                          audit, and prepare it for deployment on any EVM chain.
+                        </p>
+                      </motion.div>
+                      <StarterGrid
+                        variant="chroma"
+                        onSelect={(prompt) => {
+                          if (!hasActiveByokKey()) {
+                            setSettingsOpen(true);
+                            setInput(prompt);
+                            return;
+                          }
+                          setInput(prompt);
+                        }}
+                      />
+                    </div>
+                  ) : workflowError && !workflow ? (
+                    <div className="flex flex-col items-center justify-center py-24 text-[var(--color-text-muted)] gap-3">
+                      <div className="w-10 h-10 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                        <X className="w-5 h-5 text-amber-400" />
+                      </div>
+                      <p className="text-sm font-medium text-amber-400">
+                        {workflowError.includes("404") ||
+                        workflowError.includes("not found")
+                          ? "Workflow not found"
+                          : "Failed to load workflow"}
+                      </p>
+                      <p className="text-xs text-[var(--color-text-tertiary)] max-w-md text-center">
+                        {workflowError}
+                      </p>
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          type="button"
+                          onClick={() => fetchWorkflow()}
+                          className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)]"
+                        >
+                          Retry
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedWorkflowId(null);
+                            window.history.replaceState(null, "", ROUTES.HOME);
+                          }}
+                          className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)]"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          New workflow
+                        </button>
+                      </div>
+                    </div>
+                  ) : shellView === "code" ? (
+                    <div className="space-y-4">
+                      {selectedWorkflowId &&
+                        workflow &&
+                        (workflow.status === "running" ||
+                          workflow.status === "building" ||
+                          workflow.status === "spec_review" ||
+                          workflow.status === "design_review") && (
+                          <div className="rounded-xl border border-[var(--color-semantic-warning)]/20 bg-[var(--color-semantic-warning)]/5 px-4 py-3 mb-2">
+                            <p className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
+                              Pipeline in progress
+                            </p>
+                            <WorkflowStages
+                              workflow={workflow}
+                              contractData={contractData}
+                            />
+                          </div>
+                        )}
+                      {showCelebration && workflow && (
+                        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 mb-4 flex flex-wrap items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-500">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 shrink-0">
+                            <Check className="w-4 h-4" />
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-emerald-400">
+                              Your first contract is ready
+                            </p>
+                            <p className="text-xs text-[var(--color-text-tertiary)]">
+                              Review the code below. Deploy to a testnet or
+                              create another workflow.
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Link
+                              href={ROUTES.APPS_ID(workflow.workflow_id)}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white transition-colors"
+                            >
+                              Deploy
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedWorkflowId(null);
+                                setCreateError(null);
+                                window.history.replaceState(
+                                  null,
+                                  "",
+                                  ROUTES.HOME,
+                                );
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)] transition-colors"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              New workflow
+                            </button>
+                          </div>
                         </div>
                       )}
-                    {showCelebration && workflow && (
-                      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 mb-4 flex flex-wrap items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-500">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 shrink-0">
-                          <Check className="w-4 h-4" />
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-emerald-400">
-                            Your first contract is ready
+                      {displayCode ? (
+                        <ContractViewer
+                          contractCode={displayCode}
+                          abi={
+                            Array.isArray(selectedContract?.abi)
+                              ? (selectedContract.abi as unknown[])
+                              : undefined
+                          }
+                          contractName={String(
+                            selectedContract?.name ??
+                              `Contract ${selectedContractIndex + 1}`,
+                          )}
+                          workflowId={workflow?.workflow_id}
+                        />
+                      ) : workflow?.status === "failed" ? (
+                        <div className="flex flex-col items-center justify-center py-16 text-[var(--color-text-muted)] gap-3">
+                          <div className="w-10 h-10 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                            <X className="w-5 h-5 text-red-400" />
+                          </div>
+                          <p className="text-sm font-medium text-red-400">
+                            Pipeline failed
                           </p>
-                          <p className="text-xs text-[var(--color-text-tertiary)]">
-                            Review the code below. Deploy to a testnet or create
-                            another workflow.
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Link
-                            href={ROUTES.APPS_ID(workflow.workflow_id)}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white transition-colors"
-                          >
-                            Deploy
-                          </Link>
+                          {(
+                            (workflow.metadata ?? workflow.meta_data) as
+                              | Record<string, unknown>
+                              | undefined
+                          )?.error ? (
+                            <p className="text-xs text-[var(--color-text-tertiary)] max-w-md text-center break-words font-mono">
+                              {String(
+                                (
+                                  (workflow.metadata ??
+                                    workflow.meta_data) as Record<
+                                    string,
+                                    unknown
+                                  >
+                                ).error,
+                              )}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-[var(--color-text-tertiary)] max-w-md text-center">
+                              The pipeline encountered an error. Check your API
+                              keys in Settings and try creating a new workflow.
+                            </p>
+                          )}
                           <button
                             type="button"
                             onClick={() => {
@@ -829,312 +901,264 @@ function ChatPageContent() {
                                 ROUTES.HOME,
                               );
                             }}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)] transition-colors"
+                            className="mt-2 inline-flex items-center gap-2 rounded-lg bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)]"
                           >
                             <Plus className="w-3.5 h-3.5" />
                             New workflow
                           </button>
                         </div>
-                      </div>
-                    )}
-                    {displayCode ? (
-                      <ContractViewer
-                        contractCode={displayCode}
-                        abi={
-                          Array.isArray(selectedContract?.abi)
-                            ? (selectedContract.abi as unknown[])
-                            : undefined
-                        }
-                        contractName={String(
-                          selectedContract?.name ??
-                            `Contract ${selectedContractIndex + 1}`,
-                        )}
-                        workflowId={workflow?.workflow_id}
-                      />
-                    ) : workflow?.status === "failed" ? (
-                      <div className="flex flex-col items-center justify-center py-16 text-[var(--color-text-muted)] gap-3">
-                        <div className="w-10 h-10 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
-                          <X className="w-5 h-5 text-red-400" />
-                        </div>
-                        <p className="text-sm font-medium text-red-400">
-                          Pipeline failed
-                        </p>
-                        {(
-                          (workflow.metadata ?? workflow.meta_data) as
-                            | Record<string, unknown>
-                            | undefined
-                        )?.error ? (
-                          <p className="text-xs text-[var(--color-text-tertiary)] max-w-md text-center break-words font-mono">
-                            {String(
-                              (
-                                (workflow.metadata ??
-                                  workflow.meta_data) as Record<string, unknown>
-                              ).error,
-                            )}
-                          </p>
-                        ) : (
-                          <p className="text-xs text-[var(--color-text-tertiary)] max-w-md text-center">
-                            The pipeline encountered an error. Check your API
-                            keys in Settings and try creating a new workflow.
-                          </p>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedWorkflowId(null);
-                            setCreateError(null);
-                            window.history.replaceState(null, "", ROUTES.HOME);
-                          }}
-                          className="mt-2 inline-flex items-center gap-2 rounded-lg bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)]"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          New workflow
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-4">
-                        {workflowLoading ? (
-                          <div className="flex flex-col items-center justify-center py-16 text-[var(--color-text-muted)] gap-2">
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                            <p className="text-sm">Loading contract code...</p>
-                          </div>
-                        ) : workflow?.status === "running" ||
-                          workflow?.status === "building" ? (
-                          <>
-                            <CodeBlockShimmer className="min-h-[200px]" />
-                            <p className="text-xs text-[var(--color-text-muted)] flex items-center gap-2">
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              Pipeline is running. Waiting for contracts...
-                            </p>
-                          </>
-                        ) : (
-                          <div className="flex flex-col items-center justify-center py-16 text-[var(--color-text-muted)] gap-2">
-                            <FileCode className="w-6 h-6 opacity-40" />
-                            <p className="text-sm">
-                              Waiting for the pipeline to generate contracts.
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {workflow &&
-                      (workflow.status === "completed" ||
-                        workflow.status === "success" ||
-                        workflow.status === "failed" ||
-                        workflow.status === "cancelled") && (
-                        <div className="mt-6">
-                          <WorkflowStages
-                            workflow={workflow}
-                            contractData={contractData}
-                          />
+                      ) : (
+                        <div className="flex flex-col gap-4">
+                          {workflowLoading ? (
+                            <div className="flex flex-col items-center justify-center py-16 text-[var(--color-text-muted)] gap-2">
+                              <Loader2 className="w-5 h-5 animate-spin" />
+                              <p className="text-sm">
+                                Loading contract code...
+                              </p>
+                            </div>
+                          ) : workflow?.status === "running" ||
+                            workflow?.status === "building" ? (
+                            <>
+                              <CodeBlockShimmer className="min-h-[200px]" />
+                              <p className="text-xs text-[var(--color-text-muted)] flex items-center gap-2">
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                Pipeline is running. Waiting for contracts...
+                              </p>
+                            </>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center py-16 text-[var(--color-text-muted)] gap-2">
+                              <FileCode className="w-6 h-6 opacity-40" />
+                              <p className="text-sm">
+                                Waiting for the pipeline to generate contracts.
+                              </p>
+                            </div>
+                          )}
                         </div>
                       )}
-                    {workflow && needsSpecApproval(workflow) && (
-                      <SpecReviewPanel
-                        workflow={workflow}
-                        onApproved={() => fetchWorkflow()}
-                        onError={(msg) => setCreateError(msg)}
-                      />
-                    )}
-                    {workflow && needsDeployApproval(workflow) && (
-                      <DeployApprovalPanel
-                        workflow={workflow}
-                        onApproved={() => fetchWorkflow()}
-                        onError={(msg) => setCreateError(msg)}
-                      />
-                    )}
-                  </div>
-                ) : shellView === "data" ? (
-                  <div className="p-4 space-y-4">
-                    <div className="flex items-center gap-2 text-[var(--color-text-muted)]">
-                      <Database className="w-4 h-4" />
-                      <span className="text-sm font-medium">Contract data</span>
-                    </div>
-                    {contracts.length === 0 ? (
-                      <p className="text-sm text-[var(--color-text-tertiary)]">
-                        No contracts loaded. Build a smart contract via chat to
-                        inspect its ABI and storage.
-                      </p>
-                    ) : (
-                      <div className="space-y-3">
-                        {contracts.map((c, i) => (
-                          <div
-                            key={i}
-                            className="glass-panel rounded-lg p-3 space-y-2"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium text-white">
-                                {String(
-                                  (c as Record<string, unknown>).name ||
-                                    `Contract ${i + 1}`,
-                                )}
-                              </span>
-                              {Boolean((c as Record<string, unknown>).abi) && (
-                                <span className="text-xs text-[var(--color-text-muted)]">
-                                  {Array.isArray(
-                                    (c as Record<string, unknown>).abi,
-                                  )
-                                    ? `${((c as Record<string, unknown>).abi as unknown[]).length} ABI entries`
-                                    : "ABI"}
-                                </span>
-                              )}
-                            </div>
-                            {Boolean((c as Record<string, unknown>).abi) &&
-                              Array.isArray(
-                                (c as Record<string, unknown>).abi,
-                              ) && (
-                                <div className="max-h-64 overflow-y-auto">
-                                  <table className="w-full text-xs">
-                                    <thead>
-                                      <tr className="border-b border-[var(--color-border-subtle)]">
-                                        <th className="text-left py-1 pr-2 text-[var(--color-text-muted)]">
-                                          Type
-                                        </th>
-                                        <th className="text-left py-1 pr-2 text-[var(--color-text-muted)]">
-                                          Name
-                                        </th>
-                                        <th className="text-left py-1 text-[var(--color-text-muted)]">
-                                          Inputs
-                                        </th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {(
-                                        c as {
-                                          abi: Array<{
-                                            type?: string;
-                                            name?: string;
-                                            inputs?: Array<{
-                                              name?: string;
-                                              type?: string;
-                                            }>;
-                                          }>;
-                                        }
-                                      ).abi
-                                        .filter(
-                                          (entry) =>
-                                            entry.type === "function" ||
-                                            entry.type === "event",
-                                        )
-                                        .map((entry, j) => (
-                                          <tr
-                                            key={j}
-                                            className="border-b border-[var(--color-border-subtle)] last:border-0"
-                                          >
-                                            <td className="py-1 pr-2 text-[var(--color-text-muted)]">
-                                              {entry.type}
-                                            </td>
-                                            <td className="py-1 pr-2 font-mono text-[var(--color-text-primary)]">
-                                              {entry.name}
-                                            </td>
-                                            <td className="py-1 text-[var(--color-text-tertiary)]">
-                                              {(entry.inputs || [])
-                                                .map(
-                                                  (inp) =>
-                                                    `${inp.type} ${inp.name}`,
-                                                )
-                                                .join(", ") || "-"}
-                                            </td>
-                                          </tr>
-                                        ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              )}
+                      {workflow &&
+                        (workflow.status === "completed" ||
+                          workflow.status === "success" ||
+                          workflow.status === "failed" ||
+                          workflow.status === "cancelled") && (
+                          <div className="mt-6">
+                            <WorkflowStages
+                              workflow={workflow}
+                              contractData={contractData}
+                            />
                           </div>
-                        ))}
+                        )}
+                      {workflow && needsSpecApproval(workflow) && (
+                        <SpecReviewPanel
+                          workflow={workflow}
+                          onApproved={() => fetchWorkflow()}
+                          onError={(msg) => setCreateError(msg)}
+                        />
+                      )}
+                      {workflow && needsDeployApproval(workflow) && (
+                        <DeployApprovalPanel
+                          workflow={workflow}
+                          onApproved={() => fetchWorkflow()}
+                          onError={(msg) => setCreateError(msg)}
+                        />
+                      )}
+                    </div>
+                  ) : shellView === "data" ? (
+                    <div className="p-4 space-y-4">
+                      <div className="flex items-center gap-2 text-[var(--color-text-muted)]">
+                        <Database className="w-4 h-4" />
+                        <span className="text-sm font-medium">
+                          Contract data
+                        </span>
                       </div>
-                    )}
-                  </div>
-                ) : null}
+                      {contracts.length === 0 ? (
+                        <p className="text-sm text-[var(--color-text-tertiary)]">
+                          No contracts loaded. Build a smart contract via chat
+                          to inspect its ABI and storage.
+                        </p>
+                      ) : (
+                        <div className="space-y-3">
+                          {contracts.map((c, i) => (
+                            <div
+                              key={i}
+                              className="glass-panel rounded-lg p-3 space-y-2"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-white">
+                                  {String(
+                                    (c as Record<string, unknown>).name ||
+                                      `Contract ${i + 1}`,
+                                  )}
+                                </span>
+                                {Boolean(
+                                  (c as Record<string, unknown>).abi,
+                                ) && (
+                                  <span className="text-xs text-[var(--color-text-muted)]">
+                                    {Array.isArray(
+                                      (c as Record<string, unknown>).abi,
+                                    )
+                                      ? `${((c as Record<string, unknown>).abi as unknown[]).length} ABI entries`
+                                      : "ABI"}
+                                  </span>
+                                )}
+                              </div>
+                              {Boolean((c as Record<string, unknown>).abi) &&
+                                Array.isArray(
+                                  (c as Record<string, unknown>).abi,
+                                ) && (
+                                  <div className="max-h-64 overflow-y-auto">
+                                    <table className="w-full text-xs">
+                                      <thead>
+                                        <tr className="border-b border-[var(--color-border-subtle)]">
+                                          <th className="text-left py-1 pr-2 text-[var(--color-text-muted)]">
+                                            Type
+                                          </th>
+                                          <th className="text-left py-1 pr-2 text-[var(--color-text-muted)]">
+                                            Name
+                                          </th>
+                                          <th className="text-left py-1 text-[var(--color-text-muted)]">
+                                            Inputs
+                                          </th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {(
+                                          c as {
+                                            abi: Array<{
+                                              type?: string;
+                                              name?: string;
+                                              inputs?: Array<{
+                                                name?: string;
+                                                type?: string;
+                                              }>;
+                                            }>;
+                                          }
+                                        ).abi
+                                          .filter(
+                                            (entry) =>
+                                              entry.type === "function" ||
+                                              entry.type === "event",
+                                          )
+                                          .map((entry, j) => (
+                                            <tr
+                                              key={j}
+                                              className="border-b border-[var(--color-border-subtle)] last:border-0"
+                                            >
+                                              <td className="py-1 pr-2 text-[var(--color-text-muted)]">
+                                                {entry.type}
+                                              </td>
+                                              <td className="py-1 pr-2 font-mono text-[var(--color-text-primary)]">
+                                                {entry.name}
+                                              </td>
+                                              <td className="py-1 text-[var(--color-text-tertiary)]">
+                                                {(entry.inputs || [])
+                                                  .map(
+                                                    (inp) =>
+                                                      `${inp.type} ${inp.name}`,
+                                                  )
+                                                  .join(", ") || "-"}
+                                              </td>
+                                            </tr>
+                                          ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </div>
-          </div>
-          <div className="shrink-0 flex flex-col items-center gap-3 px-4 pb-4 pt-2">
-            <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-black/30 backdrop-blur-xl shadow-[0_0_40px_rgba(124,58,237,0.08)] focus-within:shadow-[0_0_40px_rgba(124,58,237,0.15)] transition-shadow overflow-hidden">
-              <ChatCommandBar
-                value={input}
-                onChange={setInput}
-                onSubmit={handleSubmit}
-                disabled={isLoading}
-                placeholder={
-                  llmPassThrough
-                    ? "Ask HyperAgent to build..."
-                    : "Add an LLM key in Settings to start chatting..."
-                }
-                onCreateWorkflow={handleCreateWorkflowFromChat}
-                canCreateWorkflow={canCreateWorkflow}
-                creatingWorkflow={creatingWorkflow}
-                className="border-t-0 bg-transparent"
-                statusIndicator={
-                  llmPassThrough ? (
-                    <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                      <span className="text-[10px] text-emerald-400 font-medium">
-                        {llmPassThrough.provider === "google"
-                          ? "Gemini"
-                          : llmPassThrough.provider === "openai"
-                            ? "OpenAI"
-                            : "Anthropic"}{" "}
-                        key active
-                      </span>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setSettingsOpen(true)}
-                      className="flex items-center gap-2 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/15 transition-colors w-full text-left"
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                      <span className="text-[10px] text-amber-400 font-medium">
-                        No LLM key set. Click to add one in Settings.
-                      </span>
-                    </button>
-                  )
-                }
-              />
-            </div>
-            {createError && (
-              <div className="w-full max-w-2xl space-y-2">
-                <ApiErrorBanner
-                  error={createError}
-                  onRetry={
-                    isByokStorageOrMigrationError(createError)
-                      ? () => {
-                          setCreateError(null);
-                          setSettingsOpen(true);
-                        }
-                      : undefined
+            <div className="shrink-0 flex flex-col items-center gap-3 px-4 pb-4 pt-2">
+              <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-black/30 backdrop-blur-xl shadow-[0_0_40px_rgba(124,58,237,0.08)] focus-within:shadow-[0_0_40px_rgba(124,58,237,0.15)] transition-shadow overflow-hidden">
+                <ChatCommandBar
+                  value={input}
+                  onChange={setInput}
+                  onSubmit={handleSubmit}
+                  disabled={isLoading}
+                  placeholder={
+                    llmPassThrough
+                      ? "Ask HyperAgent to build..."
+                      : "Add an LLM key in Settings to start chatting..."
+                  }
+                  onCreateWorkflow={handleCreateWorkflowFromChat}
+                  canCreateWorkflow={canCreateWorkflow}
+                  creatingWorkflow={creatingWorkflow}
+                  className="border-t-0 bg-transparent"
+                  statusIndicator={
+                    llmPassThrough ? (
+                      <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        <span className="text-[10px] text-emerald-400 font-medium">
+                          {llmPassThrough.provider === "google"
+                            ? "Gemini"
+                            : llmPassThrough.provider === "openai"
+                              ? "OpenAI"
+                              : "Anthropic"}{" "}
+                          key active
+                        </span>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setSettingsOpen(true)}
+                        className="flex items-center gap-2 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/15 transition-colors w-full text-left"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                        <span className="text-[10px] text-amber-400 font-medium">
+                          No LLM key set. Click to add one in Settings.
+                        </span>
+                      </button>
+                    )
                   }
                 />
-                {isCreditsError(lastCreateErrorRef.current) && (
-                  <Link
-                    href={ROUTES.PAYMENTS}
-                    className="text-xs text-[var(--color-primary-light)] hover:underline"
-                  >
-                    Top up credits in Payments
-                  </Link>
-                )}
-                {isByokStorageOrMigrationError(createError) && (
-                  <p className="text-[11px] text-[var(--color-text-muted)]">
-                    {BYOK_SAVE_AGAIN_HINT} Open Settings (header) to save keys.
-                  </p>
-                )}
               </div>
+              {createError && (
+                <div className="w-full max-w-2xl space-y-2">
+                  <ApiErrorBanner
+                    error={createError}
+                    onRetry={
+                      isByokStorageOrMigrationError(createError)
+                        ? () => {
+                            setCreateError(null);
+                            setSettingsOpen(true);
+                          }
+                        : undefined
+                    }
+                  />
+                  {isCreditsError(lastCreateErrorRef.current) && (
+                    <Link
+                      href={ROUTES.PAYMENTS}
+                      className="text-xs text-[var(--color-primary-light)] hover:underline"
+                    >
+                      Top up credits in Payments
+                    </Link>
+                  )}
+                  {isByokStorageOrMigrationError(createError) && (
+                    <p className="text-[11px] text-[var(--color-text-muted)]">
+                      {BYOK_SAVE_AGAIN_HINT} Open Settings (header) to save
+                      keys.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+            {error && (
+              <ApiErrorBanner
+                error={getErrorMessage(
+                  error,
+                  "Chat request failed. Check your API key in Settings and try again.",
+                )}
+                onRetry={() => {
+                  reload();
+                }}
+                className="rounded-none border-t border-x-0 shrink-0 mx-4 mb-4"
+              />
             )}
           </div>
-          {error && (
-            <ApiErrorBanner
-              error={getErrorMessage(
-                error,
-                "Chat request failed. Check your API key in Settings and try again.",
-              )}
-              onRetry={() => {
-                reload();
-              }}
-              className="rounded-none border-t border-x-0 shrink-0 mx-4 mb-4"
-            />
-          )}
         </main>
 
         <aside

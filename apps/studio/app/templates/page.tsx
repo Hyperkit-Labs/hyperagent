@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { ShimmerGrid } from "@/components/ai-elements";
+import { TableFilterBar } from "@/components/ui";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
@@ -135,9 +136,9 @@ function TemplatesContent() {
           </Link>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-muted)]" />
+        <TableFilterBar className="flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative min-w-0 flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" />
             <input
               type="search"
               placeholder="Search templates by name or id..."
@@ -146,17 +147,17 @@ function TemplatesContent() {
               onKeyDown={(e) =>
                 e.key === "Enter" && setSearchQuery(searchInput.trim())
               }
-              className="w-full pl-9 pr-4 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] text-[var(--color-text-primary)] text-sm placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+              className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] py-2 pl-9 pr-4 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
             />
           </div>
           <button
             type="button"
             onClick={() => setSearchQuery(searchInput.trim())}
-            className="px-4 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] text-[var(--color-text-primary)] text-sm font-medium hover:bg-[var(--color-bg-panel)] transition-colors"
+            className="shrink-0 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-bg-panel)]"
           >
             Search
           </button>
-        </div>
+        </TableFilterBar>
 
         <div className="flex flex-wrap gap-2">
           {(

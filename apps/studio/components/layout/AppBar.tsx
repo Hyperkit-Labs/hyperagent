@@ -4,12 +4,20 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
-import { Settings, PanelRightOpen, ChevronRight, Menu } from "lucide-react";
+import {
+  Settings,
+  PanelRightOpen,
+  ChevronRight,
+  Menu,
+  LayoutGrid,
+} from "lucide-react";
 import { ConnectWalletNav } from "@/components/wallet/ConnectWalletNav";
 import { NetworkSelector } from "@/components/layout/NetworkSelector";
 import { NotificationsDropdown } from "@/components/layout/NotificationsDropdown";
 import { useLayout } from "@/components/providers/LayoutProvider";
 import { ROUTES } from "@/constants/routes";
+import { ActionSearchBar, ExpandableToolbar } from "@/components/ui";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 const PATH_LABELS: Record<string, string> = {
   [ROUTES.DASHBOARD]: "Overview",
@@ -77,6 +85,7 @@ export function AppBar() {
     openCommandPalette,
     toggleMobileNav,
   } = useLayout();
+  const compactTools = useMediaQuery("(max-width: 1023px)");
 
   return (
     <header className="h-16 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)]/90 backdrop-blur-md flex items-center justify-between px-4 sm:px-6 z-40 shrink-0">
@@ -104,48 +113,80 @@ export function AppBar() {
         </Link>
         <div className="h-5 w-px bg-[var(--color-border-default)] hidden sm:block" />
         <Breadcrumb />
+        <div className="hidden lg:flex flex-1 min-w-0 justify-center px-4">
+          <ActionSearchBar
+            onClick={openCommandPalette}
+            placeholder="Search workspace, open routes…"
+            className="max-w-md w-full"
+          />
+        </div>
       </div>
 
-      <div className="flex items-center justify-end gap-4 shrink-0">
+      <div className="flex items-center justify-end gap-2 sm:gap-4 shrink-0 min-w-0">
         <NetworkSelector />
         <div className="h-5 w-px bg-[var(--color-border-default)] hidden sm:block" />
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={openCommandPalette}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)] transition-colors border border-[var(--color-border-subtle)]"
-            aria-label="Open command palette"
-            title="Command palette (Cmd+K)"
+        {compactTools ? (
+          <ExpandableToolbar
+            label="Search & panels"
+            defaultCollapsed
+            icon={<LayoutGrid className="h-3.5 w-3.5 opacity-80" />}
+            className="min-w-0 max-w-[11rem] sm:max-w-[14rem]"
+            triggerClassName="border border-[var(--color-border-subtle)] rounded-md bg-[var(--color-bg-panel)]/60"
           >
-            <span>Search</span>
-            <kbd className="hidden sm:inline-flex h-5 items-center rounded border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] px-1.5 text-[10px] font-mono">
-              ⌘K
-            </kbd>
-          </button>
-          <button
-            type="button"
-            onClick={toggleContextSidebar}
-            className={`p-1.5 rounded-md transition-colors ${contextSidebarOpen ? "bg-[var(--color-bg-hover)] text-[var(--color-text-primary)]" : "text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"}`}
-            aria-label={
-              contextSidebarOpen
-                ? "Close resource inspector"
-                : "Open resource inspector"
-            }
-            title="Resource Inspector (right panel)"
-          >
-            <PanelRightOpen className="w-5 h-5" />
-          </button>
-          <NotificationsDropdown />
-          <ConnectWalletNav />
-          <Link
-            href={ROUTES.SETTINGS}
-            className="text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition-colors p-1"
-            aria-label="Settings"
-          >
-            <Settings className="w-5 h-5" />
-          </Link>
-        </div>
+            <div className="flex flex-col gap-2 rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] p-2 shadow-lg">
+              <ActionSearchBar
+                onClick={openCommandPalette}
+                placeholder="Search or jump…"
+                className="max-w-none"
+              />
+              <button
+                type="button"
+                onClick={toggleContextSidebar}
+                className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs transition-colors ${
+                  contextSidebarOpen
+                    ? "bg-[var(--color-bg-hover)] text-[var(--color-text-primary)]"
+                    : "text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+                }`}
+              >
+                <PanelRightOpen className="h-4 w-4 shrink-0" />
+                Resource inspector
+              </button>
+              <div className="flex justify-stretch [&_button]:w-full">
+                <NotificationsDropdown />
+              </div>
+            </div>
+          </ExpandableToolbar>
+        ) : (
+          <div className="flex items-center gap-2">
+            <ActionSearchBar
+              onClick={openCommandPalette}
+              className="hidden md:flex lg:hidden max-w-[14rem] xl:max-w-xs"
+            />
+            <button
+              type="button"
+              onClick={toggleContextSidebar}
+              className={`p-1.5 rounded-md transition-colors ${contextSidebarOpen ? "bg-[var(--color-bg-hover)] text-[var(--color-text-primary)]" : "text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"}`}
+              aria-label={
+                contextSidebarOpen
+                  ? "Close resource inspector"
+                  : "Open resource inspector"
+              }
+              title="Resource Inspector (right panel)"
+            >
+              <PanelRightOpen className="w-5 h-5" />
+            </button>
+            <NotificationsDropdown />
+          </div>
+        )}
+        <ConnectWalletNav />
+        <Link
+          href={ROUTES.SETTINGS}
+          className="text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition-colors p-1 shrink-0"
+          aria-label="Settings"
+        >
+          <Settings className="w-5 h-5" />
+        </Link>
       </div>
     </header>
   );

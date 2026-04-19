@@ -21,13 +21,13 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     if (shouldLoadDatadogNodeTracer()) {
       try {
-        const initializeImportName = "dd-trace/initialize.mjs";
-        await import(
-          /* webpackIgnore: true */ initializeImportName as "dd-trace/initialize.mjs"
-        );
+        // String literal + webpackIgnore so Next/webpack never tries to resolve dd-trace at compile time.
+        // Do not use dd-trace/init (removed in favor of initialize.mjs). Do not use a separate
+        // instrumentation.datadog.ts with static imports — that breaks RSC when the package is missing.
+        await import(/* webpackIgnore: true */ "dd-trace/initialize.mjs");
       } catch {
         console.warn(
-          "[datadog] dd-trace failed to load; run pnpm install and ensure dd-trace is in the lockfile",
+          "[datadog] dd-trace failed to load; run pnpm install from repo root or set DD_LLMOBS_ENABLED/DD_TRACE_ENABLED/DD_PROFILING_ENABLED off",
         );
       }
     }

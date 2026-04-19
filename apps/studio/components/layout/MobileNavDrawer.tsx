@@ -124,10 +124,15 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
             aria-hidden
           />
           <motion.aside
-            initial={{ x: "-100%" }}
+            initial={{ x: "-104%" }}
             animate={{ x: 0 }}
-            exit={{ x: "-100%" }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            exit={{ x: "-104%" }}
+            transition={{
+              type: "spring",
+              stiffness: 420,
+              damping: 32,
+              mass: 0.72,
+            }}
             className="fixed inset-y-0 left-0 z-50 w-64 bg-[var(--color-bg-elevated)] border-r border-[var(--color-border-subtle)] shadow-2xl flex flex-col md:hidden"
             role="dialog"
             aria-label="Navigation menu"

@@ -14,10 +14,10 @@
 #
 # External: Supabase (DB). Gateway: Upstash REST in .env. Orchestrator TCP: REDIS_URL (e.g. Upstash redis:// / rediss://).
 #
-# Traefik (manual compose + Traefik on Docker): api-gateway labels below set Host(), TLS (letsencrypt), port 4000,
-# and HTTP→HTTPS redirect without matching /.well-known/acme-challenge (Let’s Encrypt HTTP-01 stays on Traefik’s path).
-# Coolify also injects Traefik labels when you attach a domain: avoid duplicate Host() rules (use Coolify UI custom
-# labels mirroring these, or disable auto labels for this service if you manage routing only from compose).
+# Traefik: Host() and TLS must use literal FQDNs in labels. Coolify does not expand ${VAR} in container labels, so
+# ACME would otherwise see the literal string "${API_GATEWAY_DOMAIN:-...}" and fail certificate issuance.
+# HTTP router excludes /.well-known/acme-challenge so HTTP-01 is not redirected to HTTPS.
+# If Coolify also attaches the same domain, avoid duplicate Host() routers for one service.
 
 services:
   api-gateway:
@@ -43,18 +43,17 @@ services:
       - hyperagent
     labels:
       - "traefik.enable=true"
-      - "traefik.http.services.hyperagent-api.loadbalancer.server.port=4000"
-      - "traefik.http.routers.hyperagent-api-https.rule=Host(`${API_GATEWAY_DOMAIN:-api.hyperkitlabs.com}`)"
-      - "traefik.http.routers.hyperagent-api-https.entrypoints=https"
-      - "traefik.http.routers.hyperagent-api-https.tls=true"
-      - "traefik.http.routers.hyperagent-api-https.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.hyperagent-api-https.service=hyperagent-api"
-      - "traefik.http.routers.hyperagent-api-http.rule=Host(`${API_GATEWAY_DOMAIN:-api.hyperkitlabs.com}`) && !PathPrefix(`/.well-known/acme-challenge`)"
-      - "traefik.http.routers.hyperagent-api-http.entrypoints=http"
-      - "traefik.http.routers.hyperagent-api-http.middlewares=hyperagent-api-redirect-https"
-      - "traefik.http.routers.hyperagent-api-http.service=hyperagent-api"
-      - "traefik.http.middlewares.hyperagent-api-redirect-https.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.hyperagent-api-redirect-https.redirectscheme.permanent=true"
+      - "traefik.http.services.api-gateway.loadbalancer.server.port=4000"
+      - "traefik.http.routers.api-gateway.rule=Host(`api.hyperkitlabs.com`)"
+      - "traefik.http.routers.api-gateway.entrypoints=https"
+      - "traefik.http.routers.api-gateway.tls=true"
+      - "traefik.http.routers.api-gateway.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.api-gateway.service=api-gateway"
+      - "traefik.http.routers.api-gateway-http.rule=Host(`api.hyperkitlabs.com`) && !PathPrefix(`/.well-known/acme-challenge`)"
+      - "traefik.http.routers.api-gateway-http.entrypoints=http"
+      - "traefik.http.routers.api-gateway-http.middlewares=https-redirect"
+      - "traefik.http.routers.api-gateway-http.service=api-gateway"
+      - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
     # Liveness only: full /health calls Supabase + orchestrator and can flap when upstreams are slow.
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:4000/health/live"]

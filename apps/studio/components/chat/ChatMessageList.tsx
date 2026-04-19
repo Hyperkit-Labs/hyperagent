@@ -13,7 +13,7 @@ import {
   Terminal,
   StackTrace,
 } from "@/components/ai-elements";
-import { GlowingBorder } from "@/components/ui";
+import { AiThinkingBars, GlowingBorder } from "@/components/ui";
 import { XTermTerminal } from "@/components/chat/XTermTerminal";
 import { Check, Loader2 } from "lucide-react";
 
@@ -262,8 +262,11 @@ export function ChatMessageList({
                       className="min-h-[180px]"
                     />
                   ) : (
-                    <div className="px-2 py-2 animate-pulse text-[var(--color-text-muted)] text-[10px]">
-                      Waiting for agent activity...
+                    <div className="px-2 py-1">
+                      <AiThinkingBars className="justify-start px-1" />
+                      <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">
+                        Waiting for agent activity...
+                      </p>
                     </div>
                   )}
                 </div>

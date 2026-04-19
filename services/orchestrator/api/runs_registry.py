@@ -4,6 +4,7 @@ presets, blueprints, templates, logs, agents, contracts, approve_spec,
 quick-demo, debug-sandbox, llm-keys.
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -32,6 +33,8 @@ from .common import (
     _run_status_for_store,
     assert_workflow_owner,
 )
+
+BYOK_DB_TIMEOUT_SEC = float(os.environ.get("BYOK_DB_TIMEOUT_SEC", "25"))
 
 logger = logging.getLogger(__name__)
 
@@ -613,7 +616,7 @@ def _trace_llm_keys(
 
 
 @llm_keys_router.get("/llm-keys")
-def get_llm_keys(
+async def get_llm_keys(
     request: Request,
     x_workspace_id: str | None = Header(None, alias="X-Workspace-Id"),
     x_user_id: str | None = Header(None, alias="X-User-Id"),
@@ -634,9 +637,24 @@ def get_llm_keys(
     if x_user_id and llm_keys_supabase._is_configured():
         from .common import _log_byok_event
 
-        db.ensure_wallet_user_profile(x_user_id)
-        _log_byok_event("byok_access", x_user_id, "get_configured_providers")
-        providers = llm_keys_supabase.get_configured_providers(x_user_id)
+        def _sync_byok_providers() -> list[str]:
+            db.ensure_wallet_user_profile(x_user_id)
+            _log_byok_event("byok_access", x_user_id, "get_configured_providers")
+            return llm_keys_supabase.get_configured_providers(x_user_id)
+
+        try:
+            providers = await asyncio.wait_for(
+                asyncio.to_thread(_sync_byok_providers),
+                timeout=BYOK_DB_TIMEOUT_SEC,
+            )
+        except TimeoutError:
+            _trace_llm_keys(request, "GET", x_user_id, x_workspace_id, "timeout")
+            raise HTTPException(
+                status_code=504,
+                detail=(
+                    "LLM keys lookup timed out; retry or check database connectivity."
+                ),
+            )
         _trace_llm_keys(
             request,
             "GET",

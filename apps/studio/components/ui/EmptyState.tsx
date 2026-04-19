@@ -2,6 +2,7 @@
 
 import { type ReactNode } from "react";
 import { motion } from "framer-motion";
+import { ElectricBorder } from "@/components/ui/ElectricBorder";
 
 export interface EmptyStateProps {
   icon: ReactNode;
@@ -11,6 +12,8 @@ export interface EmptyStateProps {
   /** Suggested prompts or next steps (e.g. "Deploy an ERC20 token") */
   suggestions?: string[];
   className?: string;
+  /** Highlight empty CTA with electric border (high-attention pattern) */
+  emphasis?: boolean;
 }
 
 export function EmptyState({
@@ -20,13 +23,10 @@ export function EmptyState({
   action,
   suggestions,
   className = "",
+  emphasis = false,
 }: EmptyStateProps) {
-  return (
-    <div
-      className={`flex flex-col items-center justify-center text-center max-w-sm mx-auto ${className}`.trim()}
-      role="status"
-      aria-label={`${title}. ${description}`}
-    >
+  const body = (
+    <>
       <motion.div
         animate={{ y: [0, -4, 0] }}
         transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
@@ -47,6 +47,24 @@ export function EmptyState({
         </p>
       )}
       {action ?? null}
+    </>
+  );
+
+  return (
+    <div
+      className={`flex flex-col items-center justify-center text-center max-w-sm mx-auto ${className}`.trim()}
+      role="status"
+      aria-label={`${title}. ${description}`}
+    >
+      {emphasis ? (
+        <ElectricBorder className="w-full">
+          <div className="flex flex-col items-center justify-center text-center px-4 py-6">
+            {body}
+          </div>
+        </ElectricBorder>
+      ) : (
+        body
+      )}
     </div>
   );
 }

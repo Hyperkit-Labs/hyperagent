@@ -8,7 +8,12 @@ import { useDeployments } from "@/hooks/useDeployments";
 import { Rocket } from "lucide-react";
 import { ShimmerTableRows } from "@/components/ai-elements";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
-import { EmptyState, MetricCard, StatusBadge } from "@/components/ui";
+import {
+  EmptyState,
+  MetricCard,
+  StatusBadge,
+  TableFilterBar,
+} from "@/components/ui";
 import { DeploymentDetails } from "./DeploymentDetails";
 import { cn } from "@/lib/utils";
 
@@ -65,14 +70,14 @@ export default function DeploymentsPage() {
               <h2 className="text-sm font-medium text-[var(--color-text-primary)]">
                 All deployments
               </h2>
-              <div className="flex gap-1 text-[11px]">
+              <TableFilterBar className="border-0 bg-transparent p-0 gap-1 text-[11px]">
                 {(["all", "success", "failed", "pending"] as const).map((f) => (
                   <button
                     key={f}
                     type="button"
                     onClick={() => setStatusFilter(f)}
                     className={cn(
-                      "px-2 py-1 rounded-full capitalize transition-colors",
+                      "rounded-full px-2 py-1 capitalize transition-colors",
                       statusFilter === f
                         ? "bg-[var(--color-primary-alpha-20)] text-[var(--color-primary-light)]"
                         : "text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-secondary)]",
@@ -81,7 +86,7 @@ export default function DeploymentsPage() {
                     {f}
                   </button>
                 ))}
-              </div>
+              </TableFilterBar>
             </header>
             <div className="flex-1 overflow-auto min-h-0">
               {loading && deployments.length === 0 ? (

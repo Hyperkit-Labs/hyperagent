@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart,
   Bar,
@@ -48,10 +48,18 @@ import {
   LiveIndicator,
   GlowingBorder,
   FlickeringGrid,
+  BentoGrid,
+  BentoCard,
+  FeatureCarousel,
+  type FeatureCarouselItem,
+  MorphSurface,
+  TiltedCard,
+  ActivityRingCard,
+  TableFilterBar,
 } from "@/components/ui";
 import { PageTitle } from "@/components/layout/PageTitle";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
-import { AnimatePresence } from "framer-motion";
+import { FeatureErrorBoundary } from "@/components/providers/FeatureErrorBoundary";
 import type { Workflow } from "@/lib/types";
 
 function DashboardCTAs({
@@ -146,6 +154,21 @@ export default function DashboardPage() {
     filters: { page_size: 5 },
   });
   const recentDeployments = deployments.slice(0, 5);
+  const [deployTableFilter, setDeployTableFilter] = useState<
+    "all" | "ok" | "bad"
+  >("all");
+  const filteredRecentDeployments = useMemo(() => {
+    return recentDeployments.filter((d) => {
+      const s = (d.status || "").toLowerCase();
+      if (deployTableFilter === "ok")
+        return (
+          s === "success" || s === "deployed" || s === "completed" || s === "ok"
+        );
+      if (deployTableFilter === "bad")
+        return s === "failed" || s === "error" || s === "cancelled";
+      return true;
+    });
+  }, [recentDeployments, deployTableFilter]);
   const apiError = dashboardError;
   const refetchAll = refetchDashboard;
   const trafficData = [
@@ -156,7 +179,29 @@ export default function DashboardPage() {
     { name: "Contracts", value: metrics?.contracts?.deployed ?? 0 },
     { name: "Verified", value: metrics?.contracts?.verified ?? 0 },
   ];
-  const maxBar = Math.max(1, ...trafficData.map((d) => d.value));
+  const dashboardFeatureSlides: FeatureCarouselItem[] = [
+    {
+      id: "wf",
+      eyebrow: "Workflows",
+      title: "Start from chat or templates",
+      description:
+        "Describe a contract in natural language or fork a template, then run the full pipeline on your connected network.",
+    },
+    {
+      id: "sec",
+      eyebrow: "Quality",
+      title: "Audit and simulation before deploy",
+      description:
+        "Static checks and simulations reduce surprises before you publish bytecode.",
+    },
+    {
+      id: "byok",
+      eyebrow: "Control",
+      title: "BYOK in Settings",
+      description:
+        "Keys stay in your workspace vault. Top up x402 when billing is enabled.",
+    },
+  ];
   // No historical time-series data available — omit sparklines rather than showing synthetic trends.
   const sparklineWorkflows: { value: number }[] | undefined = undefined;
   const sparklineDeployments: { value: number }[] | undefined = undefined;
@@ -189,70 +234,36 @@ export default function DashboardPage() {
       title="Sign in to view dashboard"
       description="Sign in with your wallet to see workflows, deployments, and metrics."
     >
-      <div className="relative min-h-screen bg-[var(--color-bg-base)]">
-        <div
-          className="absolute inset-0 pointer-events-none opacity-[0.03] z-0"
-          aria-hidden
-        >
-          <FlickeringGrid
-            color="rgba(124, 58, 237, 1)"
-            maxOpacity={1}
-            flickerChance={0.1}
-            squareSize={3}
-            gridGap={6}
-          />
-        </div>
-        <div className="relative z-10 p-6 lg:p-8">
-          <div className="max-w-[1200px] mx-auto space-y-6 animate-enter">
-            <ApiErrorBanner
-              error={apiError ?? quickDemoError ?? null}
-              onRetry={() => {
-                refetchAll();
-                setQuickDemoError(null);
-              }}
+      <FeatureErrorBoundary contextLabel="Dashboard">
+        <div className="relative min-h-screen bg-[var(--color-bg-base)]">
+          <div
+            className="absolute inset-0 pointer-events-none opacity-[0.03] z-0"
+            aria-hidden
+          >
+            <FlickeringGrid
+              color="rgba(124, 58, 237, 1)"
+              maxOpacity={1}
+              flickerChance={0.1}
+              squareSize={3}
+              gridGap={6}
             />
-            <OnboardingChecklist
-              onConnectClick={() => {
-                if (client) void connect(getConnectConfig(client));
-              }}
-              onByokClick={() => router.push(ROUTES.SETTINGS)}
-              onPaymentClick={() => router.push(ROUTES.PAYMENTS)}
-              onTryItNowClick={async () => {
-                const w =
-                  workflows.find(
-                    (w) => w.contracts && Object.keys(w.contracts).length > 0,
-                  ) ?? workflows[0];
-                if (!w?.workflow_id) {
-                  setQuickDemoError("Create a workflow first to try the demo");
-                  return;
-                }
-                setQuickDemoLoading(true);
-                setQuickDemoError(null);
-                try {
-                  const res = await createQuickDemo(w.workflow_id);
-                  if (res.url)
-                    window.open(res.url, "_blank", "noopener,noreferrer");
-                  else setQuickDemoError("No sandbox URL returned");
-                } catch (e) {
-                  setQuickDemoError(
-                    e instanceof Error ? e.message : "Quick demo failed",
-                  );
-                } finally {
-                  setQuickDemoLoading(false);
-                }
-              }}
-            />
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-2">
-              <div>
-                <PageTitle
-                  breadcrumb="Projects / Overview"
-                  title="Project Overview"
-                />
-              </div>
-              <DashboardCTAs
-                workflows={workflows}
-                quickDemoLoading={quickDemoLoading}
-                onQuickDemo={async () => {
+          </div>
+          <div className="relative z-10 p-6 lg:p-8">
+            <div className="max-w-[1200px] mx-auto space-y-6 animate-enter">
+              <ApiErrorBanner
+                error={apiError ?? quickDemoError ?? null}
+                onRetry={() => {
+                  refetchAll();
+                  setQuickDemoError(null);
+                }}
+              />
+              <OnboardingChecklist
+                onConnectClick={() => {
+                  if (client) void connect(getConnectConfig(client));
+                }}
+                onByokClick={() => router.push(ROUTES.SETTINGS)}
+                onPaymentClick={() => router.push(ROUTES.PAYMENTS)}
+                onTryItNowClick={async () => {
                   const w =
                     workflows.find(
                       (w) => w.contracts && Object.keys(w.contracts).length > 0,
@@ -279,425 +290,638 @@ export default function DashboardPage() {
                   }
                 }}
               />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {[
-                {
-                  label: "Workflows",
-                  value: dashboardLoading
-                    ? "..."
-                    : (workflowsTotal ?? workflows?.length ?? 0),
-                  sublabel: "Total in list",
-                  icon: (
-                    <div className="w-2 h-2 rounded-full bg-[var(--color-semantic-success)] shadow-[0_0_8px_var(--color-semantic-success)]" />
-                  ),
-                  sparkline: sparklineWorkflows,
-                  animateValue:
-                    !dashboardLoading &&
-                    typeof (workflowsTotal ?? workflows?.length ?? 0) ===
-                      "number",
-                  trend:
-                    (workflowsTotal ?? 0) > 0 ? ("up" as const) : undefined,
-                },
-                {
-                  label: "Deployments",
-                  value: deployments.length,
-                  sublabel: "Active",
-                  icon: (
-                    <Code className="w-4 h-4 text-[var(--color-primary-mid)]" />
-                  ),
-                  sparkline: sparklineDeployments,
-                  animateValue: true,
-                  trend: deployments.length > 0 ? ("up" as const) : undefined,
-                },
-                {
-                  label: "Metrics",
-                  value: dashboardLoading
-                    ? "..."
-                    : typeof metrics?.workflows?.total === "number"
-                      ? metrics.workflows.total
-                      : "-",
-                  sublabel: "From API",
-                  icon: (
-                    <HardDrive className="w-4 h-4 text-[var(--color-semantic-violet)]" />
-                  ),
-                  animateValue:
-                    !dashboardLoading &&
-                    typeof metrics?.workflows?.total === "number",
-                },
-                {
-                  label: "Status",
-                  value: hasActiveWorkflows ? "Building" : "Idle",
-                  sublabel: "Platform",
-                  icon: (
-                    <Package className="w-4 h-4 text-[var(--color-semantic-violet)]" />
-                  ),
-                },
-              ].map((card, i) => (
-                <motion.div
-                  key={card.label}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.25, delay: i * 0.05 }}
-                >
-                  <MetricCard
-                    label={card.label}
-                    value={card.value}
-                    sublabel={card.sublabel}
-                    icon={card.icon}
-                    sparklineData={
-                      "sparkline" in card ? card.sparkline : undefined
+              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-2">
+                <div>
+                  <PageTitle
+                    breadcrumb="Projects / Overview"
+                    title="Project Overview"
+                    withUnderbeam
+                  />
+                </div>
+                <DashboardCTAs
+                  workflows={workflows}
+                  quickDemoLoading={quickDemoLoading}
+                  onQuickDemo={async () => {
+                    const w =
+                      workflows.find(
+                        (w) =>
+                          w.contracts && Object.keys(w.contracts).length > 0,
+                      ) ?? workflows[0];
+                    if (!w?.workflow_id) {
+                      setQuickDemoError(
+                        "Create a workflow first to try the demo",
+                      );
+                      return;
                     }
-                    trend={"trend" in card ? card.trend : undefined}
-                    animateValue={
-                      "animateValue" in card ? card.animateValue : undefined
+                    setQuickDemoLoading(true);
+                    setQuickDemoError(null);
+                    try {
+                      const res = await createQuickDemo(w.workflow_id);
+                      if (res.url)
+                        window.open(res.url, "_blank", "noopener,noreferrer");
+                      else setQuickDemoError("No sandbox URL returned");
+                    } catch (e) {
+                      setQuickDemoError(
+                        e instanceof Error ? e.message : "Quick demo failed",
+                      );
+                    } finally {
+                      setQuickDemoLoading(false);
+                    }
+                  }}
+                />
+              </div>
+
+              <BentoGrid className="mb-2">
+                <BentoCard colSpan={2} className="p-4">
+                  <FeatureCarousel
+                    items={dashboardFeatureSlides}
+                    compact
+                    intervalMs={7500}
+                  />
+                </BentoCard>
+                <BentoCard className="flex flex-col justify-center gap-2 p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+                    Shortcuts
+                  </p>
+                  <Link
+                    href={ROUTES.TEMPLATES}
+                    className="text-sm font-medium text-[var(--color-primary-light)] hover:underline"
+                  >
+                    Browse templates →
+                  </Link>
+                  <Link
+                    href={ROUTES.SETTINGS}
+                    className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                  >
+                    Workspace &amp; BYOK
+                  </Link>
+                </BentoCard>
+                <BentoCard className="flex flex-col justify-center gap-2 p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+                    Pipelines
+                  </p>
+                  <Link
+                    href={ROUTES.WORKFLOWS}
+                    className="text-sm font-medium text-[var(--color-text-primary)] hover:text-[var(--color-primary-light)]"
+                  >
+                    All workflows →
+                  </Link>
+                  <Link
+                    href={ROUTES.SECURITY}
+                    className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                  >
+                    Security overview
+                  </Link>
+                </BentoCard>
+              </BentoGrid>
+
+              <div className="dashboard-01-metrics grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  {
+                    label: "Workflows",
+                    value: dashboardLoading
+                      ? "..."
+                      : (workflowsTotal ?? workflows?.length ?? 0),
+                    sublabel: "Total in list",
+                    icon: (
+                      <div className="w-2 h-2 rounded-full bg-[var(--color-semantic-success)] shadow-[0_0_8px_var(--color-semantic-success)]" />
+                    ),
+                    sparkline: sparklineWorkflows,
+                    animateValue:
+                      !dashboardLoading &&
+                      typeof (workflowsTotal ?? workflows?.length ?? 0) ===
+                        "number",
+                    trend:
+                      (workflowsTotal ?? 0) > 0 ? ("up" as const) : undefined,
+                  },
+                  {
+                    label: "Deployments",
+                    value: deployments.length,
+                    sublabel: "Active",
+                    icon: (
+                      <Code className="w-4 h-4 text-[var(--color-primary-mid)]" />
+                    ),
+                    sparkline: sparklineDeployments,
+                    animateValue: true,
+                    trend: deployments.length > 0 ? ("up" as const) : undefined,
+                  },
+                  {
+                    label: "Metrics",
+                    value: dashboardLoading
+                      ? "..."
+                      : typeof metrics?.workflows?.total === "number"
+                        ? metrics.workflows.total
+                        : "-",
+                    sublabel: "From API",
+                    icon: (
+                      <HardDrive className="w-4 h-4 text-[var(--color-semantic-violet)]" />
+                    ),
+                    animateValue:
+                      !dashboardLoading &&
+                      typeof metrics?.workflows?.total === "number",
+                  },
+                  {
+                    label: "Status",
+                    value: hasActiveWorkflows ? "Building" : "Idle",
+                    sublabel: "Platform",
+                    icon: (
+                      <Package className="w-4 h-4 text-[var(--color-semantic-violet)]" />
+                    ),
+                  },
+                ].map((card, i) => (
+                  <motion.div
+                    key={card.label}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.25, delay: i * 0.05 }}
+                  >
+                    <TiltedCard className="h-full overflow-hidden">
+                      <MetricCard
+                        label={card.label}
+                        value={card.value}
+                        sublabel={card.sublabel}
+                        icon={card.icon}
+                        sparklineData={
+                          "sparkline" in card ? card.sparkline : undefined
+                        }
+                        trend={"trend" in card ? card.trend : undefined}
+                        animateValue={
+                          "animateValue" in card ? card.animateValue : undefined
+                        }
+                      />
+                    </TiltedCard>
+                  </motion.div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <ActivityRingCard
+                  label="Workflow completion"
+                  value={`${metrics?.workflows?.completed ?? 0} / ${metrics?.workflows?.total ?? 0}`}
+                  sublabel="Completed vs total"
+                  progress={
+                    metrics?.workflows?.total
+                      ? Math.min(
+                          100,
+                          Math.round(
+                            ((metrics.workflows.completed ?? 0) /
+                              metrics.workflows.total) *
+                              100,
+                          ),
+                        )
+                      : 0
+                  }
+                />
+                <ActivityRingCard
+                  label="Deploy health"
+                  value={`${deployments.filter((d) => ["success", "deployed", "completed"].includes((d.status || "").toLowerCase())).length} ok`}
+                  sublabel="Successful in list"
+                  progress={
+                    deployments.length
+                      ? Math.min(
+                          100,
+                          Math.round(
+                            (deployments.filter((d) =>
+                              ["success", "deployed", "completed"].includes(
+                                (d.status || "").toLowerCase(),
+                              ),
+                            ).length /
+                              deployments.length) *
+                              100,
+                          ),
+                        )
+                      : 0
+                  }
+                />
+                <ActivityRingCard
+                  label="Security"
+                  value={
+                    metrics?.contracts?.verified != null
+                      ? `${metrics.contracts.verified} verified`
+                      : "—"
+                  }
+                  sublabel="Contracts verified"
+                  progress={
+                    metrics?.contracts?.deployed
+                      ? Math.min(
+                          100,
+                          Math.round(
+                            ((metrics.contracts.verified ?? 0) /
+                              metrics.contracts.deployed) *
+                              100,
+                          ),
+                        )
+                      : 0
+                  }
+                />
+              </div>
+
+              <motion.div
+                className="flex flex-wrap gap-2"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: 0.15 }}
+              >
+                <Link
+                  href={ROUTES.HOME}
+                  className="group relative inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] text-xs font-medium text-[var(--color-text-secondary)] hover:border-[var(--color-primary-alpha-30)] hover:text-[var(--color-text-primary)] transition-all overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--color-primary-alpha-10)] to-transparent -translate-x-[100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                  <Rocket className="w-3.5 h-3.5 group-hover:text-[var(--color-primary-light)] transition-colors" />
+                  New Workflow
+                </Link>
+                <Link
+                  href={ROUTES.CONTRACTS}
+                  className="group relative inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] text-xs font-medium text-[var(--color-text-secondary)] hover:border-[var(--color-primary-alpha-30)] hover:text-[var(--color-text-primary)] transition-all overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--color-primary-alpha-10)] to-transparent -translate-x-[100%] group-hover:translate-x-[100%] transition-transform duration-1000 delay-75" />
+                  <FileCode className="w-3.5 h-3.5 group-hover:text-[var(--color-primary-light)] transition-colors" />
+                  View Contracts
+                </Link>
+                <Link
+                  href={ROUTES.SECURITY}
+                  className="group relative inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] text-xs font-medium text-[var(--color-text-secondary)] hover:border-[var(--color-primary-alpha-30)] hover:text-[var(--color-text-primary)] transition-all overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--color-primary-alpha-10)] to-transparent -translate-x-[100%] group-hover:translate-x-[100%] transition-transform duration-1000 delay-150" />
+                  <Shield className="w-3.5 h-3.5 group-hover:text-[var(--color-primary-light)] transition-colors" />
+                  Check Security
+                </Link>
+                <Link
+                  href={ROUTES.HOME}
+                  className="group relative inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] text-xs font-medium text-[var(--color-text-secondary)] hover:border-[var(--color-primary-alpha-30)] hover:text-[var(--color-text-primary)] transition-all overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--color-primary-alpha-10)] to-transparent -translate-x-[100%] group-hover:translate-x-[100%] transition-transform duration-1000 delay-200" />
+                  <MessageSquare className="w-3.5 h-3.5 group-hover:text-[var(--color-primary-light)] transition-colors" />
+                  Open Chat
+                </Link>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: 0.1 }}
+              >
+                <GlowingBorder
+                  active={liveLogs.length > 0}
+                  className="glass-panel rounded-xl overflow-hidden relative border-0"
+                >
+                  <div className="p-4 border-b border-[var(--color-border-subtle)] flex items-center justify-between gap-4">
+                    <div>
+                      <h3 className="font-medium text-[var(--color-text-primary)] text-sm">
+                        Live Log Stream
+                      </h3>
+                      <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">
+                        Recent activity from backend (5 most recent)
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-4 shrink-0">
+                      {liveLogs.length > 0 && (
+                        <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-medium animate-pulse-subtle">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          Live
+                        </span>
+                      )}
+                      <Link
+                        href={ROUTES.MONITORING}
+                        className="text-xs font-medium text-[var(--color-primary-light)] hover:text-[var(--color-primary)] transition-colors flex items-center gap-1"
+                      >
+                        See all <ArrowRight className="w-3 h-3" />
+                      </Link>
+                    </div>
+                  </div>
+                  <Terminal
+                    lines={terminalLines}
+                    noScroll
+                    className="rounded-none border-0 bg-transparent"
+                  />
+                </GlowingBorder>
+              </motion.div>
+
+              <motion.div
+                className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+                initial="hidden"
+                animate="visible"
+                variants={{
+                  visible: { transition: { staggerChildren: 0.08 } },
+                  hidden: {},
+                }}
+              >
+                <motion.div
+                  className="lg:col-span-1 relative"
+                  variants={{
+                    hidden: { opacity: 0, y: 12 },
+                    visible: { opacity: 1, y: 0 },
+                  }}
+                >
+                  <MorphSurface
+                    className="glass-panel border-[var(--color-border-accent)] !bg-[var(--color-bg-panel)]"
+                    header={
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="font-medium text-[var(--color-text-primary)] flex items-center gap-2 text-sm">
+                          <Info className="w-4 h-4 text-[var(--color-primary)]" />
+                          Project Details
+                        </h3>
+                        <LiveIndicator live={hasActiveWorkflows} />
+                      </div>
+                    }
+                    summary={
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center py-2 border-b border-[var(--color-border-subtle)]">
+                          <span className="text-[var(--color-text-tertiary)] text-xs">
+                            Workflows
+                          </span>
+                          <span className="text-[var(--color-text-primary)] text-xs font-medium">
+                            {workflows?.length ?? 0}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-[var(--color-border-subtle)]">
+                          <span className="text-[var(--color-text-tertiary)] text-xs">
+                            Deployments
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-[var(--color-primary-alpha-10)] text-[var(--color-primary-light)] border border-[var(--color-primary-alpha-20)]">
+                            {deployments.length}
+                          </span>
+                        </div>
+                      </div>
+                    }
+                    detail={
+                      <div className="space-y-3 text-xs text-[var(--color-text-tertiary)]">
+                        <div className="flex justify-between items-center py-1">
+                          <span>Surface</span>
+                          <span className="text-[var(--color-text-primary)] font-medium">
+                            Dashboard
+                          </span>
+                        </div>
+                        <p>
+                          Open Chat to drive a live pipeline, or use Workflows
+                          for a list-first view of every run.
+                        </p>
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          <Link
+                            href={ROUTES.HOME}
+                            className="text-[var(--color-primary-light)] hover:underline"
+                          >
+                            Open chat
+                          </Link>
+                          <span className="text-[var(--color-text-dim)]">
+                            ·
+                          </span>
+                          <Link
+                            href={ROUTES.WORKFLOWS}
+                            className="text-[var(--color-primary-light)] hover:underline"
+                          >
+                            All workflows
+                          </Link>
+                        </div>
+                      </div>
                     }
                   />
                 </motion.div>
-              ))}
-            </div>
 
-            <motion.div
-              className="flex flex-wrap gap-2"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25, delay: 0.15 }}
-            >
-              <Link
-                href={ROUTES.HOME}
-                className="group relative inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] text-xs font-medium text-[var(--color-text-secondary)] hover:border-[var(--color-primary-alpha-30)] hover:text-[var(--color-text-primary)] transition-all overflow-hidden"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--color-primary-alpha-10)] to-transparent -translate-x-[100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-                <Rocket className="w-3.5 h-3.5 group-hover:text-[var(--color-primary-light)] transition-colors" />
-                New Workflow
-              </Link>
-              <Link
-                href={ROUTES.CONTRACTS}
-                className="group relative inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] text-xs font-medium text-[var(--color-text-secondary)] hover:border-[var(--color-primary-alpha-30)] hover:text-[var(--color-text-primary)] transition-all overflow-hidden"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--color-primary-alpha-10)] to-transparent -translate-x-[100%] group-hover:translate-x-[100%] transition-transform duration-1000 delay-75" />
-                <FileCode className="w-3.5 h-3.5 group-hover:text-[var(--color-primary-light)] transition-colors" />
-                View Contracts
-              </Link>
-              <Link
-                href={ROUTES.SECURITY}
-                className="group relative inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] text-xs font-medium text-[var(--color-text-secondary)] hover:border-[var(--color-primary-alpha-30)] hover:text-[var(--color-text-primary)] transition-all overflow-hidden"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--color-primary-alpha-10)] to-transparent -translate-x-[100%] group-hover:translate-x-[100%] transition-transform duration-1000 delay-150" />
-                <Shield className="w-3.5 h-3.5 group-hover:text-[var(--color-primary-light)] transition-colors" />
-                Check Security
-              </Link>
-              <Link
-                href={ROUTES.HOME}
-                className="group relative inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] text-xs font-medium text-[var(--color-text-secondary)] hover:border-[var(--color-primary-alpha-30)] hover:text-[var(--color-text-primary)] transition-all overflow-hidden"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--color-primary-alpha-10)] to-transparent -translate-x-[100%] group-hover:translate-x-[100%] transition-transform duration-1000 delay-200" />
-                <MessageSquare className="w-3.5 h-3.5 group-hover:text-[var(--color-primary-light)] transition-colors" />
-                Open Chat
-              </Link>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25, delay: 0.1 }}
-            >
-              <GlowingBorder
-                active={liveLogs.length > 0}
-                className="glass-panel rounded-xl overflow-hidden relative border-0"
-              >
-                <div className="p-4 border-b border-[var(--color-border-subtle)] flex items-center justify-between gap-4">
-                  <div>
-                    <h3 className="font-medium text-[var(--color-text-primary)] text-sm">
-                      Live Log Stream
+                <motion.div
+                  className="glass-panel rounded-xl p-5 lg:col-span-2 flex flex-col h-[320px] relative"
+                  variants={{
+                    hidden: { opacity: 0, y: 12 },
+                    visible: { opacity: 1, y: 0 },
+                  }}
+                >
+                  <LiveIndicator live={hasActiveWorkflows} />
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-medium text-[var(--color-text-primary)] flex items-center gap-2 text-sm">
+                      <Activity className="w-4 h-4 text-[var(--color-primary)]" />
+                      Traffic Overview
                     </h3>
-                    <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">
-                      Recent activity from backend (5 most recent)
-                    </p>
                   </div>
-                  <div className="flex items-center gap-4 shrink-0">
-                    {liveLogs.length > 0 && (
-                      <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-medium animate-pulse-subtle">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        Live
-                      </span>
-                    )}
-                    <Link
-                      href={ROUTES.MONITORING}
-                      className="text-xs font-medium text-[var(--color-primary-light)] hover:text-[var(--color-primary)] transition-colors flex items-center gap-1"
-                    >
-                      See all <ArrowRight className="w-3 h-3" />
-                    </Link>
-                  </div>
-                </div>
-                <Terminal
-                  lines={terminalLines}
-                  noScroll
-                  className="rounded-none border-0 bg-transparent"
-                />
-              </GlowingBorder>
-            </motion.div>
-
-            <motion.div
-              className="grid grid-cols-1 lg:grid-cols-3 gap-6"
-              initial="hidden"
-              animate="visible"
-              variants={{
-                visible: { transition: { staggerChildren: 0.08 } },
-                hidden: {},
-              }}
-            >
-              <motion.div
-                className="glass-panel rounded-xl p-5 lg:col-span-1 flex flex-col relative"
-                variants={{
-                  hidden: { opacity: 0, y: 12 },
-                  visible: { opacity: 1, y: 0 },
-                }}
-              >
-                <LiveIndicator live={hasActiveWorkflows} />
-                <h3 className="font-medium text-[var(--color-text-primary)] mb-4 flex items-center gap-2 text-sm">
-                  <Info className="w-4 h-4 text-[var(--color-primary)]" />
-                  Project Details
-                </h3>
-                <div className="space-y-4 flex-1">
-                  <div className="flex justify-between items-center py-2 border-b border-[var(--color-border-subtle)]">
-                    <span className="text-[var(--color-text-tertiary)] text-xs">
-                      Workflows
-                    </span>
-                    <span className="text-[var(--color-text-primary)] text-xs font-medium">
-                      {workflows?.length ?? 0}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b border-[var(--color-border-subtle)]">
-                    <span className="text-[var(--color-text-tertiary)] text-xs">
-                      Deployments
-                    </span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-[var(--color-primary-alpha-10)] text-[var(--color-primary-light)] border border-[var(--color-primary-alpha-20)]">
-                      {deployments.length}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-[var(--color-text-tertiary)] text-xs">
-                      Mode
-                    </span>
-                    <span className="text-[var(--color-text-primary)] text-xs font-medium">
-                      Dashboard
-                    </span>
-                  </div>
-                </div>
-              </motion.div>
-
-              <motion.div
-                className="glass-panel rounded-xl p-5 lg:col-span-2 flex flex-col h-[320px] relative"
-                variants={{
-                  hidden: { opacity: 0, y: 12 },
-                  visible: { opacity: 1, y: 0 },
-                }}
-              >
-                <LiveIndicator live={hasActiveWorkflows} />
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-medium text-[var(--color-text-primary)] flex items-center gap-2 text-sm">
-                    <Activity className="w-4 h-4 text-[var(--color-primary)]" />
-                    Traffic Overview
-                  </h3>
-                </div>
-                <div className="flex-1 min-h-0 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={trafficData}
-                      margin={{ top: 8, right: 8, bottom: 8, left: 8 }}
-                    >
-                      <defs>
-                        <linearGradient
-                          id="barGrad"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="0%"
-                            stopColor="var(--color-primary-mid)"
-                            stopOpacity={0.9}
-                          />
-                          <stop
-                            offset="100%"
-                            stopColor="var(--color-primary)"
-                            stopOpacity={0.6}
-                          />
-                        </linearGradient>
-                      </defs>
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fontSize: 10, fill: "var(--color-text-muted)" }}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 10, fill: "var(--color-text-muted)" }}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          background: "var(--color-bg-panel)",
-                          border: "1px solid var(--color-border-subtle)",
-                          borderRadius: 8,
-                        }}
-                        labelStyle={{ color: "var(--color-text-primary)" }}
-                        formatter={(val: number | undefined) => [
-                          val ?? 0,
-                          "Count",
-                        ]}
-                      />
-                      <Bar
-                        dataKey="value"
-                        fill="url(#barGrad)"
-                        radius={[4, 4, 0, 0]}
+                  <div className="flex-1 min-h-0 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={trafficData}
+                        margin={{ top: 8, right: 8, bottom: 8, left: 8 }}
                       >
-                        {trafficData.map((_, i) => (
-                          <Cell key={i} className="chart-bar" />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                        <defs>
+                          <linearGradient
+                            id="barGrad"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="0%"
+                              stopColor="var(--color-primary-mid)"
+                              stopOpacity={0.9}
+                            />
+                            <stop
+                              offset="100%"
+                              stopColor="var(--color-primary)"
+                              stopOpacity={0.6}
+                            />
+                          </linearGradient>
+                        </defs>
+                        <XAxis
+                          dataKey="name"
+                          tick={{
+                            fontSize: 10,
+                            fill: "var(--color-text-muted)",
+                          }}
+                        />
+                        <YAxis
+                          tick={{
+                            fontSize: 10,
+                            fill: "var(--color-text-muted)",
+                          }}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            background: "var(--color-bg-panel)",
+                            border: "1px solid var(--color-border-subtle)",
+                            borderRadius: 8,
+                          }}
+                          labelStyle={{ color: "var(--color-text-primary)" }}
+                          formatter={(val: number | undefined) => [
+                            val ?? 0,
+                            "Count",
+                          ]}
+                        />
+                        <Bar
+                          dataKey="value"
+                          fill="url(#barGrad)"
+                          radius={[4, 4, 0, 0]}
+                        >
+                          {trafficData.map((_, i) => (
+                            <Cell key={i} className="chart-bar" />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </motion.div>
               </motion.div>
-            </motion.div>
 
-            <motion.div
-              className="grid grid-cols-1 lg:grid-cols-3 gap-6"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25, delay: 0.18 }}
-            >
-              <div className="glass-panel rounded-xl p-5 lg:col-span-1">
-                <h3 className="font-medium text-[var(--color-text-primary)] flex items-center gap-2 text-sm mb-4">
-                  <Activity className="w-4 h-4 text-[var(--color-primary)]" />
-                  Activity Timeline
-                </h3>
-                <div className="space-y-0 relative overflow-hidden">
-                  <AnimatePresence initial={false}>
-                    {[
-                      ...recentDeployments.slice(0, 3).map((d) => ({
-                        type: "deploy" as const,
-                        label: `Contract deployed`,
-                        detail: `${d.network ?? "?"} · ${(d.contractAddress ?? "-").slice(0, 8)}...`,
-                        icon: CheckCircle,
-                      })),
-                      ...workflows.slice(0, 2).map((w) => ({
-                        type: "workflow" as const,
-                        label: "Workflow started",
-                        detail:
-                          w.intent?.slice(0, 30) ??
-                          w.workflow_id?.slice(0, 8) ??
-                          "-",
-                        icon: PlayCircle,
-                      })),
-                    ]
-                      .slice(0, 5)
-                      .map((ev, i) => {
-                        const Icon = ev.icon;
-                        return (
-                          <motion.div
-                            key={`${ev.type}-${ev.detail}-${i}`}
-                            initial={{ height: 0, opacity: 0, scale: 0.95 }}
-                            animate={{ height: "auto", opacity: 1, scale: 1 }}
-                            exit={{ height: 0, opacity: 0, scale: 0.95 }}
-                            transition={{
-                              type: "spring",
-                              bounce: 0,
-                              duration: 0.4,
-                            }}
-                            className="flex gap-3 py-2 border-b border-[var(--color-border-subtle)] last:border-0 overflow-hidden"
-                          >
-                            <div className="shrink-0 w-6 h-6 rounded-full bg-[var(--color-primary-alpha-15)] flex items-center justify-center mt-1">
-                              <Icon className="w-3 h-3 text-[var(--color-primary-light)]" />
-                            </div>
-                            <div className="min-w-0 py-1">
-                              <p className="text-xs font-medium text-[var(--color-text-primary)]">
-                                {ev.label}
-                              </p>
-                              <p className="text-[10px] text-[var(--color-text-muted)] truncate">
-                                {ev.detail}
-                              </p>
-                            </div>
-                          </motion.div>
-                        );
-                      })}
-                  </AnimatePresence>
-                  {recentDeployments.length === 0 && workflows.length === 0 && (
-                    <p className="text-xs text-[var(--color-text-muted)] py-4">
-                      No recent activity
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div className="glass-panel rounded-xl overflow-hidden lg:col-span-2">
-                <div className="p-5 border-b border-[var(--color-border-subtle)] flex items-center justify-between">
-                  <h3 className="font-medium text-[var(--color-text-primary)] flex items-center gap-2 text-sm">
-                    <List className="w-4 h-4 text-[var(--color-primary)]" />
-                    Recent Deployments
+              <motion.div
+                className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: 0.18 }}
+              >
+                <div className="glass-panel rounded-xl p-5 lg:col-span-1">
+                  <h3 className="font-medium text-[var(--color-text-primary)] flex items-center gap-2 text-sm mb-4">
+                    <Activity className="w-4 h-4 text-[var(--color-primary)]" />
+                    Activity Timeline
                   </h3>
-                  <Link
-                    href={ROUTES.DEPLOYMENTS}
-                    className="text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] text-xs flex items-center gap-1 transition-colors"
-                  >
-                    View All <ArrowRight className="w-3 h-3" />
-                  </Link>
+                  <div className="space-y-0 relative overflow-hidden">
+                    <AnimatePresence initial={false}>
+                      {[
+                        ...recentDeployments.slice(0, 3).map((d) => ({
+                          type: "deploy" as const,
+                          label: `Contract deployed`,
+                          detail: `${d.network ?? "?"} · ${(d.contractAddress ?? "-").slice(0, 8)}...`,
+                          icon: CheckCircle,
+                        })),
+                        ...workflows.slice(0, 2).map((w) => ({
+                          type: "workflow" as const,
+                          label: "Workflow started",
+                          detail:
+                            w.intent?.slice(0, 30) ??
+                            w.workflow_id?.slice(0, 8) ??
+                            "-",
+                          icon: PlayCircle,
+                        })),
+                      ]
+                        .slice(0, 5)
+                        .map((ev, i) => {
+                          const Icon = ev.icon;
+                          return (
+                            <motion.div
+                              key={`${ev.type}-${ev.detail}-${i}`}
+                              initial={{ height: 0, opacity: 0, scale: 0.95 }}
+                              animate={{ height: "auto", opacity: 1, scale: 1 }}
+                              exit={{ height: 0, opacity: 0, scale: 0.95 }}
+                              transition={{
+                                type: "spring",
+                                bounce: 0,
+                                duration: 0.4,
+                              }}
+                              className="flex gap-3 py-2 border-b border-[var(--color-border-subtle)] last:border-0 overflow-hidden"
+                            >
+                              <div className="shrink-0 w-6 h-6 rounded-full bg-[var(--color-primary-alpha-15)] flex items-center justify-center mt-1">
+                                <Icon className="w-3 h-3 text-[var(--color-primary-light)]" />
+                              </div>
+                              <div className="min-w-0 py-1">
+                                <p className="text-xs font-medium text-[var(--color-text-primary)]">
+                                  {ev.label}
+                                </p>
+                                <p className="text-[10px] text-[var(--color-text-muted)] truncate">
+                                  {ev.detail}
+                                </p>
+                              </div>
+                            </motion.div>
+                          );
+                        })}
+                    </AnimatePresence>
+                    {recentDeployments.length === 0 &&
+                      workflows.length === 0 && (
+                        <p className="text-xs text-[var(--color-text-muted)] py-4">
+                          No recent activity
+                        </p>
+                      )}
+                  </div>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="text-[11px] text-[var(--color-text-muted)] uppercase tracking-wider bg-[var(--color-bg-surface)]/50 border-b border-[var(--color-border-subtle)]">
-                        <th className="px-6 py-3 font-medium">Network</th>
-                        <th className="px-6 py-3 font-medium">Status</th>
-                        <th className="px-6 py-3 font-medium">Contract</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-xs divide-y divide-[var(--color-border-subtle)]">
-                      {dashboardLoading ? (
-                        <tr>
-                          <td
-                            colSpan={3}
-                            className="px-6 py-8 text-center text-[var(--color-text-muted)]"
+                <div className="glass-panel rounded-xl overflow-hidden lg:col-span-2">
+                  <div className="p-5 border-b border-[var(--color-border-subtle)] flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <h3 className="font-medium text-[var(--color-text-primary)] flex items-center gap-2 text-sm">
+                      <List className="w-4 h-4 text-[var(--color-primary)]" />
+                      Recent Deployments
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <TableFilterBar className="border-0 bg-transparent p-0 gap-1.5">
+                        {(
+                          [
+                            ["all", "All"],
+                            ["ok", "Healthy"],
+                            ["bad", "Issues"],
+                          ] as const
+                        ).map(([id, label]) => (
+                          <button
+                            key={id}
+                            type="button"
+                            onClick={() => setDeployTableFilter(id)}
+                            className={`rounded-lg px-2.5 py-1 text-[10px] font-medium border transition-colors ${
+                              deployTableFilter === id
+                                ? "border-[var(--color-primary)] bg-[var(--color-primary-alpha-15)] text-[var(--color-primary-light)]"
+                                : "border-[var(--color-border-subtle)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)]"
+                            }`}
                           >
-                            Loading deployments...
-                          </td>
+                            {label}
+                          </button>
+                        ))}
+                      </TableFilterBar>
+                      <Link
+                        href={ROUTES.DEPLOYMENTS}
+                        className="text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] text-xs flex items-center gap-1 transition-colors shrink-0"
+                      >
+                        View All <ArrowRight className="w-3 h-3" />
+                      </Link>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="text-[11px] text-[var(--color-text-muted)] uppercase tracking-wider bg-[var(--color-bg-surface)]/50 border-b border-[var(--color-border-subtle)]">
+                          <th className="px-6 py-3 font-medium">Network</th>
+                          <th className="px-6 py-3 font-medium">Status</th>
+                          <th className="px-6 py-3 font-medium">Contract</th>
                         </tr>
-                      ) : recentDeployments.length === 0 ? (
-                        <tr>
-                          <td
-                            colSpan={3}
-                            className="px-6 py-8 text-center text-[var(--color-text-tertiary)]"
-                          >
-                            No deployments yet.
-                          </td>
-                        </tr>
-                      ) : (
-                        recentDeployments.map((d) => (
-                          <tr
-                            key={d.id}
-                            className="group hover:bg-[var(--color-bg-panel)] transition-colors"
-                          >
-                            <td className="px-6 py-4 font-mono text-[var(--color-text-secondary)] flex items-center gap-2">
-                              <GitBranch className="w-3 h-3 text-[var(--color-text-dim)]" />{" "}
-                              {d.network ?? "-"}
-                            </td>
-                            <td className="px-6 py-4">
-                              <StatusBadge status={d.status} />
-                            </td>
-                            <td className="px-6 py-4 text-[var(--color-text-tertiary)] font-mono text-[10px] truncate max-w-[120px]">
-                              {d.contractAddress ?? "-"}
+                      </thead>
+                      <tbody className="text-xs divide-y divide-[var(--color-border-subtle)]">
+                        {dashboardLoading ? (
+                          <tr>
+                            <td
+                              colSpan={3}
+                              className="px-6 py-8 text-center text-[var(--color-text-muted)]"
+                            >
+                              Loading deployments...
                             </td>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+                        ) : filteredRecentDeployments.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={3}
+                              className="px-6 py-8 text-center text-[var(--color-text-tertiary)]"
+                            >
+                              {recentDeployments.length === 0
+                                ? "No deployments yet."
+                                : "No deployments match this filter."}
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredRecentDeployments.map((d) => (
+                            <tr
+                              key={d.id}
+                              className="group hover:bg-[var(--color-bg-panel)] transition-colors"
+                            >
+                              <td className="px-6 py-4 font-mono text-[var(--color-text-secondary)] flex items-center gap-2">
+                                <GitBranch className="w-3 h-3 text-[var(--color-text-dim)]" />{" "}
+                                {d.network ?? "-"}
+                              </td>
+                              <td className="px-6 py-4">
+                                <StatusBadge status={d.status} />
+                              </td>
+                              <td className="px-6 py-4 text-[var(--color-text-tertiary)] font-mono text-[10px] truncate max-w-[120px]">
+                                {d.contractAddress ?? "-"}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
+              </motion.div>
+            </div>
           </div>
         </div>
-      </div>
+      </FeatureErrorBoundary>
     </RequireApiSession>
   );
 }

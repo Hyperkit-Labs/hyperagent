@@ -17,6 +17,12 @@ function tracingMatchers(): Array<
     { match: /^https?:\/\/localhost:4000/, propagatorTypes: ["datadog"] },
     { match: /^https?:\/\/127\.0\.0\.1:4000/, propagatorTypes: ["datadog"] },
   ];
+  if (typeof window !== "undefined" && window.location?.origin) {
+    out.push({
+      match: window.location.origin,
+      propagatorTypes: ["datadog"],
+    });
+  }
   const api = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (!api) return out;
   try {

@@ -1,5 +1,35 @@
 const INIT_FLAG = "__hyperagent_dd_rum_init__";
 const INIT_STARTED = "__hyperagent_dd_rum_started__";
+const SKIPPED_FLAG = "__hyperagent_dd_rum_skipped__";
+
+type RumReadyListener = () => void;
+const rumReadyListeners = new Set<RumReadyListener>();
+
+/** Run after RUM `init` succeeds (or immediately if already initialized). */
+export function onDatadogRumReady(cb: RumReadyListener): () => void {
+  if (typeof window === "undefined") return () => {};
+  const w = window as unknown as Record<string, boolean>;
+  if (w[SKIPPED_FLAG]) return () => {};
+  if (w[INIT_FLAG]) {
+    queueMicrotask(cb);
+    return () => {};
+  }
+  rumReadyListeners.add(cb);
+  return () => {
+    rumReadyListeners.delete(cb);
+  };
+}
+
+function flushRumReadyListeners(): void {
+  for (const cb of rumReadyListeners) {
+    try {
+      cb();
+    } catch {
+      /* listener errors should not break RUM */
+    }
+  }
+  rumReadyListeners.clear();
+}
 
 function parseSampleRate(raw: string | undefined, fallback: number): number {
   if (raw == null || raw === "") return fallback;
@@ -38,11 +68,13 @@ function tracingMatchers(): Array<
 export function initDatadogBrowserRum(): void {
   if (typeof window === "undefined") return;
   const w = window as unknown as Record<string, boolean>;
-  if (w[INIT_FLAG] || w[INIT_STARTED]) return;
+  if (w[SKIPPED_FLAG] || w[INIT_FLAG] || w[INIT_STARTED]) return;
 
   const applicationId = process.env.NEXT_PUBLIC_DD_RUM_APPLICATION_ID?.trim();
   const clientToken = process.env.NEXT_PUBLIC_DD_RUM_CLIENT_TOKEN?.trim();
   if (!applicationId || !clientToken) {
+    w[SKIPPED_FLAG] = true;
+    rumReadyListeners.clear();
     if (process.env.NEXT_PUBLIC_DD_RUM_DEBUG === "1") {
       console.warn(
         "[Datadog RUM] skipped: NEXT_PUBLIC_DD_RUM_APPLICATION_ID or NEXT_PUBLIC_DD_RUM_CLIENT_TOKEN empty at build time",
@@ -90,12 +122,17 @@ export function initDatadogBrowserRum(): void {
           allowedTracingUrls: tracingMatchers(),
         });
         w[INIT_FLAG] = true;
+        flushRumReadyListeners();
         if (process.env.NEXT_PUBLIC_DD_RUM_DEBUG === "1") {
           console.info("[Datadog RUM] initialized", { site, service, env });
         }
       } catch (e) {
         console.error("[Datadog RUM] init failed", e);
+        rumReadyListeners.clear();
       }
     })
-    .catch((e) => console.error("[Datadog RUM] load failed", e));
+    .catch((e) => {
+      console.error("[Datadog RUM] load failed", e);
+      rumReadyListeners.clear();
+    });
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { ApiAuthProvider } from "@/components/providers/ApiAuthProvider";
 import { ConfigProvider } from "@/components/providers/ConfigProvider";
 import { SessionProvider } from "@/components/providers/SessionProvider";
@@ -9,10 +10,16 @@ import { SelectedNetworkProvider } from "@/components/providers/SelectedNetworkP
 import { PipelineStateProvider } from "@/components/providers/PipelineStateProvider";
 import { ThirdwebProviderWrapper } from "@/components/providers/ThirdwebProviderWrapper";
 import { WalletAuthProvider } from "@/components/providers/WalletAuthContext";
+import { StudioErrorBoundary } from "@/components/providers/StudioErrorBoundary";
 import { LayoutSwitcher } from "@/components/layout/LayoutSwitcher";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
-import { Analytics } from "@vercel/analytics/next";
 import { DatadogRumInit } from "@/components/providers/DatadogRumInit";
+
+const VercelAnalytics = dynamic(
+  () => import("@vercel/analytics/next").then((m) => m.Analytics),
+  { ssr: false },
+);
 
 /**
  * Single client boundary for all providers. Ensures ThirdwebProvider wraps
@@ -23,27 +30,31 @@ import { DatadogRumInit } from "@/components/providers/DatadogRumInit";
  */
 export function ClientProviders({ children }: { children: React.ReactNode }) {
   return (
-    <ThirdwebProviderWrapper>
-      <WalletAuthProvider>
-        <SessionProvider>
-          <ConfigProvider>
-            <ApiAuthProvider>
-              <NetworksProvider>
-                <SelectedNetworkProvider>
-                  <PipelineStateProvider>
-                    <LayoutProvider>
-                      <LayoutSwitcher>{children}</LayoutSwitcher>
-                    </LayoutProvider>
-                  </PipelineStateProvider>
-                </SelectedNetworkProvider>
-              </NetworksProvider>
-              <Toaster position="top-right" richColors />
-              <DatadogRumInit />
-              <Analytics />
-            </ApiAuthProvider>
-          </ConfigProvider>
-        </SessionProvider>
-      </WalletAuthProvider>
-    </ThirdwebProviderWrapper>
+    <StudioErrorBoundary>
+      <ThirdwebProviderWrapper>
+        <WalletAuthProvider>
+          <SessionProvider>
+            <ConfigProvider>
+              <ApiAuthProvider>
+                <NetworksProvider>
+                  <SelectedNetworkProvider>
+                    <PipelineStateProvider>
+                      <LayoutProvider>
+                        <TooltipProvider delayDuration={300}>
+                          <LayoutSwitcher>{children}</LayoutSwitcher>
+                        </TooltipProvider>
+                      </LayoutProvider>
+                    </PipelineStateProvider>
+                  </SelectedNetworkProvider>
+                </NetworksProvider>
+                <Toaster position="top-right" richColors />
+                <DatadogRumInit />
+                <VercelAnalytics />
+              </ApiAuthProvider>
+            </ConfigProvider>
+          </SessionProvider>
+        </WalletAuthProvider>
+      </ThirdwebProviderWrapper>
+    </StudioErrorBoundary>
   );
 }

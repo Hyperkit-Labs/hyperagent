@@ -384,6 +384,38 @@ input[type="number"] {
   }
 }
 
+@keyframes grid-beam-shift-h {
+  0%,
+  100% {
+    transform: translateX(-18%);
+    opacity: 0.45;
+  }
+  50% {
+    transform: translateX(18%);
+    opacity: 0.95;
+  }
+}
+
+@keyframes grid-beam-shift-v {
+  0%,
+  100% {
+    transform: translateY(-18%);
+    opacity: 0.45;
+  }
+  50% {
+    transform: translateY(18%);
+    opacity: 0.95;
+  }
+}
+
+.animate-grid-beam-h {
+  animation: grid-beam-shift-h 5s ease-in-out infinite;
+}
+
+.animate-grid-beam-v {
+  animation: grid-beam-shift-v 5s ease-in-out infinite;
+}
+
 .animate-pulse-slow {
   animation: pulse-subtle 3s infinite ease-in-out;
 }
@@ -544,4 +576,77 @@ input[type="number"] {
 }
 .animate-shine {
   animation: shine linear infinite;
+}
+
+@keyframes logo-marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-logo-marquee {
+  animation: logo-marquee linear infinite;
+}
+
+.mask-linear-fade {
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    black 6%,
+    black 94%,
+    transparent
+  );
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent,
+    black 6%,
+    black 94%,
+    transparent
+  );
+}
+
+@keyframes fault-scan {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(4px);
+  }
+}
+
+.animate-fault-scan {
+  animation: fault-scan 6s linear infinite;
+}
+
+@keyframes fault-flicker {
+  0%,
+  100% {
+    opacity: 0.03;
+    background: transparent;
+  }
+  50% {
+    opacity: 0.12;
+    background: rgba(255, 0, 80, 0.04);
+  }
+}
+
+.animate-fault-flicker {
+  animation: fault-flicker 4s steps(2) infinite;
+}
+
+@keyframes starter-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-starter-bounce {
+  animation: starter-bounce 2.2s ease-in-out infinite;
 }

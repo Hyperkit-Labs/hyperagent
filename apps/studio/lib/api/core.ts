@@ -29,8 +29,11 @@ export const getDocsUrl = (): string => {
 /** Request timeout (ms). */
 const API_REQUEST_TIMEOUT_MS = 10000;
 
-/** Longer timeout for BYOK (Settings llm-keys). */
-export const BYOK_REQUEST_TIMEOUT_MS = 20000;
+/** Longer timeout for BYOK (Settings llm-keys); gateway + KMS can exceed 20s under load. */
+export const BYOK_REQUEST_TIMEOUT_MS = 35000;
+
+/** GET /config bootstrap: cold gateway or upstream can exceed the default 10s. */
+export const CONFIG_BOOTSTRAP_TIMEOUT_MS = 45000;
 
 export const API_UNREACHABLE_MESSAGE =
   "Backend unreachable. Check that the API is running and NEXT_PUBLIC_API_URL is correct.";

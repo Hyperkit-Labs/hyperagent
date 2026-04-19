@@ -326,8 +326,9 @@ jobs:
         run: pnpm --filter hyperagent-studio run build
         env:
           NEXT_TELEMETRY_DISABLED: '1'
-          NEXT_PUBLIC_API_URL: 'http://127.0.0.1:4000'
+          NEXT_PUBLIC_API_URL: 'https://api.example.test/api/v1'
           NEXT_PUBLIC_THIRDWEB_CLIENT_ID: 'ci-test-client-id'
+          NEXT_PUBLIC_ENV: 'staging'
       
       - name: Install Playwright browsers
         run: pnpm --filter hyperagent-studio exec playwright install --with-deps chromium

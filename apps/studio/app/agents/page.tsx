@@ -17,13 +17,19 @@ import {
   FileText,
   Folder,
   X,
+  Layers,
 } from "lucide-react";
 import { useAgents } from "@/hooks/useAgents";
 import { useMetrics } from "@/hooks/useMetrics";
 import { ROUTES } from "@/constants/routes";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { ShimmerGrid } from "@/components/ai-elements";
-import { EmptyState, RadialProgress } from "@/components/ui";
+import {
+  EmptyState,
+  RadialProgress,
+  TeamSelector,
+  type TeamSelectorMember,
+} from "@/components/ui";
 import { PageTitle } from "@/components/layout/PageTitle";
 
 type AgentCategory = "all" | "generators" | "auditors" | "deployers";
@@ -110,12 +116,35 @@ export default function AgentsPage() {
     return list;
   }, [agents, search, category]);
 
-  const categories: { id: AgentCategory; label: string }[] = [
-    { id: "all", label: "All" },
-    { id: "generators", label: "Generators" },
-    { id: "auditors", label: "Auditors" },
-    { id: "deployers", label: "Deployers" },
-  ];
+  const teamMembers: TeamSelectorMember[] = useMemo(
+    () => [
+      {
+        id: "all",
+        label: "All",
+        sublabel: "Full registry",
+        icon: <Layers className="w-4 h-4 text-[var(--color-primary-light)]" />,
+      },
+      {
+        id: "generators",
+        label: "Generators",
+        sublabel: "Spec & code",
+        icon: <BrainCircuit className="w-4 h-4" />,
+      },
+      {
+        id: "auditors",
+        label: "Auditors",
+        sublabel: "Security",
+        icon: <ShieldCheck className="w-4 h-4" />,
+      },
+      {
+        id: "deployers",
+        label: "Deployers",
+        sublabel: "Ship",
+        icon: <Rocket className="w-4 h-4" />,
+      },
+    ],
+    [],
+  );
 
   const selectedAgent = useMemo(
     () =>
@@ -165,22 +194,12 @@ export default function AgentsPage() {
                   />
                 </div>
                 <div className="h-6 w-px bg-[var(--color-border-subtle)] mx-1" />
-                <div className="flex gap-2">
-                  {categories.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => setCategory(c.id)}
-                      className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
-                        category === c.id
-                          ? "bg-[var(--color-bg-hover)] text-[var(--color-text-primary)] border-[var(--color-border-subtle)]"
-                          : "text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)] border-transparent"
-                      }`}
-                    >
-                      {c.label}
-                    </button>
-                  ))}
-                </div>
+                <TeamSelector
+                  members={teamMembers}
+                  selectedId={category}
+                  onSelect={(id) => setCategory(id as AgentCategory)}
+                  className="gap-1.5"
+                />
                 <div className="flex-1" />
                 <div className="flex items-center gap-1">
                   <button

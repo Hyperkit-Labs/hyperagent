@@ -30,6 +30,10 @@ if (loadRepoDotenv) {
 const isProduction = process.env.NODE_ENV === "production";
 const isStaging = (process.env.NODE_ENV as string) === "staging";
 
+const assetPrefixRaw = process.env.NEXT_PUBLIC_ASSET_PREFIX?.trim() ?? "";
+const assetPrefix =
+  assetPrefixRaw.length > 0 ? assetPrefixRaw.replace(/\/$/, "") : undefined;
+
 // Guard fires on ANY production build (Vercel, CI, Docker, local next build).
 // The earlier guard was Vercel-only, which meant a local/CI `next build` with a
 // localhost value loaded from repo `.env` would silently bundle that address.
@@ -74,6 +78,8 @@ if (isProduction || isStaging) {
 }
 
 const nextConfig: NextConfig = {
+  ...(assetPrefix ? { assetPrefix } : {}),
+
   // MSW (tests) pulls in pure-ESM packages; Next/Jest only transpiles listed packages.
   transpilePackages: ["msw", "until-async"],
 
@@ -85,6 +91,9 @@ const nextConfig: NextConfig = {
       "@headlessui/react",
       "@heroicons/react",
       "framer-motion",
+      "@tanstack/react-query",
+      "sonner",
+      "@ai-sdk/react",
     ],
   },
 

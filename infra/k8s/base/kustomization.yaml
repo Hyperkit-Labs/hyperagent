@@ -5,7 +5,9 @@ resources:
   - namespace.yaml
   - configmap-placeholder.yaml
   - api-gateway-deployment.yaml
+  - api-gateway-hpa.yaml
   - orchestrator-deployment.yaml
+  - orchestrator-hpa.yaml
 labels:
   - includeSelectors: true
     pairs:

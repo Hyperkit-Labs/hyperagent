@@ -24,6 +24,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { jwtVerify } from "jose";
 import { getApiBase } from "@/lib/api";
+import { tagActiveRootSpanWithRumSession } from "@/lib/datadogTraceContext";
 import { validateInput as guardrailValidateInput } from "@/lib/input-guardrail";
 import { FALLBACK_DEFAULT_NETWORK_ID } from "@/constants/defaults";
 
@@ -262,6 +263,7 @@ export async function POST(req: Request) {
   let parsed: {
     messages: Array<{ role: string; content: string | unknown }>;
     network?: string;
+    datadogRumSessionId?: string;
   };
   try {
     parsed = await req.json();
@@ -273,6 +275,15 @@ export async function POST(req: Request) {
   }
 
   const { messages: uiMessages, network: bodyNetwork } = parsed;
+  const datadogRumSessionId =
+    typeof parsed.datadogRumSessionId === "string"
+      ? parsed.datadogRumSessionId.trim()
+      : undefined;
+  const rumFromHeader =
+    req.headers.get("x-datadog-rum-session-id")?.trim() ?? undefined;
+  const effectiveRumSession = datadogRumSessionId || rumFromHeader;
+  await tagActiveRootSpanWithRumSession(effectiveRumSession);
+
   const lastMessage = uiMessages?.[uiMessages.length - 1];
   const content = normalizeContent(lastMessage?.content);
 
@@ -314,6 +325,7 @@ export async function POST(req: Request) {
     try {
       const streamResult = streamText({
         model: resolved.model,
+        experimental_telemetry: { isEnabled: true },
         system:
           "You are a helpful assistant for the HyperAgent smart contract platform. Be concise and professional. When users ask to create a workflow or smart contract, use the create_workflow tool.",
         messages: uiMessages.map(toModelMessage),

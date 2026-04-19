@@ -15,6 +15,7 @@ import { LayoutSwitcher } from "@/components/layout/LayoutSwitcher";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
 import { DatadogRumInit } from "@/components/providers/DatadogRumInit";
+import { DatadogRumUserContext } from "@/components/providers/DatadogRumUserContext";
 
 const VercelAnalytics = dynamic(
   () => import("@vercel/analytics/next").then((m) => m.Analytics),
@@ -49,6 +50,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
                 </NetworksProvider>
                 <Toaster position="top-right" richColors />
                 <DatadogRumInit />
+                <DatadogRumUserContext />
                 <VercelAnalytics />
               </ApiAuthProvider>
             </ConfigProvider>

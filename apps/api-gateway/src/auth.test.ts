@@ -77,6 +77,20 @@ describe("authMiddleware", () => {
     expect(payload.body).toBeUndefined();
   });
 
+  it("allows legacy /config and /platform/track-record without Authorization", () => {
+    const a = runAuth("/config");
+    expect(a.next).toHaveBeenCalledOnce();
+    const b = runAuth("/platform/track-record");
+    expect(b.next).toHaveBeenCalledOnce();
+  });
+
+  it("allows legacy /networks and /tokens/stablecoins without Authorization", () => {
+    const a = runAuth("/networks");
+    expect(a.next).toHaveBeenCalledOnce();
+    const b = runAuth("/tokens/stablecoins");
+    expect(b.next).toHaveBeenCalledOnce();
+  });
+
   it("rejects protected paths without Authorization", () => {
     const { next, payload } = runAuth("/api/v1/workflows");
     expect(next).not.toHaveBeenCalled();

@@ -1,12 +1,13 @@
 /**
  * HyperAgent API Gateway
- * Versioned proxy /api/v1 to orchestrator; legacy /run, /runs.
+ * Proxies `/api/v1` (and legacy mounts) to the orchestrator. Express strips the
+ * mount prefix before the proxy; `createOrchestratorStripMountProxy` rewrites the
+ * path so upstream sees `/api/v1/...` as FastAPI routers expect.
  * Required: JWT auth (AUTH_JWT_SECRET), Upstash REST rate limit (UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN). Security is mandatory.
  */
 import "./load-env.js";
 import cors from "cors";
 import express, { NextFunction } from "express";
-import { createProxyMiddleware } from "http-proxy-middleware";
 import { requestIdMiddleware, type RequestWithId } from "./requestId.js";
 import { otelRequestSpanMiddleware, validateRequiredSecrets } from "@hyperagent/backend-middleware";
 import { log } from "./logger.js";
@@ -14,7 +15,10 @@ import { authMiddleware, type RequestWithUser } from "./auth.js";
 import { rateLimitMiddleware, hasRestRateLimitEnv } from "./rateLimit.js";
 import { authBootstrapHandler } from "./authBootstrap.js";
 import { byokRouter } from "./byok.js";
-import { createProxyOptions } from "./proxy.js";
+import {
+  createOrchestratorLegacyMountProxy,
+  createOrchestratorStripMountProxy,
+} from "./proxy.js";
 import { healthHandler } from "./health.js";
 import { meteringMiddleware } from "./metering.js";
 import { x402GatewayMiddleware } from "./x402.js";
@@ -31,6 +35,10 @@ validateRequiredSecrets(
   [Env.AUTH_JWT_SECRET, Env.SUPABASE_URL, Env.SUPABASE_SERVICE_KEY],
   "api-gateway",
 );
+
+if (gw.isProduction && gw.billing.x402EnabledForHints) {
+  validateRequiredSecrets([Env.MERCHANT_WALLET_ADDRESS], "api-gateway (x402)");
+}
 
 if (gw.isProduction && !hasRestRateLimitEnv()) {
   log.fatal("Production requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN for rate limiting");
@@ -107,14 +115,219 @@ app.post("/api/v1/auth/bootstrap", jsonParser, (req, res, next) => {
 });
 app.use("/api/v1/byok", jsonParser, byokRouter);
 
-const proxyOpts = () => createProxyOptions(gw.orchestratorUrl, gw.proxyTimeoutMs);
+/** Legacy paths without `/api/v1` (old clients or internal probes) → orchestrator versioned routes. */
+app.use(
+  "/config",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/config",
+  ),
+);
+app.use(
+  "/platform/track-record",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/platform/track-record",
+  ),
+);
+app.use(
+  "/workspaces",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/workspaces",
+  ),
+);
+app.use(
+  "/workflows",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/workflows",
+  ),
+);
+app.use(
+  "/agent-registry",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/agent-registry",
+  ),
+);
+app.use(
+  "/a2a",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/a2a",
+  ),
+);
+app.use(
+  "/erc8004",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/erc8004",
+  ),
+);
+app.use(
+  "/user-templates",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/user-templates",
+  ),
+);
+app.use(
+  "/artifacts",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/artifacts",
+  ),
+);
+/** e.g. `/streaming/workflows/:id/code` → `/api/v1/streaming/workflows/...` */
+app.use(
+  "/streaming",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/streaming",
+  ),
+);
+/** Registry + ops paths when clients omit `/api/v1` (matches Studio’s versioned calls). */
+app.use(
+  "/presets",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/presets",
+  ),
+);
+app.use(
+  "/blueprints",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/blueprints",
+  ),
+);
+app.use(
+  "/templates",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/templates",
+  ),
+);
+app.use(
+  "/networks",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/networks",
+  ),
+);
+app.use(
+  "/agents",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/agents",
+  ),
+);
+app.use(
+  "/contracts",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/contracts",
+  ),
+);
+app.use(
+  "/logs",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/logs",
+  ),
+);
+app.use(
+  "/metrics",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/metrics",
+  ),
+);
+app.use(
+  "/security",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/security",
+  ),
+);
+app.use(
+  "/pricing",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/pricing",
+  ),
+);
+app.use(
+  "/tokens",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/tokens",
+  ),
+);
+app.use(
+  "/infra",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/infra",
+  ),
+);
+app.use(
+  "/quick-demo",
+  createOrchestratorLegacyMountProxy(
+    gw.orchestratorUrl,
+    gw.proxyTimeoutMs,
+    "/api/v1/quick-demo",
+  ),
+);
 
-app.use("/api/v1", createProxyMiddleware(proxyOpts()));
-app.use("/run", createProxyMiddleware(proxyOpts()));
-app.use("/runs", createProxyMiddleware(proxyOpts()));
-app.use("/api", createProxyMiddleware(proxyOpts()));
-app.use("/docs", createProxyMiddleware(proxyOpts()));
-app.use("/openapi.json", createProxyMiddleware(proxyOpts()));
+/** Strip-mount proxies: Express removes the mount prefix; orchestrator expects full paths (e.g. `/api/v1/...`). */
+app.use(
+  "/api/v1",
+  createOrchestratorStripMountProxy(gw.orchestratorUrl, gw.proxyTimeoutMs, "/api/v1"),
+);
+app.use(
+  "/run",
+  createOrchestratorStripMountProxy(gw.orchestratorUrl, gw.proxyTimeoutMs, "/run"),
+);
+app.use(
+  "/runs",
+  createOrchestratorStripMountProxy(gw.orchestratorUrl, gw.proxyTimeoutMs, "/api/v1/runs"),
+);
+app.use(
+  "/api",
+  createOrchestratorStripMountProxy(gw.orchestratorUrl, gw.proxyTimeoutMs, "/api"),
+);
+app.use(
+  "/docs",
+  createOrchestratorStripMountProxy(gw.orchestratorUrl, gw.proxyTimeoutMs, "/docs"),
+);
+app.use(
+  "/openapi.json",
+  createOrchestratorStripMountProxy(gw.orchestratorUrl, gw.proxyTimeoutMs, "/openapi.json"),
+);
 
 app.use((err: unknown, req: RequestWithId, res: express.Response, _next: NextFunction) => {
   const msg = err instanceof Error ? err.message : String(err);

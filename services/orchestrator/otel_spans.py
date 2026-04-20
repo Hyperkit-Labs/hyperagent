@@ -55,9 +55,15 @@ def _get_tracer():  # type: ignore[no-untyped-def]
                     OTLPSpanExporter,
                 )
 
+                exporter = OTLPSpanExporter(endpoint=endpoint, timeout=3)
                 provider = TracerProvider()
                 provider.add_span_processor(
-                    BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint))
+                    BatchSpanProcessor(
+                        exporter,
+                        max_export_batch_size=128,
+                        schedule_delay_millis=5000,
+                        export_timeout_millis=3000,
+                    )
                 )
                 trace.set_tracer_provider(provider)
             except ImportError:

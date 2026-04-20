@@ -5,6 +5,10 @@
  */
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import {
+  GATEWAY_DEV_ONLY_PUBLIC_PATHS,
+  GATEWAY_PUBLIC_PATHS,
+} from "@hyperagent/api-contracts";
 import { getGatewayEnv } from "@hyperagent/config";
 import { log } from "./logger.js";
 
@@ -21,22 +25,9 @@ function normalizePath(input: string): string {
   return trimmed || "/";
 }
 
-const PUBLIC_PATHS = new Set([
-  "/",
-  "/health",
-  "/health/live",
-  "/api/v1/health",
-  "/api/v1/health/live",
-  "/auth/bootstrap",
-  "/api/v1/auth/bootstrap",
-  "/api/v1/config",
-  "/api/v1/networks",
-  "/api/v1/tokens/stablecoins",
-  "/api/v1/platform/track-record",
-]);
+const PUBLIC_PATHS = new Set<string>(GATEWAY_PUBLIC_PATHS);
 
-/** Dev-only paths: excluded from PUBLIC_PATHS in production to avoid leaking debug info. */
-const DEV_ONLY_PUBLIC_PATHS = new Set(["/api/v1/config/integrations-debug"]);
+const DEV_ONLY_PUBLIC_PATHS = new Set<string>(GATEWAY_DEV_ONLY_PUBLIC_PATHS);
 
 function isPublicPathFromReq(req: Request): boolean {
   const candidates = [

@@ -72,6 +72,12 @@ pipeline_runs_failed = Counter(
     registry=_registry,
 )
 
+x402_replay_blocked_total = Counter(
+    "hyperagent_x402_replay_blocked_total",
+    "x402 payment nonces or authorization keys reused (replay)",
+    registry=_registry,
+)
+
 # Storage subsystem counters
 storage_ipfs_pin_success = Counter(
     "hyperagent_storage_ipfs_pin_success_total",
@@ -209,6 +215,10 @@ def inc_pipeline_runs_completed() -> None:
 
 def inc_pipeline_runs_failed() -> None:
     pipeline_runs_failed.inc()
+
+
+def inc_x402_replay_blocked() -> None:
+    x402_replay_blocked_total.inc()
 
 
 def get_pipeline_counts() -> tuple[float, float, float]:

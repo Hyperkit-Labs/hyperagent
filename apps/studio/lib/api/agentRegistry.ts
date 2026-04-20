@@ -3,6 +3,13 @@
  * Paths are relative to /api/v1 (gateway → orchestrator).
  */
 
+import {
+  ApiPaths,
+  a2aTaskPath,
+  agentRegistryAgentPath,
+  agentRegistryCapabilityAgentsPath,
+  erc8004AgentPath,
+} from "@hyperagent/api-contracts";
 import { fetchJsonAuthed, type FetchJsonOptions } from "./core";
 
 // --- Agent registry ---
@@ -36,7 +43,7 @@ export async function registerRegistryAgent(
   body: RegisterAgentBody,
   options?: FetchJsonOptions,
 ): Promise<{ agent_id: string; status: string; registry_cid?: string | null }> {
-  return fetchJsonAuthed("/agent-registry/agents", {
+  return fetchJsonAuthed(ApiPaths.agentRegistryAgents, {
     method: "POST",
     body: JSON.stringify(body),
     ...options,
@@ -47,10 +54,7 @@ export async function getRegistryAgent(
   agentId: string,
   options?: FetchJsonOptions,
 ): Promise<RegistryAgentRow> {
-  return fetchJsonAuthed(
-    `/agent-registry/agents/${encodeURIComponent(agentId)}`,
-    options,
-  );
+  return fetchJsonAuthed(agentRegistryAgentPath(agentId), options);
 }
 
 export async function listRegistryAgents(
@@ -74,7 +78,7 @@ export async function listRegistryAgents(
   if (params?.limit !== undefined) q.set("limit", String(params.limit));
   const qs = q.toString();
   return fetchJsonAuthed(
-    `/agent-registry/agents${qs ? `?${qs}` : ""}`,
+    `${ApiPaths.agentRegistryAgents}${qs ? `?${qs}` : ""}`,
     options,
   );
 }
@@ -83,10 +87,10 @@ export async function deprecateRegistryAgent(
   agentId: string,
   options?: FetchJsonOptions,
 ): Promise<{ agent_id: string; status: string }> {
-  return fetchJsonAuthed(
-    `/agent-registry/agents/${encodeURIComponent(agentId)}/deprecate`,
-    { method: "POST", ...options },
-  );
+  return fetchJsonAuthed(`${agentRegistryAgentPath(agentId)}/deprecate`, {
+    method: "POST",
+    ...options,
+  });
 }
 
 export async function postRegistryAttestation(
@@ -99,10 +103,11 @@ export async function postRegistryAttestation(
   },
   options?: FetchJsonOptions,
 ): Promise<{ attestation_id: string; status: string }> {
-  return fetchJsonAuthed(
-    `/agent-registry/agents/${encodeURIComponent(agentId)}/attestations`,
-    { method: "POST", body: JSON.stringify(body), ...options },
-  );
+  return fetchJsonAuthed(`${agentRegistryAgentPath(agentId)}/attestations`, {
+    method: "POST",
+    body: JSON.stringify(body),
+    ...options,
+  });
 }
 
 export async function getRegistryReputation(
@@ -114,7 +119,7 @@ export async function getRegistryReputation(
   history: Array<Record<string, unknown>>;
 }> {
   return fetchJsonAuthed(
-    `/agent-registry/agents/${encodeURIComponent(agentId)}/reputation`,
+    `${agentRegistryAgentPath(agentId)}/reputation`,
     options,
   );
 }
@@ -122,7 +127,7 @@ export async function getRegistryReputation(
 export async function listRegistryCapabilities(
   options?: FetchJsonOptions,
 ): Promise<{ capabilities: string[] }> {
-  return fetchJsonAuthed("/agent-registry/capabilities", options);
+  return fetchJsonAuthed(ApiPaths.agentRegistryCapabilities, options);
 }
 
 export async function listAgentsForCapability(
@@ -135,10 +140,7 @@ export async function listAgentsForCapability(
     q.set("chain_id", String(params.chain_id));
   if (params?.limit !== undefined) q.set("limit", String(params.limit));
   const qs = q.toString();
-  return fetchJsonAuthed(
-    `/agent-registry/capabilities/${encodeURIComponent(name)}/agents${qs ? `?${qs}` : ""}`,
-    options,
-  );
+  return fetchJsonAuthed(agentRegistryCapabilityAgentsPath(name, qs), options);
 }
 
 // --- A2A tasks ---
@@ -172,7 +174,7 @@ export async function createA2aTask(
   },
   options?: FetchJsonOptions,
 ): Promise<{ task_id: string; status: string }> {
-  return fetchJsonAuthed("/a2a/tasks", {
+  return fetchJsonAuthed(ApiPaths.a2aTasks, {
     method: "POST",
     body: JSON.stringify(body),
     ...options,
@@ -183,7 +185,7 @@ export async function getA2aTask(
   taskId: string,
   options?: FetchJsonOptions,
 ): Promise<A2aTaskRow> {
-  return fetchJsonAuthed(`/a2a/tasks/${encodeURIComponent(taskId)}`, options);
+  return fetchJsonAuthed(a2aTaskPath(taskId), options);
 }
 
 export async function dispatchA2aTask(
@@ -191,7 +193,7 @@ export async function dispatchA2aTask(
   body: { agent_id: string; selection_reason?: string | null },
   options?: FetchJsonOptions,
 ): Promise<{ status: string; agent_id: string }> {
-  return fetchJsonAuthed(`/a2a/tasks/${encodeURIComponent(taskId)}/dispatch`, {
+  return fetchJsonAuthed(`${a2aTaskPath(taskId)}/dispatch`, {
     method: "POST",
     body: JSON.stringify(body),
     ...options,
@@ -202,7 +204,7 @@ export async function ackA2aTask(
   taskId: string,
   options?: FetchJsonOptions,
 ): Promise<{ status: string }> {
-  return fetchJsonAuthed(`/a2a/tasks/${encodeURIComponent(taskId)}/ack`, {
+  return fetchJsonAuthed(`${a2aTaskPath(taskId)}/ack`, {
     method: "POST",
     ...options,
   });
@@ -218,7 +220,7 @@ export async function completeA2aTask(
   },
   options?: FetchJsonOptions,
 ): Promise<Record<string, unknown>> {
-  return fetchJsonAuthed(`/a2a/tasks/${encodeURIComponent(taskId)}/complete`, {
+  return fetchJsonAuthed(`${a2aTaskPath(taskId)}/complete`, {
     method: "POST",
     body: JSON.stringify(body),
     ...options,
@@ -230,7 +232,7 @@ export async function failA2aTask(
   body: { error: string; error_cid?: string | null; retryable?: boolean },
   options?: FetchJsonOptions,
 ): Promise<Record<string, unknown>> {
-  return fetchJsonAuthed(`/a2a/tasks/${encodeURIComponent(taskId)}/fail`, {
+  return fetchJsonAuthed(`${a2aTaskPath(taskId)}/fail`, {
     method: "POST",
     body: JSON.stringify(body),
     ...options,
@@ -241,20 +243,14 @@ export async function listA2aTaskMessages(
   taskId: string,
   options?: FetchJsonOptions,
 ): Promise<{ task_id: string; messages: unknown[]; total: number }> {
-  return fetchJsonAuthed(
-    `/a2a/tasks/${encodeURIComponent(taskId)}/messages`,
-    options,
-  );
+  return fetchJsonAuthed(`${a2aTaskPath(taskId)}/messages`, options);
 }
 
 export async function listA2aTaskArtifacts(
   taskId: string,
   options?: FetchJsonOptions,
 ): Promise<{ task_id: string; artifacts: unknown[]; total: number }> {
-  return fetchJsonAuthed(
-    `/a2a/tasks/${encodeURIComponent(taskId)}/artifacts`,
-    options,
-  );
+  return fetchJsonAuthed(`${a2aTaskPath(taskId)}/artifacts`, options);
 }
 
 // --- ERC-8004 sync (operational mirror) ---
@@ -262,7 +258,7 @@ export async function listA2aTaskArtifacts(
 export async function syncErc8004Registry(
   options?: FetchJsonOptions,
 ): Promise<{ synced: number; message?: string }> {
-  return fetchJsonAuthed("/erc8004/sync", { method: "POST", ...options });
+  return fetchJsonAuthed(ApiPaths.erc8004Sync, { method: "POST", ...options });
 }
 
 export async function getErc8004AgentMirror(
@@ -273,8 +269,5 @@ export async function getErc8004AgentMirror(
   anchored: boolean;
   source: string;
 }> {
-  return fetchJsonAuthed(
-    `/erc8004/agents/${encodeURIComponent(agentId)}`,
-    options,
-  );
+  return fetchJsonAuthed(erc8004AgentPath(agentId), options);
 }

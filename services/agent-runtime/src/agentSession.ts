@@ -53,7 +53,9 @@ function decryptApiKeys(encB64: string, key: Buffer): Record<string, string> {
 export function resolveAgentSession(token: string): ResolvedContext | null {
   const secret = process.env.JWT_SECRET_KEY;
   if (!secret) {
-    console.warn("[agent-session] JWT_SECRET_KEY not set, skipping JWT resolution");
+    console.warn(
+      "[agent-session] JWT_SECRET_KEY not set (orchestrator HS256 for X-Agent-Session); skipping JWT resolution. This is not AUTH_JWT_SECRET.",
+    );
     return null;
   }
   try {

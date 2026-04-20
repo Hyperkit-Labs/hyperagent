@@ -91,6 +91,10 @@ function warnIfProductionApiIsInsecure(resolved: string): void {
   }
 }
 
+export type StudioServiceName = "backend" | "orchestrator";
+
+export function getServiceUrl(serviceName: StudioServiceName): string;
+export function getServiceUrl(serviceName: string): string;
 export function getServiceUrl(serviceName: string): string {
   const env = getAppEnv();
 

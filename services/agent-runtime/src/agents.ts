@@ -30,7 +30,8 @@ function getModel(provider: string, modelId: string, apiKey: string): LanguageMo
     }
     case "anthropic": {
       const ant = createAnthropic({ apiKey });
-      return ant(modelId);
+      // @ai-sdk/anthropic v3 exposes LanguageModelV3; `ai` 4.x types generateText as LanguageModelV1.
+      return ant(modelId) as unknown as LanguageModelV1;
     }
     case "google": {
       const goog = createGoogleGenerativeAI({ apiKey });

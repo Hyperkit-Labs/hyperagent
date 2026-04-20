@@ -17,7 +17,8 @@ HyperAgent is a layered platform. Each layer has distinct security responsibilit
                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  GATEWAY LAYER                                                               │
-│  API Gateway │ JWT auth │ Rate limiting (Redis) │ CORS │ Request validation  │
+│  API Gateway │ JWT auth │ Upstash REST rate limits │ metering │ x402 (priced) │
+│  Identity HMAC to orchestrator │ CORS │ Request validation                  │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │
                                       ▼
@@ -48,6 +49,7 @@ HyperAgent is a layered platform. Each layer has distinct security responsibilit
 | **Deploy signing** | User signs deploy transaction in browser; private key never leaves wallet. |
 | **API calls** | All backend calls use `Authorization: Bearer <JWT>`; JWT from SIWE. |
 | **CORS** | `CORS_ORIGINS` restricts allowed origins; set for production domains. |
+| **Feature flags** | Billing and x402 hints follow gateway env (`X402_ENABLED`, merchant address, metering). Studio should not assume paid routes are off in production without checking deployment config. |
 
 Studio is a thin client. All pipeline logic, BYOK handling, and safety gates live in backend services.
 
@@ -57,12 +59,17 @@ Studio is a thin client. All pipeline logic, BYOK handling, and safety gates liv
 
 | Component | Security responsibility |
 |-----------|-------------------------|
-| **JWT auth** | `AUTH_JWT_SECRET` required for production. Validates `Authorization: Bearer` on all `/api/v1` routes except public paths. |
-| **Public paths** | `/health`, `/api/v1/auth/bootstrap`, `/api/v1/config`, `/api/v1/networks`, `/api/v1/tokens/stablecoins` are unauthenticated. |
-| **Rate limiting** | Upstash REST (`@upstash/ratelimit`). Per-IP and per-user limits. Stricter limits for LLM keys, workflow start, and deploy prepare. Fail-closed when Upstash REST is unavailable in production. |
-| **Request validation** | Request ID for tracing; structured security event logging. |
+| **JWT auth** | `AUTH_JWT_SECRET` required for production. Validates `Authorization: Bearer` on non-public paths. Bootstrap paths under `/auth/bootstrap/` remain public for SIWE completion. |
+| **Public paths** | Canonical list: `GATEWAY_PUBLIC_PATHS` in `@hyperagent/api-contracts` (health, `GET /api/v1/auth/bootstrap`, `GET /api/v1/config`, networks, stablecoins, platform track record, and legacy aliases). Dev-only public paths (`/api/v1/config/integrations-debug` and legacy alias) apply only when not in production. |
+| **Identity to orchestrator** | The proxy strips client-supplied `X-User-Id`, `x-user-id`, and `x-user-id-sig`. It sets `x-user-id` from the JWT `sub` and, when `IDENTITY_HMAC_SECRET` is set, adds `x-user-id-sig` so the orchestrator can reject spoofed identity. Gateway and orchestrator must share the same secret. |
+| **Rate limiting** | Upstash **REST** (`UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`) via `@upstash/ratelimit`. Per-IP and per-user limits; stricter buckets for bootstrap, config reads, BYOK, workflow generate, and deploy prepare. Fail-closed in production when REST Redis is missing or the limiter errors without an auth-style response. |
+| **Metering (credits)** | When `METERING_ENFORCED` is on, non-exempt routes require a usable credit balance before expensive work. Exempt prefixes are defined in `METERING_EXEMPT_PREFIXES` (`@hyperagent/api-contracts`): e.g. health, config, networks, stablecoins, BYOK, credits/payments/pricing, storage webhooks, identity. Fail-closed if balance cannot be read when enforcement is on. |
+| **x402 (external agents)** | Priced routes are declared in `X402_PRICED_PATHS` (`@hyperagent/api-contracts`). External callers without the internal JWT path receive HTTP 402 and payment requirements. Internal Studio traffic (JWT) skips the gateway x402 gate and uses credits/metering instead. Orchestrator still enforces x402 for direct external calls. Default facilitator URL is PayAI; Kite/Pieverse URLs exist for Kite network verification/settlement when enabled. |
+| **Request validation** | Request ID for tracing; structured security event logging. Production readiness fields on `/health` include rate-limit REST config and identity HMAC configuration. |
 
-**Required env:** `AUTH_JWT_SECRET`, `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (gateway rate limiting), `REQUIRE_AUTH=true` (or unset; default enforced).
+**Required env (typical production):** `AUTH_JWT_SECRET`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `REQUIRE_AUTH=true` (or unset; default enforced). Set `IDENTITY_HMAC_SECRET` when the orchestrator should enforce signed identity. For x402 hints in production, `MERCHANT_WALLET_ADDRESS` is validated at startup when billing x402 hints are enabled.
+
+**Optional env:** Beta allowlist — `WAITLIST_SUPABASE_URL`, `WAITLIST_SUPABASE_SERVICE_KEY`, `BETA_ALLOWLIST_ENFORCED` (gateway bootstrap may reject non-allowlisted wallets when configured).
 
 ---
 
@@ -70,13 +77,18 @@ Studio is a thin client. All pipeline logic, BYOK handling, and safety gates liv
 
 | Component | Security responsibility |
 |-----------|-------------------------|
-| **BYOK decryption** | Decrypts LLM keys only in request scope; never logs or returns plaintext. Uses `LLM_KEY_ENCRYPTION_KEY`. |
+| **BYOK decryption** | Decrypts LLM keys only in request scope; never logs or returns plaintext. Uses `LLM_KEY_ENCRYPTION_KEY` or AWS KMS via `LLM_KEY_KMS_KEY_ARN` when configured; production requires one of these when BYOK persistence is enabled. |
+| **Signed identity** | `SpoofedIdentityMiddleware`: when `IDENTITY_HMAC_SECRET` is set and enforcement is active (production or `ENFORCE_IDENTITY_HMAC=1`), requests with `X-User-Id` must present a valid `x-user-id-sig` from the gateway. Health, docs, metrics, and storage webhook prefixes are skipped. |
+| **Second-layer rate limits** | `slowapi` limits sensitive routes (e.g. workflow generate, deploy) keyed by `X-User-Id` or client IP — defense in depth if traffic bypasses the gateway. Tunables: `RATE_LIMIT_ORCHESTRATOR_GENERATE`, `RATE_LIMIT_ORCHESTRATOR_DEPLOY`. |
+| **x402 enforcement** | `x402_middleware.py`: internal callers (Studio path with user id) skip payment; external callers must supply `X-Payment` proof, pass structure/expiry checks, and replay protection (Redis-backed when `REDIS_URL` is set). Optional facilitator settlement (`X402_FACILITATOR_URL`, `X402_FACILITATOR_ENABLED`). |
 | **Agent session JWTs** | Short-lived JWTs for cross-service calls; scoped to run. |
 | **Internal service token** | `INTERNAL_SERVICE_TOKEN` for service-to-service auth when configured. |
 | **Step audit trail** | `run_steps` table records each pipeline step; trace blob IDs for provenance. |
-| **Workspace isolation** | Runs and keys scoped by `X-User-Id` (wallet user). |
+| **Workspace isolation** | Runs and keys scoped by `X-User-Id` after gateway trust; do not accept raw client identity headers on the public internet without the gateway + HMAC pattern above. |
 
 Orchestrator never stores raw LLM keys. Keys are encrypted at rest and decrypted only when building agent context for a run.
+
+**Redis (TCP):** `REDIS_URL` on the orchestrator backs LangGraph queue/checkpointer, x402 nonce/replay storage, and related state. This is separate from the gateway’s Upstash **REST** credentials used only for HTTP rate limiting.
 
 ---
 
@@ -129,7 +141,7 @@ Policy: `infra/registries/security.yaml` defines `tieredGates`, `mandatoryTools`
 | Store | Security responsibility |
 |-------|-------------------------|
 | **Supabase (Postgres)** | RLS on `wallet_users`, `wallet_user_profiles`; only owning user can read/update `encrypted_llm_keys`. No LLM keys in logs or responses. |
-| **Redis** | Rate limit state; no persistent user data. Required in production for rate limiting. |
+| **Redis** | Gateway: Upstash REST for rate-limit counters only. Orchestrator: TCP `REDIS_URL` for queues, checkpointer, x402 replay protection — not interchangeable with gateway REST env vars. |
 | **IPFS (Pinata)** | Artifacts by CID; gateway URLs. No secrets in pinned content. |
 
 Storage policy: `docs/storage-policy.md`. Traces (stub IDs), artifacts (IPFS), indexes (Supabase). No large blobs in Postgres.
@@ -138,7 +150,7 @@ Storage policy: `docs/storage-policy.md`. Traces (stub IDs), artifacts (IPFS), i
 
 ## BYOK (Bring Your Own Keys)
 
-- **Storage:** `wallet_users.encrypted_llm_keys` (Supabase). Encrypted with Fernet using `LLM_KEY_ENCRYPTION_KEY`.
+- **Storage:** `wallet_users.encrypted_llm_keys` (Supabase). Encrypted with Fernet using `LLM_KEY_ENCRYPTION_KEY`, or envelope encryption when `LLM_KEY_KMS_KEY_ARN` is set.
 - **Write path:** `POST /api/v1/workspaces/current/llm-keys`; orchestrator encrypts before write.
 - **Read path:** `GET` returns `configured_providers` only; never plaintext keys.
 - **Use path:** Orchestrator decrypts in request scope when building agent context; keys not exposed to frontend.
@@ -148,18 +160,37 @@ See `docs/runbooks/BYOK-key-lifecycle.md` for rotation and re-key procedures.
 
 ---
 
+## Inbound webhooks (HMAC)
+
+Webhook endpoints verify HMAC-SHA256 signatures before mutating state. In production, missing secrets should fail closed (503) where implemented.
+
+| Webhook | Secret env | Header (typical) |
+|---------|------------|------------------|
+| Pinata pin events | `PINATA_WEBHOOK_SECRET` | `x-pinata-signature` or `x-pinata-hmac-sha256` |
+| Tenderly simulation alerts | `TENDERLY_WEBHOOK_SECRET` | `x-tenderly-signature` |
+| x402 facilitator settlement | `X402_WEBHOOK_SECRET` | `x-facilitator-signature` |
+
+Implementations live under `services/orchestrator/api/` (`storage_webhooks.py`, `simulation_webhooks.py`, `x402_webhooks.py`) with shared `webhook_utils.verify_hmac_sha256`.
+
+---
+
 ## Deployment Checklist
 
 1. Set `AUTH_JWT_SECRET` (`openssl rand -base64 32`).
-2. Set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (Upstash console → REST API). Set `REDIS_URL` for orchestrator TCP (e.g. `redis://default:TOKEN@....upstash.io:6379`).
-3. Set `LLM_KEY_ENCRYPTION_KEY` (strong secret for BYOK).
-4. Set `REQUIRE_AUTH=true` or leave unset (default: enforced).
-5. Set `CORS_ORIGINS` to production domains.
-6. Do not disable rate limiting in production.
-7. Ensure Supabase RLS is enabled on `wallet_users` and `wallet_user_profiles`.
-8. Set `TOOLS_API_KEY` if using remote hyperagent-tools for audit.
-9. Set `TENDERLY_API_KEY` for simulation service. For Layer 5 fail-closed, set `TENDERLY_SIMULATION_REQUIRED=true`.
-10. Set `PINATA_JWT` or equivalent for storage service when using IPFS.
+2. Set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (Upstash console → REST API). Set `REDIS_URL` for orchestrator **TCP** (queue, checkpointer, x402 replay — distinct from REST).
+3. Set `LLM_KEY_ENCRYPTION_KEY` and/or `LLM_KEY_KMS_KEY_ARN` for BYOK (production requires one when persistence is on).
+4. Set `IDENTITY_HMAC_SECRET` to the same value on gateway and orchestrator so user id forwarding cannot be spoofed; avoid `DISABLE_IDENTITY_HMAC_ENFORCEMENT` in production.
+5. Set `REQUIRE_AUTH=true` or leave unset (default: enforced).
+6. Set `CORS_ORIGINS` to production domains.
+7. Do not disable rate limiting in production.
+8. Ensure Supabase RLS is enabled on `wallet_users` and `wallet_user_profiles`.
+9. Set `TOOLS_API_KEY` if using remote hyperagent-tools for audit.
+10. Set `TENDERLY_API_KEY` for simulation service. For Layer 5 fail-closed, set `TENDERLY_SIMULATION_REQUIRED=true`.
+11. Set `PINATA_JWT` or equivalent for storage service when using IPFS.
+12. Set `PINATA_WEBHOOK_SECRET`, `TENDERLY_WEBHOOK_SECRET`, and `X402_WEBHOOK_SECRET` in production when those webhooks are exposed.
+13. If metering is on, configure credits backend and `METERING_ENFORCED` per ops runbook; confirm exempt paths match product expectations.
+14. If x402 is enabled, set `X402_PAY_TO_ADDRESS`, facilitator URLs, and review `X402_PRICED_PATHS` and chain CAIP settings; confirm merchant wallet validation passes gateway startup checks when x402 hints are enabled in production.
+15. Optional beta gate: `WAITLIST_SUPABASE_*` and `BETA_ALLOWLIST_ENFORCED` if using waitlist allowlist at bootstrap.
 
 ---
 

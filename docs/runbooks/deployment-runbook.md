@@ -27,6 +27,12 @@ High-level checklist for operators shipping HyperAgent components. Adjust for yo
 - Revert to the previous container image or Vercel deployment.
 - If a migration ran forward-only, follow the migration’s downgrade notes or restore DB from backup (runbook-specific).
 
+### Database backup and restore (Supabase)
+
+- Use the Supabase project dashboard: **Database → Backups** (scheduled backups and point-in-time recovery when enabled on your plan).
+- For a destructive migration promoted to production, restore to a timestamp before the deploy or apply a new forward migration that reverses the schema change; do not rely on undocumented manual edits.
+- Record the backup window and project ref used for each production restore in your operator log.
+
 ## Related automation
 
 - GitHub Actions workflows under `.github/workflows/` (for example `deploy-staging.yml`, `ci.yml`).

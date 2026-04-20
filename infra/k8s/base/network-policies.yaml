@@ -1,0 +1,75 @@
+# Default-deny with explicit allows. Requires a CNI that enforces NetworkPolicy (Calico, Cilium, etc.).
+# Tune ingress namespace selectors to match your ingress controller installation.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-gateway-netpol
+  labels:
+    app.kubernetes.io/part-of: hyperagent
+spec:
+  podSelector:
+    matchLabels:
+      app: api-gateway
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow in-cluster callers (ingress controller, mesh) — tighten by namespaceSelector in production.
+    - ports:
+        - port: 4000
+          protocol: TCP
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: orchestrator
+      ports:
+        - port: 8000
+          protocol: TCP
+    - ports:
+        - port: 443
+          protocol: TCP
+    - ports:
+        - port: 53
+          protocol: UDP
+    - ports:
+        - port: 53
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: orchestrator-netpol
+  labels:
+    app.kubernetes.io/part-of: hyperagent
+spec:
+  podSelector:
+    matchLabels:
+      app: orchestrator
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: api-gateway
+      ports:
+        - port: 8000
+          protocol: TCP
+  egress:
+    - ports:
+        - port: 443
+          protocol: TCP
+    - ports:
+        - port: 5432
+          protocol: TCP
+    - ports:
+        - port: 6379
+          protocol: TCP
+    - ports:
+        - port: 53
+          protocol: UDP
+    - ports:
+        - port: 53
+          protocol: TCP

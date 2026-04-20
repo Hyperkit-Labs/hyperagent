@@ -25,6 +25,7 @@ import { x402GatewayMiddleware } from "./x402.js";
 import { Env, getGatewayEnv } from "@hyperagent/config";
 import { initOtel } from "./otel-sdk.js";
 import { initSentry } from "./sentry-init.js";
+import { createPlatformTrackRecordHandler } from "./trackRecord.js";
 
 initSentry();
 initOtel();
@@ -49,6 +50,13 @@ if (gw.isProduction && !gw.auth.jwtSecret) {
   log.fatal("Production requires AUTH_JWT_SECRET");
   process.exit(1);
 }
+
+/** Cap upstream wait for public track-record so login can fall back to gateway env quickly. */
+const trackRecordUpstreamMs = Math.min(gw.proxyTimeoutMs, 10_000);
+const platformTrackRecordHandler = createPlatformTrackRecordHandler(
+  gw.orchestratorUrl,
+  trackRecordUpstreamMs,
+);
 
 const allowedOrigins = gw.corsOrigins;
 
@@ -124,14 +132,9 @@ app.use(
     "/api/v1/config",
   ),
 );
-app.use(
-  "/platform/track-record",
-  createOrchestratorLegacyMountProxy(
-    gw.orchestratorUrl,
-    gw.proxyTimeoutMs,
-    "/api/v1/platform/track-record",
-  ),
-);
+app.get("/platform/track-record", (req, res, next) => {
+  platformTrackRecordHandler(req as RequestWithId, res, next);
+});
 app.use(
   "/workspaces",
   createOrchestratorLegacyMountProxy(
@@ -304,6 +307,9 @@ app.use(
 );
 
 /** Strip-mount proxies: Express removes the mount prefix; orchestrator expects full paths (e.g. `/api/v1/...`). */
+app.get("/api/v1/platform/track-record", (req, res, next) => {
+  platformTrackRecordHandler(req as RequestWithId, res, next);
+});
 app.use(
   "/api/v1",
   createOrchestratorStripMountProxy(gw.orchestratorUrl, gw.proxyTimeoutMs, "/api/v1"),

@@ -2,6 +2,7 @@
  * Billing API: payments, credits, pricing.
  */
 
+import { ApiPaths } from "@hyperagent/api-contracts";
 import { fetchJsonAuthed, reportApiError } from "./core";
 
 export interface PaymentHistoryItem {
@@ -50,25 +51,27 @@ export async function getPaymentHistory(params?: {
     offset: String(offset),
   });
   return fetchJsonAuthed<PaymentHistoryResponse>(
-    `/payments/history?${qs}`,
+    `${ApiPaths.paymentsHistory}?${qs}`,
   ).catch((e) => {
-    reportApiError(e, { path: "/payments/history" });
+    reportApiError(e, { path: ApiPaths.paymentsHistory });
     return { items: [], total: 0 } as PaymentHistoryResponse;
   });
 }
 
 export async function getPaymentSummary(): Promise<PaymentSummary> {
-  return fetchJsonAuthed<PaymentSummary>("/payments/summary").catch((e) => {
-    reportApiError(e, { path: "/payments/summary" });
-    return {} as PaymentSummary;
-  });
+  return fetchJsonAuthed<PaymentSummary>(ApiPaths.paymentsSummary).catch(
+    (e) => {
+      reportApiError(e, { path: ApiPaths.paymentsSummary });
+      return {} as PaymentSummary;
+    },
+  );
 }
 
 export async function getSpendingControlWithBudget(): Promise<SpendingControlWithBudget> {
   return fetchJsonAuthed<SpendingControlWithBudget>(
-    "/payments/spending-control",
+    ApiPaths.paymentsSpendingControl,
   ).catch((e) => {
-    reportApiError(e, { path: "/payments/spending-control" });
+    reportApiError(e, { path: ApiPaths.paymentsSpendingControl });
     return {} as SpendingControlWithBudget;
   });
 }
@@ -76,7 +79,7 @@ export async function getSpendingControlWithBudget(): Promise<SpendingControlWit
 export async function patchSpendingControl(
   body: SpendingControlPatchBody,
 ): Promise<SpendingControlWithBudget> {
-  return fetchJsonAuthed("/payments/spending-control", {
+  return fetchJsonAuthed(ApiPaths.paymentsSpendingControl, {
     method: "PATCH",
     body: JSON.stringify(body),
   });
@@ -97,8 +100,8 @@ export interface CreditsTopUpBody {
 }
 
 export async function getCreditsBalance(): Promise<CreditsBalance> {
-  return fetchJsonAuthed<CreditsBalance>("/credits/balance").catch((e) => {
-    reportApiError(e, { path: "/credits/balance" });
+  return fetchJsonAuthed<CreditsBalance>(ApiPaths.creditsBalance).catch((e) => {
+    reportApiError(e, { path: ApiPaths.creditsBalance });
     return { balance: 0, currency: "USD" } as CreditsBalance;
   });
 }
@@ -106,7 +109,7 @@ export async function getCreditsBalance(): Promise<CreditsBalance> {
 export async function topUpCredits(
   body: CreditsTopUpBody,
 ): Promise<CreditsBalance & { user_id?: string }> {
-  return fetchJsonAuthed("/credits/top-up", {
+  return fetchJsonAuthed(ApiPaths.creditsTopUp, {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -149,15 +152,15 @@ export interface UsageSummary {
 }
 
 export async function getPricingPlans(): Promise<{ plans: PricingPlan[] }> {
-  return fetchJsonAuthed("/pricing/plans");
+  return fetchJsonAuthed(ApiPaths.pricingPlans);
 }
 
 export async function getPricingResources(): Promise<{
   resources: PricingResource[];
 }> {
-  return fetchJsonAuthed("/pricing/resources");
+  return fetchJsonAuthed(ApiPaths.pricingResources);
 }
 
 export async function getPricingUsage(): Promise<UsageSummary> {
-  return fetchJsonAuthed("/pricing/usage");
+  return fetchJsonAuthed(ApiPaths.pricingUsage);
 }

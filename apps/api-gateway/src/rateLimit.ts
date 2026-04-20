@@ -9,6 +9,7 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { Response, NextFunction } from "express";
+import { ApiPaths, GatewayLegacyMountPaths } from "@hyperagent/api-contracts";
 import { getGatewayEnv } from "@hyperagent/config";
 import { RequestWithId } from "./requestId.js";
 import { RequestWithUser } from "./auth.js";
@@ -26,8 +27,9 @@ function nodeEnv(): string {
   return getGatewayEnv().nodeEnv;
 }
 
-const LLM_KEYS_PATH = "/api/v1/workspaces/current/llm-keys";
-const BOOTSTRAP_PATH = "/api/v1/auth/bootstrap";
+const LLM_KEYS_PATH = ApiPaths.workspacesCurrentLlmKeys;
+const LLM_KEYS_PATH_LEGACY = "/workspaces/current/llm-keys";
+const BOOTSTRAP_PATH = ApiPaths.authBootstrap;
 
 const REST_BACKOFF_MS = 60_000;
 let lastRestFailure = 0;
@@ -238,10 +240,20 @@ export async function rateLimitMiddleware(
 
   const isLightweightRead =
     req.method === "GET" &&
-    (req.path === "/api/v1/config" ||
-      req.path === "/api/v1/config/integrations-debug" ||
-      req.path === "/api/v1/networks" ||
-      req.path === "/api/v1/tokens/stablecoins");
+    (req.path === ApiPaths.config ||
+      req.path === ApiPaths.configIntegrationsDebug ||
+      req.path === GatewayLegacyMountPaths.config ||
+      req.path === GatewayLegacyMountPaths.integrationsDebugConfig ||
+      req.path === GatewayLegacyMountPaths.platformTrackRecord ||
+      req.path === ApiPaths.networks ||
+      req.path === ApiPaths.tokensStablecoins ||
+      req.path === GatewayLegacyMountPaths.networks ||
+      req.path.startsWith(`${GatewayLegacyMountPaths.networks}/`) ||
+      req.path === "/tokens/stablecoins" ||
+      req.path === "/presets" ||
+      req.path === "/blueprints" ||
+      req.path === "/templates" ||
+      req.path.startsWith("/templates/"));
   if (isLightweightRead) {
     const ip = req.ip || (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
     const userId = req.userId || "";
@@ -278,7 +290,7 @@ export async function rateLimitMiddleware(
   const ip = req.ip || (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
   const userId = req.userId || "";
 
-  const isByokRoute = req.path.startsWith("/api/v1/byok");
+  const isByokRoute = req.path.startsWith(ApiPaths.byokPrefix);
   if (isByokRoute) {
     const limIp = getLimiter(redis, rl.byokMaxIp, rl.windowSec, "byok-ip");
     const byokIp = await checkLimit(limIp, ip, rl.windowSec);
@@ -308,9 +320,17 @@ export async function rateLimitMiddleware(
     return;
   }
 
-  const isLlmKeysPost = req.method === "POST" && req.path === LLM_KEYS_PATH;
-  const isWorkflowGenerate = req.method === "POST" && req.path === "/api/v1/workflows/generate";
-  const isDeployPrepare = req.method === "POST" && /^\/api\/v1\/workflows\/[^/]+\/deploy\/prepare$/.test(req.path);
+  const isLlmKeysPost =
+    req.method === "POST" &&
+    (req.path === LLM_KEYS_PATH || req.path === LLM_KEYS_PATH_LEGACY);
+  const isWorkflowGenerate =
+    req.method === "POST" &&
+    (req.path === ApiPaths.workflowsGenerate ||
+      req.path === "/workflows/generate");
+  const isDeployPrepare =
+    req.method === "POST" &&
+    (/^\/api\/v1\/workflows\/[^/]+\/deploy\/prepare$/.test(req.path) ||
+      /^\/workflows\/[^/]+\/deploy\/prepare$/.test(req.path));
 
   if (isWorkflowGenerate) {
     const limIp = getLimiter(redis, rl.workflowGenerateMaxIp, rl.windowSec, "wf-ip");

@@ -478,6 +478,75 @@ class TestX402NonceCacheRedis:
         is_replay = x402_middleware._check_replay("redis_dup_nonce")
         assert is_replay is True
 
+    @patch("x402_middleware._redis_client")
+    @patch.dict(
+        os.environ,
+        {
+            "NODE_ENV": "production",
+            "X402_ENABLED": "1",
+            "X402_ALLOW_INMEMORY_NONCE": "1",
+        },
+        clear=False,
+    )
+    def test_check_replay_redis_error_no_memory_fallback_in_prod_with_x402(
+        self, mock_redis_fn
+    ):
+        import x402_middleware
+
+        mock_r = MagicMock()
+        mock_r.set.side_effect = OSError("redis down")
+        mock_redis_fn.return_value = mock_r
+        x402_middleware._nonce_cache.clear()
+        x402_middleware._nonce_cache_warned = False
+        with pytest.raises(RuntimeError, match="refusing in-memory fallback"):
+            x402_middleware._check_replay("nonce_after_redis_err")
+
+
+# ---------------------------------------------------------------------------
+# x402 facilitator fail-closed in production
+# ---------------------------------------------------------------------------
+
+
+class TestX402FacilitatorReachable:
+    @patch.dict(os.environ, {"NODE_ENV": "production"}, clear=False)
+    @patch("httpx.Client")
+    def test_facilitator_exception_fails_closed_in_production(self, mock_http):
+        import x402_middleware
+
+        mock_http.return_value.__enter__.return_value.post.side_effect = OSError(
+            "network"
+        )
+        ok, ref = x402_middleware._call_facilitator({}, {})
+        assert ok is False
+        assert "facilitator_unreachable" in ref
+
+    @patch.dict(
+        os.environ,
+        {"NODE_ENV": "production", "X402_FACILITATOR_FAIL_OPEN": "1"},
+        clear=False,
+    )
+    @patch("httpx.Client")
+    def test_facilitator_exception_fail_open_when_env_set(self, mock_http):
+        import x402_middleware
+
+        mock_http.return_value.__enter__.return_value.post.side_effect = OSError(
+            "network"
+        )
+        ok, ref = x402_middleware._call_facilitator({}, {})
+        assert ok is True
+        assert "facilitator_unreachable" in ref
+
+    @patch.dict(os.environ, {"NODE_ENV": "development"}, clear=False)
+    @patch("httpx.Client")
+    def test_facilitator_exception_fail_open_in_development_by_default(self, mock_http):
+        import x402_middleware
+
+        mock_http.return_value.__enter__.return_value.post.side_effect = OSError(
+            "network"
+        )
+        ok, ref = x402_middleware._call_facilitator({}, {})
+        assert ok is True
+
 
 # ---------------------------------------------------------------------------
 # Startup validation tests

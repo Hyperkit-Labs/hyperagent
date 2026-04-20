@@ -41,6 +41,8 @@ function getEnvMap(): Record<string, string | undefined> {
     ...base,
     [Env.NEXT_PUBLIC_API_URL]: process.env.NEXT_PUBLIC_API_URL,
     [Env.NEXT_PUBLIC_ENV]: process.env.NEXT_PUBLIC_ENV,
+    NEXT_PUBLIC_ERC8004_SYNC_ENABLED:
+      process.env.NEXT_PUBLIC_ERC8004_SYNC_ENABLED,
     [Env.NODE_ENV]: process.env.NODE_ENV,
   };
 }
@@ -53,6 +55,9 @@ function getAppEnv(): string {
 function getStaticFeatureFlag(featureName: string): boolean | undefined {
   if (featureName === "monitoring") {
     return parseEnvBool(process.env.NEXT_PUBLIC_MONITORING_ENABLED, false);
+  }
+  if (featureName === "erc8004Sync") {
+    return parseEnvBool(process.env.NEXT_PUBLIC_ERC8004_SYNC_ENABLED, false);
   }
   return FALLBACK_FEATURES[featureName as keyof typeof FALLBACK_FEATURES];
 }

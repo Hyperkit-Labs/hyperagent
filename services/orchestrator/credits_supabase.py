@@ -21,6 +21,15 @@ logger = logging.getLogger(__name__)
 DEFAULT_CREDITS_PER_STEP = 1.0
 
 
+def _is_production_blocking() -> bool:
+    """Align with orchestrator main.py: block unsafe credit fallbacks in prod-shaped envs."""
+    return (
+        os.environ.get("RENDER", "").strip().lower() in ("1", "true", "yes")
+        or os.environ.get("NODE_ENV", "").strip().lower() == "production"
+        or os.environ.get("ENVIRONMENT", "").strip().lower() == "production"
+    )
+
+
 def _client():
     return db._client()
 
@@ -165,7 +174,7 @@ def _top_up_fallback(
 ) -> dict[str, Any] | None:
     """Fallback when RPC not available (e.g. migration not run). Non-atomic.
     Blocked in production to prevent race conditions and double-spend."""
-    if os.environ.get("NODE_ENV", "").lower() == "production":
+    if _is_production_blocking():
         logger.error(
             "[credits] top_up fallback blocked in production user_id=%s amount=%s",
             user_id,
@@ -276,7 +285,7 @@ def _consume_fallback(
 ) -> tuple[bool, float]:
     """Fallback when consume_credits RPC not available. Non-atomic, race-prone.
     Blocked in production to prevent double-spend and balance drift."""
-    if os.environ.get("NODE_ENV", "").lower() == "production":
+    if _is_production_blocking():
         logger.error(
             "[credits] consume fallback blocked in production user_id=%s amount=%s",
             user_id,
@@ -405,7 +414,7 @@ def _refund_fallback(
     metadata: dict[str, Any],
 ) -> tuple[bool, float]:
     """Fallback refund when RPC is unavailable. Only allowed in non-production."""
-    if os.environ.get("NODE_ENV", "").lower() == "production":
+    if _is_production_blocking():
         logger.error(
             "[credits] refund fallback blocked in production user_id=%s amount=%s",
             user_id,

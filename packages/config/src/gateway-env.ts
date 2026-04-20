@@ -62,6 +62,7 @@ export interface GatewayEnv {
   readonly billing: {
     readonly x402EnabledForHints: boolean;
     readonly merchantWallet: string;
+    readonly defaultTopupBaseUnits: string;
   };
   readonly sentry: {
     readonly dsn: string | undefined;
@@ -81,14 +82,21 @@ export interface GatewayEnv {
     readonly securityResearchers: string | undefined;
     readonly contractsDeployed: string | undefined;
   };
+  readonly waitlist: {
+    readonly url: string | undefined;
+    readonly serviceKey: string | undefined;
+    readonly allowlistEnforced: boolean;
+  };
 }
 
 function trimEnv(e: NodeJS.ProcessEnv, key: string): string {
   return (e[key] || "").trim();
 }
 
-function parseCorsOrigins(e: NodeJS.ProcessEnv): string[] {
-  const raw = trimEnv(e, Env.CORS_ORIGINS) || trimEnv(e, Env.CORS_ORIGIN) || "http://localhost:3000";
+function parseCorsOrigins(e: NodeJS.ProcessEnv, isProduction: boolean): string[] {
+  const configured = trimEnv(e, Env.CORS_ORIGINS) || trimEnv(e, Env.CORS_ORIGIN);
+  const raw =
+    configured || (isProduction ? "" : "http://localhost:3000");
   return raw
     .split(",")
     .map((s) => s.trim())
@@ -102,8 +110,13 @@ function resolveMeteringEnforced(
   return parseOptionalEnvBool(value) ?? isProduction;
 }
 
-function resolveOptInFlag(value: string | undefined): boolean {
-  return parseOptionalEnvBool(value) ?? false;
+/** When unset: on in production, off in non-production. Set `X402_ENABLED=0` to disable in prod. */
+function resolveX402Enabled(e: NodeJS.ProcessEnv, isProduction: boolean): boolean {
+  const parsed = parseOptionalEnvBool(e[Env.X402_ENABLED]);
+  if (parsed !== undefined) {
+    return parsed;
+  }
+  return isProduction;
 }
 
 function resolveRequireAuth(
@@ -163,7 +176,7 @@ export function buildGatewayEnv(e: NodeJS.ProcessEnv): GatewayEnv {
     e[Env.METERING_ENFORCED],
     isProduction,
   );
-  const x402EnabledForHints = resolveOptInFlag(e[Env.X402_ENABLED]);
+  const x402EnabledForHints = resolveX402Enabled(e, isProduction);
   const requireAuth = resolveRequireAuth(e[Env.REQUIRE_AUTH], isProduction);
 
   return {
@@ -172,7 +185,7 @@ export function buildGatewayEnv(e: NodeJS.ProcessEnv): GatewayEnv {
     port: parseEnvNonNegativeInt(e[Env.PORT], 4000),
     orchestratorUrl: trimEnv(e, Env.ORCHESTRATOR_URL) || "http://localhost:8000",
     proxyTimeoutMs: parseEnvNonNegativeInt(e[Env.PROXY_TIMEOUT_MS], 25_000),
-    corsOrigins: parseCorsOrigins(e),
+    corsOrigins: parseCorsOrigins(e, isProduction),
     auth: {
       jwtSecret: trimEnv(e, Env.AUTH_JWT_SECRET) || undefined,
       requireAuth,
@@ -201,6 +214,8 @@ export function buildGatewayEnv(e: NodeJS.ProcessEnv): GatewayEnv {
     billing: {
       x402EnabledForHints,
       merchantWallet: trimEnv(e, Env.MERCHANT_WALLET_ADDRESS),
+      defaultTopupBaseUnits:
+        trimEnv(e, Env.X402_DEFAULT_TOPUP_BASE_UNITS) || "1000000",
     },
     sentry: {
       dsn: trimEnv(e, Env.SENTRY_DSN) || undefined,
@@ -219,6 +234,11 @@ export function buildGatewayEnv(e: NodeJS.ProcessEnv): GatewayEnv {
       vulnerabilitiesFound: e[Env.PLATFORM_VULNERABILITIES_FOUND],
       securityResearchers: e[Env.PLATFORM_SECURITY_RESEARCHERS],
       contractsDeployed: e[Env.PLATFORM_CONTRACTS_DEPLOYED],
+    },
+    waitlist: {
+      url: trimEnv(e, Env.WAITLIST_SUPABASE_URL) || undefined,
+      serviceKey: trimEnv(e, Env.WAITLIST_SUPABASE_SERVICE_KEY) || undefined,
+      allowlistEnforced: parseEnvBool(e[Env.BETA_ALLOWLIST_ENFORCED], false),
     },
   };
 }

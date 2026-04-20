@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Zap } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import type { RuntimeConfig, NetworkConfig } from "@/lib/api";
+import { WorkspaceTabSkeleton } from "@/components/settings/WorkspaceSettingsSkeleton";
 
 interface WorkspaceTabProps {
   config: RuntimeConfig | null;
@@ -54,12 +54,7 @@ export function WorkspaceTab({
 
   return (
     <div className="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] backdrop-blur-md p-4 space-y-4 relative overflow-hidden">
-      {workspaceLoading && (
-        <div className="flex items-center gap-2 text-[var(--color-text-muted)] py-4">
-          <Zap className="w-4 h-4 animate-pulse" />
-          <span className="text-sm">Loading workspace settings...</span>
-        </div>
-      )}
+      {workspaceLoading && <WorkspaceTabSkeleton />}
       {configError && (
         <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 flex items-center justify-between">
           <p className="text-xs text-red-400">{configError}</p>

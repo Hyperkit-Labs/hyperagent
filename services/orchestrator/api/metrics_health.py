@@ -12,7 +12,7 @@ from typing import Any, cast
 import credits_supabase
 import db
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from observability import p95_latency_ms
 from pydantic import BaseModel, Field
 from redis_util import effective_redis_url
@@ -47,21 +47,25 @@ STORAGE_SERVICE_URL = os.environ.get(
     "STORAGE_SERVICE_URL", "http://localhost:4005"
 ).rstrip("/")
 VECTORDB_URL = os.environ.get("VECTORDB_URL", "http://localhost:8010").rstrip("/")
-# Parallel /health probes for GET /api/v1/config integration flags. Prefer INTEGRATIONS_HEALTH_TIMEOUT;
-# else legacy INTEGRATIONS_TIMEOUT; default 5s per upstream so config stays responsive when a dep is down.
+# Parallel /health probes for GET /api/v1/config. Defaults stay under typical 10s browser/proxy limits
+# (Studio may use a shorter bootstrap timeout via NEXT_PUBLIC_CONFIG_BOOTSTRAP_TIMEOUT_MS).
 INTEGRATIONS_HEALTH_TIMEOUT = float(
     os.environ.get(
         "INTEGRATIONS_HEALTH_TIMEOUT",
-        os.environ.get("INTEGRATIONS_TIMEOUT", "5.0"),
+        os.environ.get("INTEGRATIONS_TIMEOUT", "3.0"),
     )
 )
-# Upper bound for entire _fetch_integrations() in GET /config (parallel probes + local env flags).
+# Upper bound for asyncio.wait_for around _fetch_integrations() (parallel probes).
 INTEGRATIONS_FETCH_BUDGET_SEC = float(
     os.environ.get(
         "INTEGRATIONS_FETCH_BUDGET_SEC",
-        str(max(INTEGRATIONS_HEALTH_TIMEOUT + 5.0, 12.0)),
+        str(min(7.0, max(4.0, INTEGRATIONS_HEALTH_TIMEOUT * 2.0 + 0.5))),
     )
 )
+# When TTL expired but a cached payload exists, return it immediately and refresh in background.
+INTEGRATIONS_STALE_WHILE_REVALIDATE = os.environ.get(
+    "INTEGRATIONS_STALE_WHILE_REVALIDATE", "1"
+).strip().lower() in ("1", "true", "yes")
 # In-process cache for GET /config integration flags (0 disables).
 INTEGRATIONS_CACHE_TTL_SEC = float(os.environ.get("INTEGRATIONS_CACHE_TTL_SEC", "45"))
 # After this many consecutive budget timeouts, skip probes for INTEGRATIONS_CIRCUIT_COOLDOWN_SEC.
@@ -261,7 +265,17 @@ def _integrations_fallback() -> dict[str, Any]:
     }
 
 
-async def _fetch_integrations_bounded(*, skip_cache: bool = False) -> dict[str, Any]:
+async def _integrations_background_refresh() -> None:
+    """Refresh integration cache after a stale-while-revalidate /config response."""
+    try:
+        await _fetch_integrations_bounded(force_refresh=True)
+    except Exception as e:
+        logger.warning("[integrations] background refresh failed: %s", e)
+
+
+async def _fetch_integrations_bounded(
+    *, skip_cache: bool = False, force_refresh: bool = False
+) -> dict[str, Any]:
     """Integration flags for /config. Uses TTL cache unless skip_cache (e.g. integrations-debug)."""
     global _integrations_cache_payload, _integrations_cache_mono
     global _integrations_consecutive_budget_timeouts, _integrations_circuit_open_until
@@ -272,6 +286,7 @@ async def _fetch_integrations_bounded(*, skip_cache: bool = False) -> dict[str, 
 
     if (
         not skip_cache
+        and not force_refresh
         and INTEGRATIONS_CACHE_TTL_SEC > 0
         and _integrations_cache_payload is not None
         and (now - _integrations_cache_mono) < INTEGRATIONS_CACHE_TTL_SEC
@@ -556,12 +571,51 @@ async def get_integrations_debug_api() -> dict[str, Any]:
 
 
 @config_router.get("")
-async def get_config_api() -> dict[str, Any]:
-    """Return public runtime config (x402, monitoring, payment, integrations, A2A identity) from registries."""
+async def get_config_api(background_tasks: BackgroundTasks) -> dict[str, Any]:
+    """Return public runtime config (x402, monitoring, payment, integrations, A2A identity) from registries.
+
+    Uses stale-while-revalidate for ``integrations`` when TTL expired: returns the last cached
+    probe result immediately (``integrations_stale: true``) and schedules a background refresh,
+    so Studio bootstrap stays fast even if upstream /health probes are slow.
+    """
     merchant = os.environ.get("MERCHANT_WALLET_ADDRESS", "").strip()
-    integrations = await _fetch_integrations_bounded()
+    now = time.monotonic()
+    integrations: dict[str, Any]
+    integrations_stale = False
+
+    cache_exists = _integrations_cache_payload is not None
+    cache_age = (now - _integrations_cache_mono) if cache_exists else None
+    cache_expired = (
+        cache_exists
+        and INTEGRATIONS_CACHE_TTL_SEC > 0
+        and cache_age is not None
+        and cache_age >= INTEGRATIONS_CACHE_TTL_SEC
+    )
+    circuit_open = now < _integrations_circuit_open_until
+
+    if (
+        INTEGRATIONS_STALE_WHILE_REVALIDATE
+        and cache_exists
+        and INTEGRATIONS_CACHE_TTL_SEC > 0
+    ):
+        if circuit_open:
+            if _integrations_cache_payload is not None:
+                integrations = _integrations_cache_payload
+                integrations_stale = cache_expired
+            else:
+                integrations = _integrations_fallback()
+                integrations_stale = True
+        elif cache_expired:
+            integrations = _integrations_cache_payload or _integrations_fallback()
+            integrations_stale = True
+            background_tasks.add_task(_integrations_background_refresh)
+        else:
+            integrations = await _fetch_integrations_bounded()
+    else:
+        integrations = await _fetch_integrations_bounded()
+
     a2a_identity = get_erc8004_agent_identity()
-    return {
+    payload: dict[str, Any] = {
         "x402_enabled": get_x402_enabled(),
         "monitoring_enabled": get_monitoring_enabled(),
         "merchant_wallet_address": merchant or None,
@@ -575,6 +629,9 @@ async def get_config_api() -> dict[str, Any]:
         "a2a_identity": a2a_identity,
         "integrations": integrations,
     }
+    if integrations_stale:
+        payload["integrations_stale"] = True
+    return payload
 
 
 # Agent identity router (ERC-8004)

@@ -10,5 +10,7 @@ COPY apps/api-gateway ./apps/api-gateway
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter hyperagent-api-gateway... build
 WORKDIR /app/apps/api-gateway
+RUN chown -R node:node /app
+USER node
 EXPOSE 4000
 CMD ["node", "build/index.js"]

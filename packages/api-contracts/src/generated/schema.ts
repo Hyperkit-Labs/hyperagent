@@ -674,6 +674,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/simulation/webhooks/tenderly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tenderly Alert Webhook
+         * @description Tenderly push: merge alert payload into simulations.results and set status.
+         */
+        post: operations["tenderly_alert_webhook_api_v1_simulation_webhooks_tenderly_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/storage/webhooks/pinata": {
         parameters: {
             query?: never;
@@ -995,6 +1015,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workflows/{workflow_id}/quarantine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Quarantine Workflow Api
+         * @description Fail-closed: mark workflow failed and record quarantine reason.
+         */
+        post: operations["quarantine_workflow_api_api_v1_workflows__workflow_id__quarantine_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/{workflow_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry Workflow Api
+         * @description Re-enqueue pipeline for failed or cancelled workflows with stored intent.
+         */
+        post: operations["retry_workflow_api_api_v1_workflows__workflow_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/{workflow_id}/rollback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rollback Workflow Api
+         * @description Record rollback request; workflow becomes cancelled.
+         */
+        post: operations["rollback_workflow_api_api_v1_workflows__workflow_id__rollback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workflows/{workflow_id}/status": {
         parameters: {
             query?: never;
@@ -1167,6 +1247,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/x402/settlement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * X402 Settlement Webhook
+         * @description Facilitator push: update payment_history for a proof nonce after settlement.
+         */
+        post: operations["x402_settlement_webhook_api_v1_x402_settlement_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -1244,26 +1344,6 @@ export interface paths {
          * @description Prometheus-format metrics for pipeline runs and p95 latency.
          */
         get: operations["metrics_metrics_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/platform/track-record": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Platform Track Record Legacy Api
-         * @description Legacy path. Mirrors /api/v1/platform/track-record.
-         */
-        get: operations["get_platform_track_record_legacy_api_platform_track_record_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1478,6 +1558,14 @@ export interface components {
         QuickDemoBody: {
             /** Workflow Id */
             workflow_id?: string | null;
+        };
+        /** RecoveryReasonBody */
+        RecoveryReasonBody: {
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
         };
         /** RegisterIdentityBody */
         RegisterIdentityBody: {
@@ -2553,6 +2641,39 @@ export interface operations {
             };
         };
     };
+    tenderly_alert_webhook_api_v1_simulation_webhooks_tenderly_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-tenderly-signature"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     pinata_pin_webhook_api_v1_storage_webhooks_pinata_post: {
         parameters: {
             query?: never;
@@ -3077,6 +3198,113 @@ export interface operations {
             };
         };
     };
+    quarantine_workflow_api_api_v1_workflows__workflow_id__quarantine_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecoveryReasonBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_workflow_api_api_v1_workflows__workflow_id__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rollback_workflow_api_api_v1_workflows__workflow_id__rollback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecoveryReasonBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_workflow_status_api_api_v1_workflows__workflow_id__status_get: {
         parameters: {
             query?: never;
@@ -3423,6 +3651,39 @@ export interface operations {
             };
         };
     };
+    x402_settlement_webhook_api_v1_x402_settlement_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-facilitator-signature"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     health_health_get: {
         parameters: {
             query?: never;
@@ -3499,28 +3760,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_platform_track_record_legacy_api_platform_track_record_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
                 };
             };
         };

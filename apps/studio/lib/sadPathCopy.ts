@@ -22,7 +22,7 @@ export function getErrorRequestId(err: unknown): string | undefined {
     : undefined;
 }
 
-/** GET /config bootstrap failures when JWT is still assumed valid (non-401). */
+/** GET /api/v1/config bootstrap failures when JWT is still assumed valid (non-401). */
 export function bootstrapConfigFailureMessage(
   status: number | undefined,
   _code: string | undefined,

@@ -22,26 +22,31 @@ export function healthHandler(orchestratorUrl: string) {
     const authSigninReady = authJwtConfigured && Boolean(supabase) && dbOk;
     const orchBase = orchestratorUrl.replace(/\/$/, "");
 
-    async function fetchOrch(path: string, ms: number): Promise<globalThis.Response | null> {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), ms);
-      try {
-        const r = await fetch(`${orchBase}${path}`, { signal: controller.signal });
-        clearTimeout(timeout);
-        return r;
-      } catch {
-        clearTimeout(timeout);
-        return null;
+    let orchestratorOk = false;
+    let orchestratorReachable = false;
+
+    if (authSigninReady) {
+      async function fetchOrch(path: string, ms: number): Promise<globalThis.Response | null> {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), ms);
+        try {
+          const r = await fetch(`${orchBase}${path}`, { signal: controller.signal });
+          clearTimeout(timeout);
+          return r;
+        } catch {
+          clearTimeout(timeout);
+          return null;
+        }
       }
+
+      const [rLive, rHealth] = await Promise.all([
+        fetchOrch("/health/live", 2000),
+        fetchOrch("/health", 3000),
+      ]);
+
+      orchestratorOk = rHealth !== null && rHealth.ok;
+      orchestratorReachable = (rLive !== null && rLive.ok) || rHealth !== null;
     }
-
-    const [rLive, rHealth] = await Promise.all([
-      fetchOrch("/health/live", 2000),
-      fetchOrch("/health", 3000),
-    ]);
-
-    const orchestratorOk = rHealth !== null && rHealth.ok;
-    const orchestratorReachable = (rLive !== null && rLive.ok) || rHealth !== null;
 
     const pipeline_ready = authSigninReady && orchestratorReachable && orchestratorOk;
 
@@ -77,22 +82,32 @@ export function healthHandler(orchestratorUrl: string) {
         db_connected: dbOk,
         db_error: dbError,
       });
-      res.status(200).json({ status: "degraded", ...basePayload, message: msg });
+      res.status(503).json({ status: "degraded", ...basePayload, message: msg });
       return;
     }
 
     const overallStatus = orchestratorOk ? "ok" : "degraded";
     let message: string | undefined;
     if (!orchestratorReachable) {
-      message = "Orchestrator unreachable (no response from /health or /health/live). Check ORCHESTRATOR_URL and that the orchestrator service is running. Workflows will fail until it is reachable.";
+      message =
+        "Orchestrator unreachable (no response from /health or /health/live). Check ORCHESTRATOR_URL and that the orchestrator service is running. Workflows will fail until it is reachable.";
     } else if (!orchestratorOk) {
-      message = "Orchestrator is reachable but GET /health is not OK (often Redis, Supabase, or queue config on the orchestrator). Sign-in works; pipeline runs may fail until orchestrator /health is healthy.";
+      message =
+        "Orchestrator is reachable but GET /health is not OK (often Redis, Supabase, or queue config on the orchestrator). Sign-in works; pipeline runs may fail until orchestrator /health is healthy.";
+    }
+
+    if (!pipeline_ready) {
+      res.status(503).json({
+        status: overallStatus,
+        ...basePayload,
+        ...(message ? { message } : {}),
+      });
+      return;
     }
 
     res.status(200).json({
-      status: overallStatus,
+      status: "ok",
       ...basePayload,
-      ...(message ? { message } : {}),
     });
   };
 }

@@ -262,3 +262,50 @@ spec:
         framework: hardhat
         gasStrategy: standard
         securityProfile: strict
+
+    kite-mainnet:
+      chainId: 2366
+      enabled: true
+      tier: supported
+      category: L1
+      rpcUrl: https://rpc.gokite.ai/
+      explorerUrl: https://kitescan.ai/
+      nativeCurrency:
+        symbol: KITE
+        decimals: 18
+      capabilities:
+        tenderly: false
+        x402: true
+        erc8004: false
+        verification: limited
+        accountAbstraction:
+          erc4337: false
+          eip7702: false
+      defaults:
+        framework: hardhat
+        gasStrategy: standard
+        securityProfile: strict
+
+    kite-testnet:
+      chainId: 2368
+      enabled: true
+      tier: primary
+      category: testnet
+      rpcUrl: https://rpc-testnet.gokite.ai/
+      explorerUrl: https://testnet.kitescan.ai/
+      nativeCurrency:
+        symbol: KITE
+        decimals: 18
+        faucetUrl: https://faucet.gokite.ai
+      capabilities:
+        tenderly: false
+        x402: true
+        erc8004: false
+        verification: limited
+        accountAbstraction:
+          erc4337: false
+          eip7702: false
+      defaults:
+        framework: hardhat
+        gasStrategy: cheap
+        securityProfile: relaxed

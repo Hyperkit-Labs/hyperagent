@@ -88,7 +88,6 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 
 logger = logging.getLogger(__name__)
 
-X402_ENABLED_ENV = os.environ.get("X402_ENABLED", "0")
 REPLAY_WINDOW_SECONDS = int(os.environ.get("X402_REPLAY_WINDOW", "300"))
 _X402_MANDATORY_V01 = os.environ.get("X402_MANDATORY_V01", "").strip().lower() in (
     "1",
@@ -101,17 +100,69 @@ _NONCE_CACHE_MAX = 10_000
 _nonce_cache_warned = False
 
 
-def _get_redis_client() -> Any | None:
-    """Return a Redis-compatible client from the orchestrator pool, or None."""
-    try:
-        redis_url = os.environ.get("REDIS_URL")
-        if not redis_url:
-            return None
-        import redis
+def _is_production_env() -> bool:
+    """Match orchestrator main.py: cloud / production-shaped environments."""
+    return (
+        os.environ.get("RENDER", "").strip().lower() in ("1", "true", "yes")
+        or os.environ.get("NODE_ENV", "").strip().lower() == "production"
+        or os.environ.get("ENVIRONMENT", "").strip().lower() == "production"
+    )
 
-        return redis.from_url(redis_url, decode_responses=True)
-    except Exception:
-        return None
+
+def _effective_x402_enabled_env() -> str:
+    """Effective ``X402_ENABLED`` string (read at call time).
+
+    When unset: ``\"1\"`` in production-shaped env (payments on), else ``\"0\"``.
+    Set ``X402_ENABLED=0`` explicitly to disable x402 in production (incident / lab only).
+    """
+    explicit = (os.environ.get("X402_ENABLED") or "").strip()
+    if explicit:
+        return explicit
+    return "1" if _is_production_env() else "0"
+
+
+def _redis_url_candidates() -> list[str]:
+    urls: list[str] = []
+    for key in ("REDIS_URL", "UPSTASH_REDIS_URL"):
+        v = (os.environ.get(key) or "").strip()
+        if v:
+            urls.append(v)
+    return urls
+
+
+def _redis_configured_in_env() -> bool:
+    """True when a TCP Redis URL is set (required for cross-worker nonce replay safety)."""
+    return bool(_redis_url_candidates())
+
+
+def _x402_allow_inmemory_nonce() -> bool:
+    """Escape hatch for single-worker labs; never use in real multi-instance production."""
+    return os.environ.get("X402_ALLOW_INMEMORY_NONCE", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def _replay_backend_unacceptable_for_payment() -> bool:
+    """x402 priced routes require a TCP Redis URL unless in-memory escape is set."""
+    if not _is_x402_enabled():
+        return False
+    if _x402_allow_inmemory_nonce():
+        return False
+    return not _redis_configured_in_env()
+
+
+def _get_redis_client() -> Any | None:
+    """Return a Redis-compatible client, trying REDIS_URL then UPSTASH_REDIS_URL."""
+    import redis
+
+    for redis_url in _redis_url_candidates():
+        try:
+            return redis.from_url(redis_url, decode_responses=True)
+        except Exception:
+            continue
+    return None
 
 
 _redis: Any | None = None
@@ -123,10 +174,10 @@ def _redis_client() -> Any | None:
     if not _redis_checked:
         _redis_checked = True
         _redis = _get_redis_client()
-        if _redis is None:
+        if _redis is None and not _replay_requires_redis_backend():
             logger.warning(
-                "[x402] No REDIS_URL configured. Nonce replay protection uses in-memory cache. "
-                "In multi-worker deployments this allows replay across workers."
+                "[x402] No working Redis client (check REDIS_URL / UPSTASH_REDIS_URL). "
+                "Using in-memory nonce cache (single-worker dev only)."
             )
     return _redis
 
@@ -135,7 +186,7 @@ def _is_x402_enabled() -> bool:
     """x402 gate: X402_MANDATORY_V01 (hard enforcement), X402_ENABLED env, or registry flag."""
     if _X402_MANDATORY_V01:
         return True
-    if X402_ENABLED_ENV.lower() in ("1", "true", "yes"):
+    if _effective_x402_enabled_env().lower() in ("1", "true", "yes"):
         return True
     try:
         from registries import get_x402_enabled
@@ -145,6 +196,40 @@ def _is_x402_enabled() -> bool:
         return False
 
 
+def _replay_requires_redis_backend() -> bool:
+    """When True, nonce replay must use Redis; in-memory fallback is forbidden."""
+    return _is_x402_enabled() and not _x402_allow_inmemory_nonce()
+
+
+def ensure_x402_redis_for_startup() -> None:
+    """Fail fast when x402 is on but Redis is missing or unreachable (unless in-memory escape)."""
+    if not _is_x402_enabled():
+        return
+    if _x402_allow_inmemory_nonce():
+        logger.warning(
+            "[x402] X402_ALLOW_INMEMORY_NONCE=1: replay protection is not safe across workers."
+        )
+        return
+    if not _redis_configured_in_env():
+        raise RuntimeError(
+            "x402 is enabled but REDIS_URL or UPSTASH_REDIS_URL is not set. "
+            "Use TCP Redis for cross-worker nonce replay protection, or set "
+            "X402_ALLOW_INMEMORY_NONCE=1 only for approved single-worker setups."
+        )
+    global _redis, _redis_checked
+    _redis_checked = False
+    _redis = None
+    client = _redis_client()
+    if client is None:
+        raise RuntimeError(
+            "x402 is enabled but Redis client could not be created from REDIS_URL / UPSTASH_REDIS_URL."
+        )
+    try:
+        client.ping()
+    except Exception as exc:
+        raise RuntimeError(f"x402 Redis ping failed: {exc}") from exc
+
+
 def _x402_enforce_internal() -> bool:
     """When true, Studio callers (X-User-Id) cannot bypass priced routes; must send X-Payment."""
     return os.environ.get("X402_ENFORCE_INTERNAL", "").strip().lower() in (
@@ -152,6 +237,15 @@ def _x402_enforce_internal() -> bool:
         "true",
         "yes",
     )
+
+
+def _record_x402_replay_blocked() -> None:
+    try:
+        from observability import inc_x402_replay_blocked
+
+        inc_x402_replay_blocked()
+    except ImportError:
+        pass
 
 
 def _prune_nonce_cache() -> None:
@@ -166,31 +260,51 @@ def _prune_nonce_cache() -> None:
 def _check_replay(nonce: str) -> bool:
     """Return True if nonce was already seen (replay). False if fresh.
 
-    Uses Redis SET NX with TTL when available (multi-worker safe).
-    Falls back to local dict with a one-time production warning.
+    Uses Redis SET NX with TTL when x402 requires Redis (enabled and not
+    ``X402_ALLOW_INMEMORY_NONCE``). Otherwise prefers Redis but may fall back
+    to an in-process dict for local development only.
     """
     global _nonce_cache_warned
+
+    if _replay_requires_redis_backend():
+        r = _redis_client()
+        if r is None:
+            raise RuntimeError(
+                "x402 replay protection requires Redis but no client is available."
+            )
+        try:
+            key = f"x402:nonce:{nonce}"
+            was_set = r.set(key, "1", nx=True, ex=REPLAY_WINDOW_SECONDS)
+            if not was_set:
+                _record_x402_replay_blocked()
+            return not was_set
+        except Exception as exc:
+            raise RuntimeError(f"x402 Redis nonce check failed: {exc}") from exc
 
     r = _redis_client()
     if r is not None:
         try:
             key = f"x402:nonce:{nonce}"
             was_set = r.set(key, "1", nx=True, ex=REPLAY_WINDOW_SECONDS)
+            if not was_set:
+                _record_x402_replay_blocked()
             return not was_set
         except Exception as exc:
             logger.warning(
                 "[x402] Redis nonce check failed, falling back to memory: %s", exc
             )
 
-    if not _nonce_cache_warned and os.environ.get("NODE_ENV") == "production":
+    if not _nonce_cache_warned and _is_production_env():
         _nonce_cache_warned = True
         logger.error(
             "[x402] PRODUCTION WARNING: in-memory nonce cache active. "
-            "Replay protection is NOT safe across multiple workers. Set REDIS_URL."
+            "Replay protection is NOT safe across multiple workers. "
+            "Set REDIS_URL or UPSTASH_REDIS_URL, or set X402_ALLOW_INMEMORY_NONCE=1 only for single-worker."
         )
 
     _prune_nonce_cache()
     if nonce in _nonce_cache:
+        _record_x402_replay_blocked()
         return True
     _nonce_cache[nonce] = time.time()
     return False
@@ -316,6 +430,27 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
                 status_code=402,
                 media_type="application/json",
                 headers={"X-Payment-Required": "true"},
+            )
+
+        if _replay_backend_unacceptable_for_payment():
+            _log_x402_event(
+                "replay_backend_misconfigured",
+                path,
+                extra={"price_usd": price},
+            )
+            return Response(
+                content=json.dumps(
+                    {
+                        "error": "service_unavailable",
+                        "message": (
+                            "x402 replay protection requires REDIS_URL or UPSTASH_REDIS_URL "
+                            "in production. Set one of these, or X402_ALLOW_INMEMORY_NONCE=1 "
+                            "only for approved single-worker deployments."
+                        ),
+                    }
+                ),
+                status_code=503,
+                media_type="application/json",
             )
 
         proof = _parse_payment_header(payment_header)

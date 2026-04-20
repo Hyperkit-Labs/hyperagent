@@ -5,6 +5,7 @@
 
 export {
   getApiBase,
+  joinApiUrlForFetch,
   getGatewayOrigin,
   getDocsUrl,
   setAuthHeaderProvider,

@@ -62,12 +62,28 @@ _root_logger = logging.getLogger()
 if not any(isinstance(f, TraceContextFilter) for f in _root_logger.filters):
     _root_logger.addFilter(TraceContextFilter())
 
-COMPILE_SERVICE_URL = os.environ.get(
-    "COMPILE_SERVICE_URL", "http://localhost:8004"
-).rstrip("/")
-AUDIT_SERVICE_URL = os.environ.get("AUDIT_SERVICE_URL", "http://localhost:8001").rstrip(
-    "/"
-)
+
+def _is_production() -> bool:
+    """True when RENDER=true or NODE_ENV=production or similar production indicators."""
+    return (
+        os.environ.get("RENDER", "").strip().lower() in ("1", "true", "yes")
+        or os.environ.get("NODE_ENV", "").strip().lower() == "production"
+        or os.environ.get("ENVIRONMENT", "").strip().lower() == "production"
+    )
+
+
+def _service_url(env_key: str, local_default: str) -> str:
+    """Production must set explicit URLs; dev falls back to local defaults."""
+    raw = (os.environ.get(env_key) or "").strip()
+    if raw:
+        return raw.rstrip("/")
+    if _is_production():
+        return ""
+    return local_default.rstrip("/")
+
+
+COMPILE_SERVICE_URL = _service_url("COMPILE_SERVICE_URL", "http://localhost:8004")
+AUDIT_SERVICE_URL = _service_url("AUDIT_SERVICE_URL", "http://localhost:8001")
 
 app = FastAPI(title="HyperAgent Orchestrator", version="0.1.0")
 
@@ -82,15 +98,6 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # /health returns 503 (readable for debugging), and /health/live stays 200.
 _startup_degraded: bool = False
 _startup_missing_vars: list[str] = []
-
-
-def _is_production() -> bool:
-    """True when RENDER=true or NODE_ENV=production or similar production indicators."""
-    return (
-        os.environ.get("RENDER", "").strip().lower() in ("1", "true", "yes")
-        or os.environ.get("NODE_ENV", "").strip().lower() == "production"
-        or os.environ.get("ENVIRONMENT", "").strip().lower() == "production"
-    )
 
 
 def is_startup_degraded() -> tuple[bool, list[str]]:
@@ -132,6 +139,19 @@ def _validate_critical_services() -> None:
                 _is_kms_configured = lambda: False  # type: ignore[misc,assignment]
             if not _is_kms_configured():
                 missing.append("LLM_KEY_KMS_KEY_ARN (required when BYOK_TEE_STRICT=1)")
+
+        require_byok_kms = os.environ.get(
+            "LLM_REQUIRE_KMS_IN_PRODUCTION", "1"
+        ).strip().lower() in ("1", "true", "yes")
+        if require_byok_kms:
+            try:
+                from llm_keys_kms import _is_kms_configured as _kms_on
+            except ImportError:
+                _kms_on = lambda: False  # type: ignore[misc,assignment]
+            if not _kms_on():
+                missing.append(
+                    "LLM_KEY_KMS_KEY_ARN (BYOK envelope encryption; set LLM_REQUIRE_KMS_IN_PRODUCTION=0 only for legacy Fernet)"
+                )
 
         if missing:
             _startup_degraded = True
@@ -192,6 +212,20 @@ def _validate_critical_services() -> None:
 
 
 @app.on_event("startup")
+def _ensure_x402_redis_strict() -> None:
+    """x402 replay protection requires Redis when enabled; fail fast (no silent in-memory)."""
+    try:
+        from x402_middleware import ensure_x402_redis_for_startup
+
+        ensure_x402_redis_for_startup()
+    except ImportError:
+        return
+    except RuntimeError as exc:
+        logger.critical("[orchestrator] %s", exc)
+        raise SystemExit(1) from exc
+
+
+@app.on_event("startup")
 def _start_reconciliation_schedule() -> None:
     """Start a background thread for periodic billing reconciliation every 6 hours."""
     import threading
@@ -203,7 +237,9 @@ def _start_reconciliation_schedule() -> None:
     def _reconcile_loop():
         import time as _time
 
-        _time.sleep(60)
+        initial_delay = int(os.environ.get("RECONCILIATION_INITIAL_DELAY_SEC", "60"))
+        if initial_delay > 0:
+            _time.sleep(initial_delay)
         while True:
             try:
                 from billing_reconciliation import find_drifted_users
@@ -239,7 +275,11 @@ def _start_storage_reconciliation_schedule() -> None:
     def _storage_loop():
         import time as _time
 
-        _time.sleep(120)
+        initial_delay = int(
+            os.environ.get("STORAGE_RECONCILE_INITIAL_DELAY_SEC", "120")
+        )
+        if initial_delay > 0:
+            _time.sleep(initial_delay)
         while True:
             try:
                 from storage_reconciliation import run_storage_reconciliation_pass

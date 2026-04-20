@@ -1,27 +1,65 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getPlatformTrackRecord } from "@/lib/api";
+import { getPlatformTrackRecord, type PlatformTrackRecord } from "@/lib/api";
 
-const DEFAULTS = {
+/** Refresh waitlist-backed beta count on the login track record (ms). */
+const TRACK_RECORD_POLL_MS = 30_000;
+
+const DEFAULTS: PlatformTrackRecord = {
   audits_completed: 0,
   vulnerabilities_found: 0,
   security_researchers: 0,
   contracts_deployed: 0,
+  beta_testers_confirmed: 0,
+  source: "env_defaults",
 };
 
+function normalizeRecord(data: PlatformTrackRecord): PlatformTrackRecord {
+  return {
+    ...DEFAULTS,
+    ...data,
+    beta_testers_confirmed:
+      typeof data.beta_testers_confirmed === "number"
+        ? data.beta_testers_confirmed
+        : 0,
+  };
+}
+
 export function useTrackRecord() {
-  const [record, setRecord] = useState(DEFAULTS);
+  const [record, setRecord] = useState<PlatformTrackRecord>(DEFAULTS);
 
   useEffect(() => {
-    const ac = new AbortController();
-    getPlatformTrackRecord(ac.signal)
-      .then(setRecord)
-      .catch(() => setRecord(DEFAULTS));
-    return () => ac.abort();
+    let cancelled = false;
+
+    const load = () => {
+      getPlatformTrackRecord()
+        .then((r) => {
+          if (!cancelled) setRecord(normalizeRecord(r));
+        })
+        .catch(() => {
+          if (!cancelled) setRecord(DEFAULTS);
+        });
+    };
+
+    load();
+    const interval = setInterval(load, TRACK_RECORD_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
+  const betaUsers = record.beta_testers_confirmed ?? 0;
+
   const trackRecord = [
+    {
+      label: "Users",
+      value: betaUsers,
+      prefix: "",
+      suffix: "",
+      desc: "Beta testers",
+    },
     {
       label: "Audits",
       value: record.audits_completed,
@@ -35,13 +73,6 @@ export function useTrackRecord() {
       prefix: "",
       suffix: "",
       desc: "Vulnerabilities Found",
-    },
-    {
-      label: "Team",
-      value: record.security_researchers,
-      prefix: "",
-      suffix: record.security_researchers > 0 ? "+" : "",
-      desc: "Security Researchers",
     },
     {
       label: "Deployments",

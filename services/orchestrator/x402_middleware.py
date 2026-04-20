@@ -78,9 +78,9 @@ def _call_facilitator(
             return False, f"facilitator_error_{resp.status_code}"
     except Exception as exc:
         logger.warning("[x402] facilitator call failed: %s", exc)
-        # Non-fatal: if facilitator is unreachable, allow the request through
-        # but log prominently so ops can investigate settlement gaps.
-        return True, f"facilitator_unreachable:{exc}"
+        if _facilitator_unreachable_allows_request():
+            return True, f"facilitator_unreachable:{exc}"
+        return False, f"facilitator_unreachable:{exc}"
 
 
 from fastapi import Request, Response
@@ -107,6 +107,22 @@ def _is_production_env() -> bool:
         or os.environ.get("NODE_ENV", "").strip().lower() == "production"
         or os.environ.get("ENVIRONMENT", "").strip().lower() == "production"
     )
+
+
+def _facilitator_unreachable_allows_request() -> bool:
+    """If True, facilitator HTTP errors still admit the request (no on-chain settlement proof).
+
+    Default **False** in production-shaped environments so traffic is not accepted
+    without settlement. Non-production defaults **True** for local dev; set
+    ``X402_FACILITATOR_FAIL_OPEN=0`` to fail closed everywhere, or ``=1`` to allow
+    (incident / lab only in prod).
+    """
+    raw = (os.environ.get("X402_FACILITATOR_FAIL_OPEN") or "").strip().lower()
+    if raw in ("1", "true", "yes"):
+        return True
+    if raw in ("0", "false", "no"):
+        return False
+    return not _is_production_env()
 
 
 def _effective_x402_enabled_env() -> str:
@@ -293,6 +309,10 @@ def _check_replay(nonce: str) -> bool:
             logger.warning(
                 "[x402] Redis nonce check failed, falling back to memory: %s", exc
             )
+            if _is_production_env() and _is_x402_enabled():
+                raise RuntimeError(
+                    "x402 Redis nonce check failed; refusing in-memory fallback in production"
+                ) from exc
 
     if not _nonce_cache_warned and _is_production_env():
         _nonce_cache_warned = True

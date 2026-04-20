@@ -5,6 +5,7 @@
  * Optional payment hints on 402 only when X402 is enabled and a merchant address exists.
  */
 import type { Request, Response, NextFunction } from "express";
+import { METERING_EXEMPT_PREFIXES } from "@hyperagent/api-contracts";
 import { getGatewayEnv } from "@hyperagent/config";
 import { getSupabaseAdmin } from "./authBootstrap.js";
 import type { RequestWithUser } from "./auth.js";
@@ -22,20 +23,7 @@ function normalizePath(input: string): string {
   return trimmed || "/";
 }
 
-const EXEMPT_PREFIXES = [
-  "/api/v1/credits",
-  "/api/v1/payments",
-  "/api/v1/pricing",
-  "/api/v1/byok",
-  "/api/v1/config",
-  "/api/v1/networks",
-  "/api/v1/tokens/stablecoins",
-  "/api/v1/platform/track-record",
-  "/api/v1/identity",
-  "/api/v1/health",
-  "/api/v1/workspaces/current/llm-keys",
-  "/api/v1/storage/webhooks",
-];
+const EXEMPT_PREFIXES = [...METERING_EXEMPT_PREFIXES];
 
 /**
  * Exported for unit tests. True when this request should not consume credit preflight.
@@ -58,9 +46,6 @@ function absoluteRequestUrl(req: Request, pathOnly: string): string {
   if (!host) return pathOnly;
   return `${proto}://${host}${pathOnly}`;
 }
-
-/** Minimum amount hint for clients that expect maxAmountRequired (USDC 6 decimals; adjust in Payments if needed). */
-const DEFAULT_TOPUP_BASE_UNITS = "1000000";
 
 function buildInsufficientCreditsPayload(opts: {
   req: Request;
@@ -85,10 +70,11 @@ function buildInsufficientCreditsPayload(opts: {
     return base;
   }
 
+  const defaultTopup = getGatewayEnv().billing.defaultTopupBaseUnits || "1000000";
   const resource = absoluteRequestUrl(opts.req, opts.path);
   const paymentRequirements: Record<string, string> = {
     scheme: "exact",
-    maxAmountRequired: DEFAULT_TOPUP_BASE_UNITS,
+    maxAmountRequired: defaultTopup,
     payTo: payTo!,
     resource,
     description: "Insufficient credits. Top up credits or pay via x402, then retry.",
@@ -97,7 +83,7 @@ function buildInsufficientCreditsPayload(opts: {
   base.paymentRequirements = paymentRequirements;
   base.x402 = {
     payTo,
-    maxAmountRequired: DEFAULT_TOPUP_BASE_UNITS,
+    maxAmountRequired: defaultTopup,
     resource,
   };
 

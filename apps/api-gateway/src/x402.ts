@@ -13,33 +13,37 @@
 
 import type { RoutesConfig } from "@x402/core/server";
 import type { Request, Response, NextFunction } from "express";
+import {
+  SKALE_BASE_MAINNET_CAIP,
+  X402_PRICED_PATHS,
+} from "@hyperagent/api-contracts";
 import { log } from "./logger.js";
 
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
 
-const X402_PAY_TO_ADDRESS = process.env.X402_PAY_TO_ADDRESS ?? "";
+const MERCHANT_WALLET = (process.env.MERCHANT_WALLET_ADDRESS ?? "").trim();
+const X402_PAY_TO_RAW = (process.env.X402_PAY_TO_ADDRESS ?? "").trim();
+const X402_PAY_TO_ADDRESS = X402_PAY_TO_RAW || MERCHANT_WALLET;
 const X402_FACILITATOR_URL =
   process.env.X402_FACILITATOR_URL ?? "https://facilitator.payai.network";
 
-// CAIP-2 chain ID for SKALE Base Mainnet
-const SKALE_BASE_MAINNET_CAIP = "eip155:1187947933";
+const PRICED_ROUTES: Record<string, { price: string; network: string }> =
+  X402_PRICED_PATHS;
 
-// Endpoint prices in USD — must stay in sync with billing.py get_endpoint_price()
-const PRICED_ROUTES: Record<string, { price: string; network: string }> = {
-  "/api/v1/workflows/generate": {
-    price: "$0.15",
-    network: SKALE_BASE_MAINNET_CAIP,
-  },
-  "/api/v1/deploy": { price: "$0.15", network: SKALE_BASE_MAINNET_CAIP },
-  "/api/v1/compile": { price: "$0.02", network: SKALE_BASE_MAINNET_CAIP },
-  "/api/v1/audit": { price: "$0.10", network: SKALE_BASE_MAINNET_CAIP },
-};
+function x402EnabledFromEnv(): boolean {
+  const raw = (process.env.X402_ENABLED ?? "").trim().toLowerCase();
+  if (raw === "0" || raw === "false" || raw === "no") {
+    return false;
+  }
+  if (raw === "1" || raw === "true" || raw === "yes") {
+    return true;
+  }
+  return process.env.NODE_ENV === "production";
+}
 
-const X402_ENABLED =
-  !!X402_PAY_TO_ADDRESS &&
-  (process.env.X402_ENABLED ?? "0").toLowerCase() !== "0";
+const X402_ENABLED = !!X402_PAY_TO_ADDRESS && x402EnabledFromEnv();
 
 // ---------------------------------------------------------------------------
 // Helpers

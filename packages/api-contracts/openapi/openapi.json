@@ -715,6 +715,161 @@
         }
       }
     },
+    "/api/v1/workflows/{workflow_id}/quarantine": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Quarantine Workflow Api",
+        "description": "Fail-closed: mark workflow failed and record quarantine reason.",
+        "operationId": "quarantine_workflow_api_api_v1_workflows__workflow_id__quarantine_post",
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workflow Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoveryReasonBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Quarantine Workflow Api Api V1 Workflows  Workflow Id  Quarantine Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflows/{workflow_id}/rollback": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Rollback Workflow Api",
+        "description": "Record rollback request; workflow becomes cancelled.",
+        "operationId": "rollback_workflow_api_api_v1_workflows__workflow_id__rollback_post",
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workflow Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoveryReasonBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Rollback Workflow Api Api V1 Workflows  Workflow Id  Rollback Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflows/{workflow_id}/retry": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Retry Workflow Api",
+        "description": "Re-enqueue pipeline for failed or cancelled workflows with stored intent.",
+        "operationId": "retry_workflow_api_api_v1_workflows__workflow_id__retry_post",
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workflow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Retry Workflow Api Api V1 Workflows  Workflow Id  Retry Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/streaming/workflows/{workflow_id}/code": {
       "get": {
         "tags": [
@@ -1452,31 +1607,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/platform/track-record": {
-      "get": {
-        "tags": [
-          "registry",
-          "legacy"
-        ],
-        "summary": "Get Platform Track Record Legacy Api",
-        "description": "Legacy path. Mirrors /api/v1/platform/track-record.",
-        "operationId": "get_platform_track_record_legacy_api_platform_track_record_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Get Platform Track Record Legacy Api Platform Track Record Get"
                 }
               }
             }
@@ -2626,6 +2756,110 @@
         }
       }
     },
+    "/api/v1/x402/settlement": {
+      "post": {
+        "tags": [
+          "x402"
+        ],
+        "summary": "X402 Settlement Webhook",
+        "description": "Facilitator push: update payment_history for a proof nonce after settlement.",
+        "operationId": "x402_settlement_webhook_api_v1_x402_settlement_post",
+        "parameters": [
+          {
+            "name": "x-facilitator-signature",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Facilitator-Signature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response X402 Settlement Webhook Api V1 X402 Settlement Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/simulation/webhooks/tenderly": {
+      "post": {
+        "tags": [
+          "simulation"
+        ],
+        "summary": "Tenderly Alert Webhook",
+        "description": "Tenderly push: merge alert payload into simulations.results and set status.",
+        "operationId": "tenderly_alert_webhook_api_v1_simulation_webhooks_tenderly_post",
+        "parameters": [
+          {
+            "name": "x-tenderly-signature",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenderly-Signature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Tenderly Alert Webhook Api V1 Simulation Webhooks Tenderly Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/storage/webhooks/pinata": {
       "post": {
         "tags": [
@@ -3338,6 +3572,17 @@
         },
         "type": "object",
         "title": "QuickDemoBody"
+      },
+      "RecoveryReasonBody": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "RecoveryReasonBody"
       },
       "RegisterIdentityBody": {
         "properties": {

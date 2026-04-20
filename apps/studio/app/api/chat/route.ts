@@ -23,7 +23,8 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { jwtVerify } from "jose";
-import { getApiBase } from "@/lib/api";
+import { workflowsGeneratePath } from "@hyperagent/api-contracts";
+import { getApiBase, joinApiUrlForFetch } from "@/lib/api";
 import { tagActiveRootSpanWithRumSession } from "@/lib/datadogTraceContext";
 import { validateInput as guardrailValidateInput } from "@/lib/input-guardrail";
 import { FALLBACK_DEFAULT_NETWORK_ID } from "@/constants/defaults";
@@ -209,7 +210,7 @@ async function callBackendWorkflow(
   };
   if (authHeader) headers.Authorization = authHeader;
   if (userId) headers["X-User-Id"] = userId;
-  const res = await fetch(`${base}/workflows/generate`, {
+  const res = await fetch(joinApiUrlForFetch(base, workflowsGeneratePath()), {
     method: "POST",
     headers,
     body: JSON.stringify({

@@ -1,6 +1,9 @@
 /**
  * OpenZeppelin Contracts Wizard: generate Solidity source from kind + options.
  * Uses @openzeppelin/wizard programmatic API. Returns { filename: source }.
+ * Option objects are allow-listed in `filterOptions` then cast to `print()` args;
+ * the wizard package does not export a single JSON-serializable input type, so the
+ * `as unknown as Parameters<typeof …print>[0]` bridge is intentional.
  */
 import { erc20, erc721, erc1155 } from "@openzeppelin/wizard";
 

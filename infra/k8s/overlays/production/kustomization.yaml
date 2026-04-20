@@ -3,11 +3,28 @@ kind: Kustomization
 namespace: hyperagent-production
 resources:
   - ../../base
+  - pdb.yaml
 patches:
   - path: namespace-patch.yaml
     target:
       kind: Namespace
       name: hyperagent
+  - path: hpa-orchestrator-patch.yaml
+    target:
+      kind: HorizontalPodAutoscaler
+      name: orchestrator-hpa
+  - path: hpa-gateway-patch.yaml
+    target:
+      kind: HorizontalPodAutoscaler
+      name: api-gateway-hpa
+  - path: orchestrator-secrets-required-patch.yaml
+    target:
+      kind: Deployment
+      name: orchestrator
+  - path: api-gateway-secrets-required-patch.yaml
+    target:
+      kind: Deployment
+      name: api-gateway
 labels:
   - includeSelectors: true
     pairs:

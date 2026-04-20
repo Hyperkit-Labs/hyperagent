@@ -7,7 +7,7 @@
  *     authenticated Thirdweb endpoints, avoiding third-party aggregator 403s.
  *   - Custom chains not in Thirdweb's registry: use defineChain with an
  *     explicit RPC URL. Currently: SKALE Base Mainnet and SKALE Base Sepolia
- *     (v0.1.0 launch targets), Mantle, Filecoin.
+ *     (v0.1.0 launch targets), KiteAI Mainnet/Testnet, Mantle, Filecoin.
  *
  * v0.1.0 user-facing support is limited to SKALE Base Mainnet and SKALE Base
  * Sepolia. All other chains are roadmap / configuration scaffolding.
@@ -101,4 +101,22 @@ export const skaleBaseMainnet = defineChain({
       url: "https://skale-base-explorer.skalenodes.com/",
     },
   ],
+});
+
+// --- KiteAI (GoKITE) — custom chain, not in default Thirdweb registry ---
+export const kiteAiTestnet = defineChain({
+  id: 2368,
+  name: "KiteAI Testnet",
+  nativeCurrency: { decimals: 18, name: "KITE", symbol: "KITE" },
+  rpc: "https://rpc-testnet.gokite.ai/",
+  blockExplorers: [{ name: "KiteScan", url: "https://testnet.kitescan.ai/" }],
+  testnet: true,
+});
+
+export const kiteAiMainnet = defineChain({
+  id: 2366,
+  name: "KiteAI Mainnet",
+  nativeCurrency: { decimals: 18, name: "KITE", symbol: "KITE" },
+  rpc: "https://rpc.gokite.ai/",
+  blockExplorers: [{ name: "KiteScan", url: "https://kitescan.ai/" }],
 });

@@ -110,8 +110,12 @@ export interface PlatformTrackRecord {
   vulnerabilities_found: number;
   security_researchers: number;
   contracts_deployed: number;
-  /** Confirmed waitlist rows (separate Supabase) when configured on orchestrator. */
+  /** Confirmed waitlist rows (email confirmed OR status confirmed); separate Supabase when configured. */
   beta_testers_confirmed?: number;
+  /** Total waitlist signups; same semantics as waitlist /api/stats `total`. */
+  waitlist_total?: number;
+  /** Pending confirmations; same semantics as waitlist /api/stats `pending`. */
+  waitlist_pending?: number;
   source?: "database" | "env_defaults";
 }
 

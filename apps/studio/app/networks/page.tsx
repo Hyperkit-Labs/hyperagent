@@ -19,6 +19,7 @@ function NetworkLogo({ id }: { id: string }) {
     src = "/AvalancheLogo_Horizontal_1C_Red.png";
   else if (lowercaseId.includes("mantle")) src = "/MantleNetwork-White.png";
   else if (lowercaseId.includes("skale")) src = "/skale-logo.png";
+  else if (lowercaseId.includes("kite")) src = "/kite-logo.svg";
 
   if (!src) return <Globe className="w-5 h-5 text-[var(--color-text-muted)]" />;
 
@@ -32,9 +33,10 @@ function NetworkLogo({ id }: { id: string }) {
 export default function NetworksPage() {
   const { networks, loading, error, refetch } = useNetworks();
   const list = networks ?? [];
-  const supportedList = list.filter((network) =>
-    network.id.toLowerCase().includes("skale"),
-  );
+  const supportedList = list.filter((network) => {
+    const id = network.id.toLowerCase();
+    return id.includes("skale") || id.includes("kite");
+  });
   const [testing, setTesting] = useState<string | null>(null);
   const [rpcResult, setRpcResult] = useState<
     Record<string, { ok: boolean; latency_ms?: number; error?: string }>
@@ -75,7 +77,7 @@ export default function NetworksPage() {
         <div className="max-w-[1200px] mx-auto space-y-6 animate-enter">
           <PageTitle
             title="Networks"
-            subtitle="Supported v0.1.0 chains and network configuration."
+            subtitle="SKALE Base and KiteAI networks from the chain registry."
           />
 
           {!loading && list.length > supportedList.length && (

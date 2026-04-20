@@ -2,6 +2,13 @@
  * User-owned templates: DB index + IPFS CID (orchestrator /api/v1/user-templates).
  */
 
+import {
+  ApiPaths,
+  artifactFetchPath,
+  artifactPath,
+  userTemplatePath,
+  userTemplateVersionsPath,
+} from "@hyperagent/api-contracts";
 import { fetchJsonAuthed, type FetchJsonOptions } from "./core";
 
 export interface UserTemplateRow {
@@ -48,7 +55,10 @@ export interface PublishTemplateVersionResponse {
 export async function listUserTemplates(
   signal?: AbortSignal,
 ): Promise<{ templates: UserTemplateRow[]; total: number }> {
-  return fetchJsonAuthed("/user-templates", signal ? { signal } : undefined);
+  return fetchJsonAuthed(
+    ApiPaths.userTemplates,
+    signal ? { signal } : undefined,
+  );
 }
 
 export async function createUserTemplate(body: {
@@ -57,7 +67,7 @@ export async function createUserTemplate(body: {
   category?: string;
   project_id?: string;
 }): Promise<{ id: string; status: string }> {
-  return fetchJsonAuthed("/user-templates", {
+  return fetchJsonAuthed(ApiPaths.userTemplates, {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -68,7 +78,7 @@ export async function publishTemplateVersion(
   content: Record<string, unknown>,
   options?: FetchJsonOptions,
 ): Promise<PublishTemplateVersionResponse> {
-  return fetchJsonAuthed(`/user-templates/${templateId}/versions`, {
+  return fetchJsonAuthed(userTemplateVersionsPath(templateId), {
     method: "POST",
     body: JSON.stringify({ content }),
     ...options,
@@ -78,7 +88,7 @@ export async function publishTemplateVersion(
 export async function getUserTemplate(
   templateId: string,
 ): Promise<UserTemplateSummaryResponse> {
-  return fetchJsonAuthed(`/user-templates/${templateId}`);
+  return fetchJsonAuthed(userTemplatePath(templateId));
 }
 
 export async function lookupArtifactByCid(cid: string): Promise<{
@@ -90,14 +100,14 @@ export async function lookupArtifactByCid(cid: string): Promise<{
   pin_status?: string;
   gateway_url?: string | null;
 }> {
-  return fetchJsonAuthed(`/artifacts/${encodeURIComponent(cid)}`);
+  return fetchJsonAuthed(artifactPath(cid));
 }
 
 export async function fetchArtifactJson(
   cid: string,
   body?: { validate_hash?: string | null },
 ): Promise<{ cid: string; content: unknown }> {
-  return fetchJsonAuthed(`/artifacts/${encodeURIComponent(cid)}/fetch`, {
+  return fetchJsonAuthed(artifactFetchPath(cid), {
     method: "POST",
     body: JSON.stringify(body ?? {}),
   });

@@ -1,5 +1,6 @@
 # OpenTelemetry Collector: OTLP in → Tempo (traces), Prometheus scrape (metrics), Loki (logs).
 # Docs: https://opentelemetry.io/docs/collector/
+# tls.insecure and http:// loki are for private Docker networks only; use TLS and CA config for cross-network production.
 
 receivers:
   otlp:

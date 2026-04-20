@@ -15,9 +15,23 @@ spec:
       labels:
         app: orchestrator
     spec:
+      serviceAccountName: hyperagent-orchestrator
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
       containers:
         - name: orchestrator
           image: hyperagent-orchestrator:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           ports:
             - containerPort: 8000
               name: http
@@ -50,6 +64,9 @@ spec:
               port: 8000
             initialDelaySeconds: 5
             periodSeconds: 5
+      volumes:
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

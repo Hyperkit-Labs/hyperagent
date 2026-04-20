@@ -1,4 +1,6 @@
+import type { NextFunction, Response } from "express";
 import { getGatewayEnv } from "@hyperagent/config";
+import type { RequestWithId } from "./requestId.js";
 
 export interface PlatformTrackRecord {
   audits_completed: number;
@@ -66,4 +68,21 @@ export async function fetchTrackRecordWithFallback(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/**
+ * Express handler: try orchestrator, then {@link getTrackRecordFallback} (gateway env).
+ * Use a capped timeout so the login page does not wait for the full proxy budget.
+ */
+export function createPlatformTrackRecordHandler(
+  orchestratorUrl: string,
+  timeoutMs: number,
+): (req: RequestWithId, res: Response, next: NextFunction) => void {
+  return (req, res, next) => {
+    void fetchTrackRecordWithFallback(orchestratorUrl, timeoutMs, req.requestId)
+      .then((payload) => {
+        res.json(payload);
+      })
+      .catch(next);
+  };
 }

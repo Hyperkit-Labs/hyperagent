@@ -171,14 +171,16 @@ export async function createOfficialX402Fetch(
       import("viem"),
     ]);
 
-    // SKALE uses legacy (type 0) transactions only — supply the RPC so the
-    // signer can read on-chain nonces without EIP-1559 gas fields.
-    const skaleRpcs: Record<number, string> = {
+    // Custom RPCs for chains not fully covered by the default viem transport
+    // (SKALE legacy gas; Kite public RPCs for x402 ERC-3009 signing).
+    const chainRpcOverrides: Record<number, string> = {
       1187947933: "https://skale-base.skalenodes.com/v1/base",
       324705682:
         "https://base-sepolia-testnet.skalenodes.com/v1/jubilant-horrible-ancha",
+      2366: "https://rpc.gokite.ai/",
+      2368: "https://rpc-testnet.gokite.ai/",
     };
-    const rpcUrl = skaleRpcs[chainId];
+    const rpcUrl = chainRpcOverrides[chainId];
     const publicClient = rpcUrl
       ? createPublicClient({ transport: http(rpcUrl) })
       : createPublicClient({ transport: http() });

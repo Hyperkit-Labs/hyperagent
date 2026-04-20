@@ -14,8 +14,12 @@ from agents.audit_agent import run_security_audits
 logger = logging.getLogger(__name__)
 
 SCRUBD_PATH = os.environ.get("SCRUBD_PATH", "./data/SCRUBD")
-SCRUBD_VERSION = os.environ.get("SCRUBD_VERSION", "V6.0")
 SCRUBD_REPO = "https://github.com/sujeetc/SCRUBD"
+# Pinned tip of branch V6.0 as of pin date; override with SCRUBD_GIT_COMMIT for reproducible builds.
+SCRUBD_PINNED_COMMIT = "9dba1928d4aea9a5d27014e5f31a8ed0b703f711"
+SCRUBD_GIT_COMMIT = (
+    os.environ.get("SCRUBD_GIT_COMMIT", SCRUBD_PINNED_COMMIT) or SCRUBD_PINNED_COMMIT
+).strip()
 LABELS_CSV = "SCRUBD-CD/data/labels.csv"
 
 
@@ -30,20 +34,41 @@ def _ensure_scrubd() -> Path:
     base.mkdir(parents=True, exist_ok=True)
     try:
         subprocess.run(
+            ["git", "init", str(base)],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        subprocess.run(
+            ["git", "-C", str(base), "remote", "add", "origin", SCRUBD_REPO],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        subprocess.run(
             [
                 "git",
-                "clone",
+                "-C",
+                str(base),
+                "fetch",
                 "--depth",
                 "1",
-                "--branch",
-                SCRUBD_VERSION,
-                SCRUBD_REPO,
-                str(base),
+                "origin",
+                SCRUBD_GIT_COMMIT,
             ],
             check=True,
             capture_output=True,
             text=True,
             timeout=120,
+        )
+        subprocess.run(
+            ["git", "-C", str(base), "checkout", "FETCH_HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
     except (
         subprocess.CalledProcessError,

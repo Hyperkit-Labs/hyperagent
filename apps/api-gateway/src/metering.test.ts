@@ -11,6 +11,16 @@ describe("metering", () => {
     );
     expect(isMeteringExemptPath("/api/v1/byok/status", "GET")).toBe(true);
     expect(isMeteringExemptPath("/api/v1/config", "GET")).toBe(true);
+    expect(isMeteringExemptPath("/config", "GET")).toBe(true);
+    expect(isMeteringExemptPath("/config/integrations-debug", "GET")).toBe(
+      true,
+    );
+    expect(isMeteringExemptPath("/platform/track-record", "GET")).toBe(true);
+    expect(isMeteringExemptPath("/workspaces/current/llm-keys", "GET")).toBe(
+      true,
+    );
+    expect(isMeteringExemptPath("/networks", "GET")).toBe(true);
+    expect(isMeteringExemptPath("/tokens/stablecoins", "GET")).toBe(true);
   });
 
   it("isMeteringExemptPath does not exempt workflows", () => {

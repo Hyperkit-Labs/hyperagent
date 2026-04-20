@@ -6,6 +6,7 @@ import {
   FALLBACK_DEFAULT_NETWORK_ID,
   FALLBACK_DEFAULT_CHAIN_ID,
 } from "@/constants/defaults";
+import { ApiPaths } from "@hyperagent/api-contracts";
 import {
   fetchJson,
   fetchJsonAuthed,
@@ -36,6 +37,8 @@ export interface RuntimeConfig {
   credits_per_usd?: number;
   credits_per_run?: number;
   integrations?: IntegrationsStatus;
+  /** True when orchestrator returned a cached integrations probe (TTL expired or circuit). */
+  integrations_stale?: boolean;
   default_network_id?: string;
   default_chain_id?: number;
   a2a_agent_id?: string | null;
@@ -43,12 +46,12 @@ export interface RuntimeConfig {
   a2a_identity?: Record<string, unknown> | null;
 }
 
-/** One in-flight GET /config so SessionProvider and ConfigProvider (SWR) share a single request. */
+/** One in-flight GET /api/v1/config so SessionProvider and ConfigProvider (SWR) share a single request. */
 let configFetchInflight: Promise<RuntimeConfig> | null = null;
 
 function fetchConfigShared(): Promise<RuntimeConfig> {
   if (!configFetchInflight) {
-    configFetchInflight = fetchJson<RuntimeConfig>("/config", {
+    configFetchInflight = fetchJson<RuntimeConfig>(ApiPaths.config, {
       timeoutMs: CONFIG_BOOTSTRAP_TIMEOUT_MS,
     }).finally(() => {
       configFetchInflight = null;
@@ -59,7 +62,7 @@ function fetchConfigShared(): Promise<RuntimeConfig> {
 
 export async function getConfig(): Promise<RuntimeConfig> {
   return fetchConfigShared().catch((e) => {
-    reportApiError(e, { path: "/config" });
+    reportApiError(e, { path: ApiPaths.config });
     return {
       x402_enabled: false,
       monitoring_enabled: false,
@@ -76,14 +79,27 @@ export async function getConfig(): Promise<RuntimeConfig> {
   });
 }
 
+const CONFIG_BOOTSTRAP_MAX_ATTEMPTS = 3;
+
 export async function fetchConfigStrict(): Promise<RuntimeConfig> {
-  return fetchConfigShared();
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= CONFIG_BOOTSTRAP_MAX_ATTEMPTS; attempt++) {
+    try {
+      return await fetchConfigShared();
+    } catch (e) {
+      lastError = e;
+      if (attempt < CONFIG_BOOTSTRAP_MAX_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, 400 * attempt));
+      }
+    }
+  }
+  throw lastError;
 }
 
 export async function getConfiguredLLMProviders(
   workspaceId?: string,
 ): Promise<{ configured_providers: string[] }> {
-  return fetchJsonAuthed("/workspaces/current/llm-keys", {
+  return fetchJsonAuthed(ApiPaths.workspacesCurrentLlmKeys, {
     credentials: "include",
     headers: workspaceHeaders(workspaceId),
     timeoutMs: BYOK_REQUEST_TIMEOUT_MS,
@@ -109,7 +125,7 @@ export async function setLLMKeys(
   keys: Record<string, string>,
   workspaceId?: string,
 ): Promise<{ configured_providers: string[] }> {
-  return fetchJsonAuthed("/workspaces/current/llm-keys", {
+  return fetchJsonAuthed(ApiPaths.workspacesCurrentLlmKeys, {
     method: "POST",
     headers: workspaceHeaders(workspaceId),
     body: JSON.stringify({ keys }),
@@ -120,7 +136,7 @@ export async function setLLMKeys(
 export async function deleteLLMKeys(
   workspaceId?: string,
 ): Promise<{ success: boolean }> {
-  return fetchJsonAuthed("/workspaces/current/llm-keys", {
+  return fetchJsonAuthed(ApiPaths.workspacesCurrentLlmKeys, {
     method: "DELETE",
     headers: workspaceHeaders(workspaceId),
     timeoutMs: BYOK_REQUEST_TIMEOUT_MS,
@@ -132,7 +148,7 @@ export async function validateLLMKey(
   apiKey?: string,
   workspaceId?: string,
 ): Promise<{ valid: boolean; latency_ms?: number; error?: string }> {
-  return fetchJsonAuthed("/workspaces/current/llm-keys/validate", {
+  return fetchJsonAuthed(ApiPaths.workspacesCurrentLlmKeysValidate, {
     method: "POST",
     headers: workspaceHeaders(workspaceId),
     body: JSON.stringify({ provider, api_key: apiKey || undefined }),

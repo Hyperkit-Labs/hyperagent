@@ -4,6 +4,7 @@ import { useState } from "react";
 import { RefreshCw, Database, Shield } from "lucide-react";
 import { syncErc8004Registry } from "@/lib/api/agentRegistry";
 import { getErrorMessage } from "@/lib/api";
+import { isFeatureEnabled } from "@/config/environment";
 import { useRegistryAgents } from "@/hooks/useRegistryAgents";
 import type { RegistryAgentRow } from "@/lib/api/agentRegistry";
 
@@ -18,8 +19,15 @@ export function RegistryAgentsPanel() {
   const { agents: rows, loading, error, refetch } = useRegistryAgents(100);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const syncUiEnabled = isFeatureEnabled("erc8004Sync");
 
   const onSync = async () => {
+    if (!syncUiEnabled) {
+      setSyncError(
+        "ERC-8004 mirror sync is disabled. Set NEXT_PUBLIC_ERC8004_SYNC_ENABLED=1 when the indexer and POST /erc8004/sync are deployed.",
+      );
+      return;
+    }
     setSyncing(true);
     setSyncError(null);
     try {
@@ -59,7 +67,12 @@ export function RegistryAgentsPanel() {
           <button
             type="button"
             onClick={() => void onSync()}
-            disabled={syncing}
+            disabled={syncing || !syncUiEnabled}
+            title={
+              syncUiEnabled
+                ? undefined
+                : "Enable NEXT_PUBLIC_ERC8004_SYNC_ENABLED when sync is deployed."
+            }
             className="text-xs px-3 py-1.5 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] disabled:opacity-50 flex items-center gap-1.5"
           >
             <Shield className="w-3.5 h-3.5" />

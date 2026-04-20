@@ -7,9 +7,29 @@
 import { simulate, pin } from "./simulateDeploy.js";
 import type { SimulateTxResult } from "@hyperagent/core-types";
 
-const AUDIT_SERVICE_URL = process.env.AUDIT_SERVICE_URL || "http://localhost:8001";
-const COMPILE_SERVICE_URL = process.env.COMPILE_SERVICE_URL || "http://localhost:8004";
-const DEPLOY_SERVICE_URL = process.env.DEPLOY_SERVICE_URL || "http://localhost:8003";
+function resolveAgentServiceUrl(envName: string, devFallback: string): string {
+  const raw = process.env[envName]?.trim();
+  if (raw) return raw.replace(/\/$/, "");
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      `${envName} is required in production (localhost defaults are disabled).`,
+    );
+  }
+  return devFallback.replace(/\/$/, "");
+}
+
+const AUDIT_SERVICE_URL = resolveAgentServiceUrl(
+  "AUDIT_SERVICE_URL",
+  "http://localhost:8001",
+);
+const COMPILE_SERVICE_URL = resolveAgentServiceUrl(
+  "COMPILE_SERVICE_URL",
+  "http://localhost:8004",
+);
+const DEPLOY_SERVICE_URL = resolveAgentServiceUrl(
+  "DEPLOY_SERVICE_URL",
+  "http://localhost:8003",
+);
 
 async function checkedFetch(url: string, init: RequestInit): Promise<unknown> {
   const res = await fetch(url, init);

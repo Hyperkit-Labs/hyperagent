@@ -429,3 +429,82 @@ spec:
         notes:
           - "Use FEVM for storage-related contracts; integrate with IPFS/Filecoin DA."
 
+    # -------------------------------------------------------------------------
+    # KiteAI Mainnet (GoKITE)
+    # -------------------------------------------------------------------------
+    - id: 2366
+      enabled: true
+
+      chainlist:
+        name: KiteAI Mainnet
+        chainId: 2366
+        rpcUrls:
+          - https://rpc.gokite.ai/
+        blockExplorerUrls:
+          - https://kitescan.ai/
+        nativeCurrency:
+          name: KITE
+          symbol: KITE
+          decimals: 18
+        faucets: []
+
+      hyperagent:
+        slug: kite-mainnet
+        category: L1
+        tier: supported
+        capabilities:
+          tenderly: false
+          accountAbstraction:
+            erc4337: false
+            eip7702: false
+          x402: true
+          erc8004: false
+          verification: limited
+        defaults:
+          framework: hardhat
+          gasStrategy: standard
+          securityProfile: strict
+        notes:
+          - "KiteAI Mainnet. x402 verify/settle via Pieverse (KITE_X402_FACILITATOR_URL)."
+          - "USDC.e (Lucid bridge): 0x7aB6f3ed87C42eF0aDb67Ed95090f8bF5240149e — verify on Kitescan before production."
+
+    # -------------------------------------------------------------------------
+    # KiteAI Testnet
+    # -------------------------------------------------------------------------
+    - id: 2368
+      enabled: true
+
+      chainlist:
+        name: KiteAI Testnet
+        chainId: 2368
+        rpcUrls:
+          - https://rpc-testnet.gokite.ai/
+        blockExplorerUrls:
+          - https://testnet.kitescan.ai/
+        nativeCurrency:
+          name: KITE
+          symbol: KITE
+          decimals: 18
+        faucets:
+          - https://faucet.gokite.ai
+
+      hyperagent:
+        slug: kite-testnet
+        category: testnet
+        tier: primary
+        capabilities:
+          tenderly: false
+          accountAbstraction:
+            erc4337: false
+            eip7702: false
+          x402: true
+          erc8004: false
+          verification: limited
+        defaults:
+          framework: hardhat
+          gasStrategy: cheap
+          securityProfile: relaxed
+        notes:
+          - "KiteAI Testnet. x402 via Pieverse when facilitator lists eip155:2368."
+          - "Default USDC for x402 on testnet: not registered until a verified bridge token address is confirmed."
+

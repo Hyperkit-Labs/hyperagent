@@ -2,11 +2,23 @@
 
 from __future__ import annotations
 
+import logging
+import os
 from typing import Any
 
 from registries import _ensure_loaded
 
+logger = logging.getLogger(__name__)
+
 _loaded: dict[str, Any] | None = None
+
+
+def _is_production_env() -> bool:
+    return (
+        os.environ.get("RENDER", "").strip().lower() in ("1", "true", "yes")
+        or os.environ.get("NODE_ENV", "").strip().lower() == "production"
+        or os.environ.get("ENVIRONMENT", "").strip().lower() == "production"
+    )
 
 
 def _get_security_spec() -> dict[str, Any]:
@@ -35,7 +47,14 @@ def get_mandatory_tools() -> list[str]:
     for p in root.get("spec", {}).get("policies", []) or []:
         if p.get("id") == "default":
             return list(p.get("mandatoryTools", []))
-    return ["scrubd", "slither", "mythril", "tenderly"]
+    builtin = ["scrubd", "slither", "mythril", "tenderly"]
+    if _is_production_env():
+        logger.warning(
+            "[policy] mandatory tools missing from registry; using built-in default %s. "
+            "Define spec.security.tools.mandatory (or legacy policies[].mandatoryTools).",
+            builtin,
+        )
+    return builtin
 
 
 def get_deploy_block_severity() -> list[str]:

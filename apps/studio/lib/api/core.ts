@@ -3,6 +3,7 @@
  * All backend calls go through fetchJson. Use getApiBase() for backend URL.
  */
 
+import { isOptionalPublicApiPathForLogging } from "@hyperagent/api-contracts";
 import { getServiceUrl } from "@/config/environment";
 import { getStoredSession } from "@/lib/session-store";
 
@@ -15,6 +16,18 @@ export const getGatewayOrigin = (): string => {
   return base.replace(/\/api\/v1\/?$/, "") || base;
 };
 
+const API_V1_SUFFIX = "/api/v1";
+
+/** Join `getApiBase()` (…/api/v1) with a path. Accepts `/resource` or `/api/v1/resource` without duplicating the prefix. */
+export function joinApiUrlForFetch(baseUrl: string, path: string): string {
+  const b = baseUrl.replace(/\/$/, "");
+  const p = path.startsWith("/") ? path : `/${path}`;
+  if (b.endsWith(API_V1_SUFFIX) && p.startsWith(API_V1_SUFFIX)) {
+    return `${b}${p.slice(API_V1_SUFFIX.length)}`;
+  }
+  return `${b}${p}`;
+}
+
 /** URL for API reference (Swagger UI). */
 export const getDocsUrl = (): string => {
   const env =
@@ -26,14 +39,31 @@ export const getDocsUrl = (): string => {
   return root ? `${root}/docs` : `${apiBase}/../docs`;
 };
 
-/** Request timeout (ms). */
-const API_REQUEST_TIMEOUT_MS = 10000;
+function readPublicTimeoutMs(envName: string, fallbackMs: number): number {
+  if (typeof process === "undefined") return fallbackMs;
+  const raw = process.env[envName]?.trim();
+  if (!raw) return fallbackMs;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : fallbackMs;
+}
 
-/** Longer timeout for BYOK (Settings llm-keys); gateway + KMS can exceed 20s under load. */
-export const BYOK_REQUEST_TIMEOUT_MS = 35000;
+/** Request timeout (ms). Override with `NEXT_PUBLIC_API_REQUEST_TIMEOUT_MS`. */
+const API_REQUEST_TIMEOUT_MS = readPublicTimeoutMs(
+  "NEXT_PUBLIC_API_REQUEST_TIMEOUT_MS",
+  10_000,
+);
 
-/** GET /config bootstrap: cold gateway or upstream can exceed the default 10s. */
-export const CONFIG_BOOTSTRAP_TIMEOUT_MS = 45000;
+/** BYOK (Settings llm-keys). Override with `NEXT_PUBLIC_BYOK_REQUEST_TIMEOUT_MS`. */
+export const BYOK_REQUEST_TIMEOUT_MS = readPublicTimeoutMs(
+  "NEXT_PUBLIC_BYOK_REQUEST_TIMEOUT_MS",
+  35_000,
+);
+
+/** GET /api/v1/config bootstrap. Override with `NEXT_PUBLIC_CONFIG_BOOTSTRAP_TIMEOUT_MS`. */
+export const CONFIG_BOOTSTRAP_TIMEOUT_MS = readPublicTimeoutMs(
+  "NEXT_PUBLIC_CONFIG_BOOTSTRAP_TIMEOUT_MS",
+  45_000,
+);
 
 export const API_UNREACHABLE_MESSAGE =
   "Backend unreachable. Check that the API is running and NEXT_PUBLIC_API_URL is correct.";
@@ -147,11 +177,22 @@ export function reportApiError(
   const isNetworkError =
     error instanceof TypeError &&
     (error.message === "Failed to fetch" || error.message === "Load failed");
-  const optionalPublicPaths =
-    path === "/config" ||
-    path === "/platform/track-record" ||
-    path?.endsWith("/platform/track-record");
-  if (optionalPublicPaths && isNetworkError) return;
+  if (isOptionalPublicApiPathForLogging(path) && isNetworkError) {
+    // Avoid noisy console on login when the API is down; still surface in dev.
+    if (
+      typeof process !== "undefined" &&
+      process.env.NODE_ENV !== "production" &&
+      typeof console !== "undefined" &&
+      console.debug
+    ) {
+      console.debug(
+        "[API] optional public path unreachable (network)",
+        path,
+        error instanceof Error ? error.message : error,
+      );
+    }
+    return;
+  }
   const msg = error instanceof Error ? error.message : String(error);
   if (typeof console !== "undefined" && console.error) {
     console.error("[API]", msg, context);
@@ -225,7 +266,7 @@ export async function fetchJson<T>(
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-      const res = await fetch(`${base()}${path}`, {
+      const res = await fetch(joinApiUrlForFetch(base(), path), {
         ...init,
         signal: init.signal ?? controller.signal,
         credentials: "include",
@@ -324,6 +365,19 @@ export async function fetchJson<T>(
       }
       if (attempt < maxRetries - 1 && error instanceof TypeError) {
         lastError = error as Error;
+        if (
+          typeof process !== "undefined" &&
+          process.env.NODE_ENV !== "production" &&
+          typeof console !== "undefined" &&
+          console.debug
+        ) {
+          console.debug(
+            "[API] retry after transport error",
+            path,
+            `attempt ${attempt + 1}/${maxRetries}`,
+            error.message,
+          );
+        }
         await new Promise((resolve) =>
           setTimeout(resolve, retryDelay * (attempt + 1)),
         );

@@ -72,7 +72,7 @@
     "thirdweb": "^5.119.3",
     "vaul": "^1.1.2",
     "viem": "2.39.0",
-    "zustand": "^5.0.11"
+    "zustand": "^5.0.12"
   },
   "optionalDependencies": {
     "@next/swc-darwin-arm64": "16.2.2",

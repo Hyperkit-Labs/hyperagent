@@ -3,6 +3,10 @@
  */
 
 import { FALLBACK_DEFAULT_CHAIN_ID } from "@/constants/defaults";
+import {
+  workflowDeployCompletePath,
+  workflowDeployPreparePath,
+} from "@hyperagent/api-contracts";
 import { fetchJsonAuthed } from "./core";
 
 export interface PrepareDeployParams {
@@ -17,7 +21,7 @@ export async function prepareDeploymentTransaction(
   const chainId = params?.chainId ?? FALLBACK_DEFAULT_CHAIN_ID;
   const mainnet_confirm = params?.mainnet_confirm ?? false;
   const qs = new URLSearchParams({ chain_id: String(chainId) });
-  return fetchJsonAuthed(`/workflows/${workflowId}/deploy/prepare?${qs}`, {
+  return fetchJsonAuthed(workflowDeployPreparePath(workflowId, qs.toString()), {
     method: "POST",
     body: JSON.stringify({ mainnet_confirm }),
   });
@@ -33,7 +37,7 @@ export async function completeDeployment(
     chainId?: number;
   },
 ): Promise<unknown> {
-  return fetchJsonAuthed(`/workflows/${workflowId}/deploy/complete`, {
+  return fetchJsonAuthed(workflowDeployCompletePath(workflowId), {
     method: "POST",
     body: JSON.stringify(body),
   });

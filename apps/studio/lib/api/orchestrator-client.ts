@@ -3,8 +3,9 @@
  */
 import { createOrchestratorClient } from "@hyperagent/api-contracts";
 
-import { getApiBase } from "./core";
+import { getGatewayOrigin } from "./core";
 
 export function getOrchestratorClient() {
-  return createOrchestratorClient(getApiBase());
+  // OpenAPI paths include `/api/v1/...`; base must be origin only (no `/api/v1` suffix).
+  return createOrchestratorClient(getGatewayOrigin());
 }

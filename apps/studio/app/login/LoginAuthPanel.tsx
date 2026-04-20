@@ -186,8 +186,8 @@ function TrackRecordMetricVisual({ item }: { item: TrackRecordItem }) {
   }
 
   const tooltipBody =
-    item.label === "Team"
-      ? "Security researchers contributing reviews, bounty triage, and audit feedback. The plus indicates additional collaborators beyond the base count when the platform reports a range."
+    item.label === "Users"
+      ? "Confirmed beta testers on the waitlist (verified email and wallet). The count refreshes while this page is open."
       : "Smart contracts deployed through Hyperkit, including publishes tracked after successful pipeline runs.";
 
   return (
@@ -219,9 +219,9 @@ const BORDER_GLOW_COLORS = ["#a78bfa", "#818cf8", "#c4b5fd"] as const;
 
 /** Short tab strip labels so four tabs fit without truncation in narrow cards */
 const TRACK_TAB_STRIP_LABEL: Record<string, string> = {
+  Users: "Users",
   Audits: "Audits",
   Vulnerabilities: "Vulns",
-  Team: "Team",
   Deployments: "Deploy",
 };
 

@@ -207,9 +207,14 @@ check-env:
 			echo "[!] Warning: CORS_ORIGINS not set or using wildcard"; \
 		fi; \
 		if grep -q "JWT_SECRET_KEY" .env && ! grep -q "JWT_SECRET_KEY=change-me" .env; then \
-			echo "[+] JWT_SECRET_KEY is configured"; \
+			echo "[+] JWT_SECRET_KEY is configured (orchestrator/agent-session HS256)"; \
 		else \
 			echo "[!] Warning: JWT_SECRET_KEY not set or using default"; \
+		fi; \
+		if grep -qE '^AUTH_JWT_SECRET=.' .env && ! grep -qE '^AUTH_JWT_SECRET=change-me' .env; then \
+			echo "[+] AUTH_JWT_SECRET is configured (gateway/Studio user JWT)"; \
+		else \
+			echo "[!] Warning: AUTH_JWT_SECRET missing, empty, or placeholder"; \
 		fi; \
 		if grep -q "POSTGRES_PASSWORD" .env; then \
 			echo "[+] POSTGRES_PASSWORD is configured"; \
@@ -231,7 +236,11 @@ validate-prod:
 		exit 1; \
 	fi
 	@if [ -z "$$JWT_SECRET_KEY" ] || [ "$$JWT_SECRET_KEY" = "change-me-in-production" ]; then \
-		echo "[!] Error: JWT_SECRET_KEY must be set to a secure value in production"; \
+		echo "[!] Error: JWT_SECRET_KEY must be set to a secure value in production (orchestrator/agent-session)"; \
+		exit 1; \
+	fi
+	@if [ -z "$$AUTH_JWT_SECRET" ] || [ "$$AUTH_JWT_SECRET" = "change-me-in-production" ]; then \
+		echo "[!] Error: AUTH_JWT_SECRET must be set to a secure value in production (gateway/Studio user JWT)"; \
 		exit 1; \
 	fi
 	@if [ -z "$$POSTGRES_PASSWORD" ]; then \

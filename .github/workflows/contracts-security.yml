@@ -16,8 +16,8 @@ permissions:
   contents: read
 
 jobs:
-  foundry-slither-echidna:
-    name: Foundry + Slither + Echidna smoke
+  foundry-slither:
+    name: Foundry + Slither
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -52,6 +52,26 @@ jobs:
             --config-file ../../packages/contract-security-rules/slither.config.json \
             --fail-on high
 
+  echidna-fuzz:
+    name: Echidna fuzz (required)
+    runs-on: ubuntu-latest
+    needs: [foundry-slither]
+    defaults:
+      run:
+        working-directory: contracts/evm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install forge-std
+        run: forge install foundry-rs/forge-std@v1.9.4
+
+      - name: Forge build
+        run: forge build
+
       - name: Install Echidna
         run: |
           cd /tmp
@@ -61,6 +81,6 @@ jobs:
           sudo chmod +x /usr/local/bin/echidna
           echidna --version
 
-      - name: Echidna smoke
+      - name: Echidna
         working-directory: contracts/evm
         run: echidna . --config echidna.config.yml

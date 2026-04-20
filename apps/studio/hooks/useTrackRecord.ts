@@ -23,6 +23,12 @@ function normalizeRecord(data: PlatformTrackRecord): PlatformTrackRecord {
       typeof data.beta_testers_confirmed === "number"
         ? data.beta_testers_confirmed
         : 0,
+    waitlist_total:
+      typeof data.waitlist_total === "number" ? data.waitlist_total : undefined,
+    waitlist_pending:
+      typeof data.waitlist_pending === "number"
+        ? data.waitlist_pending
+        : undefined,
   };
 }
 
@@ -50,15 +56,22 @@ export function useTrackRecord() {
     };
   }, []);
 
-  const betaUsers = record.beta_testers_confirmed ?? 0;
+  /** Match waitlist hero "Total Joined" when backend returns waitlist_total (WAITLIST_SUPABASE_* on orchestrator). */
+  const waitlistUsers =
+    typeof record.waitlist_total === "number"
+      ? record.waitlist_total
+      : (record.beta_testers_confirmed ?? 0);
 
   const trackRecord = [
     {
       label: "Users",
-      value: betaUsers,
+      value: waitlistUsers,
       prefix: "",
       suffix: "",
-      desc: "Beta testers",
+      desc:
+        typeof record.waitlist_total === "number"
+          ? "Waitlist signups"
+          : "Beta confirmations",
     },
     {
       label: "Audits",

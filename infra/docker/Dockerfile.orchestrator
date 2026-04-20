@@ -5,6 +5,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends git \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
-RUN mkdir -p /app/data && git clone --depth 1 --branch V6.0 https://github.com/sujeetc/SCRUBD /app/data/SCRUBD
+ARG SCRUBD_GIT_SHA=9dba1928d4aea9a5d27014e5f31a8ed0b703f711
+RUN mkdir -p /app/data/SCRUBD \
+    && git init /app/data/SCRUBD \
+    && git -C /app/data/SCRUBD remote add origin https://github.com/sujeetc/SCRUBD.git \
+    && git -C /app/data/SCRUBD fetch --depth 1 origin ${SCRUBD_GIT_SHA} \
+    && git -C /app/data/SCRUBD checkout FETCH_HEAD
+RUN useradd --system --uid 10001 --no-create-home appuser \
+    && chown -R appuser:appuser /app
+USER appuser
 EXPOSE 8000
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

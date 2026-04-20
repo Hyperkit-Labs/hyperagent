@@ -18,3 +18,37 @@ groups:
           severity: warning
         annotations:
           summary: "Slow Prometheus scrape of OTel collector"
+
+      - alert: WorkflowFailureRateHigh
+        expr: |
+          (
+            sum(rate(hyperagent_pipeline_runs_failed_total[10m]))
+            /
+            (sum(rate(hyperagent_pipeline_runs_total[10m])) + 1e-9)
+          ) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pipeline failure rate above 10% (rolling 10m)"
+          description: "Tune threshold; requires hyperagent_pipeline_runs_* metrics from orchestrator."
+
+      - alert: HighOrchestratorLatencyP99
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(hyperagent_request_latency_seconds_bucket[5m])) by (le)
+          ) > 30
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P99 HTTP latency high on orchestrator histogram"
+
+      - alert: X402ReplayBurst
+        expr: increase(hyperagent_x402_replay_blocked_total[1m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Elevated x402 replay blocks (possible abuse or client bug)"

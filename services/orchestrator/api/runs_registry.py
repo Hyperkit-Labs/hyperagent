@@ -298,8 +298,9 @@ def get_stablecoins_api() -> dict[str, dict[str, str]]:
 def get_platform_track_record_api() -> dict[str, Any]:
     """Return platform track record stats for login page. Public.
 
-    When WAITLIST_SUPABASE_* is set, includes beta_testers_confirmed (waitlist_entries with
-    status=confirmed and email_confirmed=true).
+    When WAITLIST_SUPABASE_URL and WAITLIST_SUPABASE_SERVICE_KEY are set, includes waitlist
+    aggregates matching waitlist/src/app/api/stats/route.ts: waitlist_total, waitlist_pending,
+    and beta_testers_confirmed (confirmed = email_confirmed OR status=confirmed).
     """
     audits = int(os.environ.get("PLATFORM_AUDITS_COMPLETED", "0"))
     vulnerabilities = int(os.environ.get("PLATFORM_VULNERABILITIES_FOUND", "0"))
@@ -354,9 +355,11 @@ def get_platform_track_record_api() -> dict[str, Any]:
         "contracts_deployed": contracts_deployed,
         "source": source,
     }
-    beta_n = waitlist_client.count_confirmed_beta_testers()
-    if beta_n is not None:
-        payload["beta_testers_confirmed"] = beta_n
+    ws = waitlist_client.get_waitlist_public_stats()
+    if ws is not None:
+        payload["waitlist_total"] = ws["total"]
+        payload["waitlist_pending"] = ws["pending"]
+        payload["beta_testers_confirmed"] = ws["confirmed"]
     return payload
 
 

@@ -92,7 +92,10 @@ function buildModel(
     case "google":
       return createGoogleGenerativeAI({ apiKey })("gemini-2.0-flash");
     case "anthropic":
-      return createAnthropic({ apiKey })("claude-3-5-sonnet-20241022");
+      // @ai-sdk/anthropic v3 exposes LanguageModelV3; `ai` 4.x types streamText as LanguageModelV1.
+      return createAnthropic({ apiKey })(
+        "claude-3-5-sonnet-20241022",
+      ) as unknown as LanguageModelV1;
   }
 }
 

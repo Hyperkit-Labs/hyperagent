@@ -5,6 +5,7 @@
 # SKALE Base Mainnet (1187947933) tokens are IMA-bridged from Base mainnet.
 # SKALE Base Sepolia (324705682) tokens are IMA-bridged from Base Sepolia.
 # All SKALE token transfers are gasless (CREDIT is native, not charged for ERC-20 transfers).
+# KiteAI Mainnet (2366) USDC.e: Lucid bridge deployment — verify on Kitescan before changing.
 apiVersion: hyperkitlabs.com/v1
 kind: StablecoinRegistry
 metadata:
@@ -46,6 +47,11 @@ spec:
           address: "0x85889c8c714505E0c94b30fcfcF64fE3Ac8FCb20"
           native: false
           notes: "USDC.e bridged via SKALE IMA from Base mainnet"
+        # KiteAI Mainnet — USDC.e via Lucid bridge (6 decimals)
+        - chainId: 2366
+          address: "0x7aB6f3ed87C42eF0aDb67Ed95090f8bF5240149e"
+          native: false
+          notes: "USDC.e on KiteAI Mainnet (Lucid bridge); verify from Kite bridge docs / Kitescan"
 
     - symbol: USDT
       name: Tether USD
@@ -162,3 +168,5 @@ spec:
     # SKALE Base chains — USDC.e via IMA bridge, gasless transfers on SKALE
     1187947933: USDC
     324705682: USDC
+    # KiteAI Mainnet — USDC.e via Lucid bridge
+    2366: USDC

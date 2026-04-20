@@ -426,17 +426,33 @@ class TestQueueCompensation:
 
 
 class TestX402NonceCacheRedis:
-    """Tests that nonce cache prefers Redis and logs prod warning on fallback."""
+    """Nonce replay uses Redis when x402 requires it; dev may use in-memory."""
 
     @patch("x402_middleware._redis_client", return_value=None)
-    @patch.dict(os.environ, {"NODE_ENV": "production"})
-    def test_check_replay_warns_in_production_without_redis(self, _redis):
+    @patch.dict(
+        os.environ,
+        {"NODE_ENV": "production", "X402_ENABLED": "1"},
+        clear=False,
+    )
+    def test_check_replay_raises_when_x402_requires_redis_but_none(self, _redis):
         import x402_middleware
 
         x402_middleware._nonce_cache.clear()
         x402_middleware._nonce_cache_warned = False
 
-        is_replay = x402_middleware._check_replay("test_prod_nonce_1")
+        with pytest.raises(RuntimeError, match="x402 replay protection requires Redis"):
+            x402_middleware._check_replay("test_prod_nonce_1")
+
+    @patch("x402_middleware._redis_client", return_value=None)
+    @patch.dict(
+        os.environ, {"NODE_ENV": "production", "X402_ENABLED": "0"}, clear=False
+    )
+    def test_check_replay_inmemory_when_x402_off_in_production(self, _redis):
+        import x402_middleware
+
+        x402_middleware._nonce_cache.clear()
+        x402_middleware._nonce_cache_warned = False
+        is_replay = x402_middleware._check_replay("test_prod_nonce_inmem")
         assert is_replay is False
 
     @patch("x402_middleware._redis_client")

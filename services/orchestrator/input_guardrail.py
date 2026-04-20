@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import logging
 import re
+import unicodedata
 from typing import Tuple
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,15 @@ FORBIDDEN_PATTERNS: tuple[str, ...] = (
     r"```system\b",
 )
 
+# Zero-width and format characters often used to evade substring deny-lists.
+_ZW_SPACE_RE = re.compile(r"[\u200B-\u200D\uFEFF\u2060-\u206F]")
+
+
+def _normalize_for_guardrail(text: str) -> str:
+    """Unicode NFKC plus strip zero-width homoglyph tricks before scanning."""
+    folded = unicodedata.normalize("NFKC", text)
+    return _ZW_SPACE_RE.sub("", folded)
+
 
 def validate_input(user_prompt: str) -> Tuple[bool, str | None]:
     """Validate user prompt against deny-list. Returns (passed, violation_message).
@@ -64,7 +74,7 @@ def validate_input(user_prompt: str) -> Tuple[bool, str | None]:
     if not user_prompt or not isinstance(user_prompt, str):
         return False, "Empty or invalid input"
 
-    text = user_prompt.strip()
+    text = _normalize_for_guardrail(user_prompt.strip())
     if not text:
         return False, "Empty input"
 

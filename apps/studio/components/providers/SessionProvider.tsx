@@ -88,7 +88,7 @@ function logAuth(...args: unknown[]) {
 }
 
 /**
- * Single owner of session + authenticated bootstrap (GET /config).
+ * Single owner of session + authenticated bootstrap (GET /api/v1/config).
  * Clears session and redirects only on 401/403. 503/429 stay logged-in with bootstrapError + retry.
  */
 export function SessionProvider({ children }: { children: ReactNode }) {

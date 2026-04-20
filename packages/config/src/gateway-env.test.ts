@@ -44,7 +44,7 @@ describe("buildGatewayEnv", () => {
     ).toBe(false);
   });
 
-  it("x402 hints only when explicitly enabled", () => {
+  it("x402 hints follow explicit flag or default on in production", () => {
     expect(
       buildGatewayEnv({ [Env.X402_ENABLED]: "true" } as NodeJS.ProcessEnv).billing.x402EnabledForHints,
     ).toBe(true);
@@ -52,6 +52,16 @@ describe("buildGatewayEnv", () => {
       buildGatewayEnv({ [Env.X402_ENABLED]: "false" } as NodeJS.ProcessEnv).billing.x402EnabledForHints,
     ).toBe(false);
     expect(buildGatewayEnv({} as NodeJS.ProcessEnv).billing.x402EnabledForHints).toBe(false);
+    expect(
+      buildGatewayEnv({ [Env.NODE_ENV]: "production" } as NodeJS.ProcessEnv).billing
+        .x402EnabledForHints,
+    ).toBe(true);
+    expect(
+      buildGatewayEnv({
+        [Env.NODE_ENV]: "production",
+        [Env.X402_ENABLED]: "0",
+      } as NodeJS.ProcessEnv).billing.x402EnabledForHints,
+    ).toBe(false);
   });
 
   it("x402 uses shared yes/no boolean semantics", () => {
@@ -85,6 +95,21 @@ describe("buildGatewayEnv", () => {
         [Env.REQUIRE_AUTH]: "false",
       } as NodeJS.ProcessEnv).auth.requireAuth,
     ).toBe(true);
+  });
+
+  it("CORS: dev defaults to localhost:3000; production has no default origin", () => {
+    expect(
+      buildGatewayEnv({ [Env.NODE_ENV]: "development" } as NodeJS.ProcessEnv).corsOrigins,
+    ).toEqual(["http://localhost:3000"]);
+    expect(
+      buildGatewayEnv({ [Env.NODE_ENV]: "production" } as NodeJS.ProcessEnv).corsOrigins,
+    ).toEqual([]);
+    expect(
+      buildGatewayEnv({
+        [Env.NODE_ENV]: "production",
+        [Env.CORS_ORIGINS]: "https://app.example.com",
+      } as NodeJS.ProcessEnv).corsOrigins,
+    ).toEqual(["https://app.example.com"]);
   });
 
   it("parses RATE_LIMIT_BYPASS_ON_FAIL with shared boolean semantics", () => {

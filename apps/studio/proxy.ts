@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { jwtVerify } from "jose";
 import { buildStudioConnectSrcDirective } from "@hyperagent/config";
 import { ROUTES } from "@/constants/routes";
 
@@ -90,7 +91,10 @@ function redirectToLogin(request: NextRequest): NextResponse {
   return NextResponse.redirect(url);
 }
 
-function _isValidJwt(token: string): boolean {
+/**
+ * Dev fallback when `AUTH_JWT_SECRET` is unset: structural check + `exp` only.
+ */
+function jwtLooksValidAndNotExpired(token: string): boolean {
   try {
     const parts = token.split(".");
     if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return false;
@@ -105,12 +109,39 @@ function _isValidJwt(token: string): boolean {
   }
 }
 
+/** HS256 verify with `AUTH_JWT_SECRET` (same secret as gateway bootstrap). */
+async function sessionTokenIsValid(token: string): Promise<boolean> {
+  const secret = process.env.AUTH_JWT_SECRET?.trim();
+  if (secret) {
+    try {
+      await jwtVerify(token, new TextEncoder().encode(secret), {
+        algorithms: ["HS256"],
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  if (process.env.NODE_ENV === "production") {
+    return false;
+  }
+  return jwtLooksValidAndNotExpired(token);
+}
+
 const E2E_BYPASS_COOKIE = "PLAYWRIGHT_E2E";
+
+function e2eBypassEnvAllowed(): boolean {
+  return (
+    process.env.PLAYWRIGHT_E2E_ALLOW === "1" ||
+    process.env.CI === "true" ||
+    process.env.NODE_ENV === "test"
+  );
+}
 
 /**
  * Next.js 16+ proxy (replaces deprecated middleware file name). Edge runtime; uses @hyperagent/config for CSP connect-src.
  */
-export function proxy(request: NextRequest): NextResponse {
+export async function proxy(request: NextRequest): Promise<NextResponse> {
   const pathname = request.nextUrl.pathname;
   const nonce = generateNonce();
 
@@ -129,8 +160,17 @@ export function proxy(request: NextRequest): NextResponse {
       request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
       request.cookies.get(SESSION_TOKEN_COOKIE_NAME)?.value;
 
-    if (!token || !_isValidJwt(token)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!token) {
+      return NextResponse.json(
+        { error: "Unauthorized", code: "missing_token" },
+        { status: 401 },
+      );
+    }
+    if (!(await sessionTokenIsValid(token))) {
+      return NextResponse.json(
+        { error: "Unauthorized", code: "invalid_token" },
+        { status: 401 },
+      );
     }
 
     return nextWithCsp(request, nonce);
@@ -138,6 +178,7 @@ export function proxy(request: NextRequest): NextResponse {
 
   if (
     process.env.NODE_ENV !== "production" &&
+    e2eBypassEnvAllowed() &&
     request.cookies.get(E2E_BYPASS_COOKIE)?.value === "1"
   ) {
     const res = nextWithCsp(request, nonce);
@@ -152,10 +193,17 @@ export function proxy(request: NextRequest): NextResponse {
 
   const rawToken = request.cookies.get(SESSION_TOKEN_COOKIE_NAME)?.value;
   if (rawToken) {
-    if (!_isValidJwt(rawToken)) {
+    if (!(await sessionTokenIsValid(rawToken))) {
       return redirectToLogin(request);
     }
     return nextWithCsp(request, nonce);
+  }
+
+  const secretConfigured = Boolean(process.env.AUTH_JWT_SECRET?.trim());
+  const requireSignedBrowserSession =
+    process.env.NODE_ENV === "production" || secretConfigured;
+  if (requireSignedBrowserSession) {
+    return redirectToLogin(request);
   }
 
   const now = Math.floor(Date.now() / 1000);

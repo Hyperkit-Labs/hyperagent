@@ -1,4 +1,11 @@
-export { Env } from "./keys.js";
+export { Env, EnvConfig, EnvFlat, EnvSecrets } from "./keys.js";
+export {
+  allTaxonomySecretKeys,
+  crossServiceSecretKeys,
+  gatewayNonSecretConfigKeys,
+  gatewaySensitiveSecretKeys,
+  publicBrowserEnvKeys,
+} from "./env-taxonomy.js";
 export {
   parseEnvBool,
   parseEnvInt,

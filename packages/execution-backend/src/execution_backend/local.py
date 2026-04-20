@@ -1,14 +1,35 @@
 """Local execution backend: uses existing HTTP services (compile, audit)."""
 
 import os
+import re
 from typing import Any
 
 import httpx
 
 from .protocol import AuditResult, CompileResult, ExploitSimResult, GasBenchmarkResult
 
-COMPILE_SERVICE_URL = os.environ.get("COMPILE_SERVICE_URL", "http://localhost:8004").rstrip("/")
-AUDIT_SERVICE_URL = os.environ.get("AUDIT_SERVICE_URL", "http://localhost:8001").rstrip("/")
+_TOOL_NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{0,63}$", re.IGNORECASE)
+
+
+def _is_production_env() -> bool:
+    n = (os.environ.get("NODE_ENV") or "").strip().lower()
+    e = (os.environ.get("ENV") or "").strip().lower()
+    return n == "production" or e in ("production", "prod")
+
+
+def _service_base_url(env_var: str, dev_default: str) -> str:
+    raw = (os.environ.get(env_var) or "").strip()
+    if raw:
+        return raw.rstrip("/")
+    if _is_production_env():
+        raise RuntimeError(
+            f"{env_var} is required in production (no localhost default for LocalBackend).",
+        )
+    return dev_default.rstrip("/")
+
+
+COMPILE_SERVICE_URL = _service_base_url("COMPILE_SERVICE_URL", "http://localhost:8004")
+AUDIT_SERVICE_URL = _service_base_url("AUDIT_SERVICE_URL", "http://localhost:8001")
 TOOLS_BASE_URL = (os.environ.get("TOOLS_BASE_URL") or "").rstrip("/")
 TOOLS_API_KEY = os.environ.get("TOOLS_API_KEY", "")
 
@@ -77,7 +98,10 @@ class LocalBackend:
         url = f"{self.audit_url}/audit"
         if self.tools_url:
             url = f"{self.tools_url}/audit"
-        tool_list = tools or ["slither", "mythril"]
+        raw_tools = tools or ["slither", "mythril"]
+        tool_list = [t.strip() for t in raw_tools if _TOOL_NAME_RE.match(t.strip())]
+        if not tool_list:
+            tool_list = ["slither", "mythril"]
         try:
             async with httpx.AsyncClient(timeout=180) as client:
                 r = await client.post(

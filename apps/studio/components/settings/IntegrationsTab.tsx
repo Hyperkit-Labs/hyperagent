@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { ApiPaths } from "@hyperagent/api-contracts";
 import type { RuntimeConfig } from "@/lib/api";
+import { getApiBase, joinApiUrlForFetch } from "@/lib/api/core";
 
 interface IntegrationsTabProps {
   config: RuntimeConfig | null;
@@ -105,8 +107,10 @@ export function IntegrationsTab({
       setTestState((s) => ({ ...s, [name]: "loading" }));
       setTestDetail((d) => ({ ...d, [name]: "" }));
       try {
-        const base = apiBase || "";
-        const url = `${base}/api/v1/integrations-debug`;
+        const url = joinApiUrlForFetch(
+          (apiBase || getApiBase()).replace(/\/$/, ""),
+          ApiPaths.configIntegrationsDebug,
+        );
         const res = await fetch(url, { credentials: "include" });
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}`);

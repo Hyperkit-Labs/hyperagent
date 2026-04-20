@@ -86,11 +86,21 @@ jobs:
       - name: Run Bandit security linter (orchestrator)
         run: |
           pip install bandit
-          bandit -r services/orchestrator/ -f json -o bandit-report.json -x '*/data/*' || true
-          bandit -r services/orchestrator/ -x '*/data/*' || true
-      
-      - name: Run Trivy vulnerability scanner (fail on CRITICAL)
+          bandit -r services/orchestrator/ -f json -o bandit-report.json -x '*/data/*' --exit-zero
+          bandit -r services/orchestrator/ -x '*/data/*'
+
+      - name: Run Trivy filesystem scan (CRITICAL — blocking)
         uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          severity: 'CRITICAL'
+          exit-code: '1'
+
+      - name: Run Trivy filesystem scan (HIGH+CRITICAL SARIF, informational)
+        uses: aquasecurity/trivy-action@master
+        if: always()
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -98,9 +108,7 @@ jobs:
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
           exit-code: '0'
-        # exit-code '0': dependency CVEs are reported via SARIF upload to GitHub Security tab
-        # but do not block the pipeline. Fix vulnerabilities via Dependabot PRs.
-      
+
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
         if: always()
@@ -130,7 +138,6 @@ jobs:
 
       - name: pnpm audit (Node)
         run: pnpm audit --audit-level=high
-        continue-on-error: true
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -142,8 +149,7 @@ jobs:
         run: pip install pip-audit
 
       - name: pip-audit (orchestrator)
-        run: pip-audit -r services/orchestrator/requirements.txt --desc --ignore-vuln PYSEC-2024-* || true
-        continue-on-error: true
+        run: pip-audit -r services/orchestrator/requirements.txt --desc --ignore-vuln PYSEC-2024-*
 
   # ============================================================================
   # STAGE 2.5: GATEWAY BUILD GATE
@@ -527,6 +533,7 @@ jobs:
         env:
           POSTGRES_PASSWORD: test_password_ci_12345
           JWT_SECRET_KEY: test_jwt_secret_key_ci_12345
+          AUTH_JWT_SECRET: test_auth_jwt_secret_ci_12345
         run: |
           docker compose --project-directory . -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.ci.yml up -d
           sleep 45

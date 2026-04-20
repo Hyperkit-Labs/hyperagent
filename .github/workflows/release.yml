@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   packages: write
+  id-token: write
 
 jobs:
   validate-tag:
@@ -129,6 +130,7 @@ jobs:
             type=semver,pattern={{major}}
       
       - name: Build and push backend
+        id: push-backend
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -141,8 +143,24 @@ jobs:
           build-args: |
             VERSION=${{ github.ref_name }}
             COMMIT_SHA=${{ github.sha }}
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign backend image (keyless)
+        env:
+          COSIGN_EXPERIMENTAL: 1
+        run: |
+          cosign sign --yes "ghcr.io/${{ github.repository }}/backend@${{ steps.push-backend.outputs.digest }}"
+
+      - name: Generate SBOM (backend)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ghcr.io/${{ github.repository }}/backend@${{ steps.push-backend.outputs.digest }}
+          artifact-name: sbom-backend.spdx.json
       
       - name: Build and push frontend
+        id: push-frontend
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -173,6 +191,18 @@ jobs:
             NEXT_PUBLIC_DD_RUM_DEBUG=${{ vars.NEXT_PUBLIC_DD_RUM_DEBUG }}
             NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN || secrets.NEXT_PUBLIC_SENTRY_DSN }}
             NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE=${{ vars.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE }}
+
+      - name: Sign frontend image (keyless)
+        env:
+          COSIGN_EXPERIMENTAL: 1
+        run: |
+          cosign sign --yes "ghcr.io/${{ github.repository }}/frontend@${{ steps.push-frontend.outputs.digest }}"
+
+      - name: Generate SBOM (frontend)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ghcr.io/${{ github.repository }}/frontend@${{ steps.push-frontend.outputs.digest }}
+          artifact-name: sbom-frontend.spdx.json
 
   generate-changelog:
     name: Generate Changelog
@@ -260,7 +290,7 @@ jobs:
             2. Manually sync in ArgoCD dashboard
             3. Monitor deployment health
             
-            **Approval Required:** @JustineDevs or @ArhonJay
+            **Production:** Use GitHub **Environment** protection rules and required reviewers for `production` (this workflow gates `update-argocd-production` on that environment).
             
             ## 📝 Documentation
             
@@ -282,14 +312,11 @@ jobs:
       
       - name: Update production manifests
         run: |
-          # Update k8s production overlay to point to new tag
-          cd k8s/overlays/production
-          
+          cd infra/k8s/overlays/production
           kustomize edit set image \
-            hyperagent-backend=${{ needs.build-and-push-release.outputs.backend_image }}
-          
+            hyperagent-orchestrator=ghcr.io/${{ github.repository }}/backend:${{ github.ref_name }}
           kustomize edit set image \
-            hyperagent-frontend=${{ needs.build-and-push-release.outputs.frontend_image }}
+            hyperagent-api-gateway=ghcr.io/${{ github.repository }}/frontend:${{ github.ref_name }}
       
       - name: Create PR to main with manifest updates
         run: |
@@ -297,7 +324,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
           git checkout -b release/deploy-${{ github.ref_name }}
-          git add k8s/overlays/production/
+          git add infra/k8s/overlays/production/
           git commit -m "chore(release): update production images to ${{ github.ref_name }}"
           git push origin release/deploy-${{ github.ref_name }}
           
@@ -359,7 +386,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "⚠️ *Approval Required:* @JustineDevs or @ArhonJay must approve production deployment in ArgoCD"
+                    "text": "⚠️ *Approval:* Use GitHub Environment reviewers for `production` and ArgoCD manual sync policy."
                   }
                 },
                 {

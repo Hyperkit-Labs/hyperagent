@@ -5,7 +5,46 @@ import { getGatewayEnv } from "@hyperagent/config";
 import type { RequestWithId } from "./requestId.js";
 import type { RequestWithUser } from "./auth.js";
 import { log } from "./logger.js";
-import { responseInterceptor } from "http-proxy-middleware";
+import { responseInterceptor, createProxyMiddleware } from "http-proxy-middleware";
+
+/**
+ * Express strips the mount path before the proxy runs, so the upstream only sees
+ * the suffix (e.g. `/config` for `GET /api/v1/config`). Orchestrator routers use
+ * full paths like `/api/v1/config`. Rewrite to `upstreamPathPrefix + tail + query`.
+ */
+export function rewriteMountToUpstreamPath(
+  pathWithQuery: string,
+  upstreamPathPrefix: string,
+): string {
+  const qIndex = pathWithQuery.indexOf("?");
+  const pathname = qIndex >= 0 ? pathWithQuery.slice(0, qIndex) : pathWithQuery;
+  const query = qIndex >= 0 ? pathWithQuery.slice(qIndex) : "";
+  const tail =
+    pathname === "/" || pathname === ""
+      ? ""
+      : pathname.startsWith("/")
+        ? pathname
+        : `/${pathname}`;
+  const base = upstreamPathPrefix.replace(/\/$/, "");
+  return `${base}${tail}${query}`;
+}
+
+/**
+ * Proxy mounted at `mountPath` (handled in `index.ts` via `app.use(mountPath, …)`).
+ * Restores the full path the orchestrator expects after Express strips the mount.
+ */
+export function createOrchestratorStripMountProxy(
+  orchestratorUrl: string,
+  timeoutMs: number,
+  upstreamPathPrefix: string,
+) {
+  const baseOpts = createProxyOptions(orchestratorUrl, timeoutMs);
+  return createProxyMiddleware({
+    ...baseOpts,
+    pathRewrite: (path: string) =>
+      rewriteMountToUpstreamPath(path, upstreamPathPrefix),
+  });
+}
 
 export function createProxyOptions(
   orchestratorUrl: string,
@@ -63,4 +102,22 @@ export function createProxyOptions(
       return responseBuffer;
     }),
   };
+}
+
+/**
+ * Proxy mounted at a legacy path (e.g. `/config`) and forwards to the versioned
+ * orchestrator route under `upstreamApiV1Prefix` (e.g. `/api/v1/config`).
+ * Preserves query string. Express passes `req.url` relative to the mount.
+ */
+export function createOrchestratorLegacyMountProxy(
+  orchestratorUrl: string,
+  timeoutMs: number,
+  upstreamApiV1Prefix: string,
+) {
+  const baseOpts = createProxyOptions(orchestratorUrl, timeoutMs);
+  return createProxyMiddleware({
+    ...baseOpts,
+    pathRewrite: (path: string) =>
+      rewriteMountToUpstreamPath(path, upstreamApiV1Prefix),
+  });
 }

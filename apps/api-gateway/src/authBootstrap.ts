@@ -11,6 +11,7 @@ import jwt from "jsonwebtoken";
 import { getGatewayEnv } from "@hyperagent/config";
 import { log } from "./logger.js";
 import { emitAuditEvent } from "./audit.js";
+import { assertBetaAllowlistWallet } from "./waitlistAllowlist.js";
 
 function redactDebugData(data: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -340,6 +341,23 @@ export async function authBootstrapHandler(req: Request, res: Response): Promise
 
     walletAddress = verifiedAddress;
     authProvider = "thirdweb_inapp";
+  }
+
+  const allowlist = await assertBetaAllowlistWallet(walletAddress);
+  if (!allowlist.ok) {
+    emitAuditEvent(req, "auth_bootstrap_failure", {
+      reason: allowlist.code,
+      wallet: walletAddress.toLowerCase(),
+    });
+    let errTitle = "Bad Request";
+    if (allowlist.status === 403) errTitle = "Forbidden";
+    else if (allowlist.status === 503) errTitle = "Service Unavailable";
+    res.status(allowlist.status).json({
+      error: errTitle,
+      code: allowlist.code,
+      message: allowlist.message,
+    });
+    return;
   }
 
   // #region agent log

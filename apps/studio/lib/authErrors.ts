@@ -28,6 +28,11 @@ export function messageForBootstrapCode(
       return "This sign-in request was not valid. Refresh the page and try again.";
     case "WALLET_RECORD_FAILED":
       return "We could not save your account. Try again or contact support.";
+    case "NOT_ON_BETA_ALLOWLIST":
+      return "This wallet is not on the confirmed beta list. Use the same wallet you confirmed on the waitlist.";
+    case "BETA_ALLOWLIST_MISCONFIGURED":
+    case "WAITLIST_LOOKUP_FAILED":
+      return "Beta access could not be verified right now. Try again later or contact support.";
     default:
       return null;
   }

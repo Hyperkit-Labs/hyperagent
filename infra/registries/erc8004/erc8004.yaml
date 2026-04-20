@@ -75,6 +75,7 @@ spec:
       notes:
         - "KiteAI Mainnet — chainId 2366, RPC https://rpc.gokite.ai/"
         - "Pair with KITE_X402_FACILITATOR_URL (Pieverse) for x402 verify/settle on this chain"
+        - "USDC.e for x402: see infra/registries/x402/stablecoins.yaml (chainId 2366)"
 
   # HyperAgent registration on this registry (agentId from Transfer event after register())
   # paymentWallet: set via setAgentWallet() on-chain; matches MERCHANT_WALLET_ADDRESS

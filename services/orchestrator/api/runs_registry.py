@@ -13,6 +13,7 @@ from typing import Any
 
 import db
 import httpx
+import waitlist_client
 from fastapi import APIRouter, Header, HTTPException, Request
 from llm_keys_store import DEFAULT_WORKSPACE
 from pydantic import BaseModel, Field
@@ -295,7 +296,11 @@ def get_stablecoins_api() -> dict[str, dict[str, str]]:
 
 @registry_router.get("/platform/track-record")
 def get_platform_track_record_api() -> dict[str, Any]:
-    """Return platform track record stats for login page. Public."""
+    """Return platform track record stats for login page. Public.
+
+    When WAITLIST_SUPABASE_* is set, includes beta_testers_confirmed (waitlist_entries with
+    status=confirmed and email_confirmed=true).
+    """
     audits = int(os.environ.get("PLATFORM_AUDITS_COMPLETED", "0"))
     vulnerabilities = int(os.environ.get("PLATFORM_VULNERABILITIES_FOUND", "0"))
     researchers = int(os.environ.get("PLATFORM_SECURITY_RESEARCHERS", "0"))
@@ -342,13 +347,17 @@ def get_platform_track_record_api() -> dict[str, Any]:
         except Exception as e:
             logger.warning("[track-record] database metrics failed: %s", e)
 
-    return {
+    payload: dict[str, Any] = {
         "audits_completed": audits,
         "vulnerabilities_found": vulnerabilities,
         "security_researchers": researchers,
         "contracts_deployed": contracts_deployed,
         "source": source,
     }
+    beta_n = waitlist_client.count_confirmed_beta_testers()
+    if beta_n is not None:
+        payload["beta_testers_confirmed"] = beta_n
+    return payload
 
 
 @registry_router.get("/presets")

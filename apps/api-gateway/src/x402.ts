@@ -23,6 +23,9 @@ import { log } from "./logger.js";
 // Configuration
 // ---------------------------------------------------------------------------
 
+const KITE_MAINNET_CAIP = "eip155:2366";
+const KITE_TESTNET_CAIP = "eip155:2368";
+
 const MERCHANT_WALLET = (process.env.MERCHANT_WALLET_ADDRESS ?? "").trim();
 const X402_PAY_TO_RAW = (process.env.X402_PAY_TO_ADDRESS ?? "").trim();
 const X402_PAY_TO_ADDRESS = X402_PAY_TO_RAW || MERCHANT_WALLET;
@@ -148,8 +151,12 @@ async function buildX402Middleware(): Promise<
       // facilitatorClients: empty — PayAI facilitator is called by the
       // Python orchestrator after receiving the forwarded X-Payment header.
       [],
-      // schemes: register ExactEvmScheme for SKALE Base
-      [{ network: SKALE_BASE_MAINNET_CAIP, server: new ExactEvmScheme() }],
+      // schemes: ExactEvmScheme per CAIP-2 network (ERC-3009 verify on gateway)
+      [
+        { network: SKALE_BASE_MAINNET_CAIP, server: new ExactEvmScheme() },
+        { network: KITE_MAINNET_CAIP, server: new ExactEvmScheme() },
+        { network: KITE_TESTNET_CAIP, server: new ExactEvmScheme() },
+      ],
       // paywallConfig (HTML paywall UI only; route payTo lives in `accepts`)
       {},
       // paywall: optional PayAI integration — set X402_FACILITATOR_URL

@@ -3,6 +3,7 @@
  * Supports both SIWE (external wallet) and thirdweb_inapp (OAuth: Google, email, passkey, etc.).
  */
 
+import { ApiPaths } from "@hyperagent/api-contracts";
 import { SiweMessage } from "siwe";
 import { getGatewayOrigin } from "@/lib/api";
 
@@ -69,7 +70,7 @@ async function callBootstrap(body: {
   siwePayload?: { message: string; signature: string };
   authToken?: string;
 }): Promise<BootstrapSession> {
-  const url = new URL("/api/v1/auth/bootstrap", getGatewayOrigin()).toString();
+  const url = new URL(ApiPaths.authBootstrap, getGatewayOrigin()).toString();
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < BOOTSTRAP_MAX_ATTEMPTS; attempt++) {

@@ -5,7 +5,8 @@
 
 import { NextRequest } from "next/server";
 import { formatDataStreamPart } from "ai";
-import { getApiBase } from "@/lib/api";
+import { streamingWorkflowCodePath } from "@hyperagent/api-contracts";
+import { getApiBase, joinApiUrlForFetch } from "@/lib/api";
 
 function createRequestId(): string {
   return typeof crypto !== "undefined" && crypto.randomUUID
@@ -34,7 +35,10 @@ export async function GET(
   }
 
   const backendBase = getApiBase();
-  const streamUrl = `${backendBase}/streaming/workflows/${workflowId}/code`;
+  const streamUrl = joinApiUrlForFetch(
+    backendBase,
+    streamingWorkflowCodePath(workflowId),
+  );
 
   try {
     const response = await fetch(streamUrl, {

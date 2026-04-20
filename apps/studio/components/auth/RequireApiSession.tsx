@@ -1,10 +1,15 @@
 "use client";
 
 import { ReactNode, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useSessionContext } from "@/components/providers/SessionProvider";
 import { getLoginRedirectHref } from "@/lib/authRedirect";
-import { Loader2 } from "lucide-react";
+import { ROUTES } from "@/constants/routes";
+import {
+  SessionPrepSkeleton,
+  SettingsBootstrapSkeleton,
+  GenericBootstrapSkeleton,
+} from "@/components/settings/WorkspaceSettingsSkeleton";
 
 interface RequireApiSessionProps {
   children: ReactNode;
@@ -24,6 +29,7 @@ export function RequireApiSession({ children }: RequireApiSessionProps) {
     recheckBootstrap,
   } = useSessionContext();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!isReady) return;
@@ -33,28 +39,14 @@ export function RequireApiSession({ children }: RequireApiSessionProps) {
   }, [isReady, hasSession, router]);
 
   if (!isReady || !hasSession) {
-    return (
-      <div className="p-6 lg:p-8 flex flex-col items-center justify-center min-h-[60vh] gap-3">
-        <Loader2 className="w-8 h-8 text-[var(--color-text-muted)] animate-spin" />
-        <p className="text-sm text-[var(--color-text-tertiary)]">
-          Preparing your session…
-        </p>
-      </div>
-    );
+    return <SessionPrepSkeleton />;
   }
 
   if (bootstrapStatus === "pending") {
-    return (
-      <div className="p-6 lg:p-8 flex flex-col items-center justify-center min-h-[60vh] gap-3 max-w-sm mx-auto text-center">
-        <Loader2 className="w-8 h-8 text-[var(--color-text-muted)] animate-spin" />
-        <p className="text-sm text-[var(--color-text-secondary)]">
-          Loading workspace settings…
-        </p>
-        <p className="text-xs text-[var(--color-text-tertiary)]">
-          First load after deploy can take up to a minute if the API is warming
-          up.
-        </p>
-      </div>
+    return pathname === ROUTES.SETTINGS ? (
+      <SettingsBootstrapSkeleton />
+    ) : (
+      <GenericBootstrapSkeleton />
     );
   }
 

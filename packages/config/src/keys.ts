@@ -61,6 +61,8 @@ export const EnvConfig = {
   PLATFORM_VULNERABILITIES_FOUND: "PLATFORM_VULNERABILITIES_FOUND",
   PLATFORM_SECURITY_RESEARCHERS: "PLATFORM_SECURITY_RESEARCHERS",
   PLATFORM_CONTRACTS_DEPLOYED: "PLATFORM_CONTRACTS_DEPLOYED",
+  /** When true, Studio enables ERC-8004 mirror sync (requires working POST /erc8004/sync). Default off until indexer ships. */
+  NEXT_PUBLIC_ERC8004_SYNC_ENABLED: "NEXT_PUBLIC_ERC8004_SYNC_ENABLED",
   /** Public Studio ↔ gateway URL; single meaning across Edge proxy and browser bundle. */
   NEXT_PUBLIC_API_URL: "NEXT_PUBLIC_API_URL",
   /** Deployment channel (development | staging | production | …); used with NEXT_PUBLIC_API_URL for dev/staging semantics. */

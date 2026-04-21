@@ -38,6 +38,25 @@ function parseSampleRate(raw: string | undefined, fallback: number): number {
   return n;
 }
 
+/** RUM `env` must not tag local dev as prod when .env copies production NEXT_PUBLIC_DD_ENV. */
+function resolveRumEnv(): string {
+  if (process.env.NODE_ENV !== "production") {
+    return "dev";
+  }
+  return (
+    process.env.NEXT_PUBLIC_DD_ENV?.trim() ||
+    process.env.NEXT_PUBLIC_ENV?.trim() ||
+    "prod"
+  );
+}
+
+function allowRumInDevelopment(): boolean {
+  return (
+    process.env.NEXT_PUBLIC_DD_RUM_IN_DEV === "1" ||
+    process.env.NEXT_PUBLIC_DD_RUM_IN_DEV === "true"
+  );
+}
+
 function tracingMatchers(): Array<
   string | { match: string | RegExp; propagatorTypes: ["datadog"] }
 > {
@@ -70,6 +89,17 @@ export function initDatadogBrowserRum(): void {
   const w = window as unknown as Record<string, boolean>;
   if (w[SKIPPED_FLAG] || w[INIT_FLAG] || w[INIT_STARTED]) return;
 
+  if (process.env.NODE_ENV !== "production" && !allowRumInDevelopment()) {
+    w[SKIPPED_FLAG] = true;
+    rumReadyListeners.clear();
+    if (process.env.NEXT_PUBLIC_DD_RUM_DEBUG === "1") {
+      console.warn(
+        "[Datadog RUM] skipped in development (set NEXT_PUBLIC_DD_RUM_IN_DEV=1 to enable)",
+      );
+    }
+    return;
+  }
+
   const applicationId = process.env.NEXT_PUBLIC_DD_RUM_APPLICATION_ID?.trim();
   const clientToken = process.env.NEXT_PUBLIC_DD_RUM_CLIENT_TOKEN?.trim();
   if (!applicationId || !clientToken) {
@@ -88,10 +118,7 @@ export function initDatadogBrowserRum(): void {
   const site = process.env.NEXT_PUBLIC_DD_SITE?.trim() || "us5.datadoghq.com";
   const service =
     process.env.NEXT_PUBLIC_DD_SERVICE_NAME?.trim() || "hyperagent-studio";
-  const env =
-    process.env.NEXT_PUBLIC_DD_ENV?.trim() ||
-    process.env.NEXT_PUBLIC_ENV?.trim() ||
-    "development";
+  const env = resolveRumEnv();
   const version =
     process.env.NEXT_PUBLIC_DD_VERSION?.trim() ||
     process.env.NEXT_PUBLIC_APP_VERSION?.trim() ||

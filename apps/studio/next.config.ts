@@ -117,13 +117,22 @@ const nextConfig: NextConfig = {
     return [];
   },
 
-  webpack(config) {
+  webpack(config, ctx) {
+    const isServer = ctx.isServer;
     config.resolve = config.resolve || {};
     config.resolve.alias = {
       ...(config.resolve.alias || {}),
       // thirdweb pulls pino's optional pretty-printer through walletconnect logging.
       // Studio never uses that server-only formatter in the browser/runtime bundle.
       "pino-pretty": false,
+      // dd-trace is Node-only; if anything pulls it into the client graph, HMR fails (e.g. "Can't resolve 'dd-trace/init'").
+      ...(!isServer
+        ? {
+            "dd-trace": false,
+            "dd-trace/init": false,
+            "dd-trace/initialize.mjs": false,
+          }
+        : {}),
     };
     return config;
   },

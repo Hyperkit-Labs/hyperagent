@@ -1,23 +1,8 @@
-# Production stack for Contabo VPS (Coolify or manual deploy).
-# Paths are relative to project directory (repo root). Coolify uses --project-directory.
-#
-# Run from repo root:
-#   docker compose --project-directory . -f infra/docker/docker-compose.yml up -d
-#
-# Coolify:
-#   - Base Directory: / (repo root)
-#   - Compose path: infra/docker/docker-compose.yml
-#   - Custom Build: docker compose -f infra/docker/docker-compose.yml build
-#   - Custom Start: docker compose -f infra/docker/docker-compose.yml up -d
-#   - Disable Git submodules and LFS in Advanced > Git (Coolify #4746)
-#   - Set env vars in Shared Env (include DD_API_KEY for a working dd-agent; compose uses ${DD_API_KEY:-} so build does not warn when unset)
-#
-# External: Supabase (DB). Gateway: Upstash REST in .env. Orchestrator TCP: REDIS_URL (e.g. Upstash redis:// / rediss://).
-#
-# Traefik: use literal FQDNs in Host() — Coolify does not expand ${VAR} in container labels (ACME would fail on the raw string).
-# If Coolify also attaches the same domain, avoid duplicate Host() routers for one service.
+# Production stack (repo root = --project-directory). VPS: add -f docker-compose.resource-limits.yml or `make up-contabo`.
+# Coolify/scripts: infra/scripts/compose-vps-{build,up}.sh · swap: infra/scripts/vps-setup-swap.sh · details: infra/README.md
 
 services:
+  # --- Edge ---
   api-gateway:
     build:
       context: .
@@ -34,7 +19,6 @@ services:
       - ORCHESTRATOR_URL=http://orchestrator:8000
       - AGENT_RUNTIME_URL=http://agent-runtime:4001
       - STORAGE_SERVICE_URL=http://storage:4005
-      # OpenTelemetry → Datadog Agent OTLP HTTP (same Docker network as dd-agent).
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://dd-agent:4318
       - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://dd-agent:4318/v1/metrics
     labels:
@@ -53,7 +37,6 @@ services:
         condition: service_healthy
     networks:
       - hyperagent
-    # Liveness only: full /health calls Supabase + orchestrator and can flap when upstreams are slow.
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:4000/health/live"]
       interval: 15s
@@ -61,6 +44,7 @@ services:
       retries: 3
       start_period: 10s
 
+  # --- Core ---
   orchestrator:
     build:
       context: .
@@ -71,7 +55,6 @@ services:
       - .env
     environment:
       - PYTHONUNBUFFERED=1
-      # Writable path for prometheus-client multiproc (created on startup if missing).
       - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
       - REGISTRIES_PATH=/app/services/orchestrator/registries
       - AGENT_RUNTIME_URL=http://agent-runtime:4001
@@ -83,17 +66,13 @@ services:
       - VECTORDB_URL=http://vectordb:8080
       - ROMA_URL=http://roma-service:8080
       - TOOLS_BASE_URL=http://hyperagent-tools:9000
-      # Datadog APM – send traces + metrics via Unix socket
       - DD_SERVICE=hyperagent-orchestrator
       - DD_ENV=${DD_ENV:-prod}
       - DD_TRACE_AGENT_URL=unix:///var/run/datadog/apm.socket
       - DD_DOGSTATSD_URL=unix:///var/run/datadog/dsd.socket
-      # Orchestrator does not ship openai-agents; ddtrace would try to patch it and log ModuleNotFoundError.
       - DD_TRACE_OPENAI_AGENTS_ENABLED=false
-      # LLM Observability (Python ddtrace): set DD_LLMOBS_ENABLED=1 in .env when product is enabled in Datadog.
       - DD_LLMOBS_ENABLED=${DD_LLMOBS_ENABLED:-0}
       - DD_LLMOBS_ML_APP=${DD_LLMOBS_ML_APP:-hyperagent-orchestrator}
-      # Pipeline OTLP spans (otel_spans.py) → Agent, not localhost / external collector (fixes missing trace data in US5).
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://dd-agent:4318
       - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://dd-agent:4318/v1/metrics
     volumes:
@@ -145,7 +124,6 @@ services:
       - SIMULATION_SERVICE_URL=http://simulation:8002
       - DEPLOY_SERVICE_URL=http://deploy:8003
       - STORAGE_SERVICE_URL=http://storage:4005
-      # Datadog APM
       - DD_SERVICE=hyperagent-agent-runtime
       - DD_ENV=${DD_ENV:-prod}
       - DD_TRACE_AGENT_URL=unix:///var/run/datadog/apm.socket
@@ -165,6 +143,7 @@ services:
       retries: 3
       start_period: 15s
 
+  # --- Pipeline (workers) ---
   simulation:
     build:
       context: .
@@ -375,6 +354,7 @@ services:
     networks:
       - hyperagent
 
+  # --- Data (RAG) ---
   qdrant:
     image: qdrant/qdrant:latest
     container_name: hyperagent-qdrant
@@ -416,6 +396,7 @@ services:
     networks:
       - hyperagent
 
+  # --- Sandbox ---
   sandbox-api:
     build:
       context: services/sandbox-docker
@@ -423,8 +404,6 @@ services:
     container_name: hyperagent-sandbox
     restart: unless-stopped
     ports:
-      # F-029: Bind to 127.0.0.1 only. Host access for admin/debug; internal calls use http://sandbox-api:8000.
-      # Service validates OPENSANDBOX_API_KEY (Bearer) for all non-health requests.
       - "127.0.0.1:8005:8000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -442,10 +421,7 @@ services:
     networks:
       - hyperagent
 
-  # ---------------------------------------------------------------------------
-  # Datadog Agent — APM + DogStatsD + log collection via Unix socket
-  # Shared volume datadog-run is mounted :ro by each service that sends traces.
-  # ---------------------------------------------------------------------------
+  # --- Observability ---
   dd-agent:
     image: registry.datadoghq.com/agent:7
     container_name: hyperagent-dd-agent
@@ -463,16 +439,11 @@ services:
       - DD_APM_INSTRUMENTATION_LIBRARIES=${DD_APM_INSTRUMENTATION_LIBRARIES:-java:1,python:4,js:5,php:1,dotnet:3,ruby:2}
       - DD_LOGS_ENABLED=true
       - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true
-      # Upstash and other managed Redis require auth; autoconf redisdb pings without a password and spams errors.
       - DD_IGNORE_AUTOCONF=redisdb
-      # Ingest OTLP over HTTP so apps use OTEL_EXPORTER_OTLP_ENDPOINT=http://dd-agent:4318 (same Docker network).
       - DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_HTTP_ENDPOINT=0.0.0.0:4318
-      # Agent 7.61+: OTLP pipeline can fail when /host/proc is mounted; HOST_PROC fixes process metrics registration.
       - HOST_PROC=/proc
-      # Exclude the agent itself from log collection
       - DD_CONTAINER_EXCLUDE=name:hyperagent-dd-agent
     ports:
-      # OTLP HTTP for processes on the host (e.g. local orchestrator/gateway with .env pointing at 127.0.0.1:4318).
       - "127.0.0.1:4318:4318"
     volumes:
       - datadog-run:/var/run/datadog
@@ -492,7 +463,5 @@ volumes:
     name: hyperagent_sandbox-data
   qdrant_data:
     name: hyperagent_qdrant-data
-  # Shared dir for dd-agent Unix sockets (APM + DogStatsD).
-  # dd-agent writes; all Python services mount :ro to send traces.
   datadog-run:
     name: hyperagent_datadog-run

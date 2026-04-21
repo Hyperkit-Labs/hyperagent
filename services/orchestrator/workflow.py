@@ -239,7 +239,9 @@ def _get_checkpointer():
     from redis_util import effective_redis_url
 
     redis_url = effective_redis_url(
-        (os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or "").strip()
+        (
+            os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or ""
+        ).strip()
     )
     if redis_url:
         try:
@@ -250,7 +252,9 @@ def _get_checkpointer():
             _log.warning("[checkpointer] Redis unavailable (%s), trying Postgres.", e)
 
     # --- 2. Postgres checkpointer (Supabase connection) ---
-    db_url = (os.environ.get("SUPABASE_DB_URL") or os.environ.get("DATABASE_URL") or "").strip()
+    db_url = (
+        os.environ.get("SUPABASE_DB_URL") or os.environ.get("DATABASE_URL") or ""
+    ).strip()
     if db_url:
         try:
             from langgraph.checkpoint.postgres import PostgresSaver

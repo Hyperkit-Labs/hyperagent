@@ -19,6 +19,7 @@ except ImportError:
 import logging
 import os
 import time
+import uuid
 
 from api import (
     agents_router,
@@ -313,10 +314,9 @@ async def log_request_id(request: Request, call_next):
     When OPENTELEMETRY_ENABLED, creates request span for distributed tracing."""
     rid = (
         request.headers.get("x-request-id") or request.headers.get("X-Request-Id") or ""
-    ).strip() or None
+    ).strip() or str(uuid.uuid4())
     set_request_id(rid)
-    if rid:
-        logger.info("[orchestrator] request_id=%s path=%s", rid, request.url.path)
+    logger.info("[orchestrator] request_id=%s path=%s", rid, request.url.path)
     start = time.perf_counter()
     from otel_spans import request_span
 
@@ -330,6 +330,7 @@ async def log_request_id(request: Request, call_next):
     path = request.url.path or ""
     if "/health" not in path and "/streaming/" not in path:
         record_latency(elapsed)
+    response.headers["X-Request-Id"] = rid
     response.headers["X-Response-Time-Ms"] = f"{elapsed * 1000:.0f}"
     return response
 

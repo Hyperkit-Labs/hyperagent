@@ -44,9 +44,9 @@ def get_waitlist_public_stats() -> dict[str, int] | None:
         return None
     url, key = _waitlist_credentials()
     try:
-        from supabase import create_client
+        import db
 
-        client = create_client(url, key)
+        client = db.create_supabase_sync_client(url, key)
 
         total = _execute_count(
             client.table("waitlist_entries").select("*", count="exact", head=True)

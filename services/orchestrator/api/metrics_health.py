@@ -90,14 +90,25 @@ def _check_supabase_health() -> dict[str, Any]:
     """Ping Supabase when configured."""
     if not db.is_configured():
         return {"status": "not_configured"}
-    try:
-        client = db._client()
-        if client:
+    last_err: str | None = None
+    for attempt in range(2):
+        try:
+            client = db._client()
+            if not client:
+                return {"status": "not_configured"}
             client.table("runs").select("id").limit(1).execute()
             return {"status": "ok"}
-    except Exception as e:
-        return {"status": "error", "error": str(e)[:200]}
-    return {"status": "not_configured"}
+        except Exception as e:
+            last_err = str(e)[:200]
+            if attempt == 0 and db.is_transient_supabase_http_error(e):
+                logger.warning(
+                    "[health] supabase ping transient error, refreshing client: %s",
+                    last_err,
+                )
+                db.invalidate_supabase_client()
+                continue
+            return {"status": "error", "error": last_err}
+    return {"status": "error", "error": last_err or "unknown"}
 
 
 _redis_consecutive_failures: int = 0

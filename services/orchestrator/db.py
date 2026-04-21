@@ -5,7 +5,7 @@ Uses service role key; RLS still applies to user reads via anon key.
 Realtime broadcast: after each step insert/update, a lightweight event is
 published to the `run:{run_id}` Supabase Realtime broadcast channel so the
 frontend can receive push notifications without polling.
-Broadcast uses the service-role bearer token and the Realtime REST API, which
+Broadcast uses the configured service-role key and the Realtime REST API, which
 bypasses RLS entirely (server-to-server). No table reads on the client side.
 """
 

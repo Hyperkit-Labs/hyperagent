@@ -184,7 +184,9 @@ export function buildGatewayEnv(e: NodeJS.ProcessEnv): GatewayEnv {
     isProduction,
     port: parseEnvNonNegativeInt(e[Env.PORT], 4000),
     orchestratorUrl: trimEnv(e, Env.ORCHESTRATOR_URL) || "http://localhost:8000",
-    proxyTimeoutMs: parseEnvNonNegativeInt(e[Env.PROXY_TIMEOUT_MS], 25_000),
+    // Default must exceed Studio bootstrap/BYOK client timeouts (45s / 35s in apps/studio/lib/api/core.ts)
+    // so the gateway does not reset the upstream socket while the browser is still waiting.
+    proxyTimeoutMs: parseEnvNonNegativeInt(e[Env.PROXY_TIMEOUT_MS], 120_000),
     corsOrigins: parseCorsOrigins(e, isProduction),
     auth: {
       jwtSecret: trimEnv(e, Env.AUTH_JWT_SECRET) || undefined,

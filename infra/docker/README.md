@@ -25,4 +25,4 @@ docker compose --project-directory . -f infra/docker/docker-compose.yml up --bui
 
 For production behind Nginx (e.g. Contabo), use `nginx-contabo-full.conf` or include `nginx-sse.conf` in your server block so the agent discussion SSE stream does not disconnect during long runs (10+ min). Default 60s proxy timeout causes chat to drop; use 660s for `/api/v1/streaming/`.
 
-**Critical:** Also set `PROXY_TIMEOUT_MS=660000` for the api-gateway. The gateway defaults to 25s, which kills SSE before Nginx. Add to Shared Env in Coolify or `.env` on the VPS.
+**Critical:** Set `PROXY_TIMEOUT_MS=660000` for the api-gateway when you rely on long-lived SSE (agent streaming). The code default is **120s** (enough for normal `/config` and BYOK calls); values below ~60s risk cutting off the browser before Studio’s own timeouts. Add to Shared Env in Coolify or `.env` on the VPS.

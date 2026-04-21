@@ -354,12 +354,20 @@ export async function fetchJson<T>(
       return res.json() as Promise<T>;
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
+        const fromOurTimeout = !init.signal;
         if (
           process.env.NODE_ENV === "development" &&
           typeof console !== "undefined" &&
-          !init.signal
+          fromOurTimeout
         ) {
           console.warn(`[API] ${path} → timeout after ${timeout}ms`);
+        }
+        if (fromOurTimeout) {
+          const timedOut = new Error(
+            normalizeApiError(error, { wasTimeout: true }),
+          ) as ApiErrorWithStatus;
+          timedOut.status = 408;
+          throw timedOut;
         }
         throw error;
       }

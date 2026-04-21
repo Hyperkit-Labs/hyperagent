@@ -29,6 +29,20 @@ describe("buildGatewayEnv", () => {
     ).toBe(true);
   });
 
+  it("defaults proxy timeout above Studio bootstrap/BYOK client timeouts", () => {
+    expect(
+      buildGatewayEnv({ [Env.NODE_ENV]: "development" } as NodeJS.ProcessEnv).proxyTimeoutMs,
+    ).toBe(120_000);
+    expect(
+      buildGatewayEnv({ [Env.NODE_ENV]: "production" } as NodeJS.ProcessEnv).proxyTimeoutMs,
+    ).toBe(120_000);
+    expect(
+      buildGatewayEnv({
+        [Env.PROXY_TIMEOUT_MS]: "25000",
+      } as NodeJS.ProcessEnv).proxyTimeoutMs,
+    ).toBe(25_000);
+  });
+
   it("falls back to environment defaults when metering input is invalid", () => {
     expect(
       buildGatewayEnv({

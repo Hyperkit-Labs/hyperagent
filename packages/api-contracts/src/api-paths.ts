@@ -103,6 +103,8 @@ export const GATEWAY_DEV_ONLY_PUBLIC_PATHS = [
 
 /** Prefixes exempt from metering / credit preflight. */
 export const METERING_EXEMPT_PREFIXES = [
+  ApiPaths.authBootstrap,
+  "/auth/bootstrap",
   ApiPaths.creditsPrefix,
   ApiPaths.paymentsPrefix,
   ApiPaths.pricingPrefix,

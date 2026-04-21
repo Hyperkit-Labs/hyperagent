@@ -76,14 +76,31 @@ export function authMiddleware(
 ): void {
   const requestId = (req as Request & { requestId?: string }).requestId;
   const path = normalizePath(req.originalUrl || req.path || "");
+  const gw = getGatewayEnv();
+  const authJwtSecret = gw.auth.jwtSecret;
 
   if (isPublicPathFromReq(req)) {
+    const auth = req.headers.authorization;
+    if (authJwtSecret && auth && auth.startsWith("Bearer ")) {
+      const token = auth.slice(7);
+      try {
+        const payload = jwt.verify(token, authJwtSecret) as {
+          sub?: string;
+          wallet_address?: string;
+        };
+        if (payload?.sub) req.userId = payload.sub;
+        if (
+          payload?.wallet_address &&
+          typeof payload.wallet_address === "string"
+        ) {
+          req.walletAddress = payload.wallet_address;
+        }
+      } catch {}
+    }
     next();
     return;
   }
 
-  const gw = getGatewayEnv();
-  const authJwtSecret = gw.auth.jwtSecret;
   if (!authJwtSecret) {
     if (gw.auth.requireAuth) {
       traceAuth(path, requestId, false, "none", "503_no_secret");

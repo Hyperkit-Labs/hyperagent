@@ -3,8 +3,9 @@
  * These tests call the middleware directly so they stay green in sandboxed
  * environments that forbid opening ephemeral sockets.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { NextFunction, Request, Response } from "express";
+import jwt from "jsonwebtoken";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { authMiddleware, type RequestWithUser } from "./auth.js";
 
 type JsonBody = Record<string, unknown>;
@@ -75,6 +76,18 @@ describe("authMiddleware", () => {
     expect(next).toHaveBeenCalledOnce();
     expect(payload.statusCode).toBe(200);
     expect(payload.body).toBeUndefined();
+  });
+
+  it("sets request identity on public paths when auth is present", () => {
+    const token = jwt.sign(
+      { sub: "user-123", wallet_address: "0xabc" },
+      "unit-test-secret",
+    );
+    const { req, next, payload } = runAuth("/api/v1/config", `Bearer ${token}`);
+    expect(next).toHaveBeenCalledOnce();
+    expect(payload.statusCode).toBe(200);
+    expect(req.userId).toBe("user-123");
+    expect(req.walletAddress).toBe("0xabc");
   });
 
   it("allows legacy /config and /platform/track-record without Authorization", () => {

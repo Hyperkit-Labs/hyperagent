@@ -10,7 +10,8 @@ COPY apps/api-gateway ./apps/api-gateway
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter hyperagent-api-gateway... build
 WORKDIR /app/apps/api-gateway
-RUN chown -R node:node /app
+# Avoid `chown -R /app`: pnpm workspaces create huge trees; recursive chown often hits CI/Coolify timeouts.
+# Install artifacts are root-owned with default 755/644; the node user can read and run the gateway.
 USER node
 EXPOSE 4000
 CMD ["node", "build/index.js"]

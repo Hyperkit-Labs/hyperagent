@@ -34,6 +34,39 @@ const BOOTSTRAP_PATH = ApiPaths.authBootstrap;
 const REST_BACKOFF_MS = 60_000;
 let lastRestFailure = 0;
 
+const UPSTASH_LIMIT_TIMEOUT_ERROR = "upstash_ratelimit_timeout";
+
+/**
+ * Upper bound for a single @upstash/ratelimit `limit()` HTTP round-trip.
+ * Without this, a stalled Upstash connection can leave the client waiting until the browser or proxy gives up.
+ */
+function upstashLimitTimeoutMs(): number {
+  const raw = (process.env.UPSTASH_RATELIMIT_TIMEOUT_MS || "").trim();
+  const fallback = 8_000;
+  if (!raw) return fallback;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(30_000, Math.max(1_000, n));
+}
+
+function limitWithDeadline<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => {
+      reject(new Error(UPSTASH_LIMIT_TIMEOUT_ERROR));
+    }, ms);
+    promise.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
+}
+
 type LimitOutcome =
   | { ok: true }
   | { ok: false; reason: "limit"; retryAfterSec: number }
@@ -116,7 +149,10 @@ async function checkLimit(
   defaultRetrySec: number
 ): Promise<LimitOutcome> {
   try {
-    const result = await limiter.limit(identifier);
+    const result = await limitWithDeadline(
+      limiter.limit(identifier),
+      upstashLimitTimeoutMs(),
+    );
     if (result.success) return { ok: true };
     const retryAfterSec = Math.max(
       1,
@@ -128,6 +164,15 @@ async function checkLimit(
   } catch (err) {
     resetRestClient();
     const errMsg = err instanceof Error ? err.message : String(err);
+    if (errMsg === UPSTASH_LIMIT_TIMEOUT_ERROR) {
+      const ms = upstashLimitTimeoutMs();
+      log.error({ timeoutMs: ms }, "Upstash limit() timed out");
+      if (nodeEnv() !== "production") {
+        log.warn("Upstash ratelimit timeout in dev; allowing request");
+        return { ok: true };
+      }
+      return { ok: false, reason: "redis_unavailable" };
+    }
     if (nodeEnv() !== "production") {
       log.warn({ err: errMsg }, "Upstash limit() failed, skipping rate limit");
       return { ok: true };

@@ -58,6 +58,9 @@ byokRouter.post("/validate", async (req: Request, res: Response) => {
     const base = getGatewayEnv().orchestratorUrl.replace(/\/$/, "");
     const url = `${base}/api/v1/workspaces/current/llm-keys/validate`;
     const auth = req.headers.authorization;
+    const requestId =
+      (req.headers["x-request-id"] as string | undefined) ||
+      (req.headers["X-Request-Id"] as string | undefined);
     try {
       const r = await fetch(url, {
         method: "POST",
@@ -65,6 +68,7 @@ byokRouter.post("/validate", async (req: Request, res: Response) => {
           "Content-Type": "application/json",
           ...(auth ? { Authorization: auth } : {}),
           "x-user-id": user,
+          ...(requestId ? { "x-request-id": requestId } : {}),
         },
         body: JSON.stringify({ provider: body.provider, api_key: apiKey }),
       });

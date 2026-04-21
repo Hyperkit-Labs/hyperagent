@@ -6,6 +6,8 @@ import json
 import logging
 import os
 import re
+import time
+from base64 import urlsafe_b64decode
 from typing import Any
 
 from fastapi import HTTPException, Request
@@ -127,12 +129,13 @@ def _create_agent_session_jwt_if_configured(
 def get_caller_id(request: Request) -> str | None:
     """Extract authenticated user id from gateway-injected header.
     When IDENTITY_HMAC_SECRET is set, verifies the x-user-id-sig HMAC.
-    Rejects spoofed headers in production."""
+    Rejects spoofed headers in production.
+    Falls back to validated Authorization bearer sub only when X-User-Id is absent."""
     user_id = (
         request.headers.get("X-User-Id") or request.headers.get("x-user-id") or ""
     ).strip() or None
     if not user_id:
-        return None
+        return _get_user_id_from_bearer(request)
     if _IDENTITY_HMAC_SECRET:
         sig = (request.headers.get("x-user-id-sig") or "").strip()
         if not _verify_user_id_hmac(user_id, sig):
@@ -143,6 +146,59 @@ def get_caller_id(request: Request) -> str | None:
             )
             return None
     return user_id
+
+
+def _get_user_id_from_bearer(request: Request) -> str | None:
+    """Resolve wallet_users.id from gateway JWT sub when request bypasses gateway header injection."""
+    secret = os.environ.get("AUTH_JWT_SECRET", "").strip()
+    if not secret:
+        return None
+    auth = (
+        request.headers.get("authorization") or request.headers.get("Authorization") or ""
+    ).strip()
+    if not auth.lower().startswith("bearer "):
+        return None
+    token = auth[7:].strip()
+    if not token:
+        return None
+    payload = _verify_gateway_jwt_hs256(token, secret)
+    if payload is None:
+        return None
+    sub = payload.get("sub")
+    if isinstance(sub, str) and sub.strip():
+        return sub.strip()
+    return None
+
+
+def _b64url_decode(value: str) -> bytes:
+    padding = "=" * (-len(value) % 4)
+    return urlsafe_b64decode((value + padding).encode())
+
+
+def _verify_gateway_jwt_hs256(token: str, secret: str) -> dict[str, Any] | None:
+    """Verify compact JWT signature (HS256) and return payload dict."""
+    try:
+        parts = token.split(".")
+        if len(parts) != 3:
+            return None
+        h_b64, p_b64, s_b64 = parts
+        header = json.loads(_b64url_decode(h_b64))
+        if not isinstance(header, dict) or header.get("alg") != "HS256":
+            return None
+        signing_input = f"{h_b64}.{p_b64}".encode()
+        expected = hmac.new(secret.encode(), signing_input, hashlib.sha256).digest()
+        got = _b64url_decode(s_b64)
+        if not hmac.compare_digest(got, expected):
+            return None
+        payload = json.loads(_b64url_decode(p_b64))
+        if not isinstance(payload, dict):
+            return None
+        exp = payload.get("exp")
+        if isinstance(exp, (int, float)) and time.time() >= float(exp):
+            return None
+        return payload
+    except Exception:
+        return None
 
 
 def _run_status_for_store(status: str) -> str:

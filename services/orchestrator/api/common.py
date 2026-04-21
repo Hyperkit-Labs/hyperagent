@@ -154,7 +154,9 @@ def _get_user_id_from_bearer(request: Request) -> str | None:
     if not secret:
         return None
     auth = (
-        request.headers.get("authorization") or request.headers.get("Authorization") or ""
+        request.headers.get("authorization")
+        or request.headers.get("Authorization")
+        or ""
     ).strip()
     if not auth.lower().startswith("bearer "):
         return None

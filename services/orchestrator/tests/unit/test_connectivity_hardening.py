@@ -40,7 +40,10 @@ def test_redact_error_for_logs_masks_secrets() -> None:
     from api.common import redact_error_for_logs
 
     assert redact_error_for_logs("ok") == "ok"
-    assert redact_error_for_logs("Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9") == "[redacted]"
+    assert (
+        redact_error_for_logs("Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9")
+        == "[redacted]"
+    )
 
 
 def test_get_keys_for_run_swallows_exception_without_leaking(
@@ -53,7 +56,9 @@ def test_get_keys_for_run_swallows_exception_without_leaking(
         raise RuntimeError("DB error: api_key=sk-supersecretkey123456")
 
     monkeypatch.setattr("llm_keys_supabase._is_configured", lambda: True, raising=False)
-    monkeypatch.setattr("llm_keys_supabase.get_keys_for_user", _bad_get_user, raising=False)
+    monkeypatch.setattr(
+        "llm_keys_supabase.get_keys_for_user", _bad_get_user, raising=False
+    )
 
     # Must return empty dict, not raise
     result = common._get_keys_for_run("user-123", "ws-abc")
@@ -73,7 +78,9 @@ def test_get_caller_id_falls_back_to_bearer_sub_when_header_missing(
     class _Req:
         def __init__(self) -> None:
             self.headers = {"authorization": f"Bearer {token}"}
-            self.url = type("Url", (), {"path": "/api/v1/workspaces/current/llm-keys"})()
+            self.url = type(
+                "Url", (), {"path": "/api/v1/workspaces/current/llm-keys"}
+            )()
 
     assert common.get_caller_id(_Req()) == "550e8400-e29b-41d4-a716-446655440000"
 
@@ -94,7 +101,9 @@ def test_get_caller_id_does_not_use_bearer_when_spoofed_header_present(
                 "X-User-Id": "spoofed-user-id",
                 "authorization": f"Bearer {token}",
             }
-            self.url = type("Url", (), {"path": "/api/v1/workspaces/current/llm-keys"})()
+            self.url = type(
+                "Url", (), {"path": "/api/v1/workspaces/current/llm-keys"}
+            )()
 
     assert common.get_caller_id(_Req()) is None
 
@@ -118,7 +127,9 @@ def _mint_hs256_jwt(payload: dict[str, str], secret: str) -> str:
 
 def _load_common_module():
     common_path = Path(__file__).resolve().parents[2] / "api" / "common.py"
-    spec = importlib.util.spec_from_file_location("orchestrator_common_test", common_path)
+    spec = importlib.util.spec_from_file_location(
+        "orchestrator_common_test", common_path
+    )
     assert spec and spec.loader
     if "fastapi" not in sys.modules:
         fastapi_stub = types.ModuleType("fastapi")
@@ -174,7 +185,9 @@ def test_audit_mandatory_false_disables_service_block() -> None:
             "category": "service",
         }
         blocked = aa._finding_blocks_deploy(finding, [finding])
-        assert blocked is False, "AUDIT_MANDATORY=false should not block on service unavailability"
+        assert (
+            blocked is False
+        ), "AUDIT_MANDATORY=false should not block on service unavailability"
     finally:
         os.environ.pop("AUDIT_MANDATORY", None)
         importlib.reload(aa)
@@ -194,7 +207,9 @@ def test_audit_mandatory_true_blocks_on_service_unavailable() -> None:
             "category": "service",
         }
         blocked = aa._finding_blocks_deploy(finding, [finding])
-        assert blocked is True, "AUDIT_MANDATORY=true must block on service unavailability"
+        assert (
+            blocked is True
+        ), "AUDIT_MANDATORY=true must block on service unavailability"
     finally:
         os.environ.pop("AUDIT_MANDATORY", None)
         importlib.reload(aa)

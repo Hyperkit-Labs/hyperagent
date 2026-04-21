@@ -25,7 +25,9 @@ class _RunsQuery:
         self.attempts += 1
         if self.attempts == 1:
             raise RuntimeError("ConnectionTerminated error_code:1")
-        return SimpleNamespace(data=[{"id": "run-1", "workflow_state": {"status": "running"}}])
+        return SimpleNamespace(
+            data=[{"id": "run-1", "workflow_state": {"status": "running"}}]
+        )
 
 
 class _RunStepsQuery:
@@ -44,7 +46,13 @@ class _RunStepsQuery:
             raise RuntimeError("ConnectionTerminated error_code:1")
         return SimpleNamespace(
             data=[
-                {"runs": {"projects": {"wallet_user_id": "550e8400-e29b-41d4-a716-446655440000"}}}
+                {
+                    "runs": {
+                        "projects": {
+                            "wallet_user_id": "550e8400-e29b-41d4-a716-446655440000"
+                        }
+                    }
+                }
             ]
         )
 
@@ -83,7 +91,9 @@ def test_list_workflow_states_retries_on_transient_error(monkeypatch) -> None:
 
     monkeypatch.setattr(db, "_client", _client_factory)
     monkeypatch.setattr(
-        db, "is_transient_supabase_http_error", lambda exc: "ConnectionTerminated" in str(exc)
+        db,
+        "is_transient_supabase_http_error",
+        lambda exc: "ConnectionTerminated" in str(exc),
     )
     monkeypatch.setattr(
         db,
@@ -118,7 +128,9 @@ def test_count_distinct_auditors_retries_on_transient_error(monkeypatch) -> None
 
     monkeypatch.setattr(db, "_client", _client_factory)
     monkeypatch.setattr(
-        db, "is_transient_supabase_http_error", lambda exc: "ConnectionTerminated" in str(exc)
+        db,
+        "is_transient_supabase_http_error",
+        lambda exc: "ConnectionTerminated" in str(exc),
     )
     monkeypatch.setattr(
         db,
@@ -152,7 +164,9 @@ def test_count_security_findings_retries_on_transient_error(monkeypatch) -> None
 
     monkeypatch.setattr(db, "_client", _client_factory)
     monkeypatch.setattr(
-        db, "is_transient_supabase_http_error", lambda exc: "ConnectionTerminated" in str(exc)
+        db,
+        "is_transient_supabase_http_error",
+        lambda exc: "ConnectionTerminated" in str(exc),
     )
     monkeypatch.setattr(
         db,

@@ -39,7 +39,9 @@ def _broadcast_step_event(run_id: str, payload: dict) -> None:
         supabase.channel('run:{run_id}').on('broadcast', {event: 'step_update'}, cb)
     """
     url = os.environ.get("SUPABASE_URL", "").rstrip("/")
-    key = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    key = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get(
+        "SUPABASE_SERVICE_ROLE_KEY", ""
+    )
     if not url or not key:
         return
 
@@ -131,14 +133,18 @@ def _client():
     global _supabase
     if _supabase is None:
         url = os.environ.get("SUPABASE_URL")
-        key = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        key = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get(
+            "SUPABASE_SERVICE_ROLE_KEY"
+        )
         if not url or not key:
             return None
         _supabase = create_supabase_sync_client(url, key)
     return _supabase
 
 
-def _with_transient_supabase_retry(operation: str, fallback: _T, func: Callable[[Any], _T]) -> _T:
+def _with_transient_supabase_retry(
+    operation: str, fallback: _T, func: Callable[[Any], _T]
+) -> _T:
     for attempt in range(2):
         client = _client()
         if not client:
@@ -147,7 +153,9 @@ def _with_transient_supabase_retry(operation: str, fallback: _T, func: Callable[
             return func(client)
         except Exception as e:
             if attempt == 0 and is_transient_supabase_http_error(e):
-                logger.warning("[db] %s transient error, refreshing client: %s", operation, e)
+                logger.warning(
+                    "[db] %s transient error, refreshing client: %s", operation, e
+                )
                 invalidate_supabase_client()
                 continue
             raise
@@ -157,7 +165,10 @@ def _with_transient_supabase_retry(operation: str, fallback: _T, func: Callable[
 def is_configured() -> bool:
     return bool(
         os.environ.get("SUPABASE_URL")
-        and (os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY"))
+        and (
+            os.environ.get("SUPABASE_SERVICE_KEY")
+            or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        )
     )
 
 
@@ -180,7 +191,9 @@ def ensure_user_profile(
     user_id: str, wallet_address: str | None = None, display_name: str | None = None
 ) -> bool:
     """Deprecated. Use wallet_users + wallet_user_profiles. Kept for backward compat; no-op."""
-    logger.debug("[db] ensure_user_profile deprecated; wallet_users is the only principal")
+    logger.debug(
+        "[db] ensure_user_profile deprecated; wallet_users is the only principal"
+    )
     return True
 
 
@@ -201,7 +214,9 @@ def ensure_wallet_user_profile(
             payload["display_name"] = display_name
         if preferences is not None:
             payload["preferences"] = preferences
-        client.table("wallet_user_profiles").upsert(payload, on_conflict="wallet_user_id").execute()
+        client.table("wallet_user_profiles").upsert(
+            payload, on_conflict="wallet_user_id"
+        ).execute()
         return True
     except Exception as e:
         logger.warning("[db] ensure_wallet_user_profile failed: %s", e)
@@ -742,7 +757,11 @@ def insert_step(
                 input_summary, 4096, "input_summary", run_id
             )
             row["input_summary"] = truncated or input_summary
-        r = client.table("run_steps").upsert(row, on_conflict="run_id,step_type").execute()
+        r = (
+            client.table("run_steps")
+            .upsert(row, on_conflict="run_id,step_type")
+            .execute()
+        )
         result = r.data[0] if r.data else None
         _broadcast_step_event(
             run_id,
@@ -810,7 +829,8 @@ def update_step(
                 "stage": step_type,
                 "status": status,
                 "message": output_summary or error_message or status,
-                "done": is_terminal and step_type in ("ui_scaffold", "deploy", "monitor"),
+                "done": is_terminal
+                and step_type in ("ui_scaffold", "deploy", "monitor"),
             },
         )
         return True
@@ -825,7 +845,13 @@ def get_steps(run_id: str) -> list[dict[str, Any]]:
     if not client:
         return []
     try:
-        r = client.table("run_steps").select("*").eq("run_id", run_id).order("step_index").execute()
+        r = (
+            client.table("run_steps")
+            .select("*")
+            .eq("run_id", run_id)
+            .order("step_index")
+            .execute()
+        )
         return list(r.data) if r.data else []
     except Exception as e:
         logger.warning("[db] get_steps failed: %s", e)
@@ -870,15 +896,24 @@ def _to_ts(val: Any) -> str:
 def _run_steps_to_log_entries(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     out = []
     for row in rows:
-        ts = _to_ts(row.get("completed_at") or row.get("started_at") or row.get("created_at"))
-        msg = row.get("output_summary") or row.get("error_message") or row.get("status") or ""
+        ts = _to_ts(
+            row.get("completed_at") or row.get("started_at") or row.get("created_at")
+        )
+        msg = (
+            row.get("output_summary")
+            or row.get("error_message")
+            or row.get("status")
+            or ""
+        )
         step = row.get("step_type") or ""
         if step and msg:
             msg = f"[{step}] {msg}"
         elif step:
             msg = f"[{step}] {row.get('status', '')}"
         level = "error" if row.get("status") == "failed" else "info"
-        truncated_msg, _ = _truncate_and_warn(msg, 2048, "run_step log message", row.get("run_id"))
+        truncated_msg, _ = _truncate_and_warn(
+            msg, 2048, "run_step log message", row.get("run_id")
+        )
         out.append(
             {
                 "message": truncated_msg or msg or "-",
@@ -901,7 +936,9 @@ def _agent_logs_to_log_entries(rows: list[dict[str, Any]]) -> list[dict[str, Any
             msg = f"[{agent}] {msg}"
         elif agent:
             msg = f"[{agent}] {row.get('stage', '')}"
-        truncated_msg, _ = _truncate_and_warn(msg, 2048, "agent_log message", row.get("run_id"))
+        truncated_msg, _ = _truncate_and_warn(
+            msg, 2048, "agent_log message", row.get("run_id")
+        )
         out.append(
             {
                 "message": truncated_msg or msg or "-",
@@ -1000,7 +1037,9 @@ def upsert_workflow_state(run_id: str, state: dict[str, Any]) -> bool:
     if not client:
         return False
     try:
-        client.table("runs").update({"workflow_state": state}).eq("id", run_id).execute()
+        client.table("runs").update({"workflow_state": state}).eq(
+            "id", run_id
+        ).execute()
         return True
     except Exception as e:
         logger.warning("[db] upsert_workflow_state failed: %s", e)
@@ -1021,7 +1060,9 @@ def _store_status_to_run_status(store_status: str) -> str:
     return "running"
 
 
-def list_workflow_states(limit: int = 50, status: str | None = None) -> list[dict[str, Any]]:
+def list_workflow_states(
+    limit: int = 50, status: str | None = None
+) -> list[dict[str, Any]]:
     """List runs with workflow_state, newest first. status filters runs.status (store status mapped to run status)."""
     try:
         run_status = _store_status_to_run_status(status) if status else None
@@ -1114,7 +1155,12 @@ def count_completed_audits_from_run_state() -> int:
         "ui_scaffold",
     )
     try:
-        r = client.table("run_state").select("run_id").in_("phase", phases_after_audit).execute()
+        r = (
+            client.table("run_state")
+            .select("run_id")
+            .in_("phase", phases_after_audit)
+            .execute()
+        )
         run_ids = {row.get("run_id") for row in (r.data or []) if row.get("run_id")}
         return len(run_ids)
     except Exception as e:
@@ -1128,7 +1174,9 @@ def count_security_findings() -> int:
         r = _with_transient_supabase_retry(
             "count_security_findings",
             None,
-            lambda client: client.table("security_findings").select("id", count="exact").execute(),
+            lambda client: client.table("security_findings")
+            .select("id", count="exact")
+            .execute(),
         )
         if r is None:
             return 0
@@ -1162,12 +1210,20 @@ def list_security_findings(
             return list(r.data) if r.data else []
         if wallet_user_id and _is_uuid(wallet_user_id):
             r_projects = (
-                client.table("projects").select("id").eq("wallet_user_id", wallet_user_id).execute()
+                client.table("projects")
+                .select("id")
+                .eq("wallet_user_id", wallet_user_id)
+                .execute()
             )
             project_ids = [p["id"] for p in (r_projects.data or []) if p.get("id")]
             if not project_ids:
                 return []
-            r_runs = client.table("runs").select("id").in_("project_id", project_ids).execute()
+            r_runs = (
+                client.table("runs")
+                .select("id")
+                .in_("project_id", project_ids)
+                .execute()
+            )
             run_ids = [r["id"] for r in (r_runs.data or []) if r.get("id")]
             if not run_ids:
                 return []
@@ -1217,7 +1273,9 @@ def count_distinct_auditors() -> int:
             if isinstance(runs_data, dict):
                 projects_data = runs_data.get("projects")
                 if isinstance(projects_data, dict):
-                    uid = projects_data.get("wallet_user_id") or projects_data.get("user_id")
+                    uid = projects_data.get("wallet_user_id") or projects_data.get(
+                        "user_id"
+                    )
                     if uid:
                         user_ids.add(str(uid))
         return len(user_ids)
@@ -1268,7 +1326,9 @@ def get_recent_activity_logs(limit: int = 50) -> list[dict[str, Any]]:
             rows2 = list(r2.data) if r2.data else []
             entries.extend(_agent_logs_to_log_entries(rows2))
         except Exception as e:
-            logger.warning("[db] get_recent_activity_logs agent_logs query failed: %s", e)
+            logger.warning(
+                "[db] get_recent_activity_logs agent_logs query failed: %s", e
+            )
         entries.sort(key=lambda e: (e.get("timestamp") or ""), reverse=True)
         return entries[:limit]
     except Exception as e:
@@ -1463,12 +1523,14 @@ def update_x402_settlement(
     for rid, meta in rows:
         try:
             merged = merge_metadata_dict(meta, meta_patch)
-            client.table("payment_history").update({"status": pay_status, "metadata": merged}).eq(
-                "id", rid
-            ).execute()
+            client.table("payment_history").update(
+                {"status": pay_status, "metadata": merged}
+            ).eq("id", rid).execute()
             n += 1
         except Exception as e:
-            logger.warning("[db] update_x402_settlement update id=%s failed: %s", rid, e)
+            logger.warning(
+                "[db] update_x402_settlement update id=%s failed: %s", rid, e
+            )
     return n
 
 
@@ -1502,7 +1564,10 @@ def update_simulation_result(
         seen: set[str] = set()
         if _is_uuid(simulation_id):
             rid_q = (
-                client.table("simulations").select("id,results").eq("id", simulation_id).execute()
+                client.table("simulations")
+                .select("id,results")
+                .eq("id", simulation_id)
+                .execute()
             )
             for row in rid_q.data or []:
                 rid = row.get("id")
@@ -1539,10 +1604,12 @@ def update_simulation_result(
     for rid, results in rows:
         try:
             merged = merge_metadata_dict(results, patch_results)
-            client.table("simulations").update({"status": row_status, "results": merged}).eq(
-                "id", rid
-            ).execute()
+            client.table("simulations").update(
+                {"status": row_status, "results": merged}
+            ).eq("id", rid).execute()
             n += 1
         except Exception as e:
-            logger.warning("[db] update_simulation_result update id=%s failed: %s", rid, e)
+            logger.warning(
+                "[db] update_simulation_result update id=%s failed: %s", rid, e
+            )
     return n

@@ -65,36 +65,6 @@ class SandboxCreateResponse(BaseModel):
     status: str
 
 
-def _is_public_ip(ip_str: str) -> bool:
-    try:
-        addr = ipaddress.ip_address(ip_str)
-        if addr.is_loopback or addr.is_link_local or addr.is_private:
-            return False
-        if addr.is_reserved or (hasattr(addr, "is_private") and addr.is_private):
-            return False
-        return True
-    except ValueError:
-        return False
-
-
-def _validate_tarball_url(url: str) -> None:
-    parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https"):
-        raise HTTPException(status_code=400, detail="tarball_url must use http or https")
-    hostname = (parsed.hostname or parsed.netloc or "").split(":")[0].strip()
-    if not hostname:
-        raise HTTPException(status_code=400, detail="tarball_url must have a hostname")
-    try:
-        for info in socket.getaddrinfo(hostname, None):
-            addr = info[4][0]
-            if not _is_public_ip(addr):
-                raise HTTPException(
-                    status_code=400, detail="tarball_url must point to a public host"
-                )
-    except socket.gaierror:
-        raise HTTPException(status_code=400, detail="tarball_url hostname could not be resolved")
-
-
 def _run_sync(cmd: list[str], cwd: str | None = None, timeout: int = 120) -> tuple[int, str, str]:
     try:
         r = subprocess.run(
@@ -134,6 +104,11 @@ def _validate_tarball_members(tarball_path: Path) -> None:
             )
         if member.issym() or member.islnk():
             raise HTTPException(status_code=400, detail="Invalid tarball: symlinks are not allowed")
+        if member.isdev() or member.isfifo():
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid tarball: device and FIFO entries are not allowed",
+            )
 
 
 def _extract_tarball(tarball_path: Path, extract_dir: Path) -> None:
@@ -201,7 +176,11 @@ async def _create_sandbox_container(
             r.raise_for_status()
             tarball_path.write_bytes(r.content)
 
-        _extract_tarball(tarball_path, extract_dir)
+        try:
+            _extract_tarball(tarball_path, extract_dir)
+        except HTTPException:
+            shutil.rmtree(extract_dir, ignore_errors=True)
+            raise
 
         if not (extract_dir / "package.json").exists():
             shutil.rmtree(extract_dir, ignore_errors=True)
@@ -324,6 +303,11 @@ async def sandbox_create(
         raise HTTPException(status_code=400, detail="Invalid port: must be an integer")
     if not (1 <= requested_port <= 65535):
         raise HTTPException(status_code=400, detail="Invalid port: must be between 1 and 65535")
+    if requested_port not in ALLOWED_PORTS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid port: must be one of {sorted(ALLOWED_PORTS)}",
+        )
 
     sandbox_id, host_port = await _create_sandbox_container(
         body.tarball_url,

@@ -15,6 +15,7 @@ import os
 import shutil
 import socket
 import subprocess
+import sys
 import tarfile
 import time
 import uuid
@@ -31,9 +32,6 @@ logger = logging.getLogger(__name__)
 API_KEY = (os.environ.get("OPENSANDBOX_API_KEY") or os.environ.get("SANDBOX_API_KEY") or "").strip()
 PREVIEW_BASE_URL = (os.environ.get("PREVIEW_BASE_URL") or "").rstrip("/")
 WORK_DIR = Path(os.environ.get("SANDBOX_WORK_DIR", "/var/lib/sandbox-docker"))
-DEFAULT_TIMEOUT_MINUTES = int(os.environ.get("SANDBOX_TIMEOUT_MINUTES", "30"))
-HARDHAT_PORT = 8545
-APP_PORT = 3000
 
 app = FastAPI(title="HyperAgent Docker Sandbox API", version="0.1.0")
 security = HTTPBearer(auto_error=False)
@@ -81,41 +79,50 @@ def _run_sync(cmd: list[str], cwd: str | None = None, timeout: int = 120) -> tup
         return -1, "", str(e)
 
 
-def _validate_tarball_members(tarball_path: Path) -> None:
-    try:
-        with tarfile.open(tarball_path, mode="r:gz") as archive:
-            members = archive.getmembers()
-    except tarfile.TarError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid tarball: {e}") from e
+_GNU_META = frozenset({tarfile.GNUTYPE_LONGNAME, tarfile.GNUTYPE_LONGLINK})
 
-    if not members:
-        raise HTTPException(status_code=400, detail="Invalid tarball: archive is empty")
 
-    for member in members:
-        name = member.name
-        parts = Path(name).parts
-        if not name or name.startswith(("/", "\\")):
-            raise HTTPException(
-                status_code=400, detail="Invalid tarball: absolute paths are not allowed"
-            )
-        if ".." in parts:
-            raise HTTPException(
-                status_code=400, detail="Invalid tarball: path traversal entries are not allowed"
-            )
-        if member.issym() or member.islnk():
-            raise HTTPException(status_code=400, detail="Invalid tarball: symlinks are not allowed")
-        if member.isdev() or member.isfifo():
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid tarball: device and FIFO entries are not allowed",
-            )
+def _validate_tarball_member(member: tarfile.TarInfo) -> None:
+    if member.type in _GNU_META:
+        return
+    name = member.name
+    parts = Path(name).parts
+    if not name or name.startswith(("/", "\\")):
+        raise HTTPException(
+            status_code=400, detail="Invalid tarball: absolute paths are not allowed"
+        )
+    if len(name) > 1 and name[1] == ":":
+        raise HTTPException(
+            status_code=400, detail="Invalid tarball: absolute paths are not allowed"
+        )
+    if ".." in parts:
+        raise HTTPException(
+            status_code=400, detail="Invalid tarball: path traversal entries are not allowed"
+        )
+    if member.issym() or member.islnk():
+        raise HTTPException(status_code=400, detail="Invalid tarball: symlinks are not allowed")
+    if member.isdev() or member.isfifo():
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid tarball: device and FIFO entries are not allowed",
+        )
 
 
 def _extract_tarball(tarball_path: Path, extract_dir: Path) -> None:
-    _validate_tarball_members(tarball_path)
     try:
         with tarfile.open(tarball_path, mode="r:gz") as archive:
-            archive.extractall(path=extract_dir)
+            members = archive.getmembers()
+            if not members:
+                raise HTTPException(status_code=400, detail="Invalid tarball: archive is empty")
+            for member in members:
+                _validate_tarball_member(member)
+            to_extract = [m for m in members if m.type not in _GNU_META]
+            extract_kw: dict = {"numeric_owner": False}
+            if sys.version_info >= (3, 12):
+                extract_kw["filter"] = "data"
+            archive.extractall(path=extract_dir, members=to_extract, **extract_kw)
+    except HTTPException:
+        raise
     except tarfile.TarError as e:
         raise HTTPException(status_code=400, detail=f"Invalid tarball: {e}") from e
 
@@ -301,8 +308,6 @@ async def sandbox_create(
         requested_port = int(body.port)
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="Invalid port: must be an integer")
-    if not (1 <= requested_port <= 65535):
-        raise HTTPException(status_code=400, detail="Invalid port: must be between 1 and 65535")
     if requested_port not in ALLOWED_PORTS:
         raise HTTPException(
             status_code=400,

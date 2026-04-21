@@ -145,7 +145,9 @@ def _validate_critical_services() -> None:
             if not _is_kms_configured():
                 missing.append("LLM_KEY_KMS_KEY_ARN (required when BYOK_TEE_STRICT=1)")
 
-        require_byok_kms = os.environ.get("LLM_REQUIRE_KMS_IN_PRODUCTION", "1").strip().lower() in (
+        require_byok_kms = os.environ.get(
+            "LLM_REQUIRE_KMS_IN_PRODUCTION", "1"
+        ).strip().lower() in (
             "1",
             "true",
             "yes",
@@ -173,7 +175,9 @@ def _validate_critical_services() -> None:
                     "[orchestrator] STRICT_STARTUP: aborting. Missing required env: %s",
                     ", ".join(missing),
                 )
-                raise SystemExit(f"STRICT_STARTUP: missing required env vars: {', '.join(missing)}")
+                raise SystemExit(
+                    f"STRICT_STARTUP: missing required env vars: {', '.join(missing)}"
+                )
             logger.error(
                 "[orchestrator] Production requires: %s. "
                 "Process will stay alive but /health returns 503 until resolved. "
@@ -260,7 +264,9 @@ def _start_reconciliation_schedule() -> None:
                 logger.error("[reconciliation] scheduled check failed: %s", e)
             _time.sleep(interval_s)
 
-    t = threading.Thread(target=_reconcile_loop, daemon=True, name="billing-reconciliation")
+    t = threading.Thread(
+        target=_reconcile_loop, daemon=True, name="billing-reconciliation"
+    )
     t.start()
     logger.info("[orchestrator] billing reconciliation scheduled every %ds", interval_s)
 
@@ -277,7 +283,9 @@ def _start_storage_reconciliation_schedule() -> None:
     def _storage_loop():
         import time as _time
 
-        initial_delay = int(os.environ.get("STORAGE_RECONCILE_INITIAL_DELAY_SEC", "120"))
+        initial_delay = int(
+            os.environ.get("STORAGE_RECONCILE_INITIAL_DELAY_SEC", "120")
+        )
         if initial_delay > 0:
             _time.sleep(initial_delay)
         while True:
@@ -289,7 +297,9 @@ def _start_storage_reconciliation_schedule() -> None:
                 logger.error("[orchestrator] storage reconciliation pass failed: %s", e)
             _time.sleep(interval_s)
 
-    t = threading.Thread(target=_storage_loop, daemon=True, name="storage-reconciliation")
+    t = threading.Thread(
+        target=_storage_loop, daemon=True, name="storage-reconciliation"
+    )
     t.start()
     logger.info(
         "[orchestrator] storage gateway reconciliation scheduled every %ds",
@@ -332,7 +342,9 @@ try:
     app.add_middleware(X402EnforcementMiddleware)
     logger.info("[orchestrator] x402 enforcement middleware loaded")
 except ImportError:
-    logger.warning("[orchestrator] x402_middleware not available; x402 enforcement disabled")
+    logger.warning(
+        "[orchestrator] x402_middleware not available; x402 enforcement disabled"
+    )
 
 # Include routers. Order matters: more specific routes (e.g. /generate) before parametric ({workflow_id}).
 app.include_router(pipeline_router)

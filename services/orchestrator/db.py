@@ -1286,11 +1286,16 @@ def count_distinct_auditors() -> int:
 
 def count_deployments() -> int:
     """Total deployment records (contracts deployed)."""
-    client = _client()
-    if not client:
-        return 0
     try:
-        r = client.table("deployments").select("id", count="exact").execute()
+        r = _with_transient_supabase_retry(
+            "count_deployments",
+            None,
+            lambda client: client.table("deployments")
+            .select("id", count="exact")
+            .execute(),
+        )
+        if r is None:
+            return 0
         return int(getattr(r, "count", 0) or 0)
     except Exception as e:
         logger.warning("[db] count_deployments failed: %s", e)

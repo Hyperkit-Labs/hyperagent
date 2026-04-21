@@ -17,6 +17,8 @@ import threading
 import uuid
 from typing import Any
 
+import httpx
+
 logger = logging.getLogger(__name__)
 
 
@@ -77,6 +79,55 @@ def _broadcast_step_event(run_id: str, payload: dict) -> None:
 _supabase = None
 
 
+def create_supabase_sync_client(url: str, key: str) -> Any:
+    """Build a sync Supabase client with explicit httpx settings.
+
+    PostgREST (Supabase REST) is often fronted by Cloudflare. HTTP/2 GOAWAY /
+    ``ConnectionTerminated`` from the edge can surface as ``httpx.RemoteProtocolError``
+    on pooled connections. Default is HTTP/1.1 (``SUPABASE_HTTP2`` unset or not truthy).
+    """
+    from supabase.lib.client_options import SyncClientOptions
+
+    from supabase import create_client
+
+    base = url.rstrip("/")
+    http2 = os.environ.get("SUPABASE_HTTP2", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    timeout = httpx.Timeout(120.0, connect=20.0)
+    httpx_client = httpx.Client(http2=http2, timeout=timeout)
+    return create_client(
+        base,
+        key,
+        options=SyncClientOptions(httpx_client=httpx_client),
+    )
+
+
+def invalidate_supabase_client() -> None:
+    """Drop the process-wide Supabase client so the next call builds a new httpx pool."""
+    global _supabase
+    _supabase = None
+
+
+def is_transient_supabase_http_error(exc: BaseException) -> bool:
+    """True for errors that often succeed on a fresh connection (edge H2 GOAWAY, reset, etc.)."""
+    if isinstance(
+        exc,
+        (
+            httpx.RemoteProtocolError,
+            httpx.ConnectError,
+            httpx.ReadError,
+            httpx.ConnectTimeout,
+            httpx.ReadTimeout,
+        ),
+    ):
+        return True
+    err = str(exc)
+    return "ConnectionTerminated" in err or "RemoteProtocolError" in err
+
+
 def _client():
     global _supabase
     if _supabase is None:
@@ -86,9 +137,7 @@ def _client():
         )
         if not url or not key:
             return None
-        from supabase import create_client
-
-        _supabase = create_client(url, key)
+        _supabase = create_supabase_sync_client(url, key)
     return _supabase
 
 

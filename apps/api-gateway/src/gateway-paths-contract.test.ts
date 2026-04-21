@@ -15,7 +15,10 @@ describe("gateway ↔ api-paths contract", () => {
   });
 
   it("metering exempts BYOK and credits", () => {
-    expect(METERING_EXEMPT_PREFIXES).toContain(ApiPaths.workspacesCurrentLlmKeys);
+    expect(METERING_EXEMPT_PREFIXES).toContain(ApiPaths.authBootstrap);
+    expect(METERING_EXEMPT_PREFIXES).toContain(
+      ApiPaths.workspacesCurrentLlmKeys,
+    );
     expect(METERING_EXEMPT_PREFIXES).toContain(ApiPaths.creditsPrefix);
     expect(METERING_EXEMPT_PREFIXES).toContain(ApiPaths.config);
   });

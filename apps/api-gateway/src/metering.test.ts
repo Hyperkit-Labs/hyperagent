@@ -4,11 +4,16 @@ import { isMeteringEnforced, isMeteringExemptPath } from "./metering.js";
 
 describe("metering", () => {
   it("isMeteringExemptPath exempts credits, payments, llm-keys, byok", () => {
+    expect(isMeteringExemptPath("/api/v1/auth/bootstrap", "POST")).toBe(true);
+    expect(isMeteringExemptPath("/auth/bootstrap", "POST")).toBe(true);
     expect(isMeteringExemptPath("/api/v1/credits/balance", "GET")).toBe(true);
     expect(isMeteringExemptPath("/api/v1/payments/history", "GET")).toBe(true);
-    expect(isMeteringExemptPath("/api/v1/workspaces/current/llm-keys/validate", "POST")).toBe(
-      true,
-    );
+    expect(
+      isMeteringExemptPath(
+        "/api/v1/workspaces/current/llm-keys/validate",
+        "POST",
+      ),
+    ).toBe(true);
     expect(isMeteringExemptPath("/api/v1/byok/status", "GET")).toBe(true);
     expect(isMeteringExemptPath("/api/v1/config", "GET")).toBe(true);
     expect(isMeteringExemptPath("/config", "GET")).toBe(true);

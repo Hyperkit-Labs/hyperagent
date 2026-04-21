@@ -599,6 +599,14 @@ def _require_user_id_for_byok(x_user_id: str | None) -> None:
         )
 
 
+def _resolve_byok_user_id(request: Request, x_user_id: str | None) -> str | None:
+    from .common import get_caller_id
+
+    if x_user_id and x_user_id.strip():
+        return x_user_id.strip()
+    return get_caller_id(request)
+
+
 def _trace_llm_keys(
     request: Request,
     method: str,
@@ -637,22 +645,23 @@ async def get_llm_keys(
     import llm_keys_supabase
     from llm_keys_store import get_configured_providers
 
-    _trace_llm_keys(request, "GET", x_user_id, x_workspace_id, "request_received")
+    user_id = _resolve_byok_user_id(request, x_user_id)
+    _trace_llm_keys(request, "GET", user_id, x_workspace_id, "request_received")
     try:
-        _require_user_id_for_byok(x_user_id)
+        _require_user_id_for_byok(user_id)
     except HTTPException:
         _trace_llm_keys(
-            request, "GET", x_user_id, x_workspace_id, "401_missing_x_user_id"
+            request, "GET", user_id, x_workspace_id, "401_missing_x_user_id"
         )
         raise
     wid = x_workspace_id or DEFAULT_WORKSPACE
-    if x_user_id and llm_keys_supabase._is_configured():
+    if user_id and llm_keys_supabase._is_configured():
         from .common import _log_byok_event
 
         def _sync_byok_providers() -> list[str]:
-            db.ensure_wallet_user_profile(x_user_id)
-            _log_byok_event("byok_access", x_user_id, "get_configured_providers")
-            return llm_keys_supabase.get_configured_providers(x_user_id)
+            db.ensure_wallet_user_profile(user_id)
+            _log_byok_event("byok_access", user_id, "get_configured_providers")
+            return llm_keys_supabase.get_configured_providers(user_id)
 
         try:
             providers = await asyncio.wait_for(
@@ -660,7 +669,7 @@ async def get_llm_keys(
                 timeout=BYOK_DB_TIMEOUT_SEC,
             )
         except TimeoutError:
-            _trace_llm_keys(request, "GET", x_user_id, x_workspace_id, "timeout")
+            _trace_llm_keys(request, "GET", user_id, x_workspace_id, "timeout")
             raise HTTPException(
                 status_code=504,
                 detail=(
@@ -670,7 +679,7 @@ async def get_llm_keys(
         _trace_llm_keys(
             request,
             "GET",
-            x_user_id,
+            user_id,
             x_workspace_id,
             "success",
             provider_count=len(providers),
@@ -682,7 +691,7 @@ async def get_llm_keys(
     _trace_llm_keys(
         request,
         "GET",
-        x_user_id,
+        user_id,
         x_workspace_id,
         "success",
         provider_count=len(providers),
@@ -701,38 +710,39 @@ def post_llm_keys(
     import llm_keys_supabase
     from llm_keys_store import set_keys
 
-    _trace_llm_keys(request, "POST", x_user_id, x_workspace_id, "request_received")
+    user_id = _resolve_byok_user_id(request, x_user_id)
+    _trace_llm_keys(request, "POST", user_id, x_workspace_id, "request_received")
     try:
-        _require_user_id_for_byok(x_user_id)
+        _require_user_id_for_byok(user_id)
     except HTTPException:
         _trace_llm_keys(
-            request, "POST", x_user_id, x_workspace_id, "401_missing_x_user_id"
+            request, "POST", user_id, x_workspace_id, "401_missing_x_user_id"
         )
         raise
     if os.environ.get("ENV") == "production" and not (
         os.environ.get("LLM_KEY_ENCRYPTION_KEY")
         or os.environ.get("LLM_KEY_KMS_KEY_ARN")
     ):
-        if x_user_id and (body.keys or {}):
+        if user_id and (body.keys or {}):
             _trace_llm_keys(
-                request, "POST", x_user_id, x_workspace_id, "503_missing_encryption_key"
+                request, "POST", user_id, x_workspace_id, "503_missing_encryption_key"
             )
             raise HTTPException(
                 status_code=503,
                 detail="BYOK requires LLM_KEY_ENCRYPTION_KEY or LLM_KEY_KMS_KEY_ARN in production",
             )
     wid = x_workspace_id or DEFAULT_WORKSPACE
-    if x_user_id and llm_keys_supabase._is_configured():
+    if user_id and llm_keys_supabase._is_configured():
         from .common import _log_byok_event
 
-        db.ensure_wallet_user_profile(x_user_id)
-        _log_byok_event("byok_access", x_user_id, "set_keys")
-        providers = llm_keys_supabase.set_keys_for_user(x_user_id, body.keys or {})
+        db.ensure_wallet_user_profile(user_id)
+        _log_byok_event("byok_access", user_id, "set_keys")
+        providers = llm_keys_supabase.set_keys_for_user(user_id, body.keys or {})
         if body.keys and not providers:
             _trace_llm_keys(
                 request,
                 "POST",
-                x_user_id,
+                user_id,
                 x_workspace_id,
                 "error_storage",
                 provider_count=0,
@@ -744,7 +754,7 @@ def post_llm_keys(
         _trace_llm_keys(
             request,
             "POST",
-            x_user_id,
+            user_id,
             x_workspace_id,
             "success",
             provider_count=len(providers),
@@ -759,7 +769,7 @@ def post_llm_keys(
     _trace_llm_keys(
         request,
         "POST",
-        x_user_id,
+        user_id,
         x_workspace_id,
         "success",
         provider_count=len(providers),
@@ -777,29 +787,31 @@ def delete_llm_keys(
     import llm_keys_supabase
     from llm_keys_store import delete_keys
 
-    _trace_llm_keys(request, "DELETE", x_user_id, x_workspace_id, "request_received")
+    user_id = _resolve_byok_user_id(request, x_user_id)
+    _trace_llm_keys(request, "DELETE", user_id, x_workspace_id, "request_received")
     try:
-        _require_user_id_for_byok(x_user_id)
+        _require_user_id_for_byok(user_id)
     except HTTPException:
         _trace_llm_keys(
-            request, "DELETE", x_user_id, x_workspace_id, "401_missing_x_user_id"
+            request, "DELETE", user_id, x_workspace_id, "401_missing_x_user_id"
         )
         raise
     wid = x_workspace_id or DEFAULT_WORKSPACE
-    if x_user_id and llm_keys_supabase._is_configured():
+    if user_id and llm_keys_supabase._is_configured():
         from .common import _log_byok_event
 
-        _log_byok_event("byok_access", x_user_id, "delete_keys")
-        llm_keys_supabase.delete_keys_for_user(x_user_id)
-        _trace_llm_keys(request, "DELETE", x_user_id, x_workspace_id, "success")
+        _log_byok_event("byok_access", user_id, "delete_keys")
+        llm_keys_supabase.delete_keys_for_user(user_id)
+        _trace_llm_keys(request, "DELETE", user_id, x_workspace_id, "success")
         return {"configured_providers": []}
     delete_keys(wid)
-    _trace_llm_keys(request, "DELETE", x_user_id, x_workspace_id, "success")
+    _trace_llm_keys(request, "DELETE", user_id, x_workspace_id, "success")
     return {"configured_providers": []}
 
 
 @llm_keys_router.post("/llm-keys/validate")
 async def validate_llm_key(
+    request: Request,
     body: LLMKeyValidateBody,
     x_workspace_id: str | None = Header(None, alias="X-Workspace-Id"),
     x_user_id: str | None = Header(None, alias="X-User-Id"),
@@ -808,13 +820,14 @@ async def validate_llm_key(
     import llm_keys_supabase
     from llm_keys_store import get_keys_for_pipeline
 
+    user_id = _resolve_byok_user_id(request, x_user_id)
     api_key = (body.api_key or "").strip()
     if not api_key:
-        _require_user_id_for_byok(x_user_id)
+        _require_user_id_for_byok(user_id)
         wid = x_workspace_id or DEFAULT_WORKSPACE
         stored: dict[str, str] = {}
-        if x_user_id and llm_keys_supabase._is_configured():
-            stored = llm_keys_supabase.get_keys_for_user(x_user_id) or {}
+        if user_id and llm_keys_supabase._is_configured():
+            stored = llm_keys_supabase.get_keys_for_user(user_id) or {}
         else:
             stored = get_keys_for_pipeline(wid) or {}
         api_key = (stored or {}).get(body.provider.strip().lower(), "")

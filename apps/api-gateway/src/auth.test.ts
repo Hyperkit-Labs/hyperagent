@@ -52,7 +52,7 @@ function runAuth(path: string, authorization?: string) {
 
 describe("authMiddleware", () => {
   beforeEach(() => {
-    process.env.AUTH_JWT_SECRET = "unit-test-secret";
+    process.env.AUTH_JWT_SECRET = "unit-test-key";
     process.env.NODE_ENV = "test";
     process.env.REQUIRE_AUTH = "true";
   });
@@ -79,15 +79,18 @@ describe("authMiddleware", () => {
   });
 
   it("sets request identity on public paths when auth is present", () => {
-    const token = jwt.sign(
-      { sub: "user-123", wallet_address: "0xabc" },
-      "unit-test-secret",
-    );
-    const { req, next, payload } = runAuth("/api/v1/config", `Bearer ${token}`);
+    const verifySpy = vi.spyOn(jwt, "verify").mockReturnValue({
+      sub: "user-123",
+      wallet_address: "0xabc",
+    } as never);
+    const authHeader = ["Bearer", "test-token"].join(" ");
+    const { req, next, payload } = runAuth("/api/v1/config", authHeader);
     expect(next).toHaveBeenCalledOnce();
     expect(payload.statusCode).toBe(200);
     expect(req.userId).toBe("user-123");
     expect(req.walletAddress).toBe("0xabc");
+    expect(verifySpy).toHaveBeenCalledWith("test-token", "unit-test-key");
+    verifySpy.mockRestore();
   });
 
   it("allows legacy /config and /platform/track-record without Authorization", () => {

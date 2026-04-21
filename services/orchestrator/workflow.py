@@ -4,7 +4,7 @@ and pre-run complexity estimation.
 
 Flow:
   start -> estimate -> spec -> [human_review | design] -> codegen -> audit
-    -> [guardian -> deploy -> simulation -> ui_scaffold -> END]
+    -> [guardian -> simulation -> security policy -> exploit sim -> deploy gate -> deploy -> monitor -> ui_scaffold -> END]
     or [autofix (up to MAX_AUTOFIX_CYCLES) -> audit -> ...]
     or [END (failed)]
 """
@@ -91,10 +91,10 @@ def _after_security_policy_evaluator(state: AgentState) -> str:
 
 
 def _after_exploit_simulation(state: AgentState) -> str:
-    """Route after exploit simulation: pass -> ui_scaffold, fail -> autofix (if cycles remain) or END.
+    """Route after exploit simulation: pass -> deploy_gate, fail -> autofix (if cycles remain) or END.
     ZSPS: Missing state defaults to failure."""
     if state.get("exploit_simulation_passed", False):
-        return "ui_scaffold"
+        return "deploy_gate"
     cycle = state.get("autofix_cycle", 0)
     if cycle < MAX_AUTOFIX_CYCLES:
         return "autofix"
@@ -102,10 +102,10 @@ def _after_exploit_simulation(state: AgentState) -> str:
 
 
 def _after_guardian(state: AgentState) -> str:
-    """Route after guardian: no violations -> deploy, violations -> autofix or END."""
+    """Route after guardian: no violations -> simulation, violations -> autofix or END."""
     violations = state.get("invariant_violations") or []
     if not violations:
-        return "deploy"
+        return "simulation"
     cycle = state.get("autofix_cycle", 0)
     if cycle < MAX_AUTOFIX_CYCLES:
         return "autofix"
@@ -182,14 +182,11 @@ def create_workflow():
         "guardian",
         _after_guardian,
         {
-            "deploy": "deploy_gate",
+            "simulation": "simulation",
             "autofix": "autofix",
             "failed": END,
         },
     )
-    workflow.add_edge("deploy_gate", "deploy")
-    workflow.add_edge("deploy", "monitor")
-    workflow.add_edge("monitor", "simulation")
     workflow.add_conditional_edges(
         "simulation",
         _after_simulation,
@@ -211,11 +208,14 @@ def create_workflow():
         "exploit_simulation",
         _after_exploit_simulation,
         {
-            "ui_scaffold": "ui_scaffold",
+            "deploy_gate": "deploy_gate",
             "autofix": "autofix",
             "failed": END,
         },
     )
+    workflow.add_edge("deploy_gate", "deploy")
+    workflow.add_edge("deploy", "monitor")
+    workflow.add_edge("monitor", "ui_scaffold")
     workflow.add_edge("ui_scaffold", END)
 
     return workflow
@@ -239,9 +239,7 @@ def _get_checkpointer():
     from redis_util import effective_redis_url
 
     redis_url = effective_redis_url(
-        (
-            os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or ""
-        ).strip()
+        (os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or "").strip()
     )
     if redis_url:
         try:
@@ -252,9 +250,7 @@ def _get_checkpointer():
             _log.warning("[checkpointer] Redis unavailable (%s), trying Postgres.", e)
 
     # --- 2. Postgres checkpointer (Supabase connection) ---
-    db_url = (
-        os.environ.get("SUPABASE_DB_URL") or os.environ.get("DATABASE_URL") or ""
-    ).strip()
+    db_url = (os.environ.get("SUPABASE_DB_URL") or os.environ.get("DATABASE_URL") or "").strip()
     if db_url:
         try:
             from langgraph.checkpoint.postgres import PostgresSaver

@@ -1,3 +1,8 @@
+/** Importing the hook module loads @/lib/api (thirdweb / ESM deps). Mock before import. */
+jest.mock("@/lib/api", () => ({
+  getApiBase: jest.fn(() => "http://localhost:4000/api/v1"),
+}));
+
 import { interpretHealthResponse } from "@/hooks/useServerStatus";
 
 function makeResponse(

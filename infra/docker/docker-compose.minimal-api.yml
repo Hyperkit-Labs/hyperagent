@@ -1,0 +1,23 @@
+# Minimal backend: API gateway + orchestrator only (no agent-runtime, compile, audit).
+# For debugging Studio → gateway → orchestrator (config, BYOK, workflows DB) on a small machine.
+# Still uses .env for cloud Supabase, Redis, JWT, etc. (same as `make up`).
+#
+# Foreground (logs in this terminal):
+#   make up-minimal-api
+#
+# Or manually from repo root:
+#   docker compose --project-directory . --env-file .env \
+#     -f infra/docker/docker-compose.local.yml \
+#     -f infra/docker/docker-compose.minimal-api.yml \
+#     up --build api-gateway orchestrator
+#
+# Pipeline calls (compile, audit, agent-runtime) will error until you run the full lite stack: `make up`.
+
+services:
+  orchestrator:
+    depends_on: []
+
+  api-gateway:
+    depends_on:
+      orchestrator:
+        condition: service_healthy

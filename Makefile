@@ -6,12 +6,13 @@
 COMPOSE_DIR := infra/docker
 COMPOSE_FILE := docker-compose.yml
 COMPOSE_FILE_LOCAL := docker-compose.local.yml
+COMPOSE_FILE_MINIMAL_API := docker-compose.minimal-api.yml
 ENV_FILE := .env
 # Cap BuildKit parallelism for production compose builds on small VPS (override: make build-contabo COMPOSE_VPS_BUILD_PARALLELISM=4).
 COMPOSE_VPS_BUILD_PARALLELISM ?= 2
 COMPOSE_FILES_VPS := -f $(COMPOSE_DIR)/$(COMPOSE_FILE) -f $(COMPOSE_DIR)/docker-compose.resource-limits.yml
 
-.PHONY: help up down logs test-minimal test-minimal-all verify-real-server restart migrate install-web run-web install-api run-api build rebuild \
+.PHONY: help up up-minimal-api down logs test-minimal test-minimal-all verify-real-server restart migrate install-web run-web install-api run-api build rebuild \
 	build-web build-prod build-contabo check-env validate-prod format-api lint-api type-check-api quality-check-api \
 	dogfood-setup dogfood-help dogfood-daemon ai-bom kill-ports
 
@@ -31,6 +32,7 @@ help:
 	@echo ""
 	@echo "Development:"
 	@echo "  make up          - Start lite backend (5-6 services, cloud Supabase + Upstash)"
+	@echo "  make up-minimal-api - Gateway + orchestrator only (foreground logs); no compile/audit/agent-runtime"
 	@echo "  make up-full     - Start with roma-service, codegen (legacy)"
 	@echo "  make up-tools    - Start with hyperagent-tools (port 9000); set TOOLS_BASE_URL=http://hyperagent-tools:9000 in .env"
 	@echo "  make up-local    - Start full stack with local postgres and vectordb (Upstash from .env)"
@@ -95,6 +97,10 @@ up:
 	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) up -d
 	@echo "[+] Backend up (lite). Gateway: http://localhost:4000  Run Studio: make run-web"
 	@echo "    Requires SUPABASE_URL, REDIS_URL (TCP), Upstash REST vars for production gateway. Stop: make down   Logs: make logs"
+
+# Gateway + orchestrator only; foreground so you can watch logs. Does not start agent-runtime/compile/audit.
+up-minimal-api:
+	cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) -f $(COMPOSE_FILE_MINIMAL_API) up --build api-gateway orchestrator
 
 # Start full stack with roma-service, codegen (legacy).
 up-full:

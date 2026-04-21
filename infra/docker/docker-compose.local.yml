@@ -12,6 +12,9 @@
 #
 # REMOTE TOOLS: Set TOOLS_BASE_URL to use remote hyperagent-tools (Contabo/Coolify or fly.io).
 #   Or run locally: make up-tools (adds hyperagent-tools on port 9000).
+#
+# MINIMAL (gateway + orchestrator only, foreground logs): make up-minimal-api
+#   See docker-compose.minimal-api.yml
 
 services:
   api-gateway:

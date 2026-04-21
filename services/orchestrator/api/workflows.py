@@ -39,7 +39,9 @@ from .common import (
 
 logger = logging.getLogger(__name__)
 
-COMPILE_SERVICE_URL = os.environ.get("COMPILE_SERVICE_URL", "http://localhost:8004").rstrip("/")
+COMPILE_SERVICE_URL = os.environ.get(
+    "COMPILE_SERVICE_URL", "http://localhost:8004"
+).rstrip("/")
 
 
 def _workflow_list_item(w: dict[str, Any]) -> dict[str, Any]:
@@ -66,7 +68,9 @@ def _build_workflow_tarball(workflow_id: str) -> bytes:
                 ti.size = len(data)
                 tf.addfile(ti, io.BytesIO(data))
         for name, code in test_files.items():
-            if isinstance(code, str) and (name.endswith(".sol") or name.endswith(".t.sol")):
+            if isinstance(code, str) and (
+                name.endswith(".sol") or name.endswith(".t.sol")
+            ):
                 test_path = name if "/" in name else f"test/{name}"
                 data = code.encode("utf-8")
                 ti = tarfile.TarInfo(name=test_path)
@@ -138,14 +142,20 @@ async def _stream_agent_discussion_sse(workflow_id: str):
                         "type": "log",
                         "stage": log.get("agent_name") or log.get("stage", "agent"),
                         "status": "info",
-                        "message": (log.get("message") or log.get("stage") or "")[:1024] or None,
+                        "message": (log.get("message") or log.get("stage") or "")[:1024]
+                        or None,
                         "done": False,
                     },
                 },
             )
 
         def _step_event(step: dict) -> tuple[str, dict]:
-            ts = step.get("started_at") or step.get("completed_at") or step.get("created_at") or ""
+            ts = (
+                step.get("started_at")
+                or step.get("completed_at")
+                or step.get("created_at")
+                or ""
+            )
             ev: dict = {
                 "type": "step",
                 "stage": step.get("step_type", "agent"),
@@ -211,7 +221,9 @@ def _build_hybrid_deploy_state(
         "run_id": workflow_id,
         "pipeline_id": DEFAULT_PIPELINE_ID,
         "api_keys": api_keys or {},
-        "agent_session_jwt": _create_agent_session_jwt_if_configured(user_id, workflow_id, api_keys)
+        "agent_session_jwt": _create_agent_session_jwt_if_configured(
+            user_id, workflow_id, api_keys
+        )
         or "",
         "template_id": w.get("template_id") or "",
         "use_oz_wizard": False,
@@ -262,7 +274,9 @@ def _resume_deploy_approval_job(
             )
         except (KeyError, Exception) as e:
             if "user_prompt" in str(e) or "KeyError" in type(e).__name__:
-                hybrid = _build_hybrid_deploy_state(workflow_id, user_id, project_id, api_keys)
+                hybrid = _build_hybrid_deploy_state(
+                    workflow_id, user_id, project_id, api_keys
+                )
                 if hybrid:
                     logger.info(
                         "[orchestrator] deploy resume: checkpoint failed (%s), using hybrid state",
@@ -296,7 +310,9 @@ def _resume_deploy_approval_job(
                 {"stage": "spec", "status": "completed"},
                 {
                     "stage": "design",
-                    "status": ("completed" if final.get("design_proposal") else "pending"),
+                    "status": (
+                        "completed" if final.get("design_proposal") else "pending"
+                    ),
                 },
                 {
                     "stage": "codegen",
@@ -321,7 +337,9 @@ def _resume_deploy_approval_job(
                 {
                     "stage": "deploy",
                     "status": (
-                        "completed" if current_stage in ("deployed", "ui_scaffold") else "pending"
+                        "completed"
+                        if current_stage in ("deployed", "ui_scaffold")
+                        else "pending"
                     ),
                 },
                 {
@@ -365,7 +383,9 @@ def _resume_deploy_approval_job(
                 )
     except Exception as e:
         err_msg = str(e)[:500]
-        logger.exception("[orchestrator] deploy approval resume failed workflow_id=%s", workflow_id)
+        logger.exception(
+            "[orchestrator] deploy approval resume failed workflow_id=%s", workflow_id
+        )
         update_workflow(workflow_id=workflow_id, status="failed", error=err_msg)
         if db.is_configured():
             db.update_run(workflow_id, status="failed", error_message=err_msg)
@@ -439,7 +459,9 @@ def get_workflow_api(workflow_id: str, request: Request = None) -> dict[str, Any
 
 
 @router.get("/{workflow_id}/status")
-def get_workflow_status_api(workflow_id: str, request: Request = None) -> dict[str, str]:
+def get_workflow_status_api(
+    workflow_id: str, request: Request = None
+) -> dict[str, str]:
     """Return workflow status only."""
     w = get_workflow(workflow_id)
     if not w:
@@ -450,7 +472,9 @@ def get_workflow_status_api(workflow_id: str, request: Request = None) -> dict[s
 
 
 @router.get("/{workflow_id}/contracts")
-def get_workflow_contracts_api(workflow_id: str, request: Request = None) -> list[dict[str, Any]]:
+def get_workflow_contracts_api(
+    workflow_id: str, request: Request = None
+) -> list[dict[str, Any]]:
     """Return generated contracts for a workflow."""
     w = get_workflow(workflow_id)
     if not w:
@@ -484,7 +508,9 @@ def get_workflow_tarball_api(workflow_id: str, request: Request = None) -> Respo
 
 
 @router.get("/{workflow_id}/deployments")
-def get_workflow_deployments_api(workflow_id: str, request: Request = None) -> dict[str, Any]:
+def get_workflow_deployments_api(
+    workflow_id: str, request: Request = None
+) -> dict[str, Any]:
     """Return deployments for a workflow."""
     w = get_workflow(workflow_id)
     if not w:
@@ -495,7 +521,9 @@ def get_workflow_deployments_api(workflow_id: str, request: Request = None) -> d
 
 
 @router.get("/{workflow_id}/ui-schema")
-def get_workflow_ui_schema_api(workflow_id: str, request: Request = None) -> dict[str, Any]:
+def get_workflow_ui_schema_api(
+    workflow_id: str, request: Request = None
+) -> dict[str, Any]:
     """Return UI schema for contract interaction if generated."""
     w = get_workflow(workflow_id)
     if not w:
@@ -520,7 +548,9 @@ async def generate_workflow_ui_schema_api(
         assert_workflow_owner(w, request)
     deployments = w.get("deployments") or []
     if not deployments:
-        raise HTTPException(status_code=400, detail="No deployments; deploy a contract first")
+        raise HTTPException(
+            status_code=400, detail="No deployments; deploy a contract first"
+        )
     contracts = w.get("contracts") or {}
     from agents.ui_scaffold_agent import generate_ui_schema
 
@@ -584,7 +614,9 @@ def prepare_deploy_api(
             r.raise_for_status()
             data = r.json()
     except Exception:
-        logger.exception("[orchestrator] compile request failed workflow_id=%s", workflow_id)
+        logger.exception(
+            "[orchestrator] compile request failed workflow_id=%s", workflow_id
+        )
         return {
             "workflow_id": workflow_id,
             "error": "Compilation service request failed. Check logs for details.",
@@ -815,7 +847,9 @@ def retry_workflow_api(workflow_id: str, request: Request) -> dict[str, Any]:
     if not pipeline_id:
         pipeline_id = DEFAULT_PIPELINE_ID
     template_id = w.get("template_id")
-    agent_session_jwt = _create_agent_session_jwt_if_configured(user_id, workflow_id, api_keys)
+    agent_session_jwt = _create_agent_session_jwt_if_configured(
+        user_id, workflow_id, api_keys
+    )
     request_id = (
         request.headers.get("x-request-id") or request.headers.get("X-Request-Id") or ""
     ).strip() or None
@@ -851,11 +885,15 @@ def retry_workflow_api(workflow_id: str, request: Request) -> dict[str, Any]:
 
 
 # Streaming router (separate prefix)
-streaming_router = APIRouter(prefix="/api/v1/streaming/workflows", tags=["workflows", "streaming"])
+streaming_router = APIRouter(
+    prefix="/api/v1/streaming/workflows", tags=["workflows", "streaming"]
+)
 
 
 @streaming_router.get("/{workflow_id}/code")
-def stream_workflow_code_api(workflow_id: str, request: Request = None) -> StreamingResponse:
+def stream_workflow_code_api(
+    workflow_id: str, request: Request = None
+) -> StreamingResponse:
     """SSE stream of workflow contract source for Studio code viewer."""
     w = get_workflow(workflow_id)
     if not w:
@@ -870,7 +908,9 @@ def stream_workflow_code_api(workflow_id: str, request: Request = None) -> Strea
 
 
 @streaming_router.get("/{workflow_id}/discussion")
-def stream_agent_discussion_api(workflow_id: str, request: Request = None) -> StreamingResponse:
+def stream_agent_discussion_api(
+    workflow_id: str, request: Request = None
+) -> StreamingResponse:
     """SSE stream of agent discussion events for real-time visibility."""
     w = get_workflow(workflow_id)
     if not w:

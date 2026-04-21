@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Key, Trash2, Loader2 } from "lucide-react";
 import {
   getConfiguredLLMProviders,
@@ -104,6 +104,11 @@ export function LLMKeysCard() {
 
   const refetchKeys = useCallback(() => {
     setError(null);
+    if (!hasSession) {
+      setConfigured([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     getConfiguredLLMProviders()
       .then((res) => {
@@ -112,33 +117,11 @@ export function LLMKeysCard() {
       })
       .catch((e) => setError(handleApiError(e)))
       .finally(() => setLoading(false));
-  }, []);
+  }, [hasSession]);
 
   useEffect(() => {
-    let cancelled = false;
-    getConfiguredLLMProviders()
-      .then((res) => {
-        if (!cancelled) {
-          setError(null);
-          setConfigured(res.configured_providers || []);
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) setError(handleApiError(e));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const prevSessionRef = useRef(hasSession);
-  useEffect(() => {
-    if (hasSession && !prevSessionRef.current) refetchKeys();
-    prevSessionRef.current = hasSession;
-  }, [hasSession, refetchKeys]);
+    refetchKeys();
+  }, [refetchKeys]);
 
   useEffect(() => {
     const onByok = () => refetchKeys();

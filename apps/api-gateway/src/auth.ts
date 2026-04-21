@@ -49,12 +49,49 @@ function isPublicPathFromReq(req: Request): boolean {
   });
 }
 
+function tokenFromCookieHeader(cookieHeader: string | undefined): string | null {
+  if (!cookieHeader) return null;
+  const parts = cookieHeader.split(";");
+  for (const raw of parts) {
+    const item = raw.trim();
+    if (!item) continue;
+    const eq = item.indexOf("=");
+    if (eq <= 0) continue;
+    const key = item.slice(0, eq).trim();
+    if (key !== "rt") continue;
+    const value = item.slice(eq + 1).trim();
+    if (!value) return null;
+    return decodeURIComponent(value);
+  }
+  return null;
+}
+
+function resolveJwtFromRequest(req: Request): {
+  token: string | null;
+  hasAuthorization: boolean;
+  scheme: "Bearer" | "none" | "other" | "cookie";
+} {
+  const auth = req.headers.authorization;
+  if (auth && auth.startsWith("Bearer ")) {
+    return { token: auth.slice(7), hasAuthorization: true, scheme: "Bearer" };
+  }
+  const cookieHeader = (req.headers.cookie as string | undefined) || undefined;
+  const cookieToken = tokenFromCookieHeader(cookieHeader);
+  if (cookieToken) {
+    return { token: cookieToken, hasAuthorization: false, scheme: "cookie" };
+  }
+  if (auth) {
+    return { token: null, hasAuthorization: true, scheme: "other" };
+  }
+  return { token: null, hasAuthorization: false, scheme: "none" };
+}
+
 /** Trace: log auth for non-pass outcomes, or all outcomes in dev. */
 function traceAuth(
   path: string,
   requestId: string | undefined,
   hasAuth: boolean,
-  authScheme: "Bearer" | "none" | "other",
+  authScheme: "Bearer" | "none" | "other" | "cookie",
   outcome: "pass" | "401_missing_header" | "401_invalid_token" | "503_no_secret"
 ): void {
   if (getGatewayEnv().isProduction && outcome === "pass") return;
@@ -78,13 +115,12 @@ export function authMiddleware(
   const path = normalizePath(req.originalUrl || req.path || "");
   const gw = getGatewayEnv();
   const authJwtSecret = gw.auth.jwtSecret;
+  const resolved = resolveJwtFromRequest(req);
 
   if (isPublicPathFromReq(req)) {
-    const auth = req.headers.authorization;
-    if (authJwtSecret && auth && auth.startsWith("Bearer ")) {
-      const token = auth.slice(7);
+    if (authJwtSecret && resolved.token) {
       try {
-        const payload = jwt.verify(token, authJwtSecret) as {
+        const payload = jwt.verify(resolved.token, authJwtSecret) as {
           sub?: string;
           wallet_address?: string;
         };
@@ -113,30 +149,31 @@ export function authMiddleware(
     return;
   }
 
-  const auth = req.headers.authorization;
-  const hasAuth = Boolean(auth);
-  const authScheme: "Bearer" | "none" | "other" = !auth ? "none" : auth.startsWith("Bearer ") ? "Bearer" : "other";
-
-  if (!auth || !auth.startsWith("Bearer ")) {
-    traceAuth(path, requestId, hasAuth, authScheme, "401_missing_header");
+  if (!resolved.token) {
+    traceAuth(
+      path,
+      requestId,
+      resolved.hasAuthorization,
+      resolved.scheme,
+      "401_missing_header"
+    );
     logSecurityEvent("auth_failure", 401, path, requestId, undefined);
     res.status(401).json({ error: "Unauthorized", message: "Missing or invalid Authorization header" });
     return;
   }
 
-  const token = auth.slice(7);
   try {
-    const payload = jwt.verify(token, authJwtSecret) as { sub?: string; wallet_address?: string };
+    const payload = jwt.verify(resolved.token, authJwtSecret) as { sub?: string; wallet_address?: string };
     if (payload?.sub) {
       req.userId = payload.sub;
     }
     if (payload?.wallet_address && typeof payload.wallet_address === "string") {
       req.walletAddress = payload.wallet_address;
     }
-    traceAuth(path, requestId, true, "Bearer", "pass");
+    traceAuth(path, requestId, true, resolved.scheme, "pass");
     next();
   } catch {
-    traceAuth(path, requestId, true, "Bearer", "401_invalid_token");
+    traceAuth(path, requestId, true, resolved.scheme, "401_invalid_token");
     logSecurityEvent("auth_failure", 401, path, requestId, undefined);
     res.status(401).json({ error: "Unauthorized", message: "Invalid or expired token" });
   }

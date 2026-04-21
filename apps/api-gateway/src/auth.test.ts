@@ -10,13 +10,20 @@ import { authMiddleware, type RequestWithUser } from "./auth.js";
 
 type JsonBody = Record<string, unknown>;
 
-function createReq(path: string, authorization?: string): RequestWithUser {
+function createReq(
+  path: string,
+  authorization?: string,
+  cookie?: string,
+): RequestWithUser {
+  const headers: Record<string, string> = {};
+  if (authorization) headers.authorization = authorization;
+  if (cookie) headers.cookie = cookie;
   return {
     originalUrl: path,
     path,
     baseUrl: "",
     url: path,
-    headers: authorization ? { authorization } : {},
+    headers,
   } as RequestWithUser;
 }
 
@@ -40,8 +47,8 @@ function createRes() {
   return { res, payload };
 }
 
-function runAuth(path: string, authorization?: string) {
-  const req = createReq(path, authorization);
+function runAuth(path: string, authorization?: string, cookie?: string) {
+  const req = createReq(path, authorization, cookie);
   const { res, payload } = createRes();
   const next = vi.fn<NextFunction>();
 
@@ -115,5 +122,23 @@ describe("authMiddleware", () => {
       error: "Unauthorized",
       message: "Missing or invalid Authorization header",
     });
+  });
+
+  it("allows protected paths with rt cookie JWT when Authorization header is missing", () => {
+    const verifySpy = vi.spyOn(jwt, "verify").mockReturnValue({
+      sub: "user-cookie",
+      wallet_address: "0xdef",
+    } as never);
+    const { req, next, payload } = runAuth(
+      "/api/v1/workspaces/current/llm-keys",
+      undefined,
+      "rt=cookie-token; Path=/",
+    );
+    expect(next).toHaveBeenCalledOnce();
+    expect(payload.statusCode).toBe(200);
+    expect(req.userId).toBe("user-cookie");
+    expect(req.walletAddress).toBe("0xdef");
+    expect(verifySpy).toHaveBeenCalledWith("cookie-token", "unit-test-key");
+    verifySpy.mockRestore();
   });
 });

@@ -632,7 +632,7 @@ def _trace_llm_keys(
     }
     if provider_count is not None:
         payload["configured_providers_count"] = provider_count
-    logger.warning("[llm-keys] %s", json.dumps(payload))
+    logger.info("[llm-keys] %s", json.dumps(payload))
 
 
 @llm_keys_router.get("/llm-keys")

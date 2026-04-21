@@ -14,9 +14,21 @@ function normalizeWallet(addr: string): string {
   return addr.trim().toLowerCase();
 }
 
+function isAllowlistedStatus(status: unknown): boolean {
+  if (typeof status !== "string") return false;
+  const s = status.trim().toLowerCase();
+  return (
+    s === "confirmed" ||
+    s === "approved" ||
+    s === "allowlist" ||
+    s === "allowlisted"
+  );
+}
+
 /**
- * When BETA_ALLOWLIST_ENFORCED is true, the wallet must exist on waitlist_entries with
- * status=confirmed and email_confirmed=true (case-insensitive wallet match).
+ * When BETA_ALLOWLIST_ENFORCED is true, the wallet must exist on waitlist_entries and match
+ * at least one confirmation signal (status allowlisted/confirmed OR email_confirmed=true).
+ * Handles duplicate rows and wallet normalization drift defensively.
  */
 export async function assertBetaAllowlistWallet(
   walletAddress: string,
@@ -54,11 +66,9 @@ export async function assertBetaAllowlistWallet(
 
   const { data, error } = await client
     .from("waitlist_entries")
-    .select("id")
+    .select("id,wallet_address,status,email_confirmed")
     .ilike("wallet_address", w)
-    .eq("status", "confirmed")
-    .eq("email_confirmed", true)
-    .maybeSingle();
+    .limit(50);
 
   if (error) {
     log.error(
@@ -73,7 +83,23 @@ export async function assertBetaAllowlistWallet(
     };
   }
 
-  if (!data?.id) {
+  const rows = Array.isArray(data) ? data : data ? [data] : [];
+  const matched = rows.filter(
+    (row) => normalizeWallet(String(row.wallet_address || "")) === w,
+  );
+  const allowed = matched.some(
+    (row) => row.email_confirmed === true || isAllowlistedStatus(row.status),
+  );
+
+  if (!allowed) {
+    log.warn(
+      {
+        wallet: w,
+        matched_rows: matched.length,
+        statuses: matched.map((r) => String(r.status || "")),
+      },
+      "waitlist allowlist denied",
+    );
     return {
       ok: false,
       status: 403,

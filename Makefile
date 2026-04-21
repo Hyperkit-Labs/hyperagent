@@ -7,9 +7,12 @@ COMPOSE_DIR := infra/docker
 COMPOSE_FILE := docker-compose.yml
 COMPOSE_FILE_LOCAL := docker-compose.local.yml
 ENV_FILE := .env
+# Cap BuildKit parallelism for production compose builds on small VPS (override: make build-contabo COMPOSE_VPS_BUILD_PARALLELISM=4).
+COMPOSE_VPS_BUILD_PARALLELISM ?= 2
+COMPOSE_FILES_VPS := -f $(COMPOSE_DIR)/$(COMPOSE_FILE) -f $(COMPOSE_DIR)/docker-compose.resource-limits.yml
 
 .PHONY: help up down logs test-minimal test-minimal-all verify-real-server restart migrate install-web run-web install-api run-api build rebuild \
-	build-web build-prod check-env validate-prod format-api lint-api type-check-api quality-check-api \
+	build-web build-prod build-contabo check-env validate-prod format-api lint-api type-check-api quality-check-api \
 	dogfood-setup dogfood-help dogfood-daemon ai-bom kill-ports
 
 # Free common HyperAgent dev ports (Studio, gateway, services). Uses kill-port (pnpm).
@@ -31,7 +34,8 @@ help:
 	@echo "  make up-full     - Start with roma-service, codegen (legacy)"
 	@echo "  make up-tools    - Start with hyperagent-tools (port 9000); set TOOLS_BASE_URL=http://hyperagent-tools:9000 in .env"
 	@echo "  make up-local    - Start full stack with local postgres and vectordb (Upstash from .env)"
-	@echo "  make up-contabo  - Start Contabo production stack (for local testing)"
+	@echo "  make up-contabo   - Start Contabo production stack (for local testing; includes VPS CPU/mem caps)"
+	@echo "  make build-contabo - Build production images with capped BuildKit parallelism"
 	@echo "  make build       - Build Docker images for local dev (run when code changes)"
 	@echo "  make rebuild     - Force rebuild Docker images from scratch"
 	@echo "  make down        - Stop stack"
@@ -111,9 +115,15 @@ up-local:
 
 # Start Contabo production stack (for local testing; Coolify uses infra/docker/docker-compose.yml).
 # Run from repo root with --project-directory . so paths resolve correctly.
+# Merges docker-compose.resource-limits.yml (CPU/mem caps for small VPS next to Coolify).
 up-contabo:
-	@docker compose --project-directory . --env-file $(ENV_FILE) -f $(COMPOSE_DIR)/$(COMPOSE_FILE) up -d
+	@DOCKER_BUILDKIT_MAX_PARALLELISM=$(COMPOSE_VPS_BUILD_PARALLELISM) docker compose --project-directory . --env-file $(ENV_FILE) $(COMPOSE_FILES_VPS) up -d
 	@echo "[+] Contabo stack up. Gateway: http://localhost:4000  Sandbox: http://localhost:8005"
+
+# Build production images with bounded BuildKit parallelism (pair with up-contabo on constrained hosts).
+build-contabo:
+	@DOCKER_BUILDKIT_MAX_PARALLELISM=$(COMPOSE_VPS_BUILD_PARALLELISM) docker compose --project-directory . --env-file $(ENV_FILE) $(COMPOSE_FILES_VPS) build
+	@echo "[+] Contabo images built. Run: make up-contabo"
 
 # Stop local dev stack
 down:
@@ -121,7 +131,7 @@ down:
 
 # Stop Contabo stack (use after make up-contabo)
 down-contabo:
-	@docker compose --project-directory . --env-file $(ENV_FILE) -f $(COMPOSE_DIR)/$(COMPOSE_FILE) down
+	@docker compose --project-directory . --env-file $(ENV_FILE) $(COMPOSE_FILES_VPS) down
 
 restart:
 	@cd $(COMPOSE_DIR) && docker compose --env-file ../../$(ENV_FILE) -f $(COMPOSE_FILE_LOCAL) restart

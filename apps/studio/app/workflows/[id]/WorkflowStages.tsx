@@ -209,8 +209,9 @@ export function WorkflowStages({
           <p className="text-xs font-medium text-red-400 mb-1">
             Pipeline failed
           </p>
-          <p className="text-xs text-red-400/80 break-words font-mono">
-            {workflowError}
+          <p className="text-xs text-red-400/80 break-words">
+            An internal error occurred. Check the workflow logs for detailed
+            diagnostics.
           </p>
         </div>
       )}

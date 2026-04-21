@@ -48,6 +48,7 @@ from api import (
     workflows_streaming_router,
     x402_webhooks_router,
 )
+from api.spoofed_identity_middleware import SpoofedIdentityMiddleware
 from fastapi import FastAPI, Request
 from observability import record_latency
 from slowapi import _rate_limit_exceeded_handler
@@ -86,6 +87,7 @@ COMPILE_SERVICE_URL = _service_url("COMPILE_SERVICE_URL", "http://localhost:8004
 AUDIT_SERVICE_URL = _service_url("AUDIT_SERVICE_URL", "http://localhost:8001")
 
 app = FastAPI(title="HyperAgent Orchestrator", version="0.1.0")
+app.add_middleware(SpoofedIdentityMiddleware)
 
 # slowapi: orchestrator-level rate limiting (second layer after API-gateway Upstash limits).
 from rate_limit import limiter
@@ -127,6 +129,9 @@ def _validate_critical_services() -> None:
         supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
         if not supabase_url or not supabase_key:
             missing.append("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
+        identity_hmac = os.environ.get("IDENTITY_HMAC_SECRET", "").strip()
+        if not identity_hmac:
+            missing.append("IDENTITY_HMAC_SECRET")
         byok_tee_strict = os.environ.get("BYOK_TEE_STRICT", "").strip().lower() in (
             "1",
             "true",
@@ -140,9 +145,11 @@ def _validate_critical_services() -> None:
             if not _is_kms_configured():
                 missing.append("LLM_KEY_KMS_KEY_ARN (required when BYOK_TEE_STRICT=1)")
 
-        require_byok_kms = os.environ.get(
-            "LLM_REQUIRE_KMS_IN_PRODUCTION", "1"
-        ).strip().lower() in ("1", "true", "yes")
+        require_byok_kms = os.environ.get("LLM_REQUIRE_KMS_IN_PRODUCTION", "1").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
         if require_byok_kms:
             try:
                 from llm_keys_kms import _is_kms_configured as _kms_on
@@ -166,9 +173,7 @@ def _validate_critical_services() -> None:
                     "[orchestrator] STRICT_STARTUP: aborting. Missing required env: %s",
                     ", ".join(missing),
                 )
-                raise SystemExit(
-                    f"STRICT_STARTUP: missing required env vars: {', '.join(missing)}"
-                )
+                raise SystemExit(f"STRICT_STARTUP: missing required env vars: {', '.join(missing)}")
             logger.error(
                 "[orchestrator] Production requires: %s. "
                 "Process will stay alive but /health returns 503 until resolved. "
@@ -190,8 +195,7 @@ def _validate_critical_services() -> None:
     missing_svc = [k for k, v in required if not v or v.startswith("http://localhost:")]
     if missing_svc:
         logger.warning(
-            "[orchestrator] Critical services not configured: %s. "
-            "Workflow pipeline will fail.",
+            "[orchestrator] Critical services not configured: %s. Workflow pipeline will fail.",
             ", ".join(missing_svc),
         )
     if _is_production() and missing_svc:
@@ -256,9 +260,7 @@ def _start_reconciliation_schedule() -> None:
                 logger.error("[reconciliation] scheduled check failed: %s", e)
             _time.sleep(interval_s)
 
-    t = threading.Thread(
-        target=_reconcile_loop, daemon=True, name="billing-reconciliation"
-    )
+    t = threading.Thread(target=_reconcile_loop, daemon=True, name="billing-reconciliation")
     t.start()
     logger.info("[orchestrator] billing reconciliation scheduled every %ds", interval_s)
 
@@ -275,9 +277,7 @@ def _start_storage_reconciliation_schedule() -> None:
     def _storage_loop():
         import time as _time
 
-        initial_delay = int(
-            os.environ.get("STORAGE_RECONCILE_INITIAL_DELAY_SEC", "120")
-        )
+        initial_delay = int(os.environ.get("STORAGE_RECONCILE_INITIAL_DELAY_SEC", "120"))
         if initial_delay > 0:
             _time.sleep(initial_delay)
         while True:
@@ -289,9 +289,7 @@ def _start_storage_reconciliation_schedule() -> None:
                 logger.error("[orchestrator] storage reconciliation pass failed: %s", e)
             _time.sleep(interval_s)
 
-    t = threading.Thread(
-        target=_storage_loop, daemon=True, name="storage-reconciliation"
-    )
+    t = threading.Thread(target=_storage_loop, daemon=True, name="storage-reconciliation")
     t.start()
     logger.info(
         "[orchestrator] storage gateway reconciliation scheduled every %ds",
@@ -334,9 +332,7 @@ try:
     app.add_middleware(X402EnforcementMiddleware)
     logger.info("[orchestrator] x402 enforcement middleware loaded")
 except ImportError:
-    logger.warning(
-        "[orchestrator] x402_middleware not available; x402 enforcement disabled"
-    )
+    logger.warning("[orchestrator] x402_middleware not available; x402 enforcement disabled")
 
 # Include routers. Order matters: more specific routes (e.g. /generate) before parametric ({workflow_id}).
 app.include_router(pipeline_router)

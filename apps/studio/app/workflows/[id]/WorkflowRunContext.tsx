@@ -384,7 +384,8 @@ export function WorkflowRunErrorBlock() {
         Error
       </h3>
       <p className="text-sm text-[var(--color-text-secondary)] break-words">
-        {err}
+        An internal error occurred. Review workflow logs for full diagnostic
+        details.
       </p>
     </div>
   );

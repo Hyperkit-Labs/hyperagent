@@ -15,18 +15,16 @@ import os
 import shutil
 import socket
 import subprocess
+import tarfile
 import time
 import uuid
 from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
-from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
-import ipaddress
-import socket
-from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +43,9 @@ _sandboxes: dict[str, dict] = {}
 
 def _verify_api_key(credentials: HTTPAuthorizationCredentials | None = Depends(security)) -> None:
     if not API_KEY:
-        raise HTTPException(status_code=503, detail="Sandbox API not configured: set OPENSANDBOX_API_KEY")
+        raise HTTPException(
+            status_code=503, detail="Sandbox API not configured: set OPENSANDBOX_API_KEY"
+        )
     if not credentials or credentials.credentials != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
@@ -65,34 +65,6 @@ class SandboxCreateResponse(BaseModel):
     status: str
 
 
-def _is_public_ip(ip_str: str) -> bool:
-    try:
-        addr = ipaddress.ip_address(ip_str)
-        if addr.is_loopback or addr.is_link_local or addr.is_private:
-            return False
-        if addr.is_reserved or (hasattr(addr, "is_private") and addr.is_private):
-            return False
-        return True
-    except ValueError:
-        return False
-
-
-def _validate_tarball_url(url: str) -> None:
-    parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https"):
-        raise HTTPException(status_code=400, detail="tarball_url must use http or https")
-    hostname = (parsed.hostname or parsed.netloc or "").split(":")[0].strip()
-    if not hostname:
-        raise HTTPException(status_code=400, detail="tarball_url must have a hostname")
-    try:
-        for info in socket.getaddrinfo(hostname, None):
-            addr = info[4][0]
-            if not _is_public_ip(addr):
-                raise HTTPException(status_code=400, detail="tarball_url must point to a public host")
-    except socket.gaierror:
-        raise HTTPException(status_code=400, detail="tarball_url hostname could not be resolved")
-
-
 def _run_sync(cmd: list[str], cwd: str | None = None, timeout: int = 120) -> tuple[int, str, str]:
     try:
         r = subprocess.run(
@@ -107,6 +79,45 @@ def _run_sync(cmd: list[str], cwd: str | None = None, timeout: int = 120) -> tup
         return -1, "", "timeout"
     except Exception as e:
         return -1, "", str(e)
+
+
+def _validate_tarball_members(tarball_path: Path) -> None:
+    try:
+        with tarfile.open(tarball_path, mode="r:gz") as archive:
+            members = archive.getmembers()
+    except tarfile.TarError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid tarball: {e}") from e
+
+    if not members:
+        raise HTTPException(status_code=400, detail="Invalid tarball: archive is empty")
+
+    for member in members:
+        name = member.name
+        parts = Path(name).parts
+        if not name or name.startswith(("/", "\\")):
+            raise HTTPException(
+                status_code=400, detail="Invalid tarball: absolute paths are not allowed"
+            )
+        if ".." in parts:
+            raise HTTPException(
+                status_code=400, detail="Invalid tarball: path traversal entries are not allowed"
+            )
+        if member.issym() or member.islnk():
+            raise HTTPException(status_code=400, detail="Invalid tarball: symlinks are not allowed")
+        if member.isdev() or member.isfifo():
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid tarball: device and FIFO entries are not allowed",
+            )
+
+
+def _extract_tarball(tarball_path: Path, extract_dir: Path) -> None:
+    _validate_tarball_members(tarball_path)
+    try:
+        with tarfile.open(tarball_path, mode="r:gz") as archive:
+            archive.extractall(path=extract_dir)
+    except tarfile.TarError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid tarball: {e}") from e
 
 
 def _is_public_ip(ip_str: str) -> bool:
@@ -131,7 +142,9 @@ def _validate_tarball_url(tarball_url: str) -> None:
     """
     parsed = urlparse(tarball_url)
     if parsed.scheme not in ("http", "https") or not parsed.hostname:
-        raise HTTPException(status_code=400, detail="tarball_url must be an http(s) URL with a hostname")
+        raise HTTPException(
+            status_code=400, detail="tarball_url must be an http(s) URL with a hostname"
+        )
     hostname = parsed.hostname
     try:
         addr_info = socket.getaddrinfo(hostname, parsed.port or 80, proto=socket.IPPROTO_TCP)
@@ -142,10 +155,15 @@ def _validate_tarball_url(tarball_url: str) -> None:
         raise HTTPException(status_code=400, detail="tarball_url host has no IP addresses")
     for ip in ips:
         if not _is_public_ip(ip):
-            raise HTTPException(status_code=400, detail="tarball_url must not point to private or loopback addresses")
+            raise HTTPException(
+                status_code=400,
+                detail="tarball_url must not point to private or loopback addresses",
+            )
 
 
-async def _create_sandbox_container(tarball_url: str, timeout_minutes: int, port: int) -> tuple[str, int]:
+async def _create_sandbox_container(
+    tarball_url: str, timeout_minutes: int, port: int
+) -> tuple[str, int]:
     _validate_tarball_url(tarball_url)
     sandbox_id = f"sandbox-{uuid.uuid4().hex[:12]}"
     extract_dir = WORK_DIR / sandbox_id
@@ -158,10 +176,11 @@ async def _create_sandbox_container(tarball_url: str, timeout_minutes: int, port
             r.raise_for_status()
             tarball_path.write_bytes(r.content)
 
-        code, out, err = _run_sync(["tar", "-xzf", str(tarball_path), "-C", str(extract_dir)])
-        if code != 0:
+        try:
+            _extract_tarball(tarball_path, extract_dir)
+        except HTTPException:
             shutil.rmtree(extract_dir, ignore_errors=True)
-            raise HTTPException(status_code=400, detail=f"Invalid tarball: {err or out}")
+            raise
 
         if not (extract_dir / "package.json").exists():
             shutil.rmtree(extract_dir, ignore_errors=True)
@@ -178,13 +197,20 @@ async def _create_sandbox_container(tarball_url: str, timeout_minutes: int, port
 
         timeout_sec = timeout_minutes * 60
         cmd = [
-            "docker", "run", "-d",
+            "docker",
+            "run",
+            "-d",
             "--rm",
-            "-p", f"{host_port}:{port}",
-            "-v", f"{extract_dir}:/app",
-            "-w", "/app",
+            "-p",
+            f"{host_port}:{port}",
+            "-v",
+            f"{extract_dir}:/app",
+            "-w",
+            "/app",
             "node:22-alpine",
-            "sh", "-c", "npm install && (npm run start 2>/dev/null || npm start 2>/dev/null || npx hardhat node)"
+            "sh",
+            "-c",
+            "npm install && (npm run start 2>/dev/null || npm start 2>/dev/null || npx hardhat node)",
         ]
 
         code, out, err = _run_sync(cmd, timeout=30)
@@ -197,7 +223,11 @@ async def _create_sandbox_container(tarball_url: str, timeout_minutes: int, port
             shutil.rmtree(extract_dir, ignore_errors=True)
             raise HTTPException(status_code=500, detail="Failed to get container ID")
 
-        url = f"{PREVIEW_BASE_URL}/preview/{sandbox_id}" if PREVIEW_BASE_URL else f"http://localhost:{host_port}"
+        url = (
+            f"{PREVIEW_BASE_URL}/preview/{sandbox_id}"
+            if PREVIEW_BASE_URL
+            else f"http://localhost:{host_port}"
+        )
         _sandboxes[sandbox_id] = {
             "container_id": container_id,
             "host_port": host_port,
@@ -222,7 +252,9 @@ async def _cleanup_after_timeout(sandbox_id: str, timeout_sec: int) -> None:
     if meta:
         if meta.get("container_id"):
             try:
-                subprocess.run(["docker", "stop", meta["container_id"]], capture_output=True, timeout=10)
+                subprocess.run(
+                    ["docker", "stop", meta["container_id"]], capture_output=True, timeout=10
+                )
             except Exception:
                 pass
         extract_dir = meta.get("extract_dir")
@@ -251,7 +283,10 @@ async def _preview_proxy_impl(sandbox_id: str, path: str, request: Request):
             content=await request.body() if request.method in ("POST", "PUT", "PATCH") else None,
         )
     from starlette.responses import Response
-    headers = {k: v for k, v in r.headers.items() if k.lower() not in ("transfer-encoding", "connection")}
+
+    headers = {
+        k: v for k, v in r.headers.items() if k.lower() not in ("transfer-encoding", "connection")
+    }
     return Response(content=r.content, status_code=r.status_code, headers=headers)
 
 
@@ -268,6 +303,11 @@ async def sandbox_create(
         raise HTTPException(status_code=400, detail="Invalid port: must be an integer")
     if not (1 <= requested_port <= 65535):
         raise HTTPException(status_code=400, detail="Invalid port: must be between 1 and 65535")
+    if requested_port not in ALLOWED_PORTS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid port: must be one of {sorted(ALLOWED_PORTS)}",
+        )
 
     sandbox_id, host_port = await _create_sandbox_container(
         body.tarball_url,
@@ -284,7 +324,9 @@ async def sandbox_create(
 
 
 @app.api_route("/preview/{sandbox_id}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
-@app.api_route("/preview/{sandbox_id}/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+@app.api_route(
+    "/preview/{sandbox_id}/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"]
+)
 async def preview_proxy(
     sandbox_id: str,
     request: Request,

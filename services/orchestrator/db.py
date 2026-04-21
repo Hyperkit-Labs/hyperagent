@@ -138,10 +138,13 @@ def _client():
     return _supabase
 
 
-def _with_transient_supabase_retry(operation: str, fallback: _T, func: Callable[[], _T]) -> _T:
+def _with_transient_supabase_retry(operation: str, fallback: _T, func: Callable[[Any], _T]) -> _T:
     for attempt in range(2):
+        client = _client()
+        if not client:
+            return fallback
         try:
-            return func()
+            return func(client)
         except Exception as e:
             if attempt == 0 and is_transient_supabase_http_error(e):
                 logger.warning("[db] %s transient error, refreshing client: %s", operation, e)
@@ -1020,13 +1023,10 @@ def _store_status_to_run_status(store_status: str) -> str:
 
 def list_workflow_states(limit: int = 50, status: str | None = None) -> list[dict[str, Any]]:
     """List runs with workflow_state, newest first. status filters runs.status (store status mapped to run status)."""
-    client = _client()
-    if not client:
-        return []
     try:
         run_status = _store_status_to_run_status(status) if status else None
 
-        def _query() -> list[dict[str, Any]]:
+        def _query(client: Any) -> list[dict[str, Any]]:
             q = (
                 client.table("runs")
                 .select("id, workflow_state, status, created_at")
@@ -1124,14 +1124,11 @@ def count_completed_audits_from_run_state() -> int:
 
 def count_security_findings() -> int:
     """Total count of security findings from security_findings table."""
-    client = _client()
-    if not client:
-        return 0
     try:
         r = _with_transient_supabase_retry(
             "count_security_findings",
             None,
-            lambda: client.table("security_findings").select("id", count="exact").execute(),
+            lambda client: client.table("security_findings").select("id", count="exact").execute(),
         )
         if r is None:
             return 0
@@ -1202,14 +1199,11 @@ def list_security_findings(
 
 def count_distinct_auditors() -> int:
     """Count distinct users (wallet_user_id) who have completed at least one audit run."""
-    client = _client()
-    if not client:
-        return 0
     try:
         r = _with_transient_supabase_retry(
             "count_distinct_auditors",
             None,
-            lambda: client.table("run_steps")
+            lambda client: client.table("run_steps")
             .select("run_id, runs!inner(project_id, projects!inner(wallet_user_id))")
             .eq("step_type", "audit")
             .eq("status", "completed")

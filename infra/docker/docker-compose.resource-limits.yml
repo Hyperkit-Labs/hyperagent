@@ -1,0 +1,59 @@
+# CPU/mem overlay for small VPS. Merge: `docker compose ... -f docker-compose.yml -f docker-compose.resource-limits.yml` or `make up-contabo`.
+# Tune here on OOM; BuildKit is capped via infra/scripts/compose-vps-build.sh (see infra/README.md).
+
+services:
+  api-gateway:
+    mem_limit: 384m
+    cpus: "0.75"
+
+  orchestrator:
+    mem_limit: 2560m
+    cpus: "2.5"
+
+  agent-runtime:
+    mem_limit: 768m
+    cpus: "1.0"
+
+  simulation:
+    mem_limit: 384m
+    cpus: "0.5"
+
+  deploy:
+    mem_limit: 384m
+    cpus: "0.5"
+
+  storage:
+    mem_limit: 384m
+    cpus: "0.5"
+
+  compile:
+    mem_limit: 1536m
+    cpus: "1.5"
+
+  audit:
+    mem_limit: 384m
+    cpus: "0.5"
+
+  hyperagent-tools:
+    mem_limit: 512m
+    cpus: "0.75"
+
+  roma-service:
+    mem_limit: 384m
+    cpus: "0.5"
+
+  vectordb:
+    mem_limit: 384m
+    cpus: "0.5"
+
+  sandbox-api:
+    mem_limit: 512m
+    cpus: "0.5"
+
+  qdrant:
+    mem_limit: 1024m
+    cpus: "0.75"
+
+  dd-agent:
+    mem_limit: 512m
+    cpus: "0.5"

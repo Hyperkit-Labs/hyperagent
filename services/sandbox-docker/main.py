@@ -29,7 +29,9 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-API_KEY = (os.environ.get("OPENSANDBOX_API_KEY") or os.environ.get("SANDBOX_API_KEY") or "").strip()
+API_KEY = (
+    os.environ.get("OPENSANDBOX_API_KEY") or os.environ.get("SANDBOX_API_KEY") or ""
+).strip()
 PREVIEW_BASE_URL = (os.environ.get("PREVIEW_BASE_URL") or "").rstrip("/")
 WORK_DIR = Path(os.environ.get("SANDBOX_WORK_DIR", "/var/lib/sandbox-docker"))
 
@@ -39,10 +41,13 @@ security = HTTPBearer(auto_error=False)
 _sandboxes: dict[str, dict] = {}
 
 
-def _verify_api_key(credentials: HTTPAuthorizationCredentials | None = Depends(security)) -> None:
+def _verify_api_key(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+) -> None:
     if not API_KEY:
         raise HTTPException(
-            status_code=503, detail="Sandbox API not configured: set OPENSANDBOX_API_KEY"
+            status_code=503,
+            detail="Sandbox API not configured: set OPENSANDBOX_API_KEY",
         )
     if not credentials or credentials.credentials != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
@@ -54,7 +59,9 @@ ALLOWED_PORTS = {80, 3000, 4000, 8080, 8545}
 class SandboxCreateBody(BaseModel):
     tarball_url: str = Field(..., description="URL of gzipped tarball to run")
     timeout_minutes: int = Field(default=30, ge=1, le=120)
-    port: int = Field(default=8545, description="Port to expose (8545 Hardhat, 3000 frontend)")
+    port: int = Field(
+        default=8545, description="Port to expose (8545 Hardhat, 3000 frontend)"
+    )
 
 
 class SandboxCreateResponse(BaseModel):
@@ -63,7 +70,9 @@ class SandboxCreateResponse(BaseModel):
     status: str
 
 
-def _run_sync(cmd: list[str], cwd: str | None = None, timeout: int = 120) -> tuple[int, str, str]:
+def _run_sync(
+    cmd: list[str], cwd: str | None = None, timeout: int = 120
+) -> tuple[int, str, str]:
     try:
         r = subprocess.run(
             cmd,
@@ -97,10 +106,13 @@ def _validate_tarball_member(member: tarfile.TarInfo) -> None:
         )
     if ".." in parts:
         raise HTTPException(
-            status_code=400, detail="Invalid tarball: path traversal entries are not allowed"
+            status_code=400,
+            detail="Invalid tarball: path traversal entries are not allowed",
         )
     if member.issym() or member.islnk():
-        raise HTTPException(status_code=400, detail="Invalid tarball: symlinks are not allowed")
+        raise HTTPException(
+            status_code=400, detail="Invalid tarball: symlinks are not allowed"
+        )
     if member.isdev() or member.isfifo():
         raise HTTPException(
             status_code=400,
@@ -113,7 +125,9 @@ def _extract_tarball(tarball_path: Path, extract_dir: Path) -> None:
         with tarfile.open(tarball_path, mode="r:gz") as archive:
             members = archive.getmembers()
             if not members:
-                raise HTTPException(status_code=400, detail="Invalid tarball: archive is empty")
+                raise HTTPException(
+                    status_code=400, detail="Invalid tarball: archive is empty"
+                )
             for member in members:
                 _validate_tarball_member(member)
             to_extract = [m for m in members if m.type not in _GNU_META]
@@ -135,9 +149,16 @@ def _is_public_ip(ip_str: str) -> bool:
         ip_obj = ipaddress.ip_address(ip_str)
     except ValueError:
         return False
-    if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_multicast:
+    if (
+        ip_obj.is_private
+        or ip_obj.is_loopback
+        or ip_obj.is_link_local
+        or ip_obj.is_multicast
+    ):
         return False
-    if getattr(ip_obj, "is_reserved", False) or getattr(ip_obj, "is_unspecified", False):
+    if getattr(ip_obj, "is_reserved", False) or getattr(
+        ip_obj, "is_unspecified", False
+    ):
         return False
     return True
 
@@ -154,12 +175,18 @@ def _validate_tarball_url(tarball_url: str) -> None:
         )
     hostname = parsed.hostname
     try:
-        addr_info = socket.getaddrinfo(hostname, parsed.port or 80, proto=socket.IPPROTO_TCP)
+        addr_info = socket.getaddrinfo(
+            hostname, parsed.port or 80, proto=socket.IPPROTO_TCP
+        )
     except socket.gaierror:
-        raise HTTPException(status_code=400, detail="tarball_url host could not be resolved")
+        raise HTTPException(
+            status_code=400, detail="tarball_url host could not be resolved"
+        )
     ips = {ai[4][0] for ai in addr_info if ai and ai[4]}
     if not ips:
-        raise HTTPException(status_code=400, detail="tarball_url host has no IP addresses")
+        raise HTTPException(
+            status_code=400, detail="tarball_url host has no IP addresses"
+        )
     for ip in ips:
         if not _is_public_ip(ip):
             raise HTTPException(
@@ -191,11 +218,15 @@ async def _create_sandbox_container(
 
         if not (extract_dir / "package.json").exists():
             shutil.rmtree(extract_dir, ignore_errors=True)
-            raise HTTPException(status_code=400, detail="Tarball must contain package.json")
+            raise HTTPException(
+                status_code=400, detail="Tarball must contain package.json"
+            )
 
         host_port = 0
         for p in range(19000, 65535):
-            if p not in {s.get("host_port") for s in _sandboxes.values() if s.get("host_port")}:
+            if p not in {
+                s.get("host_port") for s in _sandboxes.values() if s.get("host_port")
+            }:
                 host_port = p
                 break
         if host_port == 0:
@@ -223,7 +254,9 @@ async def _create_sandbox_container(
         code, out, err = _run_sync(cmd, timeout=30)
         if code != 0:
             shutil.rmtree(extract_dir, ignore_errors=True)
-            raise HTTPException(status_code=500, detail=f"docker run failed: {err or out}")
+            raise HTTPException(
+                status_code=500, detail=f"docker run failed: {err or out}"
+            )
 
         container_id = out.strip()
         if not container_id or len(container_id) < 10:
@@ -260,7 +293,9 @@ async def _cleanup_after_timeout(sandbox_id: str, timeout_sec: int) -> None:
         if meta.get("container_id"):
             try:
                 subprocess.run(
-                    ["docker", "stop", meta["container_id"]], capture_output=True, timeout=10
+                    ["docker", "stop", meta["container_id"]],
+                    capture_output=True,
+                    timeout=10,
                 )
             except Exception:
                 pass
@@ -287,12 +322,18 @@ async def _preview_proxy_impl(sandbox_id: str, path: str, request: Request):
         r = await client.request(
             request.method,
             target,
-            content=await request.body() if request.method in ("POST", "PUT", "PATCH") else None,
+            content=(
+                await request.body()
+                if request.method in ("POST", "PUT", "PATCH")
+                else None
+            ),
         )
     from starlette.responses import Response
 
     headers = {
-        k: v for k, v in r.headers.items() if k.lower() not in ("transfer-encoding", "connection")
+        k: v
+        for k, v in r.headers.items()
+        if k.lower() not in ("transfer-encoding", "connection")
     }
     return Response(content=r.content, status_code=r.status_code, headers=headers)
 
@@ -308,6 +349,10 @@ async def sandbox_create(
         requested_port = int(body.port)
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="Invalid port: must be an integer")
+    if not (1 <= requested_port <= 65535):
+        raise HTTPException(
+            status_code=400, detail="Invalid port: must be between 1 and 65535"
+        )
     if requested_port not in ALLOWED_PORTS:
         raise HTTPException(
             status_code=400,
@@ -328,9 +373,12 @@ async def sandbox_create(
     )
 
 
-@app.api_route("/preview/{sandbox_id}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 @app.api_route(
-    "/preview/{sandbox_id}/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"]
+    "/preview/{sandbox_id}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"]
+)
+@app.api_route(
+    "/preview/{sandbox_id}/{path:path}",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
 )
 async def preview_proxy(
     sandbox_id: str,

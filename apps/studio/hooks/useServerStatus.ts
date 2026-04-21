@@ -20,12 +20,15 @@ type HealthBody = {
   message?: string;
 };
 
-function interpretHealthResponse(
+export function interpretHealthResponse(
   res: Response,
   data: HealthBody,
 ): ServerStatus {
   if (!res.ok) {
     if (data.auth_signin_ready === false) return "signin_unavailable";
+    if (data.status === "degraded" && data.auth_signin_ready === true) {
+      return "degraded";
+    }
     return "down";
   }
 

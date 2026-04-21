@@ -26,6 +26,7 @@ import { Env, getGatewayEnv } from "@hyperagent/config";
 import { initOtel } from "./otel-sdk.js";
 import { initSentry } from "./sentry-init.js";
 import { createPlatformTrackRecordHandler } from "./trackRecord.js";
+import { logOrchestratorPreflight } from "./orchestrator-preflight.js";
 
 initSentry();
 initOtel();
@@ -360,4 +361,5 @@ app.listen(port, "0.0.0.0", () => {
     port,
     orchestrator: gw.orchestratorUrl,
   });
+  void logOrchestratorPreflight(gw.orchestratorUrl, Math.min(gw.proxyTimeoutMs, 8_000));
 });

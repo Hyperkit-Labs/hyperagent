@@ -3,7 +3,16 @@ import { getGatewayEnv } from "@hyperagent/config";
 import { getSupabaseAdmin } from "./authBootstrap.js";
 import { log } from "./logger.js";
 
-export function healthHandler(orchestratorUrl: string) {
+export type HealthHandlerOptions = {
+  /** Probe only orchestrator GET /health/live (fast). Skips deep GET /health (Redis, Supabase, queue). */
+  shallowOrchestrator?: boolean;
+};
+
+export function healthHandler(
+  orchestratorUrl: string,
+  options: HealthHandlerOptions = {},
+) {
+  const shallow = options.shallowOrchestrator === true;
   return async (_req: Request, res: Response): Promise<void> => {
     const gw = getGatewayEnv();
     const authJwtConfigured = Boolean(gw.auth.jwtSecret);
@@ -39,13 +48,20 @@ export function healthHandler(orchestratorUrl: string) {
         }
       }
 
-      const [rLive, rHealth] = await Promise.all([
-        fetchOrch("/health/live", 2000),
-        fetchOrch("/health", 3000),
-      ]);
+      if (shallow) {
+        const rLive = await fetchOrch("/health/live", 2500);
+        orchestratorOk = rLive !== null && rLive.ok;
+        orchestratorReachable = rLive !== null;
+      } else {
+        const [rLive, rHealth] = await Promise.all([
+          fetchOrch("/health/live", 2000),
+          // Orchestrator /health may include Supabase + Redis; allow >3s when Upstash is slow.
+          fetchOrch("/health", 8000),
+        ]);
 
-      orchestratorOk = rHealth !== null && rHealth.ok;
-      orchestratorReachable = (rLive !== null && rLive.ok) || rHealth !== null;
+        orchestratorOk = rHealth !== null && rHealth.ok;
+        orchestratorReachable = (rLive !== null && rLive.ok) || rHealth !== null;
+      }
     }
 
     const pipeline_ready = authSigninReady && orchestratorReachable && orchestratorOk;
@@ -62,6 +78,7 @@ export function healthHandler(orchestratorUrl: string) {
       db_error: dbError,
       auth_signin_ready: authSigninReady,
       pipeline_ready,
+      ...(shallow ? { signin_shallow_orchestrator_probe: true } : {}),
     };
 
     if (!authSigninReady) {
@@ -89,11 +106,13 @@ export function healthHandler(orchestratorUrl: string) {
     const overallStatus = orchestratorOk ? "ok" : "degraded";
     let message: string | undefined;
     if (!orchestratorReachable) {
-      message =
-        "Orchestrator unreachable (no response from /health or /health/live). Check ORCHESTRATOR_URL and that the orchestrator service is running. Workflows will fail until it is reachable.";
+      message = shallow
+        ? "Orchestrator unreachable (no response from GET /health/live). Check ORCHESTRATOR_URL and that the orchestrator process is running."
+        : "Orchestrator unreachable (no response from /health or /health/live). Check ORCHESTRATOR_URL and that the orchestrator service is running. Workflows will fail until it is reachable.";
     } else if (!orchestratorOk) {
-      message =
-        "Orchestrator is reachable but GET /health is not OK (often Redis, Supabase, or queue config on the orchestrator). Sign-in works; pipeline runs may fail until orchestrator /health is healthy.";
+      message = shallow
+        ? "Orchestrator liveness check failed (GET /health/live not OK). The process may be starting or misconfigured."
+        : "Orchestrator is reachable but GET /health is not OK (often Redis, Supabase, or queue config on the orchestrator). Sign-in works; pipeline runs may fail until orchestrator /health is healthy.";
     }
 
     if (!pipeline_ready) {

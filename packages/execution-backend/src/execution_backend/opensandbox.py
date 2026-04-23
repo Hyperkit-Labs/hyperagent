@@ -1,31 +1,168 @@
-"""OpenSandbox execution backend: runs compile, audit, exploit_sim in isolated gVisor/Firecracker sandboxes."""
+"""Remote sandbox execution: E2B first, OpenSandbox SDK fallback.
 
+Primary path uses the official E2B Python SDK (``from e2b import AsyncSandbox``) with ``E2B_API_KEY`` /
+optional ``E2B_API_URL`` (self-hosted). If ``AsyncSandbox.create`` fails or ``e2b`` is not installed,
+the backend falls back to ``opensandbox-sdk`` when ``OPENSANDBOX_API_URL`` and ``OPENSANDBOX_API_KEY``
+are set. Template ids map to E2B templates (or OpenSandbox control-plane ``templateID`` when falling back).
+"""
+
+from __future__ import annotations
+
+import asyncio
 import json
 import logging
 import os
-from typing import Any
+import shlex
+from typing import Any, Callable, Optional
 
-from .protocol import AuditResult, CompileResult, ExploitSimResult, GasBenchmarkResult
+from .protocol import (
+    AuditResult,
+    CompileResult,
+    ExecutionBackendConfigurationError,
+    ExploitSimResult,
+    GasBenchmarkResult,
+)
 
 logger = logging.getLogger(__name__)
 
-OPENSANDBOX_API_URL = os.environ.get("OPENSANDBOX_API_URL", "")
-OPENSANDBOX_API_KEY = os.environ.get("OPENSANDBOX_API_KEY", "")
+_SANDBOX_CREATE_TIMEOUT = 300
+
+
+def _sandbox_workdir() -> str:
+    """Workspace root inside the sandbox image (E2B default image uses /home/user; override if your template differs)."""
+    return (
+        os.environ.get("E2B_SANDBOX_WORKDIR", "").strip()
+        or os.environ.get("OPENSANDBOX_SANDBOX_WORKDIR", "").strip()
+        or "/home/user/hyperkit-sandbox"
+    )
+
+
+def _template_for_stage(kind: str) -> str:
+    """Resolve sandbox template name or id (E2B template / OpenSandbox templateID)."""
+    global_id = (os.environ.get("E2B_TEMPLATE_ID", "") or "").strip()
+    if global_id:
+        return global_id
+    defaults: dict[str, str] = {
+        "compile": "solidity-toolchain",
+        "audit": "audit-tools",
+        "exploit": "audit-tools",
+    }
+    env_keys: dict[str, str] = {
+        "compile": "E2B_TEMPLATE_COMPILE",
+        "audit": "E2B_TEMPLATE_AUDIT",
+        "exploit": "E2B_TEMPLATE_EXPLOIT",
+    }
+    if kind not in env_keys:
+        return "audit-tools"
+    override = (os.environ.get(env_keys[kind], "") or "").strip()
+    return override or defaults.get(kind, "audit-tools")
+
+
+def _opensandbox_credentials() -> tuple[str, str]:
+    """URL and API key for OpenSandbox-only (fallback) control plane."""
+    url = (os.environ.get("OPENSANDBOX_API_URL", "") or "").strip()
+    key = (os.environ.get("OPENSANDBOX_API_KEY", "") or "").strip()
+    return url, key
+
+
+def _e2b_api_key() -> str:
+    return (os.environ.get("E2B_API_KEY", "") or "").strip()
+
+
+def _e2b_api_url() -> str | None:
+    u = (os.environ.get("E2B_API_URL", "") or "").strip()
+    return u or None
+
+
+async def _dispose_sandbox(sandbox: Any) -> None:
+    """Best-effort teardown for E2B (kill) and OpenSandbox (kill + close)."""
+    try:
+        kill = getattr(sandbox, "kill", None)
+        if kill is not None:
+            res = kill()
+            if asyncio.iscoroutine(res):
+                await res
+    except Exception:  # noqa: BLE001
+        logger.debug("[sandbox] kill failed", exc_info=True)
+    try:
+        close = getattr(sandbox, "close", None)
+        if close is not None:
+            res = close()
+            if asyncio.iscoroutine(res):
+                await res
+    except Exception:  # noqa: BLE001
+        logger.debug("[sandbox] close failed", exc_info=True)
 
 
 class OpenSandboxBackend:
-    """OpenSandbox backend: creates sandbox, uploads files, runs commands, returns results."""
+    """E2B ``AsyncSandbox`` when configured; otherwise ``opensandbox-sdk`` to the OpenSandbox API."""
 
     def __init__(
         self,
         api_url: str | None = None,
         api_key: str | None = None,
     ):
-        self.api_url = api_url or OPENSANDBOX_API_URL
-        self.api_key = api_key or OPENSANDBOX_API_KEY
+        # Optional overrides for OpenSandbox fallback (tests or split secrets).
+        o_url, o_key = _opensandbox_credentials()
+        self._os_url = (api_url or o_url).strip()
+        self._os_key = (api_key or o_key).strip()
 
-    def _configured(self) -> bool:
-        return bool(self.api_url and self.api_key)
+        e2b_key = _e2b_api_key()
+        if not e2b_key and (not self._os_url or not self._os_key):
+            raise ExecutionBackendConfigurationError(
+                "Sandbox execution requires E2B_API_KEY for E2B, or both OPENSANDBOX_API_URL and "
+                "OPENSANDBOX_API_KEY for OpenSandbox fallback. Optional: E2B_API_URL for self-hosted E2B."
+            )
+
+    async def _open_sandbox(self, stage: str) -> Any:
+        """Try E2B ``AsyncSandbox`` first; on failure use OpenSandbox SDK."""
+        err_e2b: Exception | None = None
+        e2b_key = _e2b_api_key()
+        if e2b_key:
+            try:
+                from e2b import AsyncSandbox
+
+                kwargs: dict[str, Any] = {
+                    "template": _template_for_stage(stage),
+                    "timeout": _SANDBOX_CREATE_TIMEOUT,
+                    "api_key": e2b_key,
+                }
+                e2b_url = _e2b_api_url()
+                if e2b_url:
+                    kwargs["api_url"] = e2b_url
+                return await AsyncSandbox.create(**kwargs)
+            except ImportError as e:
+                err_e2b = e
+                logger.warning(
+                    "[sandbox] e2b package not installed; install e2b or use OpenSandbox only: %s",
+                    e,
+                )
+            except Exception as e:  # noqa: BLE001
+                err_e2b = e
+                logger.warning(
+                    "[sandbox] E2B AsyncSandbox.create failed, trying OpenSandbox fallback: %s",
+                    e,
+                )
+        if not self._os_url or not self._os_key:
+            if err_e2b is not None:
+                raise err_e2b
+            raise ExecutionBackendConfigurationError(
+                "OpenSandbox fallback is not configured (OPENSANDBOX_API_URL and OPENSANDBOX_API_KEY)."
+            )
+        try:
+            from opensandbox import Sandbox
+
+            return await Sandbox.create(
+                template=_template_for_stage(stage),
+                timeout=_SANDBOX_CREATE_TIMEOUT,
+                api_url=self._os_url,
+                api_key=self._os_key,
+            )
+        except ImportError as e:
+            raise RuntimeError(
+                "E2B failed or was skipped and OpenSandbox fallback requires opensandbox-sdk. "
+                "Install with: pip install 'execution-backend[opensandbox]'"
+            ) from e
 
     async def run_compile(
         self,
@@ -33,7 +170,7 @@ class OpenSandboxBackend:
         framework: str = "hardhat",
         files: dict[str, str] | None = None,
     ) -> CompileResult:
-        """Run compile inside OpenSandbox."""
+        """Run compile inside a sandbox (E2B or OpenSandbox)."""
         return await self.run_compile_streaming(
             contract_code, framework, files, run_id=None, on_log=None
         )
@@ -44,19 +181,18 @@ class OpenSandboxBackend:
         framework: str = "hardhat",
         files: dict[str, str] | None = None,
         run_id: str | None = None,
-        on_log: None | ((str, str) -> None) = None,
+        on_log: Optional[Callable[[str, str], None]] = None,
     ) -> CompileResult:
-        """Run compile inside OpenSandbox. When on_log is provided, streams stdout/stderr line-by-line.
-        Uses run_streaming if SDK supports it; otherwise emits after run() completes."""
-        if not self._configured():
-            logger.warning("[opensandbox] not configured, compile would run in sandbox")
-            return CompileResult(success=False, errors=["OpenSandbox not configured"])
+        """Run compile inside sandbox. When on_log is set, streams log lines when supported."""
+        workdir = _sandbox_workdir()
         try:
-            from opensandbox import Sandbox
-
-            sandbox = await Sandbox.create(template="base")
+            sandbox = await self._open_sandbox("compile")
             try:
-                workdir = "/sandbox"
+                wd_q = shlex.quote(workdir)
+                await sandbox.commands.run(
+                    f"mkdir -p {wd_q}/contracts {wd_q}/src",
+                    timeout=120,
+                )
                 src = f"{workdir}/contracts" if framework == "hardhat" else f"{workdir}/src"
                 await sandbox.files.write(f"{src}/Contract.sol", contract_code)
                 cmd: str
@@ -69,13 +205,13 @@ class OpenSandboxBackend:
                             "devDependencies": {"hardhat": "^2.19.0"},
                         }),
                     )
-                    cmd = "cd /sandbox && npm install && npm run compile"
+                    cmd = f"cd {wd_q} && npm install && npm run compile"
                 else:
                     await sandbox.files.write(
                         f"{workdir}/foundry.toml",
                         '[profile.default]\nsolc = "0.8.24"\n',
                     )
-                    cmd = "cd /sandbox && forge build --json"
+                    cmd = f"cd {wd_q} && forge build --json"
 
                 run_streaming = getattr(sandbox.commands, "run_streaming", None)
                 stdout = ""
@@ -124,13 +260,9 @@ class OpenSandboxBackend:
                         pass
                 return CompileResult(success=False, errors=[stderr or stdout[:500]])
             finally:
-                await sandbox.kill()
-                await sandbox.close()
-        except ImportError:
-            logger.warning("[opensandbox] opensandbox-sdk not installed")
-            return CompileResult(success=False, errors=["opensandbox-sdk not installed"])
+                await _dispose_sandbox(sandbox)
         except Exception as e:
-            logger.exception("[opensandbox] compile failed: %s", e)
+            logger.exception("[sandbox] compile failed: %s", e)
             return CompileResult(success=False, errors=[str(e)])
 
     async def run_audit(
@@ -138,24 +270,21 @@ class OpenSandboxBackend:
         contract_code: str,
         contract_name: str,
         tools: list[str] | None = None,
-        on_log: None | ((str, str) -> None) = None,
+        on_log: Optional[Callable[[str, str], None]] = None,
     ) -> AuditResult:
-        """Run audit (Slither, Mythril) inside OpenSandbox."""
-        if not self._configured():
-            logger.warning("[opensandbox] not configured, audit would run in sandbox")
-            return AuditResult(
-                findings=[{"severity": "high", "title": "OpenSandbox not configured", "description": "Set OPENSANDBOX_API_URL and OPENSANDBOX_API_KEY"}],
-                tools_run=[],
-                tools_failed=tools or ["slither", "mythril"],
-            )
+        """Run audit (Slither, Mythril) inside a sandbox."""
+        workdir = _sandbox_workdir()
         try:
-            from opensandbox import Sandbox
-
-            sandbox = await Sandbox.create(template="base")
+            sandbox = await self._open_sandbox("audit")
             try:
-                src = "/sandbox/src"
+                wd_q = shlex.quote(workdir)
+                await sandbox.commands.run(f"mkdir -p {wd_q}/src", timeout=60)
+                src = f"{workdir}/src"
                 await sandbox.files.write(f"{src}/{contract_name}.sol", contract_code)
-                await sandbox.files.write(f"/sandbox/foundry.toml", '[profile.default]\nsolc = "0.8.24"\n')
+                await sandbox.files.write(
+                    f"{workdir}/foundry.toml",
+                    '[profile.default]\nsolc = "0.8.24"\n',
+                )
                 tool_list = tools or ["slither", "mythril"]
                 findings: list[dict[str, Any]] = []
                 tools_run: list[str] = []
@@ -184,7 +313,9 @@ class OpenSandboxBackend:
                             except json.JSONDecodeError:
                                 tools_run.append("slither")
                         elif tool == "mythril":
-                            result = await sandbox.commands.run(f"mythril analyze {src}/{contract_name}.sol -o json 2>/dev/null || true", timeout=120)
+                            result = await sandbox.commands.run(
+                                f"mythril analyze {src}/{contract_name}.sol -o json 2>/dev/null || true", timeout=120
+                            )
                             out = result.stdout if hasattr(result, "stdout") else str(result)
                             if on_log and out:
                                 for line in out.strip().split("\n"):
@@ -205,7 +336,9 @@ class OpenSandboxBackend:
                             except (json.JSONDecodeError, TypeError):
                                 tools_run.append("mythril")
                         elif tool == "echidna":
-                            result = await sandbox.commands.run(f"echidna {src}/{contract_name}.sol --contract {contract_name} 2>/dev/null || true", timeout=60)
+                            result = await sandbox.commands.run(
+                                f"echidna {src}/{contract_name}.sol --contract {contract_name} 2>/dev/null || true", timeout=60
+                            )
                             out = result.stdout if hasattr(result, "stdout") else str(result)
                             if on_log and out:
                                 for line in out.strip().split("\n"):
@@ -223,21 +356,14 @@ class OpenSandboxBackend:
                             tools_run.append("echidna")
                         else:
                             tools_failed.append(tool)
-                    except Exception as e:
-                        logger.warning("[opensandbox] tool %s failed: %s", tool, e)
+                    except Exception as e:  # noqa: BLE001
+                        logger.warning("[sandbox] tool %s failed: %s", tool, e)
                         tools_failed.append(tool)
                 return AuditResult(findings=findings, tools_run=tools_run, tools_failed=tools_failed)
             finally:
-                await sandbox.kill()
-                await sandbox.close()
-        except ImportError:
-            return AuditResult(
-                findings=[{"severity": "high", "title": "opensandbox-sdk not installed", "description": "pip install opensandbox-sdk"}],
-                tools_run=[],
-                tools_failed=tools or ["slither", "mythril"],
-            )
-        except Exception as e:
-            logger.exception("[opensandbox] audit failed: %s", e)
+                await _dispose_sandbox(sandbox)
+        except Exception as e:  # noqa: BLE001
+            logger.exception("[sandbox] audit failed: %s", e)
             return AuditResult(
                 findings=[{"severity": "high", "title": "Audit failed", "description": str(e)}],
                 tools_run=[],
@@ -249,24 +375,16 @@ class OpenSandboxBackend:
         contract_code: str,
         contract_name: str,
         engines: list[list[str]] | None = None,
-        on_log: None | ((str, str) -> None) = None,
+        on_log: Optional[Callable[[str, str], None]] = None,
     ) -> AuditResult:
-        """Run 3+ parallel OpenSandboxes, each with a different audit engine.
-        Default engines: [slither], [mythril], [echidna] (best-effort)."""
-        if not self._configured():
-            return AuditResult(
-                findings=[{"severity": "high", "title": "OpenSandbox not configured", "description": "Set OPENSANDBOX_API_URL and OPENSANDBOX_API_KEY"}],
-                tools_run=[],
-                tools_failed=["slither", "mythril", "echidna"],
-            )
+        """Run parallel sandboxes, each with a different audit engine."""
         engine_list = engines or [["slither"], ["mythril"], ["echidna"]]
-        import asyncio
 
         async def _run_one(tools: list[str]) -> AuditResult:
             try:
                 return await self.run_audit(contract_code, contract_name, tools=tools, on_log=on_log)
-            except Exception as e:
-                logger.warning("[opensandbox] multi-engine %s failed: %s", tools, e)
+            except Exception as e:  # noqa: BLE001
+                logger.warning("[sandbox] multi-engine %s failed: %s", tools, e)
                 return AuditResult(findings=[], tools_run=[], tools_failed=tools)
 
         results = await asyncio.gather(*[_run_one(tools) for tools in engine_list])
@@ -287,20 +405,8 @@ class OpenSandboxBackend:
         spec: dict[str, Any],
         design: dict[str, Any],
     ) -> ExploitSimResult:
-        """Run parallel exploit vectors (reentrancy, flashloan, oracle, frontrun) in OpenSandbox.
-        Each vector runs in its own sandbox; findings are aggregated."""
-        if not self._configured():
-            return ExploitSimResult(
-                passed=False,
-                findings=[{
-                    "severity": "high",
-                    "title": "Exploit simulation not configured",
-                    "description": "Set OPENSANDBOX_API_URL and OPENSANDBOX_API_KEY to run exploit tests.",
-                    "tool": "opensandbox",
-                }],
-            )
-        import asyncio
-
+        """Run exploit vectors in sandboxes; aggregate findings."""
+        workdir = _sandbox_workdir()
         vectors = [
             ("reentrancy", ["reentrancy-eth", "reentrancy-loops", "reentrancy-no-eth"]),
             ("flashloan", ["delegatecall-loop", "unprotected-upgrade"]),
@@ -312,19 +418,27 @@ class OpenSandboxBackend:
             try:
                 if not contracts:
                     return ExploitSimResult(passed=True, findings=[])
-                contract_name = next((n.replace(".sol", "") for n, c in contracts.items() if isinstance(c, str) and n.endswith(".sol")), "Contract")
+                contract_name = next(
+                    (n.replace(".sol", "") for n, c in contracts.items() if isinstance(c, str) and n.endswith(".sol")),
+                    "Contract",
+                )
                 code = next((c for n, c in contracts.items() if isinstance(c, str) and n.endswith(".sol")), "")
                 if not code:
                     return ExploitSimResult(passed=True, findings=[])
-                from opensandbox import Sandbox
-
-                sandbox = await Sandbox.create(template="base")
+                sandbox = await self._open_sandbox("exploit")
                 try:
-                    src = "/sandbox/src"
+                    wd_q = shlex.quote(workdir)
+                    await sandbox.commands.run(f"mkdir -p {wd_q}/src", timeout=60)
+                    src = f"{workdir}/src"
                     await sandbox.files.write(f"{src}/{contract_name}.sol", code)
-                    await sandbox.files.write("/sandbox/foundry.toml", '[profile.default]\nsolc = "0.8.24"\n')
+                    await sandbox.files.write(
+                        f"{workdir}/foundry.toml",
+                        '[profile.default]\nsolc = "0.8.24"\n',
+                    )
                     detect_arg = ",".join(detectors)
-                    result = await sandbox.commands.run(f"slither {src} --detect {detect_arg} --json - 2>/dev/null || true", timeout=90)
+                    result = await sandbox.commands.run(
+                        f"slither {src} --detect {detect_arg} --json - 2>/dev/null || true", timeout=90
+                    )
                     out = result.stdout if hasattr(result, "stdout") else str(result)
                     findings: list[dict[str, Any]] = []
                     try:
@@ -340,10 +454,9 @@ class OpenSandboxBackend:
                         pass
                     return ExploitSimResult(passed=len(findings) == 0, findings=findings)
                 finally:
-                    await sandbox.kill()
-                    await sandbox.close()
-            except Exception as e:
-                logger.warning("[opensandbox] exploit vector %s failed: %s", label, e)
+                    await _dispose_sandbox(sandbox)
+            except Exception as e:  # noqa: BLE001
+                logger.warning("[sandbox] exploit vector %s failed: %s", label, e)
                 return ExploitSimResult(passed=True, findings=[])
 
         results = await asyncio.gather(*[_run_vector(label, dets) for label, dets in vectors])
@@ -359,9 +472,7 @@ class OpenSandboxBackend:
         contract_name: str,
         configs: list[dict[str, Any]] | None = None,
     ) -> GasBenchmarkResult:
-        """Run gas benchmark across 5 compiler configs (solc versions + optimizer). Returns score 0-100."""
-        if not self._configured():
-            return GasBenchmarkResult(score=0.0, configs=[], bytecode_sizes=[])
+        """Run gas benchmark across compiler configs. Returns score 0-100."""
         default_configs = [
             {"solc": "0.8.19", "optimizer": False},
             {"solc": "0.8.24", "optimizer": False},
@@ -370,16 +481,13 @@ class OpenSandboxBackend:
             {"solc": "0.8.19", "optimizer": True, "runs": 200},
         ]
         config_list = configs or default_configs
-        import asyncio
 
-        sizes: list[int] = []
-
-        async def _bench_one(cfg: dict[str, Any]) -> int:
+        async def _bench_one(cfg: dict[str, Any]) -> int:  # noqa: ARG001
             try:
                 r = await self.run_compile(contract_code, framework="foundry", files=None)
                 if r.success and r.bytecode:
                     return len(r.bytecode)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
             return 0
 

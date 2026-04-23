@@ -1,7 +1,8 @@
 "use client";
 
-import { useChat } from "ai/react";
-import { useCallback } from "react";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport, type UIMessage } from "ai";
+import { useCallback, useMemo, useState } from "react";
 import { getDatadogRumSessionIdForRequest } from "@/lib/datadogRumSession";
 import { getSessionOnlyLLMKey } from "@/lib/session-store";
 import { getStoredSession } from "@/lib/session-store";
@@ -10,6 +11,42 @@ const DD_RUM_SESSION_HEADER = "x-datadog-rum-session-id";
 
 export interface UseAppChatOptions {
   network?: string;
+}
+
+/** Legacy shape used by home page (AI SDK v4 style) for tool workflow_id detection. */
+export type LegacyChatMessage = {
+  id: string;
+  role: string;
+  content: string;
+  toolInvocations?: Array<{ result?: { workflow_id?: string } }>;
+};
+
+function uiMessageToLegacy(m: UIMessage): LegacyChatMessage {
+  const content = m.parts
+    .filter((p): p is { type: "text"; text: string } => p.type === "text")
+    .map((p) => p.text)
+    .join("");
+
+  const toolInvocations: Array<{ result?: { workflow_id?: string } }> = [];
+  for (const p of m.parts) {
+    if (
+      p.type === "tool-create_workflow" &&
+      "state" in p &&
+      p.state === "output-available" &&
+      p.output &&
+      typeof p.output === "object"
+    ) {
+      const out = p.output as { workflow_id?: string };
+      toolInvocations.push({ result: out });
+    }
+  }
+
+  return {
+    id: m.id,
+    role: m.role,
+    content,
+    ...(toolInvocations.length > 0 ? { toolInvocations } : {}),
+  };
 }
 
 /**
@@ -43,9 +80,13 @@ function buildFreshHeaders(): Record<string, string> {
  */
 export function useAppChat(options: UseAppChatOptions = {}) {
   const { network } = options;
+  const [input, setInput] = useState("");
 
   const chatFetch = useCallback(
-    async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    async (
+      inputArg: RequestInfo | URL,
+      init?: RequestInit,
+    ): Promise<Response> => {
       const byokHeaders = buildFreshHeaders();
 
       const existing: Record<string, string> = {};
@@ -89,7 +130,7 @@ export function useAppChat(options: UseAppChatOptions = {}) {
         fetchInit.body = nextBody;
       }
 
-      const res = await fetch(input, fetchInit);
+      const res = await fetch(inputArg, fetchInit);
 
       if (res.ok) return res;
 
@@ -104,9 +145,9 @@ export function useAppChat(options: UseAppChatOptions = {}) {
               message?: string;
               detail?: string;
             };
-            const parsed = j?.error || j?.message || j?.detail;
-            if (typeof parsed === "string" && parsed.trim())
-              message = parsed.trim();
+            const parsedErr = j?.error || j?.message || j?.detail;
+            if (typeof parsedErr === "string" && parsedErr.trim())
+              message = parsedErr.trim();
           } catch {
             if (text.trim()) message = text.trim().slice(0, 300);
           }
@@ -119,11 +160,73 @@ export function useAppChat(options: UseAppChatOptions = {}) {
     [],
   );
 
-  return useChat({
-    api: "/api/chat",
-    body: network ? { network } : undefined,
-    fetch: chatFetch,
-  });
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/chat",
+        body: network ? { network } : undefined,
+        fetch: chatFetch,
+      }),
+    [network, chatFetch],
+  );
+
+  const {
+    messages: uiMessages,
+    sendMessage,
+    status,
+    error,
+    regenerate,
+    setMessages: setUiMessages,
+  } = useChat({ transport });
+
+  const legacyMessages = useMemo(
+    () => uiMessages.map(uiMessageToLegacy),
+    [uiMessages],
+  );
+
+  const isLoading = status === "streaming" || status === "submitted";
+
+  const handleSubmit = useCallback(
+    (e?: { preventDefault?: () => void }) => {
+      e?.preventDefault?.();
+      const text = input.trim();
+      if (!text) return;
+      setInput("");
+      void sendMessage({ text });
+    },
+    [input, sendMessage],
+  );
+
+  const setMessages = useCallback(
+    (
+      next:
+        | LegacyChatMessage[]
+        | ((prev: LegacyChatMessage[]) => LegacyChatMessage[]),
+    ) => {
+      if (typeof next === "function") {
+        setUiMessages((prev) => {
+          const mapped = next(prev.map(uiMessageToLegacy));
+          return mapped.length === 0 ? [] : prev;
+        });
+        return;
+      }
+      if (next.length === 0) {
+        setUiMessages([]);
+      }
+    },
+    [setUiMessages],
+  );
+
+  return {
+    messages: legacyMessages,
+    input,
+    setInput,
+    handleSubmit,
+    setMessages,
+    isLoading,
+    error,
+    reload: regenerate,
+  };
 }
 
 export function hasActiveByokKey(): boolean {

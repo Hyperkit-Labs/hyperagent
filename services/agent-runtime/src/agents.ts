@@ -3,7 +3,7 @@
  */
 
 import { generateText } from "ai";
-import type { LanguageModelV1 } from "ai";
+import type { LanguageModel } from "ai";
 
 /** Enables OpenTelemetry-style spans for Datadog LLM Observability when the AI SDK is instrumented. */
 const AI_SDK_TELEMETRY = {
@@ -22,20 +22,19 @@ export interface AgentContext {
   apiKeys: { openai?: string; anthropic?: string; google?: string; tenderly?: string; thirdweb?: string };
 }
 
-function getModel(provider: string, modelId: string, apiKey: string): LanguageModelV1 {
+function getModel(provider: string, modelId: string, apiKey: string): LanguageModel {
   switch (provider) {
     case "openai": {
       const oai = createOpenAI({ apiKey });
-      return oai(modelId);
+      return oai(modelId) as unknown as LanguageModel;
     }
     case "anthropic": {
       const ant = createAnthropic({ apiKey });
-      // @ai-sdk/anthropic v3 exposes LanguageModelV3; `ai` 4.x types generateText as LanguageModelV1.
-      return ant(modelId) as unknown as LanguageModelV1;
+      return ant(modelId) as unknown as LanguageModel;
     }
     case "google": {
       const goog = createGoogleGenerativeAI({ apiKey });
-      return goog(modelId);
+      return goog(modelId) as unknown as LanguageModel;
     }
     default:
       throw new Error(`Unknown provider: ${provider}`);
@@ -80,7 +79,7 @@ export async function specAgent(prompt: string, context: AgentContext): Promise<
     system: `You are a smart contract specification agent. Parse the user's natural language into a structured JSON spec.
 Output only valid JSON with: version, token_type (ERC20|ERC721|ERC1155|custom), template_id (optional; use when request matches: erc20-standard, erc20-upgradeable, erc721-standard, erc721-community, erc4626-vault, lending-basic, marketplace-nft, governance-basic, multisig-gnosis, amm-uniswap-style), app_type (token|lending|marketplace|governance|multisig|amm), multi_contract (boolean; true when design requires multiple contracts e.g. lending pool + collateral token, marketplace + NFT, governor + token, multisig, AMM factory + pair), chains ([{chain_id, network_name}]), features (array), roles (array), invariants (array), risk_profile (low|medium|high), oracles (optional; array of price feed or oracle requirements when Chainlink or price feeds mentioned), frontend_actions (optional; array of user actions: deposit, withdraw, borrow, repay, liquidate, list, buy, cancelListing, propose, vote, queue, execute, submitTransaction, confirmTransaction, swap, addLiquidity, removeLiquidity), wizard_options (optional; merge into OZ wizard when using templates: name, symbol, premint/initialSupply as string e.g. "1000000", mintable, burnable, pausable). Extract token name/symbol and initial supply from the prompt when specified.`,
     prompt,
-    maxTokens: 4096,
+    maxOutputTokens: 4096,
   });
   try {
     return JSON.parse(result.text) as Record<string, unknown>;
@@ -120,7 +119,7 @@ export async function designAgent(
     model,
     system,
     prompt: `Spec: ${JSON.stringify(spec)}\nTarget chains: ${JSON.stringify(targetChains)}`,
-    maxTokens: 2048,
+    maxOutputTokens: 2048,
   });
   try {
     return JSON.parse(result.text) as DesignProposal;
@@ -189,7 +188,7 @@ MANDATORY NatSpec documentation: Add high-level documentation comments to every 
     model,
     system,
     prompt,
-    maxTokens: 8192,
+    maxOutputTokens: 8192,
   });
   return parseMultiFileOutput(result.text);
 }
@@ -216,7 +215,7 @@ Output only test code. Use forge-std for Foundry or Hardhat's expect. Include:
 Echidna invariants must be executable properties; use invariant_ prefix for fuzzing.
 Use // FILE: Contract.t.sol before each test file. Output only code with file markers.`,
     prompt: `Spec: ${JSON.stringify(spec)}\nDesign: ${JSON.stringify(design)}\n\nContracts:\n${contractSummary}\n\nGenerate comprehensive tests including invariant_ functions for security properties.`,
-    maxTokens: 8192,
+    maxOutputTokens: 8192,
   });
   return parseMultiFileOutput(result.text);
 }
@@ -268,7 +267,7 @@ Current contracts:
 ${contractsText}
 
 Generate the corrected contract(s). Output only Solidity code.`,
-    maxTokens: 8192,
+    maxOutputTokens: 8192,
   });
 
   return { "Contract.sol": result.text };
@@ -290,7 +289,7 @@ export async function pashovAuditAgent(input: PashovAuditInput): Promise<{ text:
     model,
     system: input.systemPrompt,
     prompt: input.userPrompt,
-    maxTokens: 8192,
+    maxOutputTokens: 8192,
   });
 
   return { text: result.text };
@@ -309,7 +308,7 @@ export async function estimateAgent(prompt: string, context: AgentContext): Prom
 3. riskFactors: string[] (e.g. "cross-chain bridge", "flash loan", "upgradeable proxy")
 Output only valid JSON.`,
     prompt,
-    maxTokens: 512,
+    maxOutputTokens: 512,
   });
 
   try {

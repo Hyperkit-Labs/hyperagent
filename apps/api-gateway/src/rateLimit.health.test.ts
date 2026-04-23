@@ -45,4 +45,14 @@ describe("rateLimitMiddleware health bypass", () => {
     );
     expect(next).toHaveBeenCalledTimes(1);
   });
+
+  it("calls next() for /health/signin without Upstash REST in production", async () => {
+    const next = vi.fn() as NextFunction;
+    await rateLimitMiddleware(
+      { path: "/health/signin", requestId: "t3" } as Parameters<typeof rateLimitMiddleware>[0],
+      {} as Response,
+      next
+    );
+    expect(next).toHaveBeenCalledTimes(1);
+  });
 });

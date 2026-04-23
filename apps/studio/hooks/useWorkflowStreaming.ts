@@ -7,7 +7,7 @@
 
 "use client";
 
-import { useCompletion } from "ai/react";
+import { useCompletion } from "@ai-sdk/react";
 import { useMemo, useEffect, useRef, useCallback } from "react";
 import { getStoredSession } from "@/lib/session-store";
 
@@ -75,7 +75,7 @@ export function useWorkflowStreaming(
     fetch: streamingFetch,
     streamProtocol: "data",
     body: abortSignal ? { signal: abortSignal } : undefined,
-    onFinish: (completion) => {
+    onFinish: (prompt, completion) => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
@@ -84,7 +84,7 @@ export function useWorkflowStreaming(
         onFinish(completion);
       }
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;

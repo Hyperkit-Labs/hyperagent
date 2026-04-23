@@ -11,6 +11,7 @@ describe("isKnownGatewayPath", () => {
   it.each([
     "/",
     "/health",
+    "/health/signin",
     "/health/live",
     "/api/v1/workflows",
     "/api/v1/byok/validate",

@@ -1,10 +1,10 @@
 /**
  * Next.js API route for proxying workflow code generation streaming.
- * Proxies backend SSE to a format compatible with Vercel AI SDK (useCompletion / data stream).
+ * Proxies backend SSE to AI SDK 5 UI message stream (SSE) for useCompletion.
  */
 
 import { NextRequest } from "next/server";
-import { formatDataStreamPart } from "ai";
+import { generateId, UI_MESSAGE_STREAM_HEADERS, type UIMessageChunk } from "ai";
 import { streamingWorkflowCodePath } from "@hyperagent/api-contracts";
 import { getApiBase, joinApiUrlForFetch } from "@/lib/api";
 
@@ -14,7 +14,12 @@ function createRequestId(): string {
     : `req-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
-export async function GET(
+function sseDataLine(part: UIMessageChunk): Uint8Array {
+  const s = `data: ${JSON.stringify(part)}\n\n`;
+  return new TextEncoder().encode(s);
+}
+
+async function runWorkflowCodeStream(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -42,6 +47,7 @@ export async function GET(
 
   try {
     const response = await fetch(streamUrl, {
+      method: "GET",
       credentials: "include",
       headers: {
         ...(request.headers.get("authorization") && {
@@ -70,8 +76,10 @@ export async function GET(
       });
     }
 
-    // Create a readable stream that transforms SSE format for Vercel AI SDK
-    const stream = new ReadableStream({
+    const textId = generateId();
+    let textStarted = false;
+
+    const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
@@ -81,32 +89,37 @@ export async function GET(
           return;
         }
 
+        const send = (part: UIMessageChunk) => {
+          controller.enqueue(sseDataLine(part));
+        };
+
         try {
           while (true) {
             const { done, value } = await reader.read();
 
             if (done) {
+              if (textStarted) {
+                send({ type: "text-end", id: textId });
+              }
               controller.close();
               break;
             }
 
-            // Decode chunk
             const chunk = decoder.decode(value, { stream: true });
             const lines = chunk.split("\n");
 
             for (const line of lines) {
               if (line.startsWith("data: ")) {
                 try {
-                  const data = JSON.parse(line.slice(6));
+                  const data = JSON.parse(line.slice(6)) as {
+                    done?: boolean;
+                    text?: unknown;
+                    error?: unknown;
+                  };
                   if (data.done) {
-                    const enc = new TextEncoder();
-                    controller.enqueue(
-                      enc.encode(
-                        formatDataStreamPart("finish_message", {
-                          finishReason: "stop",
-                        }) + "\n",
-                      ),
-                    );
+                    if (textStarted) {
+                      send({ type: "text-end", id: textId });
+                    }
                     controller.close();
                     return;
                   }
@@ -115,22 +128,23 @@ export async function GET(
                       typeof data.text === "string"
                         ? data.text
                         : String(data.text);
-                    const enc = new TextEncoder();
-                    controller.enqueue(
-                      enc.encode(formatDataStreamPart("text", textStr) + "\n"),
-                    );
+                    if (!textStarted) {
+                      send({ type: "text-start", id: textId });
+                      textStarted = true;
+                    }
+                    send({
+                      type: "text-delta",
+                      id: textId,
+                      delta: textStr,
+                    });
                   } else if (data.error) {
-                    const enc = new TextEncoder();
-                    controller.enqueue(
-                      enc.encode(
-                        formatDataStreamPart(
-                          "error",
-                          typeof data.error === "string"
-                            ? data.error
-                            : String(data.error),
-                        ) + "\n",
-                      ),
-                    );
+                    send({
+                      type: "error",
+                      errorText:
+                        typeof data.error === "string"
+                          ? data.error
+                          : String(data.error),
+                    });
                     controller.close();
                     return;
                   }
@@ -150,10 +164,7 @@ export async function GET(
 
     return new Response(stream, {
       headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-        "X-Vercel-AI-Data-Stream": "v1",
+        ...UI_MESSAGE_STREAM_HEADERS,
         "X-Request-Id": requestId,
       },
     });
@@ -171,4 +182,18 @@ export async function GET(
       },
     });
   }
+}
+
+export function GET(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  return runWorkflowCodeStream(request, context);
+}
+
+export function POST(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  return runWorkflowCodeStream(request, context);
 }

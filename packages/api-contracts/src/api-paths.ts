@@ -12,6 +12,7 @@ export const SKALE_BASE_MAINNET_CAIP = "eip155:1187947933";
 export const ApiPaths = {
   root: "/",
   health: "/health",
+  healthSignin: "/health/signin",
   healthLive: "/health/live",
   apiHealth: `${API_V1}/health`,
   apiHealthLive: `${API_V1}/health/live`,
@@ -81,6 +82,7 @@ export const GatewayLegacyMountPaths = {
 export const GATEWAY_PUBLIC_PATHS = [
   ApiPaths.root,
   ApiPaths.health,
+  ApiPaths.healthSignin,
   ApiPaths.healthLive,
   ApiPaths.apiHealth,
   ApiPaths.apiHealthLive,
@@ -103,6 +105,7 @@ export const GATEWAY_DEV_ONLY_PUBLIC_PATHS = [
 
 /** Prefixes exempt from metering / credit preflight. */
 export const METERING_EXEMPT_PREFIXES = [
+  ApiPaths.health,
   ApiPaths.authBootstrap,
   "/auth/bootstrap",
   ApiPaths.creditsPrefix,

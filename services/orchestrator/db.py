@@ -1138,6 +1138,25 @@ def count_completed_audits() -> int:
         return 0
 
 
+def get_platform_track_record_db_counts() -> dict[str, int]:
+    """Bundle track-record counts (sequential: shared sync Supabase client is not thread-safe)."""
+    if not is_configured():
+        return {
+            "audit_steps": 0,
+            "audit_state": 0,
+            "findings": 0,
+            "researchers": 0,
+            "deployments": 0,
+        }
+    return {
+        "audit_steps": count_completed_audits(),
+        "audit_state": count_completed_audits_from_run_state(),
+        "findings": count_security_findings(),
+        "researchers": count_distinct_auditors(),
+        "deployments": count_deployments(),
+    }
+
+
 def count_completed_audits_from_run_state() -> int:
     """Count runs whose pipeline moved past the audit node (run_state.phase).
 

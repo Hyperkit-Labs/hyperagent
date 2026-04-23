@@ -3,7 +3,11 @@
 import { useEffect, useState, Suspense, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useActiveAccountFromContext } from "@/components/providers/ActiveAccountContext";
-import { useAppChat, hasActiveByokKey } from "@/hooks/useAppChat";
+import {
+  useAppChat,
+  hasActiveByokKey,
+  type LegacyChatMessage,
+} from "@/hooks/useAppChat";
 import { useWorkflowProgress } from "@/hooks/useWorkflowProgress";
 import {
   createWorkflow,
@@ -370,13 +374,10 @@ function ChatPageContent() {
 
   useEffect(() => {
     const workflowIdFromMessage = sdkMessages
-      .flatMap((m) => {
-        const raw = m as {
-          toolInvocations?: Array<{ result?: { workflow_id?: string } }>;
-        };
-        return raw.toolInvocations || [];
-      })
-      .find((inv) => inv.result?.workflow_id)?.result?.workflow_id;
+      .flatMap((m: LegacyChatMessage) => m.toolInvocations || [])
+      .find(
+        (inv: { result?: { workflow_id?: string } }) => inv.result?.workflow_id,
+      )?.result?.workflow_id;
 
     if (workflowIdFromMessage && !selectedWorkflowId) {
       setSelectedWorkflowId(workflowIdFromMessage);

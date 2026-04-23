@@ -77,7 +77,8 @@ function vulnerabilityRadialRow(value: number) {
   return [{ name: "findings", score }];
 }
 
-const trackRecordChartBoxClassName =
+/** Fixed size for radar/radial charts in the login track record (must stay in scope for TrackRecordMetricVisual). */
+const CHART_BOX =
   "mx-auto aspect-square h-[108px] w-[108px] max-h-[108px] max-w-[108px] shrink-0 sm:h-[118px] sm:w-[118px] sm:max-h-[118px] sm:max-w-[118px]";
 
 function TrackRecordMetricVisual({ item }: { item: TrackRecordItem }) {
@@ -117,7 +118,7 @@ function TrackRecordMetricVisual({ item }: { item: TrackRecordItem }) {
       <div className="flex h-full min-h-0 flex-col items-center justify-center gap-2 px-1 py-1">
         <ChartContainer
           config={AUDIT_CHART_CONFIG}
-          className={`${trackRecordChartBoxClassName} [&_.recharts-polar-angle-axis-tick_text]:fill-[var(--color-text-muted)]`}
+          className={`${CHART_BOX} [&_.recharts-polar-angle-axis-tick_text]:fill-[var(--color-text-muted)]`}
         >
           <RadarChart
             data={auditRadarRows(n)}
@@ -154,10 +155,7 @@ function TrackRecordMetricVisual({ item }: { item: TrackRecordItem }) {
   if (item.label === "Vulnerabilities") {
     return (
       <div className="flex h-full min-h-0 flex-col items-center justify-center gap-2 px-0.5 py-1">
-        <ChartContainer
-          config={VULN_CHART_CONFIG}
-          className={trackRecordChartBoxClassName}
-        >
+        <ChartContainer config={VULN_CHART_CONFIG} className={CHART_BOX}>
           <RadialBarChart
             data={vulnerabilityRadialRow(n)}
             innerRadius={28}

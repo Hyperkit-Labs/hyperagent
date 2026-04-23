@@ -294,6 +294,14 @@ def get_stablecoins_api() -> dict[str, dict[str, str]]:
     return get_stablecoins_by_chain()
 
 
+_track_record_cache_payload: dict[str, Any] | None = None
+_track_record_cache_mono: float = 0.0
+
+PLATFORM_TRACK_RECORD_CACHE_TTL_SEC = float(
+    os.environ.get("PLATFORM_TRACK_RECORD_CACHE_TTL_SEC", "90")
+)
+
+
 @registry_router.get("/platform/track-record")
 def get_platform_track_record_api() -> dict[str, Any]:
     """Return platform track record stats for login page. Public.
@@ -302,6 +310,15 @@ def get_platform_track_record_api() -> dict[str, Any]:
     aggregates matching waitlist/src/app/api/stats/route.ts: waitlist_total, waitlist_pending,
     and beta_testers_confirmed (confirmed = email_confirmed OR status=confirmed).
     """
+    global _track_record_cache_payload, _track_record_cache_mono
+    now = time.monotonic()
+    if (
+        _track_record_cache_payload is not None
+        and PLATFORM_TRACK_RECORD_CACHE_TTL_SEC > 0
+        and (now - _track_record_cache_mono) < PLATFORM_TRACK_RECORD_CACHE_TTL_SEC
+    ):
+        return _track_record_cache_payload
+
     audits = int(os.environ.get("PLATFORM_AUDITS_COMPLETED", "0"))
     vulnerabilities = int(os.environ.get("PLATFORM_VULNERABILITIES_FOUND", "0"))
     researchers = int(os.environ.get("PLATFORM_SECURITY_RESEARCHERS", "0"))
@@ -310,12 +327,13 @@ def get_platform_track_record_api() -> dict[str, Any]:
 
     if db.is_configured():
         try:
-            audit_steps = db.count_completed_audits()
-            audit_rs = db.count_completed_audits_from_run_state()
+            counts = db.get_platform_track_record_db_counts()
+            audit_steps = counts["audit_steps"]
+            audit_rs = counts["audit_state"]
             audit_count = max(audit_steps, audit_rs)
-            findings_count = db.count_security_findings()
-            researchers_count = db.count_distinct_auditors()
-            deployments_count = db.count_deployments()
+            findings_count = counts["findings"]
+            researchers_count = counts["researchers"]
+            deployments_count = counts["deployments"]
             audits = audit_count
             vulnerabilities = findings_count
             researchers = researchers_count
@@ -360,6 +378,8 @@ def get_platform_track_record_api() -> dict[str, Any]:
         payload["waitlist_total"] = ws["total"]
         payload["waitlist_pending"] = ws["pending"]
         payload["beta_testers_confirmed"] = ws["confirmed"]
+    _track_record_cache_payload = payload
+    _track_record_cache_mono = time.monotonic()
     return payload
 
 

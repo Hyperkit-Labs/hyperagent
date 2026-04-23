@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { ApiPaths } from "@hyperagent/api-contracts";
 import { getApiBase } from "@/lib/api";
 
 /** up = sign-in ready; degraded = gateway alive, orchestrator or deps unhealthy; signin_unavailable = gateway reachable but auth prereqs fail; down = unreachable */
@@ -45,20 +46,30 @@ export function interpretHealthResponse(
   return "degraded";
 }
 
-/** Gateway /health (no auth). Distinguishes sign-in readiness from total outage. */
-export function useServerStatus(pollIntervalMs = 30_000) {
+/** Default poll for gateway /health/signin (ms). Slower than 30s to avoid noise on the login view. */
+const DEFAULT_SERVER_STATUS_POLL_MS = 90_000;
+
+/** Shallow gateway health (GET /health/signin): orchestrator /health/live only, no deep /health. */
+const HEALTH_FETCH_TIMEOUT_MS = 8000;
+
+/** Gateway /health/signin (no auth). Distinguishes sign-in readiness from total outage without deep orchestrator checks. */
+export function useServerStatus(
+  pollIntervalMs = DEFAULT_SERVER_STATUS_POLL_MS,
+) {
   const [status, setStatus] = useState<ServerStatus>("loading");
 
   useEffect(() => {
-    const healthUrl = getApiBase().replace(/\/api\/v1\/?$/, "") + "/health";
+    const base = getApiBase().replace(/\/api\/v1\/?$/, "");
+    const healthUrl = `${base}${ApiPaths.healthSignin}`;
     let isMounted = true;
     let intervalId: ReturnType<typeof setInterval> | null = null;
+    let cancelDeferred: (() => void) | undefined;
 
     const check = async () => {
       try {
         const res = await fetch(healthUrl, {
           method: "GET",
-          signal: AbortSignal.timeout(5000),
+          signal: AbortSignal.timeout(HEALTH_FETCH_TIMEOUT_MS),
         });
         if (!isMounted) return;
         const text = await res.text();
@@ -85,12 +96,52 @@ export function useServerStatus(pollIntervalMs = 30_000) {
       }
     };
 
-    check();
-    intervalId = setInterval(check, pollIntervalMs);
+    const startInterval = () => {
+      if (intervalId) clearInterval(intervalId);
+      intervalId = setInterval(() => {
+        void check();
+      }, pollIntervalMs);
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void check();
+        startInterval();
+      } else if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    const kick = () => {
+      void check();
+      startInterval();
+    };
+
+    if (typeof requestIdleCallback !== "undefined") {
+      const id = requestIdleCallback(
+        () => {
+          if (!isMounted) return;
+          kick();
+        },
+        { timeout: 2000 },
+      );
+      cancelDeferred = () => cancelIdleCallback(id);
+    } else {
+      const t = setTimeout(() => {
+        if (!isMounted) return;
+        kick();
+      }, 0);
+      cancelDeferred = () => clearTimeout(t);
+    }
+
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       isMounted = false;
+      cancelDeferred?.();
       if (intervalId) clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [pollIntervalMs]);
 

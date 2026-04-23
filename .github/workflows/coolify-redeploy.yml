@@ -1,0 +1,55 @@
+# Redeploy Coolify: optional API step (carlozanella/deploy-coolify), then webhook fallback
+# if the API step is skipped or fails. Required: COOLIFY_DEPLOY_WEBHOOK_URL. Optional:
+# carlozanella inputs — set COOLIFY_API_ENDPOINT, COOLIFY_API_TOKEN, COOLIFY_APP_UUID.
+
+name: Coolify redeploy
+
+on:
+  push:
+    branches: [main, development]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coolify-redeploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  redeploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via Coolify (API)
+        id: coolify_api
+        if: ${{ secrets.COOLIFY_API_ENDPOINT != '' && secrets.COOLIFY_API_TOKEN != '' && secrets.COOLIFY_APP_UUID != '' }}
+        continue-on-error: true
+        uses: carlozanella/deploy-coolify@v1.1
+        with:
+          endpoint: ${{ secrets.COOLIFY_API_ENDPOINT }}
+          token: ${{ secrets.COOLIFY_API_TOKEN }}
+          app_uuid: ${{ secrets.COOLIFY_APP_UUID }}
+
+      - name: Fallback (Coolify deploy webhook)
+        if: always() && (steps.coolify_api.conclusion == 'failure' || steps.coolify_api.conclusion == 'skipped')
+        env:
+          COOLIFY_DEPLOY_WEBHOOK_URL: ${{ secrets.COOLIFY_DEPLOY_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${COOLIFY_DEPLOY_WEBHOOK_URL}" ]; then
+            echo "COOLIFY_DEPLOY_WEBHOOK_URL is required" >&2
+            exit 1
+          fi
+          HTTP=$(
+            curl -sS -o /tmp/coolify-webhook.body -w '%{http_code}' \
+              -X POST \
+              -H "Content-Type: application/json" \
+              -d '{}' \
+              "$COOLIFY_DEPLOY_WEBHOOK_URL"
+          ) || { echo "Webhook request failed" >&2; exit 1; }
+          echo "HTTP status: $HTTP"
+          if [ -z "$HTTP" ] || [ "$HTTP" -lt 200 ] || [ "$HTTP" -ge 300 ]; then
+            echo "Non-success status from deploy webhook" >&2
+            cat /tmp/coolify-webhook.body 2>/dev/null || true
+            exit 1
+          fi

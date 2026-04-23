@@ -1,26 +1,15 @@
-"""Audit agent: call audit service (Slither + Mythril); persist to security_findings.
-Tiered gate model: Slither/Mythril block on High/Critical; Pashov blocks only when corroborated.
-When OPENSANDBOX_ENABLED, routes through ExecutionBackend for gVisor/Firecracker isolation."""
+"""Audit agent: run Slither/Mythril/Echidna via ExecutionBackend (E2B primary, OpenSandbox fallback).
+Tiered gate model: Slither/Mythril block on High/Critical; Pashov blocks only when corroborated."""
 
 import logging
 import os
 from collections import defaultdict
 
-import httpx
-from circuit_breaker import CircuitOpenError, get_breaker
 from db import insert_security_finding, is_configured
-from registries import get_deterministic_tools, get_timeout, get_tool_deploy_rule
-from trace_context import get_trace_headers
-
-_AUDIT_BREAKER_NAME = "audit_service"
-_DEFAULT_AUDIT_URL = "http://localhost:8001"
+from registries import get_deterministic_tools, get_tool_deploy_rule
 
 logger = logging.getLogger(__name__)
-AUDIT_SERVICE_URL = os.environ.get("AUDIT_SERVICE_URL", _DEFAULT_AUDIT_URL)
 AUDIT_TOOLS = ["slither", "mythril", "echidna"]
-OPENSANDBOX_ENABLED = os.environ.get(
-    "OPENSANDBOX_ENABLED", "false"
-).strip().lower() in ("1", "true", "yes")
 
 # When true (default), pipeline fails-closed: deploy is blocked whenever all contracts
 # fail to reach the audit service. Matches the tiered gate model in SECURITY.md.
@@ -29,18 +18,6 @@ AUDIT_MANDATORY = os.environ.get("AUDIT_MANDATORY", "true").strip().lower() in (
     "true",
     "yes",
 )
-
-if (
-    AUDIT_MANDATORY
-    and not OPENSANDBOX_ENABLED
-    and AUDIT_SERVICE_URL == _DEFAULT_AUDIT_URL
-):
-    logger.warning(
-        "[audit] AUDIT_MANDATORY=true but AUDIT_SERVICE_URL is not set (using default %s). "
-        "Set AUDIT_SERVICE_URL or OPENSANDBOX_ENABLED=1. "
-        "Pipeline will fail-closed when service is unreachable.",
-        _DEFAULT_AUDIT_URL,
-    )
 
 TOOL_WEIGHTS: dict[str, float] = {
     "slither": 0.6,
@@ -222,13 +199,24 @@ def compute_audit_deploy_blocked(
     return len(blocking) > 0, blocking
 
 
+def _execution_backend_error_finding(title: str, description: str) -> dict:
+    return {
+        "tool": "audit",
+        "severity": "high",
+        "title": title,
+        "description": description,
+        "location": None,
+        "category": "service",
+    }
+
+
 async def _run_audit_via_execution_backend(
     contract_name: str,
     code: str,
     run_id: str,
 ) -> tuple[list[dict], bool]:
-    """Run audit via ExecutionBackend (OpenSandbox when enabled).
-    When OPENSANDBOX_ENABLED, uses run_multi_engine_audit (3 parallel sandboxes: Slither, Mythril, Echidna).
+    """Run audit via ExecutionBackend (E2B AsyncSandbox with OpenSandbox SDK fallback).
+    Uses run_multi_engine_audit when available (parallel Slither, Mythril, Echidna).
     Returns (findings, success)."""
     try:
         from execution_backend import get_execution_backend
@@ -242,7 +230,7 @@ async def _run_audit_via_execution_backend(
                 insert_agent_log(run_id, tool, "audit", line[:4096], log_level="info")
 
             on_log = _on_log
-        if OPENSANDBOX_ENABLED and hasattr(backend, "run_multi_engine_audit"):
+        if hasattr(backend, "run_multi_engine_audit"):
             result = await backend.run_multi_engine_audit(
                 code, contract_name, on_log=on_log
             )
@@ -277,12 +265,28 @@ async def _run_audit_via_execution_backend(
             len(result.tools_failed) < len(result.tools_run)
             or len(result.findings) > 0,
         )
-    except ImportError:
-        logger.warning("[audit] execution_backend not installed, falling back to HTTP")
-        return [], False
+    except ImportError as e:
+        logger.exception("[audit] execution_backend not installed: %s", e)
+        return (
+            [
+                _execution_backend_error_finding(
+                    "Execution backend not installed",
+                    f"Install execution-backend (e2b) and optional opensandbox-sdk: {e!s}",
+                )
+            ],
+            False,
+        )
     except Exception as e:
-        logger.warning("[audit] execution_backend failed: %s", e)
-        return [], False
+        logger.exception("[audit] execution_backend / sandbox audit failed: %s", e)
+        return (
+            [
+                _execution_backend_error_finding(
+                    "Sandbox audit failed",
+                    f"{e!s}. Set E2B_API_KEY (and E2B_API_URL if self-hosted), or OPENSANDBOX_API_URL and OPENSANDBOX_API_KEY for fallback.",
+                )
+            ],
+            False,
+        )
 
 
 async def run_security_audits(
@@ -301,75 +305,13 @@ async def run_security_audits(
 
     audit_succeeded_count = 0
     for contract_name, code in contracts_to_audit:
-        if OPENSANDBOX_ENABLED:
-            exec_findings, exec_ok = await _run_audit_via_execution_backend(
-                contract_name, code, run_id
-            )
-            if exec_ok or exec_findings:
-                findings.extend(exec_findings)
-                audit_succeeded_count += 1
-            continue
-        breaker = get_breaker(_AUDIT_BREAKER_NAME)
-        try:
-            if not breaker.can_execute():
-                raise CircuitOpenError(f"Circuit {_AUDIT_BREAKER_NAME} is open")
-            headers = get_trace_headers()
-            async with httpx.AsyncClient(timeout=get_timeout("audit")) as client:
-                r = await client.post(
-                    f"{AUDIT_SERVICE_URL.rstrip('/')}/audit",
-                    params={"tool": ",".join(AUDIT_TOOLS)},
-                    json={"contractCode": code, "contractName": contract_name},
-                    headers=headers,
-                )
-                if r.status_code != 200:
-                    breaker.record_failure()
-                    logger.warning(
-                        "[audit] %s returned %s: %s",
-                        contract_name,
-                        r.status_code,
-                        r.text[:200],
-                    )
-                    continue
-                breaker.record_success()
-                audit_succeeded_count += 1
-                data = r.json()
-                raw_findings = (
-                    data.get("findings", [])
-                    if isinstance(data, dict)
-                    else data if isinstance(data, list) else []
-                )
-                tool_label = (
-                    ",".join(data.get("tools_run", AUDIT_TOOLS))
-                    if isinstance(data, dict)
-                    else "audit"
-                )
-                for f in raw_findings:
-                    finding = {
-                        "tool": tool_label,
-                        "severity": (f.get("severity") or "info").lower(),
-                        "title": f.get("title", ""),
-                        "description": f.get("description", ""),
-                        "location": f.get("location"),
-                        "category": f.get("category"),
-                    }
-                    findings.append(finding)
-                    if is_configured() and run_id:
-                        insert_security_finding(
-                            run_id=run_id,
-                            tool=finding["tool"],
-                            severity=finding["severity"],
-                            title=finding["title"],
-                            description=finding.get("description"),
-                            location=finding.get("location"),
-                            category=finding.get("category"),
-                        )
-        except CircuitOpenError as e:
-            logger.warning("[audit] %s circuit open, skipping: %s", contract_name, e)
-            continue
-        except Exception as e:
-            breaker.record_failure()
-            logger.warning("[audit] %s failed: %s", contract_name, e)
-            continue
+        exec_findings, exec_ok = await _run_audit_via_execution_backend(
+            contract_name, code, run_id
+        )
+        if exec_findings:
+            findings.extend(exec_findings)
+        if exec_ok:
+            audit_succeeded_count += 1
 
     if audit_succeeded_count == 0 and contracts_to_audit:
         mandatory_note = (
@@ -378,25 +320,27 @@ async def run_security_audits(
             else " AUDIT_MANDATORY=false: this finding will NOT block deploy."
         )
         logger.error(
-            "[audit] All %d contract(s) failed to reach the audit service (AUDIT_MANDATORY=%s).%s",
+            "[audit] All %d contract(s) failed sandbox audit (AUDIT_MANDATORY=%s).%s",
             len(contracts_to_audit),
             AUDIT_MANDATORY,
             mandatory_note,
         )
-        findings.append(
-            {
-                "tool": "audit",
-                "severity": "high",
-                "title": "Audit service unavailable",
-                "description": (
-                    "All contracts failed to reach the audit service. "
-                    "Check AUDIT_SERVICE_URL and that Slither/Mythril are running."
-                    + mandatory_note
-                ),
-                "location": None,
-                "category": "service",
-            }
-        )
+        if not findings:
+            findings.append(
+                {
+                    "tool": "audit",
+                    "severity": "high",
+                    "title": "Audit service unavailable",
+                    "description": (
+                        "All contracts failed the mandatory sandbox audit path. "
+                        "Set E2B_API_KEY (E2B) or OpenSandbox URL/key for fallback, and ensure E2B/OpenSandbox "
+                        "templates (e.g. audit-tools) exist for this environment."
+                        + mandatory_note
+                    ),
+                    "location": None,
+                    "category": "service",
+                }
+            )
 
     if len(findings) > 1:
         findings = _resolve_consensus(findings)

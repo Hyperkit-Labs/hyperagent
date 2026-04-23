@@ -588,6 +588,10 @@ async def get_config_api(background_tasks: BackgroundTasks) -> dict[str, Any]:
     Uses stale-while-revalidate for ``integrations`` when TTL expired: returns the last cached
     probe result immediately (``integrations_stale: true``) and schedules a background refresh,
     so Studio bootstrap stays fast even if upstream /health probes are slow.
+
+    **Cold start (no in-process cache yet):** with stale-while-revalidate enabled, returns
+    env-derived fallback flags immediately and schedules a background probe so the first
+    ``GET /api/v1/config`` after deploy does not block on simulation/storage/vectordb.
     """
     merchant = os.environ.get("MERCHANT_WALLET_ADDRESS", "").strip()
     now = time.monotonic()
@@ -605,6 +609,15 @@ async def get_config_api(background_tasks: BackgroundTasks) -> dict[str, Any]:
     circuit_open = now < _integrations_circuit_open_until
 
     if (
+        INTEGRATIONS_STALE_WHILE_REVALIDATE
+        and not cache_exists
+        and INTEGRATIONS_CACHE_TTL_SEC > 0
+    ):
+        # Process just started: avoid blocking session bootstrap on parallel /health probes.
+        integrations = _integrations_fallback()
+        integrations_stale = True
+        background_tasks.add_task(_integrations_background_refresh)
+    elif (
         INTEGRATIONS_STALE_WHILE_REVALIDATE
         and cache_exists
         and INTEGRATIONS_CACHE_TTL_SEC > 0

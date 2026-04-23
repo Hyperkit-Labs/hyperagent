@@ -97,7 +97,9 @@ def create_supabase_sync_client(url: str, key: str) -> Any:
         "true",
         "yes",
     )
-    timeout = httpx.Timeout(120.0, connect=20.0)
+    read_s = max(5.0, float(os.environ.get("SUPABASE_HTTPX_READ_TIMEOUT", "90")))
+    connect_s = max(2.0, float(os.environ.get("SUPABASE_HTTPX_CONNECT_TIMEOUT", "20")))
+    timeout = httpx.Timeout(connect=connect_s, read=read_s, write=read_s, pool=read_s)
     httpx_client = httpx.Client(http2=http2, timeout=timeout)
     return create_client(
         base,

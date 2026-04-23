@@ -22,12 +22,18 @@ const CSP_NONCE_HEADER = "x-csp-nonce";
  * Next.js reads `Content-Security-Policy` on the *incoming request* during SSR to
  * extract `nonce-*` for framework and bundle script tags. The response header * alone is not enough; mirror the policy on forwarded request headers.
  * @see https://nextjs.org/docs/app/guides/content-security-policy
+ *
+ * Thirdweb (embedded wallet / connect UI) may call `eval()`; without `'unsafe-eval'`,
+ * the browser throws EvalError and the SDK can stress the main thread (high LCP render_delay).
+ * Set `CSP_DISABLE_UNSAFE_EVAL=1` only if you do not use Thirdweb and accept broken wallet UX.
  */
 function buildContentSecurityPolicy(nonce: string): string {
-  const scriptSrc =
-    process.env.NODE_ENV === "production"
-      ? `'self' 'nonce-${nonce}' 'strict-dynamic'`
-      : `'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval'`;
+  const strictBase = `'self' 'nonce-${nonce}' 'strict-dynamic'`;
+  const withUnsafeEval =
+    process.env.CSP_DISABLE_UNSAFE_EVAL === "1"
+      ? strictBase
+      : `${strictBase} 'unsafe-eval'`;
+  const scriptSrc = withUnsafeEval;
   return [
     "default-src 'self'",
     `script-src ${scriptSrc}`,

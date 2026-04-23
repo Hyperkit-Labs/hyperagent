@@ -2,7 +2,7 @@
 
 import os
 import re
-from typing import Any
+from typing import Any, Callable, Optional
 
 import httpx
 
@@ -92,7 +92,7 @@ class LocalBackend:
         contract_code: str,
         contract_name: str,
         tools: list[str] | None = None,
-        on_log: None | ((str, str) -> None) = None,
+        on_log: Optional[Callable[[str, str], None]] = None,
     ) -> AuditResult:
         """Run audit via HTTP. on_log ignored (no streaming from HTTP audit service)."""
         url = f"{self.audit_url}/audit"
@@ -139,7 +139,7 @@ class LocalBackend:
             findings=[{
                 "severity": "high",
                 "title": "Exploit simulation not implemented",
-                "description": "LocalBackend does not run exploit tests. Set OPENSANDBOX_ENABLED=true and configure OpenSandbox for real exploit simulation.",
+                "description": "LocalBackend does not run exploit tests. Unset EXECUTION_BACKEND_FORCE_LOCAL and set E2B_API_KEY or OpenSandbox OPENSANDBOX_API_URL / OPENSANDBOX_API_KEY.",
                 "tool": "execution-backend",
             }],
         )

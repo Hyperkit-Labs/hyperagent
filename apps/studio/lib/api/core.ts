@@ -266,7 +266,12 @@ export async function fetchJson<T>(
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-      const res = await fetch(joinApiUrlForFetch(base(), path), {
+      const resolvedUrl =
+        typeof window !== "undefined" && path.startsWith("/api/gateway-health/")
+          ? new URL(path, window.location.origin).href
+          : joinApiUrlForFetch(base(), path);
+
+      const res = await fetch(resolvedUrl, {
         ...init,
         signal: init.signal ?? controller.signal,
         credentials: "include",

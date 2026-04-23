@@ -131,8 +131,13 @@ const TRACK_RECORD_DEFAULTS: PlatformTrackRecord = {
 export async function getPlatformTrackRecord(
   signal?: AbortSignal,
 ): Promise<PlatformTrackRecord> {
+  // Browser: same-origin proxy avoids CORS to the gateway on the login page. Server/test: direct path.
+  const path =
+    typeof window !== "undefined"
+      ? "/api/gateway-health/platform-track-record"
+      : ApiPaths.platformTrackRecord;
   // Public endpoint: use unauthenticated fetch so missing session never forces zeros on the login page.
-  return fetchJson<PlatformTrackRecord>(ApiPaths.platformTrackRecord, {
+  return fetchJson<PlatformTrackRecord>(path, {
     signal,
   }).catch((e) => {
     reportApiError(e, {

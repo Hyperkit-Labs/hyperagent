@@ -13,12 +13,15 @@
 
 import {
   streamText,
-  createDataStreamResponse,
-  formatDataStreamPart,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
   tool,
   jsonSchema,
+  convertToModelMessages,
+  generateId,
+  stepCountIs,
 } from "ai";
-import type { LanguageModelV1 } from "ai";
+import type { LanguageModel, ModelMessage, UIMessage } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
@@ -85,17 +88,20 @@ function logError(...args: unknown[]) {
 function buildModel(
   provider: SupportedProvider,
   apiKey: string,
-): LanguageModelV1 {
+): LanguageModel {
   switch (provider) {
     case "openai":
-      return createOpenAI({ apiKey })("gpt-4o-mini");
+      return createOpenAI({ apiKey })(
+        "gpt-4o-mini",
+      ) as unknown as LanguageModel;
     case "google":
-      return createGoogleGenerativeAI({ apiKey })("gemini-2.0-flash");
+      return createGoogleGenerativeAI({ apiKey })(
+        "gemini-2.0-flash",
+      ) as unknown as LanguageModel;
     case "anthropic":
-      // @ai-sdk/anthropic v3 exposes LanguageModelV3; `ai` 4.x types streamText as LanguageModelV1.
       return createAnthropic({ apiKey })(
         "claude-3-5-sonnet-20241022",
-      ) as unknown as LanguageModelV1;
+      ) as unknown as LanguageModel;
   }
 }
 
@@ -106,7 +112,7 @@ const PROVIDER_LABELS: Record<SupportedProvider, string> = {
 };
 
 interface ResolvedModel {
-  model: LanguageModelV1;
+  model: LanguageModel;
   provider: SupportedProvider;
   label: string;
 }
@@ -177,24 +183,17 @@ function resolveModel(req: Request): ResolvedModel | Response | null {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function normalizeContent(c: unknown): string {
-  if (typeof c === "string") return c;
-  if (Array.isArray(c)) {
-    const textPart = (c as Array<{ type?: string; text?: unknown }>).find(
-      (p) => p.type === "text",
-    );
-    const val = textPart?.text;
-    if (val == null) return "";
-    return typeof val === "string" ? val : String(val);
+function lastUserTextFromUiMessages(uiMessages: UIMessage[]): string {
+  for (let i = uiMessages.length - 1; i >= 0; i--) {
+    const m = uiMessages[i];
+    if (m.role !== "user") continue;
+    const text = m.parts
+      .filter((p): p is { type: "text"; text: string } => p.type === "text")
+      .map((p) => p.text)
+      .join("");
+    return text;
   }
   return "";
-}
-
-function toModelMessage(m: { role: string; content: string | unknown }) {
-  return {
-    role: m.role as "user" | "assistant" | "system",
-    content: normalizeContent(m.content),
-  };
 }
 
 async function callBackendWorkflow(
@@ -265,7 +264,7 @@ export async function POST(req: Request) {
   }
 
   let parsed: {
-    messages: Array<{ role: string; content: string | unknown }>;
+    messages: UIMessage[];
     network?: string;
     datadogRumSessionId?: string;
   };
@@ -278,7 +277,8 @@ export async function POST(req: Request) {
     });
   }
 
-  const { messages: uiMessages, network: bodyNetwork } = parsed;
+  const uiMessages = parsed.messages;
+  const bodyNetwork = parsed.network;
   const datadogRumSessionId =
     typeof parsed.datadogRumSessionId === "string"
       ? parsed.datadogRumSessionId.trim()
@@ -288,8 +288,7 @@ export async function POST(req: Request) {
   const effectiveRumSession = datadogRumSessionId || rumFromHeader;
   await tagActiveRootSpanWithRumSession(effectiveRumSession);
 
-  const lastMessage = uiMessages?.[uiMessages.length - 1];
-  const content = normalizeContent(lastMessage?.content);
+  const content = lastUserTextFromUiMessages(uiMessages ?? []);
 
   if (!content.trim()) {
     return new Response(JSON.stringify({ error: "Message content required" }), {
@@ -326,18 +325,31 @@ export async function POST(req: Request) {
   if (resolved) {
     log("streaming with %s", resolved.label);
     const providerLabel = resolved.label;
+    let modelMessages: ModelMessage[];
+    try {
+      modelMessages = convertToModelMessages(uiMessages);
+    } catch (convErr) {
+      const message =
+        convErr instanceof Error ? convErr.message : String(convErr);
+      logError("convertToModelMessages error:", message);
+      return new Response(JSON.stringify({ error: "Invalid message format" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     try {
       const streamResult = streamText({
         model: resolved.model,
         experimental_telemetry: { isEnabled: true },
         system:
           "You are a helpful assistant for the HyperAgent smart contract platform. Be concise and professional. When users ask to create a workflow or smart contract, use the create_workflow tool.",
-        messages: uiMessages.map(toModelMessage),
+        messages: modelMessages,
+        stopWhen: stepCountIs(5),
         tools: {
           create_workflow: tool({
             description:
               "Create a new workflow (smart contract generation) from a natural language prompt. Returns workflow_id.",
-            parameters: jsonSchema<{
+            inputSchema: jsonSchema<{
               prompt: string;
               network?: string;
               template_id?: string;
@@ -361,7 +373,15 @@ export async function POST(req: Request) {
               },
               required: ["prompt"],
             }),
-            execute: async ({ prompt, network, template_id }) => {
+            execute: async ({
+              prompt,
+              network,
+              template_id,
+            }: {
+              prompt: string;
+              network?: string;
+              template_id?: string;
+            }) => {
               try {
                 const result = await callBackendWorkflow(
                   {
@@ -390,8 +410,8 @@ export async function POST(req: Request) {
           }),
         },
       });
-      return streamResult.toDataStreamResponse({
-        getErrorMessage: (error: unknown) => {
+      return streamResult.toUIMessageStreamResponse({
+        onError: (error: unknown) => {
           const msg = error instanceof Error ? error.message : String(error);
           const cause =
             error instanceof Error && error.cause instanceof Error
@@ -433,13 +453,14 @@ export async function POST(req: Request) {
   log("no model available, returning placeholder");
   const placeholder =
     "No LLM key detected for this request. Open Settings (gear icon) and add an API key (OpenAI, Gemini, or Anthropic), then try again.";
-  return createDataStreamResponse({
-    headers: { "X-Vercel-AI-Data-Stream": "v1" },
-    execute: (writer) => {
-      writer.write(formatDataStreamPart("text", placeholder));
-      writer.write(
-        formatDataStreamPart("finish_message", { finishReason: "stop" }),
-      );
+
+  const noKeyStream = createUIMessageStream({
+    execute: async ({ writer }) => {
+      const id = generateId();
+      writer.write({ type: "text-start", id });
+      writer.write({ type: "text-delta", id, delta: placeholder });
+      writer.write({ type: "text-end", id });
     },
   });
+  return createUIMessageStreamResponse({ stream: noKeyStream });
 }

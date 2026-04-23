@@ -221,7 +221,7 @@ export async function rateLimitMiddleware(
   next: NextFunction
 ): Promise<void> {
   const path = req.path || "";
-  if (path === "/health" || path === "/health/live") {
+  if (path === "/health" || path === "/health/signin" || path === "/health/live") {
     next();
     return;
   }

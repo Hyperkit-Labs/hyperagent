@@ -75,6 +75,11 @@ INTEGRATIONS_CIRCUIT_FAILURE_THRESHOLD = int(
 INTEGRATIONS_CIRCUIT_COOLDOWN_SEC = float(
     os.environ.get("INTEGRATIONS_CIRCUIT_COOLDOWN_SEC", "90")
 )
+# Hard ceiling for GET /api/v1/config (full handler). Studio aborts the client around
+# NEXT_PUBLIC_CONFIG_BOOTSTRAP_TIMEOUT_MS (default 45s); this keeps the server well under
+# that so users get JSON (degraded) instead of a browser-side cancel. Override with
+# CONFIG_API_BUDGET_SEC (0 disables the outer wait_for; not recommended in production).
+CONFIG_API_BUDGET_SEC = float(os.environ.get("CONFIG_API_BUDGET_SEC", "18"))
 
 _integrations_cache_payload: dict[str, Any] | None = None
 _integrations_cache_mono: float = 0.0
@@ -581,18 +586,32 @@ async def get_integrations_debug_api() -> dict[str, Any]:
     }
 
 
-@config_router.get("")
-async def get_config_api(background_tasks: BackgroundTasks) -> dict[str, Any]:
-    """Return public runtime config (x402, monitoring, payment, integrations, A2A identity) from registries.
+def _degraded_get_config_payload(background_tasks: BackgroundTasks) -> dict[str, Any]:
+    """Safe JSON when the main handler hits CONFIG_API_BUDGET_SEC (stuck I/O, sync work)."""
+    merchant = os.environ.get("MERCHANT_WALLET_ADDRESS", "").strip()
+    background_tasks.add_task(_integrations_background_refresh)
+    a2a_identity = get_erc8004_agent_identity()
+    return {
+        "x402_enabled": get_x402_enabled(),
+        "monitoring_enabled": get_monitoring_enabled(),
+        "merchant_wallet_address": merchant or None,
+        "credits_enabled": credits_supabase.is_configured(),
+        "credits_per_usd": CREDITS_PER_USD,
+        "credits_per_run": CREDITS_PER_RUN,
+        "default_network_id": get_anchor_network_slug(),
+        "default_chain_id": get_default_chain_id(),
+        "a2a_agent_id": get_a2a_agent_id(),
+        "a2a_default_chain_id": get_a2a_default_chain_id(),
+        "a2a_identity": a2a_identity,
+        "integrations": _integrations_fallback(),
+        "integrations_stale": True,
+    }
 
-    Uses stale-while-revalidate for ``integrations`` when TTL expired: returns the last cached
-    probe result immediately (``integrations_stale: true``) and schedules a background refresh,
-    so Studio bootstrap stays fast even if upstream /health probes are slow.
 
-    **Cold start (no in-process cache yet):** with stale-while-revalidate enabled, returns
-    env-derived fallback flags immediately and schedules a background probe so the first
-    ``GET /api/v1/config`` after deploy does not block on simulation/storage/vectordb.
-    """
+async def _build_get_config_payload(
+    background_tasks: BackgroundTasks,
+) -> dict[str, Any]:
+    """Core logic for GET /api/v1/config (wrapped in asyncio.wait_for in get_config_api)."""
     merchant = os.environ.get("MERCHANT_WALLET_ADDRESS", "").strip()
     now = time.monotonic()
     integrations: dict[str, Any]
@@ -656,6 +675,37 @@ async def get_config_api(background_tasks: BackgroundTasks) -> dict[str, Any]:
     if integrations_stale:
         payload["integrations_stale"] = True
     return payload
+
+
+@config_router.get("")
+async def get_config_api(background_tasks: BackgroundTasks) -> dict[str, Any]:
+    """Return public runtime config (x402, monitoring, payment, integrations, A2A identity) from registries.
+
+    Uses stale-while-revalidate for ``integrations`` when TTL expired: returns the last cached
+    probe result immediately (``integrations_stale: true``) and schedules a background refresh,
+    so Studio bootstrap stays fast even if upstream /health probes are slow.
+
+    **Cold start (no in-process cache yet):** with stale-while-revalidate enabled, returns
+    env-derived fallback flags immediately and schedules a background probe so the first
+    ``GET /api/v1/config`` after deploy does not block on simulation/storage/vectordb.
+
+    **Overall deadline:** if the handler does not complete within ``CONFIG_API_BUDGET_SEC`` (default
+    18s), returns a degraded payload so clients do not hang until the browser abort (often 45s).
+    Set ``CONFIG_API_BUDGET_SEC=0`` to disable the outer wait (for debugging only).
+    """
+    if CONFIG_API_BUDGET_SEC <= 0:
+        return await _build_get_config_payload(background_tasks)
+    try:
+        return await asyncio.wait_for(
+            _build_get_config_payload(background_tasks),
+            timeout=CONFIG_API_BUDGET_SEC,
+        )
+    except TimeoutError:
+        logger.error(
+            "[config] exceeded CONFIG_API_BUDGET_SEC=%ss; returning degraded payload",
+            CONFIG_API_BUDGET_SEC,
+        )
+        return _degraded_get_config_payload(background_tasks)
 
 
 # Agent identity router (ERC-8004)

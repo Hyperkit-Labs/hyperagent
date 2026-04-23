@@ -600,26 +600,21 @@ async def simulation_agent(state: AgentState) -> AgentState:
         state["current_stage"] = (
             "simulation" if state["simulation_passed"] else "simulation_failed"
         )
-        if os.environ.get("OPENSANDBOX_ENABLED", "").strip().lower() in (
-            "1",
-            "true",
-            "yes",
-        ):
-            try:
-                from execution_backend import get_execution_backend
+        try:
+            from execution_backend import get_execution_backend
 
-                backend = get_execution_backend()
-                if hasattr(backend, "run_gas_benchmark") and contracts:
-                    for name, code in contracts.items():
-                        if isinstance(code, str) and name.endswith(".sol"):
-                            bench = await backend.run_gas_benchmark(
-                                code, name.replace(".sol", "")
-                            )
-                            state["gas_benchmark_score"] = bench.score
-                            state["gas_benchmark_configs"] = bench.configs
-                            break
-            except Exception as gb_err:
-                logger.warning("[simulation] gas_benchmark skipped: %s", gb_err)
+            backend = get_execution_backend()
+            if hasattr(backend, "run_gas_benchmark") and contracts:
+                for name, code in contracts.items():
+                    if isinstance(code, str) and name.endswith(".sol"):
+                        bench = await backend.run_gas_benchmark(
+                            code, name.replace(".sol", "")
+                        )
+                        state["gas_benchmark_score"] = bench.score
+                        state["gas_benchmark_configs"] = bench.configs
+                        break
+        except Exception as gb_err:
+            logger.warning("[simulation] gas_benchmark skipped: %s", gb_err)
         try:
             await ipfs_client.pin_and_record(
                 run_id, "simulation", results, project_id=state.get("project_id")

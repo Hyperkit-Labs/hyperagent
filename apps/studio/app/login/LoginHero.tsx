@@ -9,7 +9,6 @@ import {
   LiquidGlass,
   LogoLoop,
   type LogoLoopItem,
-  LaserFlow,
   PipelineDemo,
 } from "@/components/ui";
 import { CLI_VERSION } from "@/constants/routes";
@@ -161,26 +160,9 @@ export function LoginHero() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.35, duration: 0.5 }}
-          className="relative w-full max-w-[380px] shrink-0 pt-8"
+          className="shrink-0"
         >
-          <div className="pointer-events-none absolute left-1/2 top-[-132px] z-0 h-[174px] w-[min(116%,440px)] -translate-x-1/2 overflow-hidden">
-            <LaserFlow
-              color="#cf9eff"
-              horizontalSizing={0.94}
-              verticalSizing={3.1}
-              wispDensity={1}
-              wispSpeed={15}
-              wispIntensity={5}
-              flowSpeed={0.35}
-              flowStrength={0.25}
-              fogIntensity={0.45}
-              fogScale={0.3}
-              fogFallSpeed={0.6}
-              decay={1.1}
-              falloffStart={1.2}
-            />
-          </div>
-          <PipelineDemo className="relative z-10" />
+          <PipelineDemo />
         </motion.div>
 
         <motion.div

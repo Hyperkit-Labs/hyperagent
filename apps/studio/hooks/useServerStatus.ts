@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ApiPaths } from "@hyperagent/api-contracts";
-import { getApiBase } from "@/lib/api";
 
 /** up = sign-in ready; degraded = gateway alive, orchestrator or deps unhealthy; signin_unavailable = gateway reachable but auth prereqs fail; down = unreachable */
 export type ServerStatus =
@@ -49,8 +47,12 @@ export function interpretHealthResponse(
 /** Default poll for gateway /health/signin (ms). Slower than 30s to avoid noise on the login view. */
 const DEFAULT_SERVER_STATUS_POLL_MS = 90_000;
 
-/** Shallow gateway health (GET /health/signin): orchestrator /health/live only, no deep /health. */
-const HEALTH_FETCH_TIMEOUT_MS = 8000;
+/**
+ * Login health check timeout. Slightly above the gateway proxy upstream budget so the
+ * browser waits for the Next.js same-origin route (see /api/gateway-health/signin) rather
+ * than aborting while a cross-origin preflight hangs.
+ */
+const HEALTH_FETCH_TIMEOUT_MS = 12_000;
 
 /** Gateway /health/signin (no auth). Distinguishes sign-in readiness from total outage without deep orchestrator checks. */
 export function useServerStatus(
@@ -59,8 +61,8 @@ export function useServerStatus(
   const [status, setStatus] = useState<ServerStatus>("loading");
 
   useEffect(() => {
-    const base = getApiBase().replace(/\/api\/v1\/?$/, "");
-    const healthUrl = `${base}${ApiPaths.healthSignin}`;
+    /** Same-origin proxy avoids CORS on direct gateway fetches from the login page. */
+    const healthUrl = "/api/gateway-health/signin";
     let isMounted = true;
     let intervalId: ReturnType<typeof setInterval> | null = null;
     let cancelDeferred: (() => void) | undefined;

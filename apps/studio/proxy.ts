@@ -156,7 +156,8 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   }
 
   if (pathname.startsWith("/api/")) {
-    const PUBLIC_API_PREFIXES = ["/api/auth/"];
+    /** Public routes: auth callbacks + same-origin gateway health proxies (login page, no session yet). */
+    const PUBLIC_API_PREFIXES = ["/api/auth/", "/api/gateway-health/"];
     const isPublicApi = PUBLIC_API_PREFIXES.some((p) => pathname.startsWith(p));
     if (isPublicApi) {
       return nextWithCsp(request, nonce);

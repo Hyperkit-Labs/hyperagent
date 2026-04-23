@@ -107,4 +107,44 @@ describe("healthHandler", () => {
     expect(payload.statusCode).toBe(503);
     expect(payload.body?.auth_signin_ready).toBe(false);
   });
+
+  it("shallow: returns 200 when only orchestrator /health/live is OK (no deep /health call)", async () => {
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      const u = String(url);
+      if (u.endsWith("/health/live")) {
+        return new Response(null, { status: 200 });
+      }
+      if (u.endsWith("/health")) {
+        return new Response(JSON.stringify({ status: "degraded" }), { status: 503 });
+      }
+      return new Response("not found", { status: 404 });
+    }) as typeof fetch;
+    global.fetch = fetchMock;
+
+    const { res, payload } = createRes();
+    const h = healthHandler(orchUrl, { shallowOrchestrator: true });
+    await h({} as Request, res);
+    expect(payload.statusCode).toBe(200);
+    expect(payload.body?.status).toBe("ok");
+    expect(payload.body?.signin_shallow_orchestrator_probe).toBe(true);
+    const orchUrls = fetchMock.mock.calls.map((c) => String(c[0]));
+    expect(orchUrls.some((u) => u.includes("/health/live"))).toBe(true);
+    expect(orchUrls.some((u) => u.endsWith("/health") && !u.includes("/health/live"))).toBe(false);
+  });
+
+  it("shallow: returns 503 when /health/live is not OK", async () => {
+    global.fetch = vi.fn(async (url: string | URL) => {
+      const u = String(url);
+      if (u.endsWith("/health/live")) {
+        return new Response(null, { status: 503 });
+      }
+      return new Response("not found", { status: 404 });
+    }) as typeof fetch;
+
+    const { res, payload } = createRes();
+    const h = healthHandler(orchUrl, { shallowOrchestrator: true });
+    await h({} as Request, res);
+    expect(payload.statusCode).toBe(503);
+    expect(payload.body?.orchestrator_ok).toBe(false);
+  });
 });

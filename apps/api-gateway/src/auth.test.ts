@@ -1,12 +1,18 @@
 /**
- * authMiddleware: public path behavior (liveness must not require JWT).
- * These tests call the middleware directly so they stay green in sandboxed
- * environments that forbid opening ephemeral sockets.
+ * authMiddleware: public path behavior (liveness must not require JWT) and
+ * security/hardening regressions. These tests call the middleware directly so
+ * they stay green in sandboxed environments that forbid opening ephemeral
+ * sockets.
  */
 import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { authMiddleware, type RequestWithUser } from "./auth.js";
+import {
+  __authFailureSampleForTest,
+  __resetAuthFailureCountersForTest,
+  authMiddleware,
+  type RequestWithUser,
+} from "./auth.js";
 
 type JsonBody = Record<string, unknown>;
 
@@ -14,23 +20,33 @@ function createReq(
   path: string,
   authorization?: string,
   cookie?: string,
+  remote?: string,
 ): RequestWithUser {
   const headers: Record<string, string> = {};
   if (authorization) headers.authorization = authorization;
   if (cookie) headers.cookie = cookie;
+  if (remote) headers["x-forwarded-for"] = remote;
   return {
     originalUrl: path,
     path,
     baseUrl: "",
     url: path,
     headers,
-  } as RequestWithUser;
+    ip: remote ?? "127.0.0.1",
+  } as unknown as RequestWithUser;
+}
+
+interface ResPayload {
+  statusCode: number;
+  body?: JsonBody;
+  headers: Record<string, string>;
 }
 
 function createRes() {
-  const payload = {
+  const payload: ResPayload = {
     statusCode: 200,
-    body: undefined as JsonBody | undefined,
+    body: undefined,
+    headers: {},
   };
 
   const res = {
@@ -42,13 +58,22 @@ function createRes() {
       payload.body = body;
       return this;
     },
+    setHeader(name: string, value: string | number | readonly string[]) {
+      payload.headers[name] = Array.isArray(value) ? value.join(", ") : String(value);
+      return this;
+    },
   } as unknown as Response;
 
   return { res, payload };
 }
 
-function runAuth(path: string, authorization?: string, cookie?: string) {
-  const req = createReq(path, authorization, cookie);
+function runAuth(
+  path: string,
+  authorization?: string,
+  cookie?: string,
+  remote?: string,
+) {
+  const req = createReq(path, authorization, cookie, remote);
   const { res, payload } = createRes();
   const next = vi.fn<NextFunction>();
 
@@ -62,6 +87,7 @@ describe("authMiddleware", () => {
     process.env.AUTH_JWT_SECRET = "unit-test-key";
     process.env.NODE_ENV = "test";
     process.env.REQUIRE_AUTH = "true";
+    __resetAuthFailureCountersForTest();
   });
 
   it("allows /health/live without Authorization", () => {
@@ -96,7 +122,11 @@ describe("authMiddleware", () => {
     expect(payload.statusCode).toBe(200);
     expect(req.userId).toBe("user-123");
     expect(req.walletAddress).toBe("0xabc");
-    expect(verifySpy).toHaveBeenCalledWith("test-token", "unit-test-key");
+    expect(verifySpy).toHaveBeenCalledWith(
+      "test-token",
+      "unit-test-key",
+      expect.objectContaining({ algorithms: ["HS256"] }),
+    );
     verifySpy.mockRestore();
   });
 
@@ -118,10 +148,49 @@ describe("authMiddleware", () => {
     const { next, payload } = runAuth("/api/v1/workflows");
     expect(next).not.toHaveBeenCalled();
     expect(payload.statusCode).toBe(401);
-    expect(payload.body).toEqual({
+    expect(payload.body).toMatchObject({
       error: "Unauthorized",
+      code: "unauthorized.missing_credential",
       message: "Missing or invalid Authorization header",
     });
+    expect(payload.headers["WWW-Authenticate"]).toContain("Bearer");
+    expect(payload.headers["WWW-Authenticate"]).toContain(
+      'error="invalid_request"',
+    );
+  });
+
+  it("rejects protected paths with an invalid bearer token", () => {
+    const verifySpy = vi.spyOn(jwt, "verify").mockImplementation(() => {
+      throw new jwt.JsonWebTokenError("bad token");
+    });
+    const { next, payload } = runAuth(
+      "/api/v1/workflows",
+      "Bearer not-a-real-jwt",
+    );
+    expect(next).not.toHaveBeenCalled();
+    expect(payload.statusCode).toBe(401);
+    expect(payload.body).toMatchObject({
+      error: "Unauthorized",
+      code: "unauthorized.invalid_token",
+      message: "Invalid or expired token",
+    });
+    expect(payload.headers["WWW-Authenticate"]).toContain(
+      'error="invalid_token"',
+    );
+    verifySpy.mockRestore();
+  });
+
+  it("pins JWT verification to HS256 to prevent algorithm confusion", () => {
+    const verifySpy = vi.spyOn(jwt, "verify").mockReturnValue({
+      sub: "user-algo",
+    } as never);
+    runAuth("/api/v1/workflows", "Bearer good-token");
+    expect(verifySpy).toHaveBeenCalledWith(
+      "good-token",
+      "unit-test-key",
+      expect.objectContaining({ algorithms: ["HS256"] }),
+    );
+    verifySpy.mockRestore();
   });
 
   it("allows protected paths with rt cookie JWT when Authorization header is missing", () => {
@@ -138,7 +207,36 @@ describe("authMiddleware", () => {
     expect(payload.statusCode).toBe(200);
     expect(req.userId).toBe("user-cookie");
     expect(req.walletAddress).toBe("0xdef");
-    expect(verifySpy).toHaveBeenCalledWith("cookie-token", "unit-test-key");
+    expect(verifySpy).toHaveBeenCalledWith(
+      "cookie-token",
+      "unit-test-key",
+      expect.objectContaining({ algorithms: ["HS256"] }),
+    );
     verifySpy.mockRestore();
+  });
+
+  it("samples repeated auth-failure logs from the same source", () => {
+    const key = "10.0.0.1|401_missing_header|/api/v1/workflows";
+    const now = 1_700_000_000_000;
+    const results: { shouldLog: boolean; suppressed: number }[] = [];
+    for (let i = 0; i < 200; i++) {
+      results.push(__authFailureSampleForTest(key, now + i));
+    }
+    const logged = results.filter((r) => r.shouldLog);
+    // Window lets the first 5 through, then emits a "suppressed=1" summary at
+    // call #6, then silence until suppression crosses the summary threshold.
+    expect(logged.length).toBeGreaterThanOrEqual(5);
+    expect(logged.length).toBeLessThanOrEqual(10);
+    // At least one emitted entry must carry the summary counter.
+    expect(logged.some((r) => r.suppressed > 0)).toBe(true);
+  });
+
+  it("starts a fresh window after the sampling interval elapses", () => {
+    const key = "10.0.0.2|401_missing_header|/api/v1/workflows";
+    const t0 = 1_700_000_000_000;
+    for (let i = 0; i < 50; i++) __authFailureSampleForTest(key, t0);
+    const next = __authFailureSampleForTest(key, t0 + 60_001);
+    expect(next.shouldLog).toBe(true);
+    expect(next.suppressed).toBe(0);
   });
 });

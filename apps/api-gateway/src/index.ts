@@ -12,6 +12,7 @@ import { requestIdMiddleware, type RequestWithId } from "./requestId.js";
 import { otelRequestSpanMiddleware, validateRequiredSecrets } from "@hyperagent/backend-middleware";
 import { log } from "./logger.js";
 import { authMiddleware, type RequestWithUser } from "./auth.js";
+import { isKnownGatewayPath, isStaticProbePath } from "./knownPaths.js";
 import { rateLimitMiddleware, hasRestRateLimitEnv } from "./rateLimit.js";
 import { authBootstrapHandler } from "./authBootstrap.js";
 import { byokRouter } from "./byok.js";
@@ -101,6 +102,35 @@ app.get("/health/live", (_req, res) => {
 });
 
 app.get("/health", healthHandler(gw.orchestratorUrl));
+
+/**
+ * Pre-auth guard: short-circuit browser/crawler probes and unknown endpoints
+ * before the auth middleware runs. Without this, requests to paths that no
+ * route will ever handle (e.g. `/favicon.ico`, `/proxy/anthropic/v1/models`,
+ * random bot scans) cascade into the auth middleware, surface as
+ * `401_invalid_token` / `401_missing_header` security warnings, and drown the
+ * real auth failures in log noise.
+ */
+app.use((req, res, next) => {
+  if (isStaticProbePath(req.path)) {
+    if (req.path === "/robots.txt") {
+      res.type("text/plain").send("User-agent: *\nDisallow: /\n");
+      return;
+    }
+    res.status(204).end();
+    return;
+  }
+  if (!isKnownGatewayPath(req.path)) {
+    res.status(404).json({
+      error: "Not Found",
+      code: "route.unknown",
+      message: "Unknown endpoint",
+      requestId: (req as RequestWithId).requestId,
+    });
+    return;
+  }
+  next();
+});
 
 app.use(authMiddleware);
 app.use((req, res, next) => {

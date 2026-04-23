@@ -104,6 +104,13 @@ describe("authMiddleware", () => {
     expect(payload.body).toBeUndefined();
   });
 
+  it("allows /health/signin without Authorization", () => {
+    const { next, payload } = runAuth("/health/signin");
+    expect(next).toHaveBeenCalledOnce();
+    expect(payload.statusCode).toBe(200);
+    expect(payload.body).toBeUndefined();
+  });
+
   it("allows /api/v1/config without Authorization", () => {
     const { next, payload } = runAuth("/api/v1/config");
     expect(next).toHaveBeenCalledOnce();

@@ -101,6 +101,7 @@ app.get("/health/live", (_req, res) => {
   res.json({ status: "ok", gateway: true });
 });
 
+app.get("/health/signin", healthHandler(gw.orchestratorUrl, { shallowOrchestrator: true }));
 app.get("/health", healthHandler(gw.orchestratorUrl));
 
 /**

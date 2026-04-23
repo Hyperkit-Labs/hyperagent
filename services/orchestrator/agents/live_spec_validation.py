@@ -1,14 +1,10 @@
 """Live spec validation: shadow simulation before design.
-When OPENSANDBOX_ENABLED, compiles a minimal Solidity stub derived from spec to validate feasibility."""
+Compiles a minimal Solidity stub derived from spec via mandatory ExecutionBackend (E2B, OpenSandbox fallback)."""
 
 import logging
 import os
 
 logger = logging.getLogger(__name__)
-
-OPENSANDBOX_ENABLED = os.environ.get(
-    "OPENSANDBOX_ENABLED", "false"
-).strip().lower() in ("1", "true", "yes")
 
 
 def _stub_from_spec(spec: dict) -> str:
@@ -31,14 +27,17 @@ async def run_live_spec_validation(
     spec: dict, run_id: str | None = None
 ) -> tuple[bool, str]:
     """Run shadow compile in OpenSandbox. Returns (passed, message). When run_id is set, streams logs to agent_logs."""
-    if not OPENSANDBOX_ENABLED or not spec:
+    if not spec:
         return True, "skipped"
     try:
         from execution_backend import get_execution_backend
 
         backend = get_execution_backend()
         if not hasattr(backend, "run_compile"):
-            return True, "skipped"
+            return (
+                False,
+                "execution backend has no run_compile; cannot run live spec validation",
+            )
         stub = _stub_from_spec(spec)
         on_log = None
         if run_id and hasattr(backend, "run_compile_streaming"):
@@ -61,8 +60,19 @@ async def run_live_spec_validation(
         err = "; ".join(result.errors or ["compile failed"])[:200]
         logger.warning("[live_spec_validation] shadow compile failed: %s", err)
         return False, err
-    except ImportError:
-        return True, "skipped"
+    except ImportError as e:
+        logger.exception("[live_spec_validation] execution_backend missing: %s", e)
+        return False, f"execution_backend required for shadow compile: {e!s}"
     except Exception as e:
-        logger.warning("[live_spec_validation] %s", e)
-        return True, "skipped"
+        if os.environ.get("EXECUTION_BACKEND_FORCE_LOCAL", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        ):
+            logger.warning(
+                "[live_spec_validation] failed under EXECUTION_BACKEND_FORCE_LOCAL: %s",
+                e,
+            )
+        else:
+            logger.exception("[live_spec_validation] %s", e)
+        return False, str(e)

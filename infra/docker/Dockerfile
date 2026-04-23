@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends git \
 COPY packages/execution-backend ./packages/execution-backend
 COPY services/orchestrator/requirements.txt ./services/orchestrator/
 WORKDIR /app/services/orchestrator
-RUN pip install --no-cache-dir -e ../../packages/execution-backend -r requirements.txt
+RUN pip install --no-cache-dir -e "../../packages/execution-backend[opensandbox]" -r requirements.txt
 
 COPY services/orchestrator .
 WORKDIR /app/services/orchestrator

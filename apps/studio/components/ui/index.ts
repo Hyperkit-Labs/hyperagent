@@ -38,4 +38,5 @@ export { GlowingBorder } from "./aceternity/GlowingBorder";
 export { RadialProgress } from "./RadialProgress";
 export { PipelineDemo } from "./PipelineDemo";
 export { FlickeringGrid } from "./react-bits/FlickeringGrid";
+export { default as LaserFlow } from "./react-bits/LaserFlow";
 export { ShinyText } from "./react-bits/ShinyText";

@@ -29,8 +29,8 @@ prometheus-client>=0.19.0
 # slowapi: orchestrator-level rate limiting (second layer after API-gateway Upstash).
 # Tune via RATE_LIMIT_ORCHESTRATOR_GENERATE and RATE_LIMIT_ORCHESTRATOR_DEPLOY env vars.
 slowapi>=0.1.9
-# Execution backend (Local + OpenSandbox); optional opensandbox-sdk for OPENSANDBOX_ENABLED
-# Installed separately: in Docker via explicit pip install, in CI via "pip install -e packages/execution-backend"
+# Execution backend: E2B (e2b package) primary, OpenSandbox SDK optional fallback
+# Installed separately: in Docker/CI via "pip install -e packages/execution-backend[opensandbox]"
 # Do NOT add an -e line here; the relative path breaks when pip runs from repo root.
 # OpenTelemetry (optional): set OPENTELEMETRY_ENABLED=1 and OTEL_EXPORTER_OTLP_ENDPOINT for tracing
 opentelemetry-api>=1.20.0

@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { getPlatformTrackRecord, type PlatformTrackRecord } from "@/lib/api";
 
-/** Refresh waitlist-backed beta count on the login track record (ms). */
-const TRACK_RECORD_POLL_MS = 30_000;
+/** Refresh waitlist-backed beta count on the login track record (ms). Longer default reduces load on /platform/track-record when the tab stays open. */
+const TRACK_RECORD_POLL_MS = 120_000;
 
 const DEFAULTS: PlatformTrackRecord = {
   audits_completed: 0,
@@ -37,8 +37,15 @@ export function useTrackRecord() {
 
   useEffect(() => {
     let cancelled = false;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
 
     const load = () => {
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState === "hidden"
+      ) {
+        return;
+      }
       getPlatformTrackRecord()
         .then((r) => {
           if (!cancelled) setRecord(normalizeRecord(r));
@@ -48,11 +55,29 @@ export function useTrackRecord() {
         });
     };
 
+    const startInterval = () => {
+      if (intervalId) clearInterval(intervalId);
+      intervalId = setInterval(load, TRACK_RECORD_POLL_MS);
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        load();
+        startInterval();
+      } else if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
     load();
-    const interval = setInterval(load, TRACK_RECORD_POLL_MS);
+    startInterval();
+    document.addEventListener("visibilitychange", onVisibility);
+
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      if (intervalId) clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
 

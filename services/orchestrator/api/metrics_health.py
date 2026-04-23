@@ -6,8 +6,9 @@ import asyncio
 import logging
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
-from typing import Any, cast
+from typing import Any
 
 import credits_supabase
 import db
@@ -80,6 +81,10 @@ INTEGRATIONS_CIRCUIT_COOLDOWN_SEC = float(
 # that so users get JSON (degraded) instead of a browser-side cancel. Override with
 # CONFIG_API_BUDGET_SEC (0 disables the outer wait_for; not recommended in production).
 CONFIG_API_BUDGET_SEC = float(os.environ.get("CONFIG_API_BUDGET_SEC", "18"))
+# Redis health checks: cap socket wait so slow Upstash RTT does not serialize PING+LLEN into multi-second /health.
+REDIS_HEALTH_SOCKET_TIMEOUT_SEC = float(
+    os.environ.get("REDIS_HEALTH_SOCKET_TIMEOUT_SEC", "2.0")
+)
 
 _integrations_cache_payload: dict[str, Any] | None = None
 _integrations_cache_mono: float = 0.0
@@ -119,30 +124,56 @@ def _check_supabase_health() -> dict[str, Any]:
 _redis_consecutive_failures: int = 0
 
 
-def _check_redis_health() -> dict[str, Any]:
-    """Ping Redis TCP (e.g. Upstash) when REDIS_URL is set.
-    Emits structured alert log on consecutive failures (x402 replay protection depends on Redis).
-    """
+def _check_redis_ping_and_dlq_pipeline() -> (
+    tuple[dict[str, Any], dict[str, Any] | None]
+):
+    """One Redis round trip: PING + optional DLQ LLEN (pipeline). Also applies socket timeouts."""
     global _redis_consecutive_failures
     url = (
         os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or ""
     ).strip()
+    queue_enabled = os.environ.get("QUEUE_ENABLED", "").strip() in ("1", "true", "yes")
     if not url or url.startswith("#"):
-        return {"status": "not_configured"}
+        return ({"status": "not_configured"}, None)
     try:
         from redis import Redis
 
-        r = Redis.from_url(effective_redis_url(url))
-        r.ping()
+        t = max(0.5, REDIS_HEALTH_SOCKET_TIMEOUT_SEC)
+        r = Redis.from_url(
+            effective_redis_url(url),
+            socket_timeout=t,
+            socket_connect_timeout=min(t, 5.0),
+        )
+        pipe = r.pipeline()
+        pipe.ping()
+        if queue_enabled:
+            pipe.llen("queue:hyperagent:dead")
+        results = pipe.execute()
+        if not results:
+            raise RuntimeError("empty redis pipeline")
         if _redis_consecutive_failures > 0:
             logger.info(
                 "[redis] connection restored after %d consecutive failures",
                 _redis_consecutive_failures,
             )
         _redis_consecutive_failures = 0
-        return {"status": "ok"}
+        redis_out: dict[str, Any] = {"status": "ok"}
+        dlq_out: dict[str, Any] | None = None
+        if queue_enabled and len(results) > 1:
+            depth = int(results[1])
+            dlq_out = {"status": "ok", "depth": depth}
+            if depth > 0:
+                dlq_out["status"] = "warning"
+                logger.warning(
+                    "[alert][dlq] dead letter queue has %d unprocessed jobs. Investigate via GET /api/v1/health/detailed.",
+                    depth,
+                )
+        return (redis_out, dlq_out)
     except ImportError:
-        return {"status": "not_configured", "message": "redis package not installed"}
+        return (
+            {"status": "not_configured", "message": "redis package not installed"},
+            None,
+        )
     except Exception as e:
         _redis_consecutive_failures += 1
         err_msg = str(e)[:200]
@@ -152,11 +183,21 @@ def _check_redis_health() -> dict[str, Any]:
             _redis_consecutive_failures,
             err_msg,
         )
-        return {
+        redis_err = {
             "status": "error",
             "error": err_msg,
             "consecutive_failures": _redis_consecutive_failures,
         }
+        dlq_err: dict[str, Any] | None = None
+        if queue_enabled:
+            dlq_err = {"status": "error", "depth": -1, "error": err_msg}
+        return (redis_err, dlq_err)
+
+
+def _check_redis_health() -> dict[str, Any]:
+    """Ping Redis TCP (e.g. Upstash) when REDIS_URL is set."""
+    r, _ = _check_redis_ping_and_dlq_pipeline()
+    return r
 
 
 def _check_service_health(name: str, url: str, timeout: float = 2.0) -> dict[str, Any]:
@@ -360,36 +401,21 @@ health_router = APIRouter(tags=["health"])
 
 
 def _check_dead_letter_queue() -> dict[str, Any]:
-    """Check dead letter queue depth. High depth indicates failed jobs that need investigation."""
-    url = (
-        os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or ""
-    ).strip()
-    if not url or url.startswith("#"):
-        return {"status": "not_configured", "depth": 0}
-    try:
-        from redis import Redis
-
-        r = Redis.from_url(effective_redis_url(url))
-        depth = cast(int, r.llen("queue:hyperagent:dead"))
-        result: dict[str, Any] = {"status": "ok", "depth": depth}
-        if depth > 0:
-            logger.warning(
-                "[alert][dlq] dead letter queue has %d unprocessed jobs. Investigate via GET /api/v1/health/detailed.",
-                depth,
-            )
-            result["status"] = "warning"
-        return result
-    except ImportError:
-        return {"status": "not_configured", "depth": 0}
-    except Exception as e:
-        return {"status": "error", "depth": -1, "error": str(e)[:200]}
+    """DLQ depth from Redis (prefer reusing :func:`_check_redis_ping_and_dlq_pipeline` in the same request)."""
+    _, d = _check_redis_ping_and_dlq_pipeline()
+    if d is not None:
+        return d
+    return {"status": "not_configured", "depth": 0}
 
 
 def _root_health_critical_ok() -> tuple[bool, dict[str, Any]]:
     """Check critical deps (Supabase when configured, Redis when QUEUE_ENABLED). Returns (ok, payload)."""
     payload: dict[str, Any] = {"registries": get_registry_versions()}
-    supabase = _check_supabase_health()
-    redis = _check_redis_health()
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        fut_s = ex.submit(_check_supabase_health)
+        fut_r = ex.submit(_check_redis_ping_and_dlq_pipeline)
+    supabase = fut_s.result()
+    redis, dlq = fut_r.result()
     queue_enabled = os.environ.get("QUEUE_ENABLED", "").strip() in ("1", "true", "yes")
     redis_url = (
         os.environ.get("REDIS_URL") or os.environ.get("UPSTASH_REDIS_URL") or ""
@@ -404,7 +430,9 @@ def _root_health_critical_ok() -> tuple[bool, dict[str, Any]]:
     payload["redis"] = redis
     payload["queue_enabled"] = queue_enabled
     if queue_enabled and redis_configured:
-        payload["dead_letter_queue"] = _check_dead_letter_queue()
+        payload["dead_letter_queue"] = (
+            dlq if dlq is not None else {"status": "not_configured", "depth": 0}
+        )
     return critical_ok, payload
 
 
@@ -506,7 +534,13 @@ def health_detailed() -> dict[str, Any]:
         services["orchestrator"]["p95_latency_ms"] = round(p95, 0)
         services["orchestrator"]["slo_ok"] = p95 < 2000
     services["supabase"] = _check_supabase_health()
-    services["redis"] = _check_redis_health()
+    redis_h, dlq_h = _check_redis_ping_and_dlq_pipeline()
+    services["redis"] = redis_h
+    queue_enabled = os.environ.get("QUEUE_ENABLED", "").strip() in ("1", "true", "yes")
+    if queue_enabled:
+        services["dead_letter_queue"] = (
+            dlq_h if dlq_h is not None else {"status": "not_configured", "depth": 0}
+        )
     services["compile"] = _check_service_health("compile", COMPILE_SERVICE_URL)
     services["audit"] = _check_service_health("audit", AUDIT_SERVICE_URL)
     sim_url = os.environ.get("SIMULATION_SERVICE_URL", "http://localhost:8002").strip()
@@ -554,9 +588,6 @@ def health_detailed() -> dict[str, Any]:
             services["tools"][
                 "message"
             ] = "Toolchain offline; compile/audit may fail when using remote tools"
-    queue_enabled = os.environ.get("QUEUE_ENABLED", "").strip() in ("1", "true", "yes")
-    if queue_enabled:
-        services["dead_letter_queue"] = _check_dead_letter_queue()
     return {"status": "ok", "services": services, "registries": versions}
 
 

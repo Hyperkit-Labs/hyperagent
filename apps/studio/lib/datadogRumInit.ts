@@ -38,8 +38,26 @@ function parseSampleRate(raw: string | undefined, fallback: number): number {
   return n;
 }
 
+function isLocalhostHostname(host: string): boolean {
+  const h = host.toLowerCase();
+  return h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "[::1]";
+}
+
+function allowRumOnLocalhost(): boolean {
+  return (
+    process.env.NEXT_PUBLIC_DD_RUM_ON_LOCALHOST === "1" ||
+    process.env.NEXT_PUBLIC_DD_RUM_ON_LOCALHOST === "true"
+  );
+}
+
 /** RUM `env` must not tag local dev as prod when .env copies production NEXT_PUBLIC_DD_ENV. */
 function resolveRumEnv(): string {
+  if (
+    typeof window !== "undefined" &&
+    isLocalhostHostname(window.location.hostname)
+  ) {
+    return "dev";
+  }
   if (process.env.NODE_ENV !== "production") {
     return "dev";
   }
@@ -88,6 +106,21 @@ export function initDatadogBrowserRum(): void {
   if (typeof window === "undefined") return;
   const w = window as unknown as Record<string, boolean>;
   if (w[SKIPPED_FLAG] || w[INIT_FLAG] || w[INIT_STARTED]) return;
+
+  if (
+    process.env.NODE_ENV === "production" &&
+    isLocalhostHostname(window.location.hostname) &&
+    !allowRumOnLocalhost()
+  ) {
+    w[SKIPPED_FLAG] = true;
+    rumReadyListeners.clear();
+    if (process.env.NEXT_PUBLIC_DD_RUM_DEBUG === "1") {
+      console.warn(
+        "[Datadog RUM] skipped on localhost for production build (set NEXT_PUBLIC_DD_RUM_ON_LOCALHOST=1 to send)",
+      );
+    }
+    return;
+  }
 
   if (process.env.NODE_ENV !== "production" && !allowRumInDevelopment()) {
     w[SKIPPED_FLAG] = true;

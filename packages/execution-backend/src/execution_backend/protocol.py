@@ -1,6 +1,10 @@
 """Execution backend protocol for compile, audit, and exploit simulation."""
 
-from typing import Any, Protocol
+from typing import Any, Callable, Optional, Protocol
+
+
+class ExecutionBackendConfigurationError(RuntimeError):
+    """Raised when E2B and OpenSandbox credentials are not configured for mandatory sandbox execution."""
 
 
 class CompileResult:
@@ -74,7 +78,7 @@ class ExecutionBackend(Protocol):
         contract_code: str,
         contract_name: str,
         tools: list[str] | None = None,
-        on_log: None | ((str, str) -> None) = None,
+        on_log: Optional[Callable[[str, str], None]] = None,
     ) -> AuditResult:
         """Run security audit (Slither, Mythril, etc.). Returns findings.
         on_log(tool, line) called for each stdout/stderr line when streaming is supported."""

@@ -67,7 +67,7 @@
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
-    "dotenv": "^16.4.7",
+    "dotenv": "^17.4.2",
     "husky": "^9.1.7",
     "lint-staged": "^15.5.2",
     "pg": "^8.14.1",

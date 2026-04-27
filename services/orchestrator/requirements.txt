@@ -7,7 +7,7 @@ langchain-core>=0.3.0
 httpx>=0.25.0
 supabase>=2.0.0
 pyyaml>=6.0
-PyJWT>=2.8.0
+PyJWT>=2.12.1
 cryptography>=42.0.0
 web3>=6.0.0
 # eth-account: ECDSA/EIP-191 signature verification for x402_verifier.py.

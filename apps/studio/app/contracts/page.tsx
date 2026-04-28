@@ -43,7 +43,95 @@ type ContractEntry = {
   abi?: AbiItem[];
   transactionHash?: string;
   createdAt?: string;
+  /** Explorer or backend verification (optional) */
+  verified?: boolean;
+  /** Deployment or last-tx gas (optional) */
+  gasUsed?: number;
 };
+
+const ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
+
+function splitFunctionArgs(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+/** Coerced contract call args, including nested arrays for tuple/array ABI types. */
+type CoercedFunctionArg = string | boolean | number | CoercedFunctionArg[];
+
+function coerceArg(type: string, rawValue: unknown): CoercedFunctionArg {
+  if (type.endsWith("[]")) {
+    const elementType = type.slice(0, -2);
+    const values = Array.isArray(rawValue)
+      ? rawValue
+      : typeof rawValue === "string"
+        ? JSON.parse(rawValue)
+        : null;
+    if (!Array.isArray(values)) {
+      throw new Error("Array arguments must be entered as JSON arrays.");
+    }
+    return values.map((value) => coerceArg(elementType, value));
+  }
+  const normalizedValue =
+    typeof rawValue === "string" ? rawValue.trim() : String(rawValue);
+  if (type === "address") {
+    if (!ADDRESS_PATTERN.test(normalizedValue)) {
+      throw new Error(`Expected an address for ${type}.`);
+    }
+    return normalizedValue;
+  }
+  if (type === "bool") {
+    if (normalizedValue === "true") return true;
+    if (normalizedValue === "false") return false;
+    throw new Error("Boolean arguments must be true or false.");
+  }
+  if (type.startsWith("uint") || type.startsWith("int")) {
+    if (!/^-?\d+$/.test(normalizedValue)) {
+      throw new Error(`Expected an integer for ${type}.`);
+    }
+    return normalizedValue;
+  }
+  if (type.startsWith("bytes")) {
+    if (!/^0x[a-fA-F0-9]*$/.test(normalizedValue)) {
+      throw new Error(`Expected a hex value for ${type}.`);
+    }
+    return normalizedValue;
+  }
+  return normalizedValue;
+}
+
+function parseRawArgs(rawArgs: string): unknown[] {
+  const trimmed = rawArgs.trim();
+  if (!trimmed) {
+    return [];
+  }
+  if (trimmed.startsWith("[")) {
+    const parsed = JSON.parse(trimmed);
+    if (!Array.isArray(parsed)) {
+      throw new Error("Arguments must be a JSON array.");
+    }
+    return parsed;
+  }
+  return splitFunctionArgs(trimmed);
+}
+
+function validateAndCoerceArgs(
+  abiItem: AbiItem | undefined,
+  rawArgs: string,
+): CoercedFunctionArg[] {
+  const values = parseRawArgs(rawArgs);
+  const inputs = abiItem?.inputs ?? [];
+  if (abiItem && values.length !== inputs.length) {
+    throw new Error(
+      `Expected ${inputs.length} argument${inputs.length === 1 ? "" : "s"} for ${abiItem.name}.`,
+    );
+  }
+  return values.map((value, index) =>
+    coerceArg(inputs[index]?.type ?? "string", value),
+  );
+}
 
 function ContractInteract({ contract }: { contract: ContractEntry }) {
   const [fn, setFn] = useState("");
@@ -62,10 +150,17 @@ function ContractInteract({ contract }: { contract: ContractEntry }) {
     setResult(null);
     setInteractError(null);
     try {
+      if (!ADDRESS_PATTERN.test(contract.address)) {
+        throw new Error("Contract address is invalid.");
+      }
+      const functionDefinition = abiFunctions.find(
+        (item) => item.name === fn.trim(),
+      );
+      const parsedArgs = validateAndCoerceArgs(functionDefinition, args.trim());
       const res = await contractRead({
         contract_address: contract.address,
         function_name: fn.trim(),
-        function_args: args.trim() ? args.split(",").map((a) => a.trim()) : [],
+        function_args: parsedArgs,
         network: contract.network || "",
         abi: Array.isArray(contract.abi) ? contract.abi : [],
       });
@@ -83,10 +178,17 @@ function ContractInteract({ contract }: { contract: ContractEntry }) {
     setResult(null);
     setInteractError(null);
     try {
+      if (!ADDRESS_PATTERN.test(contract.address)) {
+        throw new Error("Contract address is invalid.");
+      }
+      const functionDefinition = abiFunctions.find(
+        (item) => item.name === fn.trim(),
+      );
+      const parsedArgs = validateAndCoerceArgs(functionDefinition, args.trim());
       const res = await contractCall({
         contract_address: contract.address,
         function_name: fn.trim(),
-        function_args: args.trim() ? args.split(",").map((a) => a.trim()) : [],
+        function_args: parsedArgs,
         network: contract.network || "",
         abi: Array.isArray(contract.abi) ? contract.abi : [],
       });
@@ -371,9 +473,11 @@ export default function ContractsPage() {
                           <div className="min-w-0 flex flex-col">
                             <div className="font-medium text-[var(--color-text-primary)] truncate flex items-center gap-2">
                               {c.name || c.workflowId || c.id}
-                              <span title="Verified">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-semantic-success)]" />
-                              </span>
+                              {c.verified === true && (
+                                <span title="Verified">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-semantic-success)]" />
+                                </span>
+                              )}
                             </div>
                             <div className="text-xs text-[var(--color-text-tertiary)] font-mono truncate flex items-center gap-1.5 mt-0.5">
                               {c.address || "-"}
@@ -394,13 +498,12 @@ export default function ContractsPage() {
                                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-primary)]"></span>
                                 {c.network || "Unknown network"}
                               </span>
-                              <span
-                                className="flex items-center gap-1 text-[var(--color-text-muted)] italic"
-                                title="Gas data not yet indexed"
-                              >
-                                <Fuel className="w-3 h-3 text-[var(--color-text-tertiary)]" />
-                                Gas: —
-                              </span>
+                              {typeof c.gasUsed === "number" && (
+                                <span className="flex items-center gap-1 text-[var(--color-text-muted)]">
+                                  <Fuel className="w-3 h-3 text-[var(--color-text-tertiary)]" />
+                                  Gas: {c.gasUsed.toLocaleString()}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>

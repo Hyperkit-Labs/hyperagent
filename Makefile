@@ -11,7 +11,7 @@ ENV_FILE := .env
 COMPOSE_VPS_BUILD_PARALLELISM ?= 2
 COMPOSE_FILES_VPS := -f $(COMPOSE_DIR)/$(COMPOSE_FILE) -f $(COMPOSE_DIR)/docker-compose.resource-limits.yml
 
-.PHONY: help up down logs test-minimal test-minimal-all verify-real-server restart migrate install-web run-web install-api run-api build rebuild \
+.PHONY: help up down logs test-minimal test-minimal-all verify-real-server restart migrate install-web run-web dev-ordered dev-ordered-stack install-api run-api build rebuild \
 	build-web build-prod build-contabo check-env validate-prod format-api lint-api type-check-api quality-check-api \
 	dogfood-setup dogfood-help dogfood-daemon ai-bom kill-ports
 
@@ -43,7 +43,9 @@ help:
 	@echo "  make logs        - Follow logs"
 	@echo "  make migrate     - Verify DB (local postgres only; use with make up-local)"
 	@echo "  make install-web - pnpm install (workspaces)"
-	@echo "  make run-web     - Start Next.js Studio locally (make up for backend first)"
+	@echo "  make run-web     - Start Next.js Studio only (use after Studio-ready order; see make dev-ordered)"
+	@echo "  make dev-ordered      - Start Studio first; prints next step (make up)"
+	@echo "  make dev-ordered-stack - Start Studio, wait for HTTP, then docker compose up -d (same as pnpm run dev:ordered:stack)"
 	@echo "  make install-api - Create .venv and install API deps (optional)"
 	@echo "  make run-api     - Run API locally with uvicorn (optional)"
 	@echo ""
@@ -59,7 +61,9 @@ help:
 	@echo "  make validate-prod - Validate production environment variables"
 	@echo "  make check-env   - Check environment configuration"
 	@echo ""
-	@echo "Typical flow:  make up && make migrate && make run-web"
+	@echo "Typical flow (frontend first, then backend):  make dev-ordered  then in another terminal:  make up"
+	@echo "One terminal:  make dev-ordered-stack  (Studio, then make up when Studio responds)"
+	@echo "Legacy:  make up && make run-web  (backend first; use dev-ordered for reproducible order)"
 	@echo "After code changes: make build && make restart"
 	@echo ""
 	@echo "QA / Dogfood:"
@@ -153,6 +157,14 @@ install-web:
 
 run-web:
 	pnpm --filter hyperagent-studio dev
+
+# Start Studio first, then print next step (make up). Reproducible order for local integration.
+dev-ordered:
+	@node scripts/dev-ordered.mjs
+
+# Start Studio, wait until HTTP responds, then docker compose up -d (lite stack). Same as: pnpm run dev:ordered:stack
+dev-ordered-stack:
+	@node scripts/dev-ordered.mjs --with-backend
 
 # Optional: run API locally without Docker (venv + uvicorn). Use "make up" for standard backend.
 install-api:

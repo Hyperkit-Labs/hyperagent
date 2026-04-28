@@ -370,6 +370,76 @@ def insert_deployment(
         return None
 
 
+def list_custom_domains_for_wallet(
+    wallet_user_id: str,
+    limit: int = 100,
+) -> list[dict[str, Any]]:
+    """Return custom domains for a wallet owner."""
+    client = _client()
+    if not client or not wallet_user_id:
+        return []
+    try:
+        result = (
+            client.table("custom_domains")
+            .select("id,domain,status,project_id,created_at,updated_at")
+            .eq("wallet_user_id", wallet_user_id)
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return list(result.data or [])
+    except Exception as e:
+        logger.warning("[db] list_custom_domains_for_wallet failed: %s", e)
+        return []
+
+
+def get_custom_domain_for_wallet(
+    wallet_user_id: str, domain: str
+) -> dict[str, Any] | None:
+    """Return a custom domain row for this wallet/domain pair."""
+    client = _client()
+    if not client or not wallet_user_id or not domain:
+        return None
+    try:
+        result = (
+            client.table("custom_domains")
+            .select("id,domain,status,project_id,created_at,updated_at")
+            .eq("wallet_user_id", wallet_user_id)
+            .ilike("domain", domain)
+            .limit(1)
+            .execute()
+        )
+        return result.data[0] if result.data else None
+    except Exception as e:
+        logger.warning("[db] get_custom_domain_for_wallet failed: %s", e)
+        return None
+
+
+def insert_custom_domain(
+    wallet_user_id: str,
+    domain: str,
+    project_id: str | None = None,
+    status: str = "pending",
+) -> dict[str, Any] | None:
+    """Create a custom domain row."""
+    client = _client()
+    if not client or not wallet_user_id or not domain:
+        return None
+    row: dict[str, Any] = {
+        "wallet_user_id": wallet_user_id,
+        "domain": domain,
+        "status": status,
+    }
+    if project_id and _is_uuid(project_id):
+        row["project_id"] = project_id
+    try:
+        result = client.table("custom_domains").insert(row).execute()
+        return result.data[0] if result.data else None
+    except Exception as e:
+        logger.warning("[db] insert_custom_domain failed: %s", e)
+        return None
+
+
 def _resolve_wallet_user_id_for_project(project_id: str) -> str | None:
     """Look up wallet_user_id from the projects table for deployment ownership."""
     client = _client()

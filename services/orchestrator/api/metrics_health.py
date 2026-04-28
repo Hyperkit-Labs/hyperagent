@@ -8,7 +8,7 @@ import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Literal
 
 import credits_supabase
 import db
@@ -380,7 +380,9 @@ async def _fetch_integrations_bounded(
     return result
 
 
-def _metrics_since_from_time_range(time_range: str) -> str | None:
+def _metrics_since_from_time_range(
+    time_range: Literal["all", "7d", "30d", "90d"],
+) -> str | None:
     """Return ISO datetime string for filtering, or None for all time."""
     if not time_range or time_range == "all":
         return None
@@ -576,7 +578,7 @@ def health_detailed() -> dict[str, Any]:
     services["trace_writer"] = (
         {
             "status": "NOT_APPLICABLE",
-            "message": "IPFS not configured; traces use stub IDs",
+            "message": "IPFS not configured; trace exports are unavailable in this environment",
         }
         if not pinata_ok
         else {"status": "ok", "message": "IPFS configured"}
@@ -852,7 +854,9 @@ metrics_router = APIRouter(prefix="/api/v1/metrics", tags=["metrics"])
 
 
 @metrics_router.get("")
-def get_metrics_api(time_range: str = "all") -> dict[str, Any]:
+def get_metrics_api(
+    time_range: Literal["all", "7d", "30d", "90d"] = "all",
+) -> dict[str, Any]:
     """Return basic metrics for Studio dashboard. time_range: 7d, 30d, 90d, all."""
     total = count_workflows()
     active = 0

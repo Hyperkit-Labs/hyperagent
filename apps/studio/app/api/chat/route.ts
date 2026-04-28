@@ -393,6 +393,15 @@ export async function POST(req: Request) {
                   authHeader,
                   userId,
                 );
+                if (
+                  !result ||
+                  typeof result.workflow_id !== "string" ||
+                  !result.workflow_id.trim()
+                ) {
+                  throw new Error(
+                    "Workflow creation returned no workflow_id. The request did not start a runnable workflow.",
+                  );
+                }
                 return {
                   workflow_id: result.workflow_id,
                   message: `Workflow created. View at /workflows/${result.workflow_id}`,
@@ -404,6 +413,7 @@ export async function POST(req: Request) {
                 return {
                   workflow_id: null,
                   message: `Workflow creation failed: ${msg}`,
+                  success: false,
                 };
               }
             },

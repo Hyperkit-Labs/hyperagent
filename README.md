@@ -93,25 +93,25 @@ HyperAgent is an AI-powered multi-agent platform that turns natural-language spe
    - Local dev: copy `.env.development.example` to `.env`. Production: copy `.env.example` to `.env` or `.env.production`.
    - Set `NEXT_PUBLIC_THIRDWEB_CLIENT_ID` and `NEXT_PUBLIC_API_URL` (e.g. `http://localhost:4000` with Docker backend).
 
-4. **Start the frontend (Studio)**
-   ```bash
-   pnpm --filter hyperagent-studio dev
-   ```
-   Open [http://localhost:3000](http://localhost:3000).
+4. **Start the stack in order (Studio first, then backend)**  
+   - **Recommended:** from the repo root run `pnpm run dev:ordered` (or `make dev-ordered`). This starts HyperAgent Studio (Next.js) and waits until it responds on port 3000, then tells you to run the backend. In a second terminal run `make up` to start the API gateway and Python services (`.env` must include Supabase, Redis/Upstash, and related settings).  
+   - **One terminal (Studio, then Docker):** `pnpm run dev:ordered:stack` or `make dev-ordered-stack` (requires Docker; runs `docker compose` in `infra/docker` after Studio is up).  
+   - **Studio only:** `pnpm --filter hyperagent-studio dev` or `make run-web`, then start the backend when you are ready.
 
-5. **Backend (optional)**  
-   If a backend is provided (e.g. API + Docker), follow its run instructions so the API is available at the URL set in `NEXT_PUBLIC_API_URL`. The web app calls that URL for workflows and data.
+5. Open [http://localhost:3000](http://localhost:3000) for Studio. The gateway (when `make up` is running) is at [http://localhost:4000](http://localhost:4000) by default.
 
-For full setup and usage, see [Getting started](docs/getting-started.md) and the [Contributor guide](docs/developer-guide.md).
+6. **Supabase and database** follow your `.env`: use your cloud Supabase project, or for local DB use the compose profile described in the developer guide (`make up-local` and migrations as documented).
+
+For full setup and usage, see [Getting started](docs/introduction/getting-started.md) and the [Contributor guide](docs/contributing/developer-guide.md).
 
 ## Documentation
 
 - [Capability truth table](docs/control-plane/capability-truth-table.md) – What is implemented vs partial vs not shipped (living document).
 - [Docs index](docs/README.md) – Onboarding, Studio usage, and contributor references.
 - **MkDocs site** – `pip install -r requirements-docs.txt && mkdocs serve` for searchable HTML (see [docs/documentation-site.md](docs/documentation-site.md)).
-- [Getting started](docs/getting-started.md) – First-time setup and run locally.
+- [Getting started](docs/introduction/getting-started.md) – First-time setup and run locally.
 - [Studio guide](docs/user-guide.md) – HyperAgent Studio (connect, BYOK, run workflows).
-- [Contributor guide](docs/developer-guide.md) – Repository layout, local setup, contributing.
+- [Contributor guide](docs/contributing/developer-guide.md) – Repository layout, local setup, contributing.
 
 ## Contributing
 

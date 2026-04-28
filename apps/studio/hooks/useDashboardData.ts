@@ -43,7 +43,6 @@ const DEFAULT_METRICS: SystemMetrics = {
     avgLatency: 0,
     totalInvocations: 0,
     successRate: 0,
-    gasConsumption: 0,
   },
 };
 

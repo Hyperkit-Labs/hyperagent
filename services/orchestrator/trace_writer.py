@@ -2,8 +2,8 @@
 Trace writer: build AgentTraceBlob-shaped payload, pin to IPFS when configured.
 EigenDA (da_client) is only used to anchor trace blobs for provenance, not as bulk storage.
 
-Returns real CID as blob_id when IPFS configured; otherwise stub for run_steps.
-In production, stub mode is invalid; IPFS is required for verifiable provenance when storage is enforced.
+Returns real CID as blob_id when IPFS configured.
+In production, trace persistence is mandatory; in non-production environments the trace id may be absent.
 """
 
 from __future__ import annotations
@@ -64,7 +64,7 @@ async def write_trace(
 ) -> tuple[str | None, str | None, str | None]:
     """
     Pin trace payload to IPFS when configured; return (blob_id, da_cert, reference_block).
-    blob_id: IPFS CID when pinned, else stub. Caller stores in run_steps via update_step.
+    blob_id: IPFS CID when pinned, else None. Caller stores in run_steps via update_step.
     extra: optional dict merged into payload (e.g. discussion_trace for debate steps).
     """
     payload = build_trace_payload(
@@ -73,7 +73,7 @@ async def write_trace(
     import json
 
     payload_str = json.dumps(payload, default=str)
-    blob_id = _stub_trace_id(run_id, step_type, step_index)
+    blob_id: str | None = None
     da_cert, ref_block = None, None
 
     try:
@@ -94,6 +94,10 @@ async def write_trace(
         from da_client import submit_blob
 
         if da_ok():
+            if not blob_id:
+                raise RuntimeError(
+                    "Trace persistence produced no blob_id; DA anchoring requires stored trace content"
+                )
             da_cert, ref_block = await submit_blob(blob_id, payload_str)
     except RuntimeError:
         raise
@@ -107,7 +111,7 @@ async def write_trace(
             raise RuntimeError(
                 "EigenDA enabled but trace produced no DA cert or reference block"
             ) from None
-        if blob_id.startswith("stub:"):
+        if not blob_id:
             raise RuntimeError(
                 "IPFS/Storage Provider unavailable. Verifiable trace is mandatory in production."
             ) from None
@@ -163,9 +167,4 @@ def write_trace_sync(
             raise RuntimeError(
                 "Trace write failed in production. Stub traces are not allowed."
             ) from e
-        return _stub_trace_id(run_id, step_type, step_index), None, None
-
-
-def _stub_trace_id(run_id: str, step_type: str, step_index: int) -> str:
-    """Deterministic stub blob_id when IPFS not configured."""
-    return f"stub:{run_id}:{step_type}:{step_index}"
+        return None, None, None

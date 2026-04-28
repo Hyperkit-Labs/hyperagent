@@ -180,13 +180,23 @@ export function __authFailureSampleForTest(
   return { shouldLog, suppressed };
 }
 
+/**
+ * Sample-key remote identifier. Prefer Express's `req.ip` because the gateway
+ * runs with `app.set("trust proxy", 1)` (see `index.ts`) and Express derives a
+ * trustworthy left-most non-trusted-proxy address from the `X-Forwarded-For`
+ * chain. Reading the raw `X-Forwarded-For` header here would let an attacker
+ * vary it per request, mint a unique sampler key on every call, and bypass the
+ * log-flood protection the sampler is designed to provide.
+ */
 function clientRemoteKey(req: Request): string {
-  const fwd = req.headers["x-forwarded-for"];
-  if (typeof fwd === "string" && fwd.length > 0) {
-    return fwd.split(",")[0]!.trim();
-  }
-  if (Array.isArray(fwd) && fwd.length > 0) return fwd[0]!;
-  return req.ip || "unknown";
+  if (req.ip && req.ip.length > 0) return req.ip;
+  if (req.socket?.remoteAddress) return req.socket.remoteAddress;
+  return "unknown";
+}
+
+/** Exposed for tests only. */
+export function __clientRemoteKeyForTest(req: Request): string {
+  return clientRemoteKey(req);
 }
 
 /** Consolidated structured log for an auth decision. */

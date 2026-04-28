@@ -238,11 +238,20 @@ export async function createWorkflow(
   body: CreateWorkflowBody,
   options?: FetchJsonOptions,
 ): Promise<{ workflow_id: string }> {
-  return fetchJsonAuthed<{ workflow_id: string }>(ApiPaths.workflowsGenerate, {
-    method: "POST",
-    body: JSON.stringify(body),
-    ...options,
-  });
+  const result = await fetchJsonAuthed<{ workflow_id?: string }>(
+    ApiPaths.workflowsGenerate,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+      ...options,
+    },
+  );
+  if (!result.workflow_id || !result.workflow_id.trim()) {
+    throw new Error(
+      "Workflow creation returned no workflow_id. The request did not start a workflow.",
+    );
+  }
+  return { workflow_id: result.workflow_id };
 }
 
 /**
@@ -332,7 +341,13 @@ export async function createWorkflowWithX402(
     throw err;
   }
 
-  return res.json() as Promise<{ workflow_id: string }>;
+  const payload = (await res.json()) as { workflow_id?: string };
+  if (!payload.workflow_id || !payload.workflow_id.trim()) {
+    throw new Error(
+      "Workflow creation returned no workflow_id. The request did not start a workflow.",
+    );
+  }
+  return { workflow_id: payload.workflow_id };
 }
 
 export async function getWorkflowStatus(
@@ -484,6 +499,7 @@ export interface DomainRecord {
   id: string;
   domain: string;
   status: "pending" | "verified" | "failed";
+  created_at?: string;
 }
 
 export async function listDomains(): Promise<DomainRecord[]> {

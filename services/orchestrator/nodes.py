@@ -938,7 +938,7 @@ async def ui_scaffold_agent(state: AgentState) -> AgentState:
 
 async def autofix_agent(state: AgentState) -> AgentState:
     """Proposer + Auditor debate subgraph. Proposer suggests fixes; Auditor (pashov-audit) verifies.
-    Converges when Auditor finds no state-breaking path. Discussion trace persisted as stub.
+    Converges when Auditor finds no state-breaking path. Discussion trace is persisted when storage is configured.
     """
     run_id = state.get("run_id") or ""
     _step_start(run_id, "debate")

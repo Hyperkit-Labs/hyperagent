@@ -41,7 +41,6 @@ export interface SystemMetrics {
     avgLatency: number;
     totalInvocations: number;
     successRate: number;
-    gasConsumption: number;
   };
 }
 
@@ -69,7 +68,6 @@ interface MetricsApiResponse {
     avg_latency?: number;
     total_invocations?: number;
     success_rate?: number;
-    gas_consumption?: number;
   };
 }
 
@@ -118,7 +116,6 @@ const DEFAULT_METRICS: SystemMetrics = {
     avgLatency: 0,
     totalInvocations: 0,
     successRate: 0,
-    gasConsumption: 0,
   },
 };
 
@@ -180,7 +177,6 @@ export function useMetrics(options: UseMetricsOptions = {}): UseMetricsReturn {
               avgLatency: raw.performance?.avg_latency || 0,
               totalInvocations: raw.performance?.total_invocations || 0,
               successRate: raw.performance?.success_rate || 0,
-              gasConsumption: raw.performance?.gas_consumption || 0,
             },
           };
 

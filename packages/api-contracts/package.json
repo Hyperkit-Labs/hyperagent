@@ -24,6 +24,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@babel/runtime": "^7.28.0",
     "openapi-fetch": "^0.17.0",
     "zod": "^3.25.76"
   },

@@ -103,10 +103,7 @@ export function CreditsCard({
         Top up with fiat or stablecoins (USDC/USDT).
         {creditsPerRun != null && creditsPerRun > 0
           ? ` Each run costs ${creditsPerRun} credits.`
-          : " Each workflow run consumes credits."}{" "}
-        This repo still exposes legacy credits wording while v0.1.0 payment
-        surfaces are being aligned to x402-backed billing on supported SKALE
-        Base flows.
+          : " Each workflow run consumes credits."}
       </p>
       {error && <ApiErrorBanner error={error} onRetry={handleRefetch} />}
       {loading ? (

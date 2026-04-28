@@ -10,6 +10,7 @@ import {
   getErrorMessage,
   type UserTemplateRow,
 } from "@/lib/api";
+import { validateTemplatePackage } from "@/lib/templatePackageValidation";
 
 const DEFAULT_PACKAGE = `{
   "schema_version": "1",
@@ -40,6 +41,7 @@ export function UserTemplatesPublisher() {
   const [createDesc, setCreateDesc] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [jsonText, setJsonText] = useState(DEFAULT_PACKAGE);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -62,10 +64,15 @@ export function UserTemplatesPublisher() {
   }, [load]);
 
   const onCreate = async () => {
+    const trimmedName = createName.trim();
+    if (!trimmedName) {
+      toast.error("Template name is required");
+      return;
+    }
     setBusy(true);
     try {
       const r = await createUserTemplate({
-        name: createName.trim() || "Untitled",
+        name: trimmedName,
         description: createDesc.trim(),
       });
       toast.success("Template created (draft)");
@@ -87,9 +94,17 @@ export function UserTemplatesPublisher() {
     try {
       parsed = JSON.parse(jsonText) as Record<string, unknown>;
     } catch {
+      setValidationErrors(["Template package must be valid JSON."]);
       toast.error("Invalid JSON");
       return;
     }
+    const validation = validateTemplatePackage(parsed);
+    if (!validation.ok) {
+      setValidationErrors(validation.errors);
+      toast.error("Template package validation failed");
+      return;
+    }
+    setValidationErrors([]);
     setBusy(true);
     try {
       const out = await publishTemplateVersion(selectedId, parsed);
@@ -181,9 +196,26 @@ export function UserTemplatesPublisher() {
             <textarea
               className="w-full min-h-[220px] rounded-lg border border-[var(--color-border-subtle)] bg-[#0d1117] px-3 py-2 text-[11px] font-mono text-[var(--color-text-secondary)]"
               value={jsonText}
-              onChange={(e) => setJsonText(e.target.value)}
+              onChange={(e) => {
+                setJsonText(e.target.value);
+                if (validationErrors.length > 0) {
+                  setValidationErrors([]);
+                }
+              }}
               spellCheck={false}
             />
+            {validationErrors.length > 0 && (
+              <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3">
+                <p className="text-[11px] font-medium text-red-300">
+                  Package validation failed
+                </p>
+                <ul className="mt-2 space-y-1 text-[11px] text-red-200">
+                  {validationErrors.map((error) => (
+                    <li key={error}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <button
               type="button"
               disabled={busy || !selectedId}

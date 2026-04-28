@@ -30,6 +30,6 @@ describe("MSW", () => {
     const res = await fetch("http://localhost/api/health");
     expect(res.ok).toBe(true);
     const body = await res.json();
-    expect(body).toMatchObject({ ok: true, service: "mock-gateway" });
+    expect(body).toMatchObject({ status: "ok", service: "gateway" });
   });
 });

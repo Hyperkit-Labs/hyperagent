@@ -83,6 +83,42 @@ function iconBgClass(w: Workflow): string {
 
 type SortField = "updated_at" | "created_at" | "name";
 
+function extractWorkflowTypes(workflows: Workflow[]): string[] {
+  const values = new Set<string>();
+  for (const workflow of workflows) {
+    const raw = (workflow.contract_type || "").trim();
+    if (raw) {
+      values.add(raw);
+    }
+  }
+  return Array.from(values).sort((a, b) => a.localeCompare(b));
+}
+
+function extractWorkflowNetworks(workflows: Workflow[]): string[] {
+  const values = new Set<string>();
+  for (const workflow of workflows) {
+    const raw = (workflow.network || "").trim();
+    if (raw) {
+      values.add(raw);
+    }
+  }
+  return Array.from(values).sort((a, b) => a.localeCompare(b));
+}
+
+function getWorkflowCodePreview(workflow: Workflow): string | null {
+  const contracts = workflow.contracts;
+  if (!contracts || typeof contracts !== "object") {
+    return null;
+  }
+  const firstContract = Object.values(contracts).find(
+    (value) => typeof value === "string" && value.trim().length > 0,
+  );
+  if (!firstContract || typeof firstContract !== "string") {
+    return null;
+  }
+  return firstContract.split("\n").slice(0, 4).join("\n");
+}
+
 export default function WorkflowsPage() {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<"grid" | "kanban">("grid");
@@ -106,6 +142,14 @@ export default function WorkflowsPage() {
   const { workflows, loading, error, refetch } = useWorkflows({
     filters: { limit: 100, status: statusFilter || undefined },
   });
+  const networkOptions = useMemo(
+    () => extractWorkflowNetworks(workflows),
+    [workflows],
+  );
+  const typeOptions = useMemo(
+    () => extractWorkflowTypes(workflows),
+    [workflows],
+  );
 
   const toggleSelectWorkflow = (id: string) => {
     setSelectedWorkflows((prev) => {
@@ -157,7 +201,7 @@ export default function WorkflowsPage() {
       ).getTime();
       return bDate - aDate;
     });
-  }, [workflows, search, sortBy]);
+  }, [workflows, search, sortBy, networkFilter, typeFilter]);
 
   return (
     <RequireApiSession>
@@ -216,8 +260,11 @@ export default function WorkflowsPage() {
                   className="px-3 py-1.5 rounded-lg bg-[var(--color-bg-panel)] border border-[var(--color-border-subtle)] hover:bg-[var(--color-bg-hover)] text-xs text-[var(--color-text-secondary)] transition-colors"
                 >
                   <option value="">All Networks</option>
-                  <option value="skale base">SKALE Base Mainnet</option>
-                  <option value="skale base sepolia">SKALE Base Sepolia</option>
+                  {networkOptions.map((network) => (
+                    <option key={network} value={network}>
+                      {network}
+                    </option>
+                  ))}
                 </select>
                 <select
                   value={typeFilter}
@@ -225,9 +272,11 @@ export default function WorkflowsPage() {
                   className="px-3 py-1.5 rounded-lg bg-[var(--color-bg-panel)] border border-[var(--color-border-subtle)] hover:bg-[var(--color-bg-hover)] text-xs text-[var(--color-text-secondary)] transition-colors"
                 >
                   <option value="">All Types</option>
-                  <option value="nft">NFT</option>
-                  <option value="token">Token</option>
-                  <option value="dao">DAO / Governance</option>
+                  {typeOptions.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
                 </select>
                 <div className="flex-1" />
                 <div className="flex items-center gap-1 bg-[var(--color-bg-panel)] p-1 rounded-lg border border-[var(--color-border-subtle)]">
@@ -487,16 +536,14 @@ export default function WorkflowsPage() {
                               </div>
                             </div>
 
-                            <div className="mb-4 bg-[#0d1117] rounded border border-[var(--color-border-subtle)] p-2 overflow-hidden h-16 relative">
-                              <div className="text-[8px] font-mono text-[var(--color-text-secondary)] whitespace-pre opacity-70">
-                                {`// Code preview
-contract ${w.name?.replace(/\s/g, "") || "MyContract"} {
-  uint256 public count;
-  function update() external {}
-}`}
+                            {getWorkflowCodePreview(w) && (
+                              <div className="mb-4 bg-[#0d1117] rounded border border-[var(--color-border-subtle)] p-2 overflow-hidden h-16 relative">
+                                <div className="text-[8px] font-mono text-[var(--color-text-secondary)] whitespace-pre opacity-70">
+                                  {getWorkflowCodePreview(w)}
+                                </div>
+                                <div className="absolute inset-0 bg-gradient-to-t from-[#0d1117] to-transparent pointer-events-none" />
                               </div>
-                              <div className="absolute inset-0 bg-gradient-to-t from-[#0d1117] to-transparent pointer-events-none" />
-                            </div>
+                            )}
 
                             <div className="mt-auto flex flex-col gap-2 pt-4 border-t border-[var(--color-border-subtle)]">
                               <div className="flex flex-wrap items-center gap-2">
@@ -510,16 +557,17 @@ contract ${w.name?.replace(/\s/g, "") || "MyContract"} {
                                       const res = await createQuickDemo(
                                         w.workflow_id,
                                       );
-                                      if (res.url)
-                                        window.open(
-                                          res.url,
-                                          "_blank",
-                                          "noopener,noreferrer",
-                                        );
-                                      else
+                                      if (!res.url) {
                                         setSandboxError(
                                           "No sandbox URL returned",
                                         );
+                                        return;
+                                      }
+                                      window.open(
+                                        res.url,
+                                        "_blank",
+                                        "noopener,noreferrer",
+                                      );
                                     } catch (err) {
                                       setSandboxError(
                                         err instanceof Error
@@ -552,16 +600,17 @@ contract ${w.name?.replace(/\s/g, "") || "MyContract"} {
                                         const res = await createDebugSandbox(
                                           w.workflow_id,
                                         );
-                                        if (res.url)
-                                          window.open(
-                                            res.url,
-                                            "_blank",
-                                            "noopener,noreferrer",
-                                          );
-                                        else
+                                        if (!res.url) {
                                           setSandboxError(
                                             "No sandbox URL returned",
                                           );
+                                          return;
+                                        }
+                                        window.open(
+                                          res.url,
+                                          "_blank",
+                                          "noopener,noreferrer",
+                                        );
                                       } catch (err) {
                                         setSandboxError(
                                           err instanceof Error

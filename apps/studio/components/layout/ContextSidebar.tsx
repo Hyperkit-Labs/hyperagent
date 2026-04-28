@@ -2,7 +2,7 @@
 
 import { usePathname, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Cpu, HardDrive, FileCode, FunctionSquare, X } from "lucide-react";
+import { FunctionSquare, X } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 
 interface ContextSidebarProps {
@@ -18,34 +18,24 @@ function ResourceInspectorChat({ workflowId }: { workflowId?: string | null }) {
   return (
     <div className="space-y-4">
       <h3 className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">
-        OpenSandbox
+        Workflow Context
       </h3>
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-[var(--color-text-tertiary)] flex items-center gap-2">
-            <Cpu className="w-3.5 h-3.5" />
-            CPU
-          </span>
-          <span className="text-[10px] text-[var(--color-text-muted)]">
-            {workflowId ? "—" : "No active sandbox"}
-          </span>
-        </div>
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-[var(--color-text-tertiary)] flex items-center gap-2">
-            <HardDrive className="w-3.5 h-3.5" />
-            RAM
-          </span>
-          <span className="text-[10px] text-[var(--color-text-muted)]">
-            {workflowId ? "—" : "No active sandbox"}
-          </span>
-        </div>
-      </div>
       {workflowId && (
-        <p
-          className="text-[10px] text-[var(--color-text-dim)] font-mono truncate"
-          title={workflowId}
-        >
-          {workflowId.slice(0, 8)}...
+        <div className="rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] p-3">
+          <p className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider">
+            Active workflow
+          </p>
+          <p
+            className="mt-2 text-[11px] text-[var(--color-text-dim)] font-mono break-all"
+            title={workflowId}
+          >
+            {workflowId}
+          </p>
+        </div>
+      )}
+      {!workflowId && (
+        <p className="text-[10px] text-[var(--color-text-muted)] italic">
+          Select a workflow to inspect its live context.
         </p>
       )}
     </div>

@@ -10,8 +10,18 @@ export interface ChatToolResultProps {
 }
 
 export function ChatToolResult({ toolName, result }: ChatToolResultProps) {
-  if (toolName !== "create_workflow" || !result?.workflow_id) {
+  if (toolName !== "create_workflow") {
     return null;
+  }
+
+  if (!result?.workflow_id) {
+    return (
+      <div className="mt-2 rounded-lg border border-red-500/20 bg-red-500/10 p-3">
+        <p className="text-[13px] text-red-200">
+          {result?.message ?? "Workflow creation failed."}
+        </p>
+      </div>
+    );
   }
 
   return (

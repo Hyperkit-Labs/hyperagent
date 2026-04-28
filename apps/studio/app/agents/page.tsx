@@ -13,9 +13,7 @@ import {
   Rocket,
   PenTool,
   Play,
-  Pencil,
   FileText,
-  Folder,
   X,
   Layers,
 } from "lucide-react";
@@ -70,7 +68,6 @@ export default function AgentsPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<AgentCategory>("all");
   const [viewMode, setViewMode] = useState<"list" | "grid" | "graph">("list");
-  const [enabledMap, setEnabledMap] = useState<Record<string, boolean>>({});
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set());
   const router = useRouter();
@@ -94,15 +91,6 @@ export default function AgentsPage() {
       setSelectedAgents(new Set(agents.map((a) => a.name ?? "")));
     }
   }, [agents, selectedAgents]);
-
-  const toggleEnabled = useCallback((name: string) => {
-    setEnabledMap((prev) => ({ ...prev, [name]: !prev[name] }));
-  }, []);
-
-  const isEnabled = useCallback(
-    (name: string) => (name in enabledMap ? enabledMap[name] : true),
-    [enabledMap],
-  );
 
   const filtered = useMemo(() => {
     let list = agents ?? [];
@@ -323,15 +311,13 @@ export default function AgentsPage() {
                   const cat = agentCategory(agent.name);
                   const statusKey = (agent.status || "").toLowerCase();
                   const isOk = statusKey === "ok" || statusKey === "healthy";
-                  const enabled = isEnabled(agent.name ?? "");
                   const name = agent.name ?? "Agent";
-                  const toggleId = `agent-toggle-${String(agent.name ?? "").replace(/\s/g, "-")}-${i}`;
                   const isSelected = selectedName === (agent.name ?? null);
                   const isChecked = selectedAgents.has(name);
                   const stepIndex =
                     typeof agent.step_index === "number" ? agent.step_index : 0;
                   const progressMap: Record<string, number> = {
-                    idle: 100,
+                    idle: 0,
                     ok: 100,
                     healthy: 100,
                     running: stepIndex > 0 ? Math.min(90, stepIndex * 15) : 45,
@@ -378,9 +364,7 @@ export default function AgentsPage() {
                       <div className="flex-1 min-w-0 grid grid-cols-12 gap-4 items-center">
                         <div className="col-span-12 sm:col-span-4">
                           <div className="flex items-center gap-2">
-                            <h3
-                              className={`text-sm font-medium ${enabled ? "text-[var(--color-text-primary)]" : "text-[var(--color-text-muted)]"}`}
-                            >
+                            <h3 className="text-sm font-medium text-[var(--color-text-primary)]">
                               {name}
                             </h3>
                             <RadialProgress
@@ -410,49 +394,18 @@ export default function AgentsPage() {
                             </span>
                           </div>
                         </div>
-                        <div className="col-span-6 sm:col-span-3">
+                        <div className="col-span-6 sm:col-span-5">
                           <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium mb-1">
-                            Project
-                          </div>
-                          <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)]">
-                            <Folder className="w-3 h-3 text-[var(--color-text-muted)]" />
-                            Global
-                          </div>
-                        </div>
-                        <div className="col-span-6 sm:col-span-3">
-                          <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium mb-1">
-                            Last Run
+                            Stage index
                           </div>
                           <div className="text-xs text-[var(--color-text-secondary)]">
-                            -
+                            {stepIndex}
                           </div>
                         </div>
-                        <div className="col-span-12 sm:col-span-2 flex justify-end items-center">
-                          <span
-                            className={`text-[10px] mr-2 ${enabled ? "text-[var(--color-text-muted)]" : "text-[var(--color-text-muted)]"}`}
-                            title="Session toggle"
-                          >
-                            {enabled ? "Enabled" : "Disabled"}
+                        <div className="col-span-12 sm:col-span-1 flex justify-end items-center">
+                          <span className="text-[10px] text-[var(--color-text-muted)]">
+                            {agent.status ?? "Unknown"}
                           </span>
-                          <input
-                            type="checkbox"
-                            id={toggleId}
-                            checked={enabled}
-                            onChange={() => toggleEnabled(name)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="toggle-checkbox"
-                            aria-label={
-                              enabled
-                                ? "Disable agent (session-only)"
-                                : "Enable agent (session-only)"
-                            }
-                            title="Toggle enabled for this session"
-                          />
-                          <label
-                            htmlFor={toggleId}
-                            className="toggle-label"
-                            onClick={(e) => e.stopPropagation()}
-                          />
                         </div>
                       </div>
                       <div className="h-8 w-px bg-[var(--color-border-subtle)] mx-2 shrink-0 hidden sm:block" />
@@ -460,14 +413,13 @@ export default function AgentsPage() {
                         <button
                           type="button"
                           title="Run agent"
-                          disabled={!enabled}
                           onClick={(e) => {
                             e.stopPropagation();
                             router.push(
                               `${ROUTES.HOME}?agent=${encodeURIComponent(name)}`,
                             );
                           }}
-                          className={`p-2 rounded-md transition-colors ${enabled ? "hover:bg-[var(--color-primary-alpha-10)] text-[var(--color-text-tertiary)] hover:text-[var(--color-semantic-violet)]" : "text-[var(--color-text-muted)] cursor-not-allowed opacity-60"}`}
+                          className="p-2 rounded-md transition-colors hover:bg-[var(--color-primary-alpha-10)] text-[var(--color-text-tertiary)] hover:text-[var(--color-semantic-violet)]"
                         >
                           <Play className="w-4 h-4" />
                         </button>
@@ -480,7 +432,7 @@ export default function AgentsPage() {
                             setSelectedName(name);
                           }}
                         >
-                          <Pencil className="w-4 h-4" />
+                          <FileText className="w-4 h-4" />
                         </button>
                         <Link
                           href={ROUTES.MONITORING}
@@ -557,7 +509,7 @@ export default function AgentsPage() {
 
                 <div>
                   <div className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] font-semibold mb-3">
-                    Execution History (Last 7 Days)
+                    Pipeline totals (Last 7 Days)
                   </div>
                   <div className="h-24 bg-[var(--color-bg-panel)] rounded-lg border border-[var(--color-border-subtle)] p-3 flex items-center justify-center gap-6">
                     <div className="text-center">
@@ -588,40 +540,20 @@ export default function AgentsPage() {
                 </div>
 
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] font-semibold mb-3 flex items-center justify-between">
-                    <span>Configuration</span>
-                    <button className="text-[10px] text-[var(--color-primary)] hover:underline">
-                      Edit
-                    </button>
+                  <div className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] font-semibold mb-3">
+                    Live details
                   </div>
-                  <div className="bg-[#0d1117] rounded-lg p-3 overflow-x-auto border border-[var(--color-border-subtle)]">
-                    <pre className="text-[10px] text-[var(--color-text-secondary)] font-mono leading-relaxed">
-                      {JSON.stringify(
-                        {
-                          model: "gpt-4-turbo-preview",
-                          temperature: 0.2,
-                          maxTokens: 4096,
-                          capabilities: ["solidity", "erc20", "erc721"],
-                          tools: ["slither", "mythril"],
-                          timeout: "120s",
-                        },
-                        null,
-                        2,
-                      )}
-                    </pre>
+                  <div className="rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] p-3 text-[11px] text-[var(--color-text-secondary)]">
+                    This view shows the current pipeline agent inventory from
+                    the backend. No editable runtime configuration is exposed
+                    for these agents in Studio.
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-[var(--color-border-subtle)] flex items-center gap-3">
-                  <button
-                    type="button"
-                    className="flex-1 btn-primary-gradient text-xs px-4 py-2 rounded-lg flex items-center justify-center gap-2"
-                  >
-                    <Play className="w-3.5 h-3.5" /> Test Agent
-                  </button>
+                <div className="pt-4 border-t border-[var(--color-border-subtle)]">
                   <Link
                     href={ROUTES.MONITORING}
-                    className="flex-1 bg-[var(--color-bg-panel)] hover:bg-[var(--color-bg-hover)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] text-xs px-4 py-2 rounded-lg flex items-center justify-center transition-colors"
+                    className="w-full bg-[var(--color-bg-panel)] hover:bg-[var(--color-bg-hover)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] text-xs px-4 py-2 rounded-lg flex items-center justify-center transition-colors"
                   >
                     View Logs
                   </Link>

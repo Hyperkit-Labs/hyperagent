@@ -101,6 +101,8 @@ The frontend communicates with the HyperAgent API through:
 
 - `POST /api/v1/workflows/generate` - Create new workflow
 - `GET /api/v1/workflows/{id}` - Get workflow details
+- `GET /api/v1/infra/domains` - List workspace custom domains
+- `POST /api/v1/infra/domains` - Add a validated custom domain
 - `GET /api/v1/templates` - List templates
 - `POST /api/v1/templates/search` - Search templates
 - `GET /api/v1/networks` - List supported networks

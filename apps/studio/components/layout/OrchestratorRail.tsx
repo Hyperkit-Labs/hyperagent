@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import useSWR from "swr";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
+import { getWorkflow } from "@/lib/api";
 
 interface OrchestratorRailProps {
   /** Whether the rail is collapsed */
@@ -27,13 +29,48 @@ export function OrchestratorRail({
   onCollapsedChange,
   activeRunName,
   runStatus = "idle",
-  networkLabel = "skale-base-sepolia",
-  environment = "Firecracker VM",
+  networkLabel,
+  environment,
   children,
 }: OrchestratorRailProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [isCollapsed, setIsCollapsed] = useState(collapsed);
   const [inputValue, setInputValue] = useState("");
+
+  const workflowIdFromPath = pathname?.startsWith("/workflows/")
+    ? pathname.split("/")[2] || null
+    : null;
+  const activeWorkflowId = searchParams.get("workflow") || workflowIdFromPath;
+  const { data: workflow } = useSWR(
+    activeWorkflowId ? `workflow-${activeWorkflowId}` : null,
+    () => getWorkflow(activeWorkflowId!),
+  );
+
+  const resolvedRunName =
+    activeRunName ||
+    workflow?.name ||
+    workflow?.intent ||
+    (activeWorkflowId ? `Workflow ${activeWorkflowId.slice(0, 8)}` : undefined);
+  const resolvedRunStatus: "idle" | "running" | "failed" =
+    workflow?.status === "failed"
+      ? "failed"
+      : workflow?.status === "running" || workflow?.status === "building"
+        ? "running"
+        : workflow?.status === "completed"
+          ? "idle"
+          : activeWorkflowId
+            ? "running"
+            : runStatus;
+  const resolvedNetworkLabel =
+    networkLabel ||
+    workflow?.network ||
+    (activeWorkflowId ? "Workflow network unavailable" : "No active network");
+  const resolvedEnvironment =
+    environment ||
+    workflow?.current_stage ||
+    (activeWorkflowId ? "Pipeline active" : "No active workflow");
 
   const handleToggle = () => {
     const next = !isCollapsed;
@@ -80,29 +117,29 @@ export function OrchestratorRail({
           <span className="text-xs text-slate-400">Current workflow</span>
           <span
             className={`text-[11px] flex items-center gap-1 ${
-              runStatus === "running"
+              resolvedRunStatus === "running"
                 ? "text-emerald-400"
-                : runStatus === "failed"
+                : resolvedRunStatus === "failed"
                   ? "text-red-400"
                   : "text-slate-500"
             }`}
           >
-            {runStatus === "running" && (
+            {resolvedRunStatus === "running" && (
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
             )}
-            {runStatus === "failed" && (
+            {resolvedRunStatus === "failed" && (
               <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
             )}
-            {runStatus}
+            {resolvedRunStatus}
           </span>
         </div>
         <p className="mt-1 text-sm font-medium truncate">
-          {activeRunName || "No active run"}
+          {resolvedRunName || "No active workflow"}
         </p>
         <div className="mt-2 flex items-center gap-1 text-[11px] text-slate-500">
-          <span>{environment}</span>
+          <span>{resolvedEnvironment}</span>
           <span>•</span>
-          <span>{networkLabel}</span>
+          <span>{resolvedNetworkLabel}</span>
         </div>
       </div>
 

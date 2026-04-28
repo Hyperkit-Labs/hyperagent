@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense, useMemo } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
@@ -18,8 +18,6 @@ import {
 } from "lucide-react";
 import { ShimmerGrid } from "@/components/ai-elements";
 import { TableFilterBar } from "@/components/ui";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
   all: [],
@@ -70,8 +68,6 @@ function TemplatesContent() {
   const [searching, setSearching] = useState(false);
   const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
   const [compareModalOpen, setCompareModalOpen] = useState(false);
-  const [hoveredTemplate, setHoveredTemplate] = useState<string | null>(null);
-
   const toggleCompare = (id: string) => {
     setCompareIds((prev) => {
       const next = new Set(prev);
@@ -387,8 +383,6 @@ function TemplatesContent() {
                 <div
                   key={item.id}
                   className={`glass-panel rounded-xl p-5 transition-all relative overflow-hidden group ${isSelected ? "border-[var(--color-primary)] ring-1 ring-[var(--color-primary)] bg-[var(--color-primary-alpha-10)]" : "hover:border-[var(--color-primary-alpha-50)]"}`}
-                  onMouseEnter={() => setHoveredTemplate(item.id)}
-                  onMouseLeave={() => setHoveredTemplate(null)}
                 >
                   <div
                     className="absolute top-3 right-3 z-10"
@@ -427,39 +421,6 @@ function TemplatesContent() {
                   <p className="text-xs text-[var(--color-text-tertiary)] line-clamp-2 h-8 mb-4">
                     {item.description || "No description"}
                   </p>
-
-                  {hoveredTemplate === item.id && (
-                    <div className="absolute inset-0 bg-[var(--color-bg-panel)] bg-opacity-95 backdrop-blur-sm z-20 p-4 flex flex-col justify-between animate-enter opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <div className="overflow-hidden rounded border border-[var(--color-border-subtle)]">
-                        <SyntaxHighlighter
-                          language="solidity"
-                          style={vscDarkPlus}
-                          customStyle={{
-                            margin: 0,
-                            padding: "8px",
-                            fontSize: "8px",
-                            background: "transparent",
-                          }}
-                        >
-                          {`contract ${item.name?.replace(/\s/g, "") || "Template"} {
-  uint256 public value;
-  
-  function initialize() public {
-    value = 1;
-  }
-}`}
-                        </SyntaxHighlighter>
-                      </div>
-                      <div className="flex gap-2 mt-3">
-                        <Link
-                          href={`${ROUTES.HOME}?template=${encodeURIComponent(item.id)}`}
-                          className="flex-1 btn-primary-gradient text-white text-xs py-1.5 rounded-lg text-center"
-                        >
-                          Use Template
-                        </Link>
-                      </div>
-                    </div>
-                  )}
 
                   <div className="flex items-center justify-between pt-3 border-t border-[var(--color-border-subtle)] mt-auto">
                     {item.source ? (

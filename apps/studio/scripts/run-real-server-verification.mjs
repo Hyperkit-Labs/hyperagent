@@ -43,6 +43,13 @@ function gatewayOriginFromNextPublicApiUrl(apiUrl) {
   }
 }
 
+function splitCandidates(value) {
+  return (value || '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
 /** If API is at https://api.example.com, assume Studio at https://example.com (skip for localhost). */
 function studioUrlFromNextPublicApiUrl(apiUrl) {
   const origin = gatewayOriginFromNextPublicApiUrl(apiUrl);
@@ -60,16 +67,21 @@ function studioUrlFromNextPublicApiUrl(apiUrl) {
   return null;
 }
 
-const STUDIO_BASE_URL =
-  process.env.STUDIO_BASE_URL?.trim() ||
-  process.env.PLAYWRIGHT_BASE_URL?.trim() ||
-  studioUrlFromNextPublicApiUrl(process.env.NEXT_PUBLIC_API_URL) ||
-  'http://localhost:3000';
-const GATEWAY_BASE_URL =
-  process.env.GATEWAY_BASE_URL ||
-  process.env.PLAYWRIGHT_GATEWAY_URL ||
-  gatewayOriginFromNextPublicApiUrl(process.env.NEXT_PUBLIC_API_URL) ||
-  'http://localhost:4000';
+const STUDIO_BASE_URL_CANDIDATES = [
+  ...splitCandidates(process.env.STUDIO_BASE_URL),
+  ...splitCandidates(process.env.PLAYWRIGHT_BASE_URL),
+  ...splitCandidates(studioUrlFromNextPublicApiUrl(process.env.NEXT_PUBLIC_API_URL)),
+  'http://localhost:3000',
+];
+const GATEWAY_BASE_URL_CANDIDATES = [
+  ...splitCandidates(process.env.GATEWAY_BASE_URL),
+  ...splitCandidates(process.env.PLAYWRIGHT_GATEWAY_URL),
+  ...splitCandidates(gatewayOriginFromNextPublicApiUrl(process.env.NEXT_PUBLIC_API_URL)),
+  'http://localhost:4000',
+];
+
+const STUDIO_BASE_URL = STUDIO_BASE_URL_CANDIDATES[0];
+const GATEWAY_BASE_URL = GATEWAY_BASE_URL_CANDIDATES[0];
 
 async function fetchOk(url, label, timeoutMs = 15000) {
   try {
@@ -81,35 +93,52 @@ async function fetchOk(url, label, timeoutMs = 15000) {
   }
 }
 
+async function firstReachableUrl(candidates, label, timeoutMs) {
+  for (const candidate of candidates) {
+    if (await fetchOk(candidate, `${label} ${candidate}`, timeoutMs)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
 async function main() {
   console.log('[verify] Real-server verification pass (env-driven)');
-  console.log('[verify] Studio:', STUDIO_BASE_URL, '| Gateway:', GATEWAY_BASE_URL);
+  console.log('[verify] Studio candidates:', STUDIO_BASE_URL_CANDIDATES.join(', '));
+  console.log('[verify] Gateway candidates:', GATEWAY_BASE_URL_CANDIDATES.join(', '));
 
-  const gatewayOrigin = GATEWAY_BASE_URL.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '');
-  const gatewayOk = await fetchOk(`${gatewayOrigin}/health`, 'Gateway /health');
-  const gatewayLive = await fetchOk(`${gatewayOrigin}/health/live`, 'Gateway /health/live');
-  const studioTimeoutMs = STUDIO_BASE_URL.startsWith('https://') ? 35000 : 20000;
-  const studioOk = await fetchOk(STUDIO_BASE_URL, 'Studio', studioTimeoutMs);
+  const reachableGatewayOrigin = await firstReachableUrl(
+    GATEWAY_BASE_URL_CANDIDATES.map((candidate) =>
+      candidate.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '')
+    ),
+    'Gateway',
+    15000
+  );
+  const reachableStudioBase = await firstReachableUrl(
+    STUDIO_BASE_URL_CANDIDATES,
+    'Studio',
+    35000
+  );
 
-  if (!gatewayOk && !gatewayLive) {
+  if (!reachableGatewayOrigin) {
     console.error(
       '[verify] Gateway unreachable at',
-      gatewayOrigin + '.',
+      GATEWAY_BASE_URL_CANDIDATES.join(', ') + '.',
       'Start the API (make up / docker compose) or set NEXT_PUBLIC_API_URL or GATEWAY_BASE_URL in repo .env — see .env.example (Real-server verification).'
     );
     process.exit(1);
   }
-  if (!studioOk) {
+  if (!reachableStudioBase) {
     console.error(
       '[verify] Studio unreachable at',
-      STUDIO_BASE_URL + '.',
+      STUDIO_BASE_URL_CANDIDATES.join(', ') + '.',
       'Run Next (make run-web, or pnpm dev in apps/studio) or set STUDIO_BASE_URL if it runs elsewhere.'
     );
     process.exit(1);
   }
   console.log('[verify] Gateway and Studio reachable.');
 
-  if (GATEWAY_BASE_URL.startsWith('https://')) {
+  if (reachableGatewayOrigin.startsWith('https://')) {
     console.log('[verify] Coolify-backed mode: ensure .env has NEXT_PUBLIC_API_URL pointing to this gateway.');
   }
 
@@ -119,7 +148,7 @@ async function main() {
   const env = {
     ...process.env,
     PLAYWRIGHT_REAL_SERVER: '1',
-    PLAYWRIGHT_BASE_URL: STUDIO_BASE_URL,
+    PLAYWRIGHT_BASE_URL: reachableStudioBase,
     PWTEST_CACHE_DIR: process.env.PWTEST_CACHE_DIR || path.join(studioRoot, '.playwright-cache'),
     TMP: process.env.TMP || path.join(studioRoot, '.playwright-tmp'),
     TEMP: process.env.TEMP || path.join(studioRoot, '.playwright-tmp'),

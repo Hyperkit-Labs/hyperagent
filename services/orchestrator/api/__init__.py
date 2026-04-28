@@ -33,6 +33,7 @@ from .billing import (
     pricing_router,
     reconciliation_router,
 )
+from .infra import router as infra_router
 from .metrics_health import (
     api_health_router,
     config_router,
@@ -70,6 +71,7 @@ __all__ = [
     "health_router",
     "api_health_router",
     "identity_router",
+    "infra_router",
     "llm_keys_router",
     "logs_router",
     "metrics_router",

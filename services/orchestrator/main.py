@@ -31,6 +31,7 @@ from api import (
     debug_sandbox_router,
     health_router,
     identity_router,
+    infra_router,
     llm_keys_router,
     logs_router,
     metrics_router,
@@ -359,6 +360,7 @@ app.include_router(security_router)
 app.include_router(registry_router)
 app.include_router(logs_router)
 app.include_router(agents_router)
+app.include_router(infra_router)
 app.include_router(contracts_router)
 app.include_router(llm_keys_router)
 app.include_router(sandbox_router)

@@ -19,12 +19,46 @@ export interface Deployment {
 export interface Contract {
   id: string;
   workflowId: string;
+  name?: string;
   network?: string;
   address?: string;
   verified?: boolean;
+  gasUsed?: number;
   transactionHash?: string;
   createdAt?: string;
   [key: string]: unknown;
+}
+
+function simulationGasUsed(
+  simulationResults: Workflow["simulation_results"],
+): number | undefined {
+  if (!simulationResults) {
+    return undefined;
+  }
+  if (
+    typeof simulationResults === "object" &&
+    simulationResults !== null &&
+    "gasUsed" in simulationResults
+  ) {
+    const value = Number((simulationResults as { gasUsed?: unknown }).gasUsed);
+    return Number.isFinite(value) ? value : undefined;
+  }
+  return undefined;
+}
+
+function deploymentVerified(
+  deployment: Record<string, unknown>,
+): boolean | undefined {
+  if (deployment.verified === true) {
+    return true;
+  }
+  if (
+    typeof deployment.verification_status === "string" &&
+    deployment.verification_status === "verified"
+  ) {
+    return true;
+  }
+  return undefined;
 }
 
 export function transformWorkflowToDeployment(
@@ -92,9 +126,11 @@ export function transformWorkflowToContract(
     return deploymentsList.map((d, i) => ({
       id: `${w.workflow_id}-${i}`,
       workflowId: w.workflow_id,
+      name: d.contract_name,
       network: d.network ?? w.network,
       address: d.contract_address,
-      verified: w.status === "completed",
+      verified: deploymentVerified(d),
+      gasUsed: simulationGasUsed(w.simulation_results),
       transactionHash: d.transaction_hash,
       createdAt: d.created_at ?? w.updated_at ?? w.created_at,
     }));
@@ -113,9 +149,11 @@ export function transformWorkflowToContract(
   return {
     id: w.workflow_id,
     workflowId: w.workflow_id,
+    name: w.name || w.contract_type,
     network: w.network,
     address: addr,
-    verified: w.status === "completed",
+    verified: undefined,
+    gasUsed: simulationGasUsed(w.simulation_results),
     transactionHash: meta.transaction_hash,
     createdAt: w.updated_at ?? w.created_at,
   };

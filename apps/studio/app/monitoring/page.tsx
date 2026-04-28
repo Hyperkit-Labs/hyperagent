@@ -54,6 +54,8 @@ function MonitoringContent() {
   const filters = useMonitoringFilters();
   const [searchQuery, setSearchQuery] = useState("");
   const [isPaused, setIsPaused] = useState(false);
+  const pipelineStatus = health?.services?.orchestrator?.status ?? "unknown";
+  const auditStatus = health?.services?.audit?.status ?? "unknown";
 
   const baseLogList = filterLogsByParams(
     logs ?? [],
@@ -130,17 +132,25 @@ function MonitoringContent() {
                 <span className="text-[var(--color-text-tertiary)] text-xs">
                   Pipeline
                 </span>
-                <div className="text-white font-medium text-sm">healthy</div>
+                <div className="text-white font-medium text-sm">
+                  {healthLoading ? "..." : pipelineStatus}
+                </div>
               </div>
             </div>
             <div className="h-8 w-px bg-[var(--color-border-subtle)]" />
             <div className="flex items-center gap-3">
-              <ShieldCheck className="w-5 h-5 text-emerald-400" />
+              <ShieldCheck
+                className={`w-5 h-5 ${
+                  auditStatus === "ok" ? "text-emerald-400" : "text-amber-400"
+                }`}
+              />
               <div>
                 <span className="text-[var(--color-text-tertiary)] text-xs">
                   Audit Engine
                 </span>
-                <div className="text-white font-medium text-sm">healthy</div>
+                <div className="text-white font-medium text-sm">
+                  {healthLoading ? "..." : auditStatus}
+                </div>
               </div>
             </div>
           </div>

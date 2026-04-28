@@ -48,11 +48,11 @@ SANDBOX_API_KEY = (
 )
 
 
-def _has_stub_trace(steps: list[dict]) -> bool:
-    """True when any step has stub blob_id (IPFS not configured)."""
+def _has_unverifiable_trace(steps: list[dict]) -> bool:
+    """True when any step has no persisted trace blob id."""
     for s in steps:
         bid = s.get("trace_blob_id") or ""
-        if isinstance(bid, str) and bid.startswith("stub:"):
+        if not isinstance(bid, str) or not bid.strip() or bid.startswith("stub:"):
             return True
     return False
 
@@ -80,14 +80,14 @@ def get_run_api(run_id: str, request: Request = None) -> dict[str, Any]:
 
 @runs_router.get("/{run_id}/steps")
 def get_run_steps_api(run_id: str, request: Request = None) -> dict[str, Any]:
-    """Return step-level audit for a run. trace_verifiable: false when any step has stub blob_id."""
+    """Return step-level audit for a run. trace_verifiable is false when any step lacks a persisted trace blob."""
     w = get_workflow(run_id)
     if not w:
         raise HTTPException(status_code=404, detail="Run not found")
     if request:
         assert_workflow_owner(w, request)
     steps = db.get_steps(run_id)
-    trace_verifiable = not _has_stub_trace(steps)
+    trace_verifiable = not _has_unverifiable_trace(steps)
     return {"run_id": run_id, "steps": steps, "trace_verifiable": trace_verifiable}
 
 
@@ -490,7 +490,7 @@ def agents_api() -> dict[str, Any]:
 
     return {
         "agents": [
-            {"name": name, "status": "ok", "step_index": i}
+            {"name": name, "status": "idle", "step_index": i}
             for i, name in enumerate(STEP_ORDER)
         ]
     }
@@ -959,9 +959,15 @@ async def _quick_demo_via_docker_sandbox(
                 detail=f"sandbox_api_status={r.status_code}, body={detail}",
             )
         data = r.json()
+        url = data.get("url")
+        if not isinstance(url, str) or not url.strip():
+            raise HTTPException(
+                status_code=502,
+                detail="sandbox API returned no url",
+            )
         return {
             "sandbox_id": data.get("sandbox_id"),
-            "url": data.get("url"),
+            "url": url,
             "status": data.get("status", "running"),
         }
 

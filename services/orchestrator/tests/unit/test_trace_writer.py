@@ -1,4 +1,4 @@
-"""Unit tests: trace writer. Stub rejected in production."""
+"""Unit tests: trace writer. Production requires persisted traces."""
 
 from __future__ import annotations
 
@@ -26,19 +26,9 @@ def test_build_trace_payload():
     assert payload["output_summary"] == "ok"
 
 
-def test_stub_trace_id_format():
-    from trace_writer import _stub_trace_id
-
-    bid = _stub_trace_id("run-1", "audit", 2)
-    assert bid.startswith("stub:")
-    assert "run-1" in bid
-    assert "audit" in bid
-    assert "2" in bid
-
-
 @pytest.mark.asyncio
-async def test_write_trace_production_stub_raises(monkeypatch):
-    """In production, stub blob_id raises RuntimeError."""
+async def test_write_trace_production_without_storage_raises(monkeypatch):
+    """In production, missing trace persistence raises RuntimeError."""
     monkeypatch.setenv("NODE_ENV", "production")
     monkeypatch.setenv("ENV", "production")
     monkeypatch.setenv("EIGENDA_ENABLED", "0")
@@ -54,8 +44,7 @@ async def test_write_trace_production_stub_raises(monkeypatch):
     if not m.IS_PRODUCTION:
         pytest.skip("IS_PRODUCTION false; set NODE_ENV=production")
 
-    # When IPFS not configured, blob_id is stub -> raises in production
-    with pytest.raises(RuntimeError, match="stub|IPFS|Verifiable|mandatory"):
+    with pytest.raises(RuntimeError, match="IPFS|Verifiable|mandatory"):
         await m.write_trace("run-1", "codegen", 0, "completed", "ok", None)
 
 
@@ -85,8 +74,8 @@ def test_write_trace_sync_production_inner_failure_raises(monkeypatch):
         m.write_trace_sync("run-1", "codegen", 0, "completed", "ok", None)
 
 
-def test_write_trace_sync_dev_returns_stub_on_inner_failure(monkeypatch):
-    """Non-production may return stub when the async path fails."""
+def test_write_trace_sync_dev_returns_empty_trace_on_inner_failure(monkeypatch):
+    """Non-production may return an empty trace when the async path fails."""
     monkeypatch.delenv("NODE_ENV", raising=False)
     monkeypatch.delenv("ENV", raising=False)
     import importlib
@@ -104,7 +93,6 @@ def test_write_trace_sync_dev_returns_stub_on_inner_failure(monkeypatch):
     blob_id, da_cert, ref = m.write_trace_sync(
         "run-1", "codegen", 0, "completed", "ok", None
     )
-    assert blob_id is not None
-    assert str(blob_id).startswith("stub:")
+    assert blob_id is None
     assert da_cert is None
     assert ref is None

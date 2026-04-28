@@ -38,6 +38,7 @@ def test_agents_list(client):
     names = [a["name"] for a in j["agents"]]
     assert "spec" in names
     assert "codegen" in names
+    assert all(a["status"] == "idle" for a in j["agents"])
 
 
 def test_networks(client):
@@ -81,3 +82,43 @@ def test_workflows_list_without_auth(client):
     assert r.status_code == 200
     j = r.json()
     assert "workflows" in j
+
+
+def test_metrics_rejects_invalid_time_range(client):
+    r = client.get("/api/v1/metrics?time_range=1d")
+    assert r.status_code == 422
+
+
+def test_domains_list(client, monkeypatch):
+    import api.infra as infra_api
+
+    monkeypatch.setattr(infra_api.db, "is_configured", lambda: True)
+    monkeypatch.setattr(
+        infra_api.db,
+        "list_custom_domains_for_wallet",
+        lambda wallet_user_id, limit=100: [
+            {
+                "id": "dom-1",
+                "domain": "example.com",
+                "status": "pending",
+                "created_at": "2026-04-26T00:00:00Z",
+            }
+        ],
+    )
+
+    r = client.get("/api/v1/infra/domains", headers={"X-User-Id": "user-123"})
+    assert r.status_code == 200
+    assert r.json()[0]["domain"] == "example.com"
+
+
+def test_add_domain_validates_input(client, monkeypatch):
+    import api.infra as infra_api
+
+    monkeypatch.setattr(infra_api.db, "is_configured", lambda: True)
+    r = client.post(
+        "/api/v1/infra/domains",
+        headers={"X-User-Id": "user-123"},
+        json={"domain": "https://bad.example"},
+    )
+    assert r.status_code == 400
+    assert "hostname" in r.json()["detail"]

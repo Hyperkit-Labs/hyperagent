@@ -40,9 +40,18 @@ interface SearchState {
   error: string | null;
 }
 
+interface SelectedMatch {
+  filePath: string;
+  line?: number;
+  snippet?: string;
+}
+
 export function SearchPanel() {
   const [mode, setMode] = useState<SearchMode>("content");
   const [query, setQuery] = useState("");
+  const [selectedMatch, setSelectedMatch] = useState<SelectedMatch | null>(
+    null,
+  );
   const [state, setState] = useState<SearchState>({
     loading: false,
     result: null,
@@ -77,6 +86,7 @@ export function SearchPanel() {
       setState({ loading: false, result: null, error: result.error });
     } else {
       setState({ loading: false, result, error: null });
+      setSelectedMatch(null);
     }
   }, [mode, query, noQueryNeeded]);
 
@@ -87,9 +97,19 @@ export function SearchPanel() {
     [handleSearch],
   );
 
-  const handleFileClick = useCallback((filePath: string, line?: number) => {
-    console.info("[SearchPanel] open file:", filePath, line);
-  }, []);
+  const handleFileClick = useCallback(
+    (filePath: string, line?: number) => {
+      const clicked = state.result?.matches.find(
+        (match) => match.filePath === filePath && match.line === line,
+      );
+      setSelectedMatch({
+        filePath,
+        line,
+        snippet: clicked?.snippet,
+      });
+    },
+    [state.result],
+  );
 
   return (
     <GlassCard className="p-4 flex flex-col gap-3">
@@ -243,6 +263,44 @@ export function SearchPanel() {
                 mode={state.result.mode}
                 onFileClick={handleFileClick}
               />
+              {selectedMatch && (
+                <div className="mt-3 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] p-3 text-xs">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-[var(--color-text-primary)]">
+                        {selectedMatch.filePath}
+                      </p>
+                      <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">
+                        {selectedMatch.line != null
+                          ? `Line ${selectedMatch.line}`
+                          : "No line number available"}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(
+                            selectedMatch.line != null
+                              ? `${selectedMatch.filePath}:${selectedMatch.line}`
+                              : selectedMatch.filePath,
+                          );
+                        } catch {
+                          // Ignore clipboard failures in restricted browsers.
+                        }
+                      }}
+                      className="rounded-lg border border-[var(--color-border-subtle)] px-2 py-1 text-[10px] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]"
+                    >
+                      Copy path
+                    </button>
+                  </div>
+                  {selectedMatch.snippet && (
+                    <pre className="mt-3 overflow-x-auto rounded-lg bg-[var(--color-bg-surface)] px-3 py-2 text-[11px] text-[var(--color-text-secondary)]">
+                      {selectedMatch.snippet}
+                    </pre>
+                  )}
+                </div>
+              )}
             </motion.div>
           )}
 

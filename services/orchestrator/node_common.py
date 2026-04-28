@@ -31,7 +31,7 @@ def step_index(step_type: str) -> int:
     try:
         return STEP_ORDER.index(step_type)
     except ValueError:
-        return 0
+        raise ValueError(f"Unknown pipeline step: {step_type}") from None
 
 
 def step_start(run_id: str, step_type: str) -> None:

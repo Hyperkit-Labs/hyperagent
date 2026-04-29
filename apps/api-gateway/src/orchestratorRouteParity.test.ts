@@ -43,15 +43,18 @@ describe("orchestrator route parity (F-025, F-027)", () => {
     const apiInit = readFile("services/orchestrator/api/__init__.py");
     const mainPy = readFile("services/orchestrator/main.py");
 
-    // Walk every Python file under services/orchestrator/api/ and collect APIRouter prefixes.
+    // Walk every Python file under services/orchestrator/api/ and collect
+    // APIRouter prefixes -> defining module + symbol.
     const apiDir = path.join(REPO_ROOT, "services/orchestrator/api");
-    const definedPrefixes: { prefix: string; file: string; symbol?: string }[] =
-      [];
+    const definedPrefixes: {
+      prefix: string;
+      file: string;
+      module: string;
+      symbol: string;
+    }[] = [];
     for (const entry of fs.readdirSync(apiDir)) {
       if (!entry.endsWith(".py") || entry === "__init__.py") continue;
       const src = fs.readFileSync(path.join(apiDir, entry), "utf8");
-      // Match  e.g.  `name = APIRouter(prefix="/api/v1/x", ...)`  and
-      //                ` something_router = APIRouter(\n    prefix="/api/v1/y",`
       const re =
         /(\w+)\s*=\s*APIRouter\(\s*(?:[^)]*?)prefix\s*=\s*["']([^"']+)["']/gs;
       for (const match of src.matchAll(re)) {
@@ -59,9 +62,57 @@ describe("orchestrator route parity (F-025, F-027)", () => {
           symbol: match[1],
           prefix: match[2],
           file: `services/orchestrator/api/${entry}`,
+          module: entry.replace(/\.py$/, ""),
         });
       }
     }
+
+    // Resolve every alias `from .<module> import <symbol> as <alias>` and the
+    // direct form `from .<module> import <symbol>` in api/__init__.py.
+    // alias for a (module, symbol) pair = the alias if present, else the symbol.
+    function resolveExportName(module: string, symbol: string): string | null {
+      const lines = apiInit.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        const ln = lines[i];
+        const fromRe = new RegExp(
+          `^from\\s+\\.${module}\\s+import\\s+(.+?)\\s*$`,
+        );
+        const fromMatch = ln.match(fromRe);
+        if (!fromMatch) continue;
+        // Collect import items, including parenthesised multi-line forms.
+        let body = fromMatch[1];
+        if (body.startsWith("(")) {
+          let depth = body.split("(").length - body.split(")").length;
+          let j = i + 1;
+          while (depth > 0 && j < lines.length) {
+            body += " " + lines[j];
+            depth +=
+              lines[j].split("(").length -
+              1 -
+              (lines[j].split(")").length - 1);
+            j++;
+          }
+          body = body.replace(/[()]/g, "");
+        }
+        const items = body.split(",").map((s) => s.trim()).filter(Boolean);
+        for (const item of items) {
+          const asMatch = item.match(/^(\w+)\s+as\s+(\w+)$/);
+          if (asMatch && asMatch[1] === symbol) return asMatch[2];
+          if (item === symbol) return symbol;
+        }
+      }
+      return null;
+    }
+
+    // All include_router(...) call bodies in main.py, ignoring comment lines.
+    const mainPyNoComments = mainPy
+      .split("\n")
+      .filter((ln) => !/^\s*#/.test(ln))
+      .join("\n");
+    const includeRouterCalls = mainPyNoComments
+      .split("app.include_router(")
+      .slice(1)
+      .map((s) => s.split(")")[0]);
 
     for (const required of REQUIRED_API_V1_PREFIXES) {
       const def = definedPrefixes.find((d) => d.prefix === required);
@@ -69,21 +120,18 @@ describe("orchestrator route parity (F-025, F-027)", () => {
         def,
         `Gateway proxies to ${required} but no APIRouter with that prefix is defined in services/orchestrator/api/*.py`,
       ).toBeDefined();
-      // The router symbol (or its alias) must be both exported from api/__init__.py
-      // and mounted via app.include_router in main.py.
-      const symbol = def!.symbol!;
-      const exportedDirect = new RegExp(
-        `\\b${symbol}\\b`,
-      ).test(apiInit);
-      const mounted = new RegExp(
-        `app\\.include_router\\(\\s*\\w*${symbol.replace(/_router$/, "")}\\w*_router\\b`,
-      ).test(mainPy);
-      // Looser fallback: the literal symbol or a known alias appears in main.py
-      // include_router calls.
-      const aliasMounted = /app\.include_router\([^)]*_router/.test(mainPy);
+      const exportName = resolveExportName(def!.module, def!.symbol);
       expect(
-        exportedDirect && (mounted || aliasMounted),
-        `APIRouter with prefix ${required} (symbol ${symbol}) is defined in ${def!.file} but is not exported from api/__init__.py and/or not mounted in main.py.`,
+        exportName,
+        `APIRouter with prefix ${required} (defined as ${def!.symbol} in ${def!.file}) is not re-exported from services/orchestrator/api/__init__.py`,
+      ).not.toBeNull();
+      // The exported alias must appear inside an `app.include_router(<alias>)` call in main.py.
+      const mounted = includeRouterCalls.some((body) =>
+        new RegExp(`\\b${exportName!}\\b`).test(body),
+      );
+      expect(
+        mounted,
+        `APIRouter with prefix ${required} is exported as ${exportName} but is not mounted via app.include_router(${exportName}) in services/orchestrator/main.py`,
       ).toBe(true);
     }
   });

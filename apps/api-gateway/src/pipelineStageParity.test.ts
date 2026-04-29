@@ -54,9 +54,15 @@ describe("pipeline stage parity (TS↔Python)", () => {
         // Skip comment-only lines so docstrings/comments referencing
         // `current_stage = "..."` don't trip the parity check.
         if (/^\s*#/.test(ln)) return;
-        // Match  `current_stage = "..."`,  `state["current_stage"] = "..."`,
-        // and  `"current_stage": "..."`.
-        const re = /current_stage\s*[:=]\s*["']([^"']+)["']/g;
+        // Match all three Python write forms:
+        //   bare assignment            : current_stage = "..."
+        //   subscript assignment       : state["current_stage"] = "..."
+        //   dict literal value         : "current_stage": "..."
+        // The character class `[\]\s"']*` between the key and the operator
+        // tolerates the optional `"]` of subscript and the closing `"` of a
+        // dict-literal key.
+        const re =
+          /["']?current_stage["']?\s*[\]\s"']*[:=]\s*["']([^"']+)["']/g;
         for (const m of ln.matchAll(re)) {
           const literal = m[1];
           if (!KNOWN_STAGES.has(literal)) {

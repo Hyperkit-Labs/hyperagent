@@ -230,9 +230,10 @@ async def run_debate(
     state["discussion_trace"] = discussion_trace
     state["debate_converged"] = converged
     state["audit_passed"] = converged
+    from workflow_state import set_current_stage  # noqa: PLC0415
     state["audit_findings"] = []
     state["simulation_passed"] = False
     state["simulation_results"] = {}
-    state["current_stage"] = "audit"
+    set_current_stage(state, "audit")
     state["autofix_cycle"] = state.get("autofix_cycle", 0) + 1
     return state

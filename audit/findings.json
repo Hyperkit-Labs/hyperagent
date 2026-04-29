@@ -5,14 +5,15 @@
   "base": "main",
   "summary": {
     "critical": 0,
-    "high": 11,
+    "high": 10,
     "medium": 13,
     "low": 4,
     "blockers": 1,
     "fix_status_breakdown": {
-      "fixed_in_this_pr": 6,
-      "harness_added_in_this_pr": 1,
-      "tracked_in_findings": 21
+      "fixed_in_this_pr": 5,
+      "harness_added_in_this_pr": 4,
+      "doc_corrected_in_this_pr_schema_followup_tracked": 1,
+      "tracked_in_findings": 17
     }
   },
   "findings": [
@@ -369,7 +370,7 @@
       },
       "observed": "AgentState declares `current_stage: str` (no Literal). Any node that types `'desigh'` instead of `'design'` will pass typing and silently leave the UI in `idle`. This is exactly the failure mode the workflow-state package warns about in its docstring.",
       "expected": "Promote `current_stage` to `Literal[...]` mirroring `PIPELINE_STAGES`, OR add a `set_current_stage(state, stage)` setter that validates against the canonical list.",
-      "fix_action": "Added `PIPELINE_STAGES` frozenset + `set_current_stage(state, stage)` validator in services/orchestrator/workflow_state.py + TS-side parity harness in apps/api-gateway/src/pipelineStageParity.test.ts that scans every `current_stage = \"...\"` write in services/orchestrator/**/*.py and asserts it is in PIPELINE_STAGES. Existing call sites are unchanged in this PR; new writes must use the validator.",
+      "fix_action": "Three layers of defence: (a) canonical `PIPELINE_STAGES` frozenset of all 19 stages + `set_current_stage(state, stage)` validator in services/orchestrator/workflow_state.py that raises `ValueError` on unknown stages; (b) all 15 active `state['current_stage'] = ...` writes across services/orchestrator/nodes.py (12 sites including 3 multi-line conditional writes), services/orchestrator/workflow.py (1 site), and services/orchestrator/agents/debate_agent.py (1 site) migrated to `set_current_stage(...)` — the validator now gates writes at runtime; (c) TS-side parity harness in apps/api-gateway/src/pipelineStageParity.test.ts that scans every `current_stage = \"...\"` / `state[\"current_stage\"] = \"...\"` / `\"current_stage\": \"...\"` write across services/orchestrator/**/*.py and asserts each literal is in PIPELINE_STAGES — fails CI on a typo even before runtime. Initial-dict-literal sites in workflow.py:335 (`\"current_stage\": \"spec\"`) and api/runs_registry.py:138 (`\"current_stage\": \"design\"`) are left as-is; they are guarded by the parity harness because both literals are in PIPELINE_STAGES.",
       "fix_status": "fixed_in_this_pr"
     },
     {

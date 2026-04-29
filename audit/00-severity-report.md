@@ -2,7 +2,7 @@
 
 > Source of truth: `audit/findings.json`. This file is the human-readable view.
 
-**Counts:** 0 critical · 9 high · 13 medium · 4 low · 1 blocker.
+**Counts:** 0 critical · 10 high · 13 medium · 4 low · 1 blocker.
 
 ## High
 

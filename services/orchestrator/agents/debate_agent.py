@@ -231,6 +231,7 @@ async def run_debate(
     state["debate_converged"] = converged
     state["audit_passed"] = converged
     from workflow_state import set_current_stage  # noqa: PLC0415
+
     state["audit_findings"] = []
     state["simulation_passed"] = False
     state["simulation_results"] = {}

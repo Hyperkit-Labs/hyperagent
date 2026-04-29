@@ -114,22 +114,22 @@ HyperAgent is an AI-assisted smart contract development platform that turns natu
 ## AI Agent Guidelines
 
 ### Mandatory Pre-Action (Global)
-**This applies to all agents and all tasks. No exceptions.** Before any implementation, code change, or planning output, the agent MUST perform this check first (see `.cursor/rules/MANDATORY_PRE_ACTION.mdc` and `AGENTS.mdc`):
+**This applies to all agents and all tasks. No exceptions.** Before any implementation, code change, or planning output, the agent MUST review the resources that actually exist in the repo:
 
-1. **`.cursor/rules/`** — Review rule files relevant to the task (AGENT.mdc, production.mdc, rules.mdc, etc.).
-2. **`.cursor/wiki/`** — Read wiki docs (e.g. robots.txt, scope boundaries).
-3. **`.cursor/skills/`** — Identify and read relevant SKILL.md and references.
-4. **`.cursor/llm/`** — Review LLM resources (llm.txt, usage constraints).
+1. **`AGENTS.md` / `CLAUDE.md`** — this constitution (project structure, BYOK rules, MVP scope).
+2. **`docs/`** — architecture specs, runbooks, BYOK and storage policy.
+3. **`llm.txt`** at the repo root — AI usage constraints.
+4. **`audit/`** — the latest drift / ownership / scenario / route matrices and `findings.json`.
 5. **Then** proceed with the reply or implementation using those resources.
 
-Do not run other tools or write code before completing steps 1–4 for any coding, planning, or project task.
+The earlier `.cursor/rules/`, `.cursor/wiki/`, `.cursor/skills/`, and
+`.cursor/llm/` paths described in older versions of this file do not exist on
+disk and have been removed (audit finding F-002).
 
 ### AI Interaction Structure
-- **robots.txt** (`.cursor/wiki/robots.txt`): Defines AI crawler boundaries
-- **llms.txt** (root): Content manifest for AI systems
-- **skills.md** (`.cursor/skills.md`): Skills index for AI agents
-- **AGENTS.md** (this file): Main project constitution
-- **.cursorrules** (root): Cursor editor instructions
+- **`llm.txt`** (root): AI usage constraints.
+- **`AGENTS.md` / `CLAUDE.md`** (this file and its mirror): Project constitution.
+- **`audit/`**: Machine-readable findings, severity report, ownership/drift matrices.
 
 ## Assignment Distribution
 
@@ -158,44 +158,73 @@ Do not run other tools or write code before completing steps 1–4 for any codin
 - UI components
 - User experience
 
-## Project Structure
+## Project Structure (actual)
+
+This section is the source of truth for the on-disk layout. Older versions of
+this file described an aspirational layout (`hyperagent-api`, `hyperagent-web`,
+`agent-spec`, `spec-dictionary`, etc.) that does not exist on disk; that
+aspirational layout has been removed in favour of what actually ships, so
+automation does not chase phantom paths (audit finding F-001).
 
 ```
 apps/
-  hyperagent-api/    # Python/FastAPI backend
-  hyperagent-web/    # Next.js frontend
+  api-gateway/         # Express HTTP gateway (TypeScript)
+  studio/              # Next.js 14 web IDE (TypeScript)
 services/
-  orchestrator/      # LangGraph orchestration
-  api-gateway/       # HTTP API gateway
-  blockchain-gateway/ # Blockchain RPC abstraction
-  agent-spec/        # Specification agent
-  agent-codegen/     # CodeGenAgent
-  agent-audit/       # AuditAgent
-  agent-tenderly-sim/ # TenderlySimAgent
-  agent-deploy/      # DeployAgent
-  agent-verify/      # VerifyAgent
-  agent-monitor/     # MonitorAgent
+  orchestrator/        # FastAPI + LangGraph orchestration (Python)
+  agent-runtime/       # Agent runtime (Python)
+  audit/               # Slither/Mythril/MythX/Echidna runners
+  codegen/             # Solidity codegen
+  compile/             # Hardhat/Foundry compile + artifact pinning
+  context/             # Context/memory service
+  deploy/              # Deploy orchestration (Thirdweb / direct RPC)
+  hyperagent-tools/    # MCP tool surface for the orchestrator
+  roma-service/        # Spec/ROMA HTTP service
+  sandbox-docker/      # Sandboxed shell/test runner
+  simulation/          # Tenderly simulation gateway
+  storage/             # IPFS/Pinata + Supabase index helpers
+  vectordb/            # Vector DB (RAG) helpers
 packages/
-  sdk-ts/            # TypeScript SDK
-  spec-dictionary/   # Spec Lock schemas
-  rag-kb/            # RAG knowledge base
-  chain-registry/    # Chain registry
-  sdk-registry/      # SDK capability registry
-  shared-ui/         # Shared UI components
-  core-lib/          # Shared core libraries
+  agent-os/            # MCP agent shell + tool surface
+  ai-tools/            # Vercel AI SDK + provider integrations
+  api-contracts/       # Canonical TypeScript contracts (paths, schemas, env keys)
+  backend-clients/     # HTTP/SDK clients for backend services
+  backend-middleware/  # Shared Node middleware (auth, logging, identity)
+  config/              # Shared runtime config helpers
+  contract-security-rules/
+  contract-validation/
+  core-types/          # Shared TypeScript types
+  execution-backend/   # Workflow execution glue
+  frontend-data/       # Studio data layer helpers
+  mcp-pashov-auditor/
+  pashov-skills/
+  schema-registry/     # JSON-Schema/Zod registry
+  sdk-ts/              # TypeScript SDK
+  security-audit/
+  ui/                  # shadcn/ui + Tailwind component primitives
+  web3-utils/          # ethers/viem/thirdweb helpers
+  workflow-state/      # Canonical TS PIPELINE_STAGES (sync source for orchestrator)
 infra/
-  terraform/    # Infrastructure as Code
-  github/       # GitHub Actions, workflows
+  docker/              # Docker Compose + per-service Dockerfiles
+  github/              # GitHub Actions reusable workflows
+  registries/          # Chain + pipeline registries (YAML)
 contracts/
-  evm/          # EVM contracts
-  templates/    # Contract templates
-external/       # Git submodules
+  evm/                 # EVM contract sources
+  templates/           # Contract templates
+external/              # Git submodules
 docs/
-  specs/        # Architecture specs
-  runbooks/     # Operational runbooks
+  specs/               # Architecture specs
+  runbooks/            # Operational runbooks
 configs/
-  presets/      # Preset registry YAML files
+  presets/             # Preset registry YAML files
+supabase/
+  migrations/          # SQL migrations
 ```
+
+Future renames or extractions should update this section in the same PR that
+introduces the directory; the audit harness in
+`apps/api-gateway/src/orchestratorRouteParity.test.ts` enforces that gateway
+proxies do not point at non-existent orchestrator routers.
 
 ## Environment Configuration
 
@@ -336,4 +365,15 @@ See LICENSE file for details.
 - GitHub Issues for bug reports
 - GitHub Discussions for questions
 - Security issues: See SECURITY.md
+
+## Learned User Preferences
+
+- When running strict spec or implementation-executor mode, treat the ordered checklist as binding: do not de-scope, soften mandatory items to optional, or replace implementation with documentation unless that exact change is explicitly authorized; mark incomplete items NOT DONE and true blockers BLOCKED with a precise explanation.
+
+## Learned Workspace Facts
+
+- Next.js App Router CSP with `strict-dynamic`: the framework derives script nonces from `Content-Security-Policy` on the incoming request during SSR, not from the response alone; Studio `proxy.ts` must mirror the same CSP string onto forwarded request headers and the response so emitted scripts get matching nonces.
+- Studio Thirdweb `defineChain` defaults can pick bundled RPC URLs that return 403 for unauthenticated callers; keep explicit `rpc` values on supported chains aligned with `infra/registries/network/chains.yaml` and orchestrator registry metadata.
+- On some Windows dev machines, Studio Jest runs that load Next may fail with a missing SWC native binary; treat that as an environment or toolchain issue when interpreting test failures.
+- Studio edge path exclusions (`isExcludedFromStudioEdge`) must stay consistent with `GATEWAY_PUBLIC_PATHS` from `@hyperagent/api-contracts` so public gateway routes are not dropped before traffic reaches the api-gateway.
 

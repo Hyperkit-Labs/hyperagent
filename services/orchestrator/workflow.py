@@ -33,7 +33,7 @@ from nodes import (
     ui_scaffold_agent,
 )
 from registries import get_default_pipeline_id
-from workflow_state import MAX_AUTOFIX_CYCLES, AgentState
+from workflow_state import MAX_AUTOFIX_CYCLES, AgentState, set_current_stage
 
 
 def _start_router(state: AgentState) -> str:
@@ -380,5 +380,5 @@ def run_pipeline(
         err_msg = str(e)
         failed_state = initial.copy()
         failed_state["error"] = err_msg
-        failed_state["current_stage"] = "failed"
+        set_current_stage(failed_state, "failed")
         return failed_state

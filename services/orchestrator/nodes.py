@@ -21,7 +21,7 @@ from registries import (
 )
 from step_trace import step_span
 from store import _ensure_contracts_dict
-from workflow_state import AgentState
+from workflow_state import AgentState, set_current_stage
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +103,7 @@ async def spec_agent(state: AgentState) -> AgentState:
             elif template_id_from_state:
                 state["template_id"] = template_id_from_state
             state["spec"] = spec
-            state["current_stage"] = "spec_review"
+            set_current_stage(state, "spec_review")
             from store import update_workflow
 
             update_workflow(
@@ -218,7 +218,7 @@ async def design_agent(state: AgentState) -> AgentState:
                 design.get("rationale", "")
                 or f"Design for {spec.get('token_type', 'contract')} with {len(design.get('components', []))} components"
             )
-            state["current_stage"] = "design_review"
+            set_current_stage(state, "design_review")
             state["framework"] = design.get("frameworks", {}).get("primary", "hardhat")
             template_id = state.get("template_id") or ""
             template = get_template(template_id) if template_id else None
@@ -324,7 +324,7 @@ async def codegen_agent(state: AgentState) -> AgentState:
             )
         contracts = _ensure_contracts_dict(contracts)
         state["contracts"] = contracts
-        state["current_stage"] = "audit"
+        set_current_stage(state, "audit")
         from store import update_workflow
 
         update_workflow(
@@ -372,7 +372,7 @@ async def security_gate_agent(state: AgentState) -> AgentState:
         await _step_complete(
             run_id, "security_check", error_message="; ".join(findings[:5])
         )
-        state["current_stage"] = "failed"
+        set_current_stage(state, "failed")
         state["error"] = "Deployment blocked: sensitive data detected in workspace."
         state["security_check_failed"] = True
         from store import get_workflow, update_workflow
@@ -446,7 +446,7 @@ async def scrubd_validation_agent(state: AgentState) -> AgentState:
         passed, findings = await run_scrubd_validation(contracts, run_id, framework)
         state["scrubd_validation_passed"] = passed
         state["scrubd_findings"] = findings
-        state["current_stage"] = "audit" if passed else "scrubd_failed"
+        set_current_stage(state, "audit" if passed else "scrubd_failed")
         from store import update_workflow
 
         scrubd_status = "completed" if passed else "failed"
@@ -473,7 +473,7 @@ async def scrubd_validation_agent(state: AgentState) -> AgentState:
         await _step_complete(run_id, "scrubd", error_message=str(e))
         state["scrubd_validation_passed"] = False
         state["scrubd_findings"] = [{"error": str(e), "type": "scrubd_error"}]
-        state["current_stage"] = "scrubd_failed"
+        set_current_stage(state, "scrubd_failed")
         raise
 
 
@@ -518,8 +518,8 @@ async def audit_agent(state: AgentState) -> AgentState:
         )
         state["audit_passed"] = not deploy_blocked
         state["audit_blocking_findings"] = blocking_findings
-        state["current_stage"] = (
-            "simulation" if state["audit_passed"] else "audit_failed"
+        set_current_stage(
+            state, "simulation" if state["audit_passed"] else "audit_failed"
         )
         from store import update_workflow
 
@@ -597,8 +597,9 @@ async def simulation_agent(state: AgentState) -> AgentState:
             )
         state["simulation_results"] = results
         state["simulation_passed"] = results.get("passed", False)
-        state["current_stage"] = (
-            "simulation" if state["simulation_passed"] else "simulation_failed"
+        set_current_stage(
+            state,
+            "simulation" if state["simulation_passed"] else "simulation_failed",
         )
         try:
             from execution_backend import get_execution_backend
@@ -692,8 +693,9 @@ async def security_policy_evaluator_agent(state: AgentState) -> AgentState:
         verdict = evaluate_security_policy(run_id, step_outputs)
         state["security_verdict"] = verdict
         state["security_approved_for_deploy"] = verdict.get("approvedForDeploy", False)
-        state["current_stage"] = (
-            "exploit_sim" if verdict.get("approvedForDeploy") else "security_failed"
+        set_current_stage(
+            state,
+            "exploit_sim" if verdict.get("approvedForDeploy") else "security_failed",
         )
         from store import update_workflow
 
@@ -730,7 +732,7 @@ async def security_policy_evaluator_agent(state: AgentState) -> AgentState:
         await _step_complete(run_id, "security_policy_evaluator", error_message=str(e))
         state["security_verdict"] = None
         state["security_approved_for_deploy"] = False
-        state["current_stage"] = "security_failed"
+        set_current_stage(state, "security_failed")
         raise
 
 
@@ -747,7 +749,7 @@ async def exploit_simulation_agent(state: AgentState) -> AgentState:
         )
         state["exploit_simulation_passed"] = passed
         state["exploit_simulation_findings"] = findings
-        state["current_stage"] = "ui_scaffold" if passed else "exploit_sim_failed"
+        set_current_stage(state, "ui_scaffold" if passed else "exploit_sim_failed")
         from store import update_workflow
 
         status = "completed" if passed else "failed"
@@ -785,7 +787,7 @@ async def deploy_gate_agent(state: AgentState) -> AgentState:
     """Set current_stage to awaiting_deploy_approval before interrupt. No-op when deploy_approved."""
     if state.get("deploy_approved"):
         return state
-    state["current_stage"] = "awaiting_deploy_approval"
+    set_current_stage(state, "awaiting_deploy_approval")
     state["needs_deploy_approval"] = True
     run_id = state.get("run_id") or ""
     from store import update_workflow
@@ -825,7 +827,7 @@ async def deploy_agent(state: AgentState) -> AgentState:
             oz_wizard_options=state.get("oz_wizard_options") or {},
         )
         state["deployments"] = deployments
-        state["current_stage"] = "deployed"
+        set_current_stage(state, "deployed")
         from store import update_workflow
 
         update_workflow(
@@ -899,7 +901,7 @@ async def ui_scaffold_agent(state: AgentState) -> AgentState:
         network = state.get("network") or ""
         schema = await generate_ui_schema(deployments, contracts, network)
         state["ui_schema"] = schema or {}
-        state["current_stage"] = "ui_scaffold"
+        set_current_stage(state, "ui_scaffold")
         from store import update_workflow
 
         update_workflow(
@@ -1016,7 +1018,7 @@ async def autofix_agent(state: AgentState) -> AgentState:
     except Exception as e:
         logger.error("[debate] run_id=%s error=%s", run_id, e)
         state["error"] = f"Debate failed: {e}"
-        state["current_stage"] = "failed"
+        set_current_stage(state, "failed")
         await _step_complete(run_id, "debate", error_message=str(e))
         return state
 

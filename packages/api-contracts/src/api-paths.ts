@@ -86,7 +86,6 @@ export const GATEWAY_PUBLIC_PATHS = [
   ApiPaths.healthLive,
   ApiPaths.apiHealth,
   ApiPaths.apiHealthLive,
-  "/auth/bootstrap",
   ApiPaths.authBootstrap,
   ApiPaths.config,
   GatewayLegacyMountPaths.config,
@@ -107,7 +106,6 @@ export const GATEWAY_DEV_ONLY_PUBLIC_PATHS = [
 export const METERING_EXEMPT_PREFIXES = [
   ApiPaths.health,
   ApiPaths.authBootstrap,
-  "/auth/bootstrap",
   ApiPaths.creditsPrefix,
   ApiPaths.paymentsPrefix,
   ApiPaths.pricingPrefix,

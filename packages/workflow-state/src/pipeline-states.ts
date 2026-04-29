@@ -5,18 +5,24 @@
  */
 export const PIPELINE_STAGES = [
   "spec",
+  "spec_review",
   "design",
+  "design_review",
   "codegen",
   "audit",
+  "audit_failed",
+  "scrubd_failed",
   "simulation",
+  "simulation_failed",
+  "exploit_sim",
+  "exploit_sim_failed",
+  "security_failed",
   "deploy",
-  "ui_scaffold",
-  "human_review",
   "awaiting_deploy_approval",
   "deployed",
+  "ui_scaffold",
+  "human_review",
   "failed",
-  "audit_failed",
-  "simulation_failed",
 ] as const;
 
 export type PipelineStage = (typeof PIPELINE_STAGES)[number] | string;

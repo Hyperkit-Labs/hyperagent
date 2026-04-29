@@ -22,13 +22,17 @@ import time
 import uuid
 
 from api import (
+    a2a_router,
+    agent_registry_router,
     agents_router,
     api_health_router,
     approve_spec_legacy_router,
+    artifacts_router,
     config_router,
     contracts_router,
     credits_router,
     debug_sandbox_router,
+    erc8004_router,
     health_router,
     identity_router,
     infra_router,
@@ -46,6 +50,7 @@ from api import (
     simulation_webhooks_router,
     storage_webhooks_router,
     ui_export_router,
+    user_templates_router,
     workflows_router,
     workflows_streaming_router,
     x402_webhooks_router,
@@ -358,6 +363,11 @@ app.include_router(runs_router)
 app.include_router(approve_spec_legacy_router)
 app.include_router(security_router)
 app.include_router(registry_router)
+app.include_router(agent_registry_router)
+app.include_router(a2a_router)
+app.include_router(erc8004_router)
+app.include_router(user_templates_router)
+app.include_router(artifacts_router)
 app.include_router(logs_router)
 app.include_router(agents_router)
 app.include_router(infra_router)

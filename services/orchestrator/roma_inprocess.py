@@ -149,9 +149,15 @@ async def invoke_roma_spec(
     except Exception as e:
         logger.warning("ROMA agent-runtime fallback failed: %s", e)
 
+    try:
+        from registries import get_anchor_network_slug
+        anchor_chain = get_anchor_network_slug()
+    except Exception:
+        anchor_chain = "skalebase-sepolia"
+
     return {
         "version": "1.0",
-        "chains": ["mantle"],
+        "chains": [anchor_chain],
         "token_type": "ERC20",
         "features": [],
         "invariants": [],

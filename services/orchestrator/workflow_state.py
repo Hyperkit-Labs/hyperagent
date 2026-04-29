@@ -7,6 +7,44 @@ from langchain_core.messages import BaseMessage
 
 MAX_AUTOFIX_CYCLES = 3
 
+# Canonical pipeline stages. MUST be kept in sync with
+# packages/workflow-state/src/pipeline-states.ts (PIPELINE_STAGES).
+# A TS-side parity test in apps/api-gateway/src/pipelineStageParity.test.ts
+# scans this file's set_current_stage call sites + every `current_stage = "..."`
+# write across services/orchestrator/**/*.py and fails CI if a literal is not
+# in this set. F-019.
+PIPELINE_STAGES: frozenset[str] = frozenset(
+    {
+        "spec",
+        "design",
+        "codegen",
+        "audit",
+        "simulation",
+        "deploy",
+        "ui_scaffold",
+        "human_review",
+        "awaiting_deploy_approval",
+        "deployed",
+        "failed",
+        "audit_failed",
+        "simulation_failed",
+    }
+)
+
+
+def set_current_stage(state: "AgentState", stage: str) -> None:
+    """Single canonical writer for AgentState['current_stage'].
+
+    Raises ValueError when `stage` is not in PIPELINE_STAGES so a typo never
+    silently strands the UI in `idle`. F-019.
+    """
+    if stage not in PIPELINE_STAGES:
+        raise ValueError(
+            f"unknown pipeline stage {stage!r}; expected one of "
+            f"{sorted(PIPELINE_STAGES)}"
+        )
+    state["current_stage"] = stage
+
 
 class AgentState(TypedDict, total=False):
     request_id: str

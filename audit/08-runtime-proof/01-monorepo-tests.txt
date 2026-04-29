@@ -1,0 +1,40 @@
+hyperagent-studio:test: hyperagent-studio:test: [Khyperagent-studio:test: [1Ahyperagent-studio:test: [Khyperagent-studio:test: [1A
+hyperagent-studio:test: [0m[7m[33m[1m RUNS [22m[39m[27m[0m [2m__tests__/mocks/[22m[1mmsw-smoke.test.ts[22m
+hyperagent-studio:test: hyperagent-studio:test: [Khyperagent-studio:test: [1Ahyperagent-studio:test: [Khyperagent-studio:test: [1A[0m[7m[1m[32m PASS [39m[22m[27m[0m [2m__tests__/mocks/[22m[1mmsw-smoke.test.ts[22m
+hyperagent-studio:test: 
+hyperagent-studio:test: [0m[7m[33m[1m RUNS [22m[39m[27m[0m [2m__tests__/mocks/[22m[1mmsw-smoke.test.ts[22m
+hyperagent-studio:test: hyperagent-studio:test: [Khyperagent-studio:test: [1Ahyperagent-studio:test: [Khyperagent-studio:test: [1A
+hyperagent-studio:test: [0m[7m[33m[1m RUNS [22m[39m[27m[0m [2m__tests__/lib/[22m[1mauthRedirect.test.ts[22m
+hyperagent-studio:test: hyperagent-studio:test: [Khyperagent-studio:test: [1Ahyperagent-studio:test: [Khyperagent-studio:test: [1A
+hyperagent-studio:test: [0m[7m[33m[1m RUNS [22m[39m[27m[0m [2m__tests__/lib/[22m[1mauthRedirect.test.ts[22m
+hyperagent-studio:test: hyperagent-studio:test: [Khyperagent-studio:test: [1Ahyperagent-studio:test: [Khyperagent-studio:test: [1A
+hyperagent-studio:test: [0m[7m[33m[1m RUNS [22m[39m[27m[0m [2m__tests__/lib/[22m[1mauthRedirect.test.ts[22m
+hyperagent-studio:test: hyperagent-studio:test: [Khyperagent-studio:test: [1Ahyperagent-studio:test: [Khyperagent-studio:test: [1A
+hyperagent-studio:test: [0m[7m[33m[1m RUNS [22m[39m[27m[0m [2m__tests__/lib/[22m[1mauthRedirect.test.ts[22m
+hyperagent-studio:test: hyperagent-studio:test: [Khyperagent-studio:test: [1Ahyperagent-studio:test: [Khyperagent-studio:test: [1A[0m[7m[1m[32m PASS [39m[22m[27m[0m [2m__tests__/lib/[22m[1mauthRedirect.test.ts[22m
+hyperagent-studio:test: 
+hyperagent-studio:test: [0m[7m[33m[1m RUNS [22m[39m[27m[0m [2m__tests__/lib/[22m[1mauthRedirect.test.ts[22m
+hyperagent-studio:test: hyperagent-studio:test: [Khyperagent-studio:test: [1Ahyperagent-studio:test: [Khyperagent-studio:test: [1A
+hyperagent-studio:test: [0m[7m[33m[1m RUNS [22m[39m[27m[0m [2m__tests__/lib/[22m[1mdomainValidation.test.ts[22m
+hyperagent-studio:test: hyperagent-studio:test: [Khyperagent-studio:test: [1Ahyperagent-studio:test: [Khyperagent-studio:test: [1A
+hyperagent-studio:test: [0m[7m[33m[1m RUNS [22m[39m[27m[0m [2m__tests__/lib/[22m[1mdomainValidation.test.ts[22m
+hyperagent-studio:test: hyperagent-studio:test: [Khyperagent-studio:test: [1Ahyperagent-studio:test: [Khyperagent-studio:test: [1A
+hyperagent-studio:test: [0m[7m[33m[1m RUNS [22m[39m[27m[0m [2m__tests__/lib/[22m[1mdomainValidation.test.ts[22m
+hyperagent-studio:test: hyperagent-studio:test: [Khyperagent-studio:test: [1Ahyperagent-studio:test: [Khyperagent-studio:test: [1A
+hyperagent-studio:test: [0m[7m[33m[1m RUNS [22m[39m[27m[0m [2m__tests__/lib/[22m[1mdomainValidation.test.ts[22m
+hyperagent-studio:test: hyperagent-studio:test: [Khyperagent-studio:test: [1Ahyperagent-studio:test: [Khyperagent-studio:test: [1A
+hyperagent-studio:test: [0m[7m[33m[1m RUNS [22m[39m[27m[0m [2m__tests__/lib/[22m[1mdomainValidation.test.ts[22m
+hyperagent-studio:test: hyperagent-studio:test: [Khyperagent-studio:test: [1Ahyperagent-studio:test: [Khyperagent-studio:test: [1A[0m[7m[1m[32m PASS [39m[22m[27m[0m [2m__tests__/lib/[22m[1mdomainValidation.test.ts[22m
+hyperagent-studio:test: 
+hyperagent-studio:test: [0m[7m[33m[1m RUNS [22m[39m[27m[0m [2m__tests__/lib/[22m[1mdomainValidation.test.ts[22m
+hyperagent-studio:test: hyperagent-studio:test: [Khyperagent-studio:test: [1Ahyperagent-studio:test: [Khyperagent-studio:test: [1A[999D[K
+hyperagent-studio:test: [1mTest Suites: [22m[1m[32m13 passed[39m[22m, 13 total
+hyperagent-studio:test: [1mTests:       [22m[1m[32m57 passed[39m[22m, 57 total
+hyperagent-studio:test: [1mSnapshots:   [22m[1m[32m4 passed[39m[22m, 4 total
+hyperagent-studio:test: [1mTime:[22m        9.495 s
+hyperagent-studio:test: [2mRan all test suites[22m[2m.[22m
+
+ Tasks:    16 successful, 16 total
+Cached:    16 cached, 16 total
+  Time:    212ms >>> FULL TURBO
+

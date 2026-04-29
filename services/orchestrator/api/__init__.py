@@ -27,6 +27,11 @@ Orchestrator API routers. Mount in main.py:
   app.include_router(metrics_router)
 """
 
+from .agent_lifecycle import (
+    a2a_router,
+    erc8004_router,
+)
+from .agent_lifecycle import registry_router as agent_registry_router
 from .billing import (
     credits_router,
     payments_router,
@@ -57,17 +62,22 @@ from .runs_registry import (
 from .simulation_webhooks import router as simulation_webhooks_router
 from .storage_webhooks import router as storage_webhooks_router
 from .ui_export import router as ui_export_router
+from .user_templates import artifacts_router
+from .user_templates import router as user_templates_router
 from .workflows import router as workflows_router
 from .workflows import streaming_router as workflows_streaming_router
 from .x402_webhooks import router as x402_webhooks_router
 
 __all__ = [
+    "a2a_router",
+    "agent_registry_router",
     "agents_router",
     "approve_spec_legacy_router",
     "config_router",
     "contracts_router",
     "credits_router",
     "debug_sandbox_router",
+    "erc8004_router",
     "health_router",
     "api_health_router",
     "identity_router",
@@ -85,7 +95,9 @@ __all__ = [
     "security_router",
     "simulation_webhooks_router",
     "storage_webhooks_router",
+    "artifacts_router",
     "ui_export_router",
+    "user_templates_router",
     "workflows_router",
     "workflows_streaming_router",
     "x402_webhooks_router",

@@ -86,7 +86,6 @@ export const GATEWAY_PUBLIC_PATHS = [
   ApiPaths.healthLive,
   ApiPaths.apiHealth,
   ApiPaths.apiHealthLive,
-  "/auth/bootstrap",
   ApiPaths.authBootstrap,
   ApiPaths.config,
   GatewayLegacyMountPaths.config,

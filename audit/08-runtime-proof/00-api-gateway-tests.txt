@@ -1,0 +1,8 @@
+ RUN  v4.1.4 /home/ubuntu/repos/hyperagent/apps/api-gateway
+
+
+ Test Files  12 passed (12)
+      Tests  89 passed (89)
+   Start at  10:09:01
+   Duration  3.83s (transform 468ms, setup 303ms, import 1.53s, tests 340ms, environment 1ms)
+

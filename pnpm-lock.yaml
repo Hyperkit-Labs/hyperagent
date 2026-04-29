@@ -111,6 +111,9 @@ importers:
       '@hyperagent/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@hyperagent/workflow-state':
+        specifier: workspace:*
+        version: link:../../packages/workflow-state
       '@opentelemetry/exporter-metrics-otlp-http':
         specifier: ^0.214.0
         version: 0.214.0(@opentelemetry/api@1.9.1)

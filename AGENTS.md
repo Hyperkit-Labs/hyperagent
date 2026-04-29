@@ -366,3 +366,14 @@ See LICENSE file for details.
 - GitHub Discussions for questions
 - Security issues: See SECURITY.md
 
+## Learned User Preferences
+
+- When running strict spec or implementation-executor mode, treat the ordered checklist as binding: do not de-scope, soften mandatory items to optional, or replace implementation with documentation unless that exact change is explicitly authorized; mark incomplete items NOT DONE and true blockers BLOCKED with a precise explanation.
+
+## Learned Workspace Facts
+
+- Next.js App Router CSP with `strict-dynamic`: the framework derives script nonces from `Content-Security-Policy` on the incoming request during SSR, not from the response alone; Studio `proxy.ts` must mirror the same CSP string onto forwarded request headers and the response so emitted scripts get matching nonces.
+- Studio Thirdweb `defineChain` defaults can pick bundled RPC URLs that return 403 for unauthenticated callers; keep explicit `rpc` values on supported chains aligned with `infra/registries/network/chains.yaml` and orchestrator registry metadata.
+- On some Windows dev machines, Studio Jest runs that load Next may fail with a missing SWC native binary; treat that as an environment or toolchain issue when interpreting test failures.
+- Studio edge path exclusions (`isExcludedFromStudioEdge`) must stay consistent with `GATEWAY_PUBLIC_PATHS` from `@hyperagent/api-contracts` so public gateway routes are not dropped before traffic reaches the api-gateway.
+

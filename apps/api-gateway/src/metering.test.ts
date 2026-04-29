@@ -5,7 +5,10 @@ import { isMeteringEnforced, isMeteringExemptPath } from "./metering.js";
 describe("metering", () => {
   it("isMeteringExemptPath exempts credits, payments, llm-keys, byok", () => {
     expect(isMeteringExemptPath("/api/v1/auth/bootstrap", "POST")).toBe(true);
-    expect(isMeteringExemptPath("/auth/bootstrap", "POST")).toBe(true);
+    // bare /auth/bootstrap is NOT mounted in the gateway (only /api/v1/auth/bootstrap
+    // is mounted); the dead prefix was removed from METERING_EXEMPT_PREFIXES as part
+    // of the F-007 fix so this path is no longer exempt (and unreachable anyway).
+    expect(isMeteringExemptPath("/auth/bootstrap", "POST")).toBe(false);
     expect(isMeteringExemptPath("/api/v1/credits/balance", "GET")).toBe(true);
     expect(isMeteringExemptPath("/api/v1/payments/history", "GET")).toBe(true);
     expect(

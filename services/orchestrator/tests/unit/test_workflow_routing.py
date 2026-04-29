@@ -31,11 +31,11 @@ def test_after_exploit_simulation_passed_false_routes_to_failed_or_autofix():
     assert result == "failed"
 
 
-def test_after_exploit_simulation_passed_true_routes_to_ui_scaffold():
-    """exploit_simulation_passed=True -> ui_scaffold."""
+def test_after_exploit_simulation_passed_true_routes_to_deploy_gate():
+    """exploit_simulation_passed=True -> deploy_gate."""
     state = {"exploit_simulation_passed": True}
     result = _after_exploit_simulation(state)
-    assert result == "ui_scaffold"
+    assert result == "deploy_gate"
 
 
 def test_after_security_policy_approved_routes_to_exploit_sim():

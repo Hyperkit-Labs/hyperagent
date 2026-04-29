@@ -129,7 +129,13 @@ def write_trace_sync(
 ) -> tuple[str | None, str | None, str | None]:
     """Synchronous wrapper for write_trace. Runs async in event loop."""
     try:
-        loop = asyncio.get_event_loop()
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_closed():
+                raise RuntimeError("closed")
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
         if loop.is_running():
             import concurrent.futures
 

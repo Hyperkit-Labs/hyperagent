@@ -14,11 +14,13 @@ sys.path.insert(
 
 @pytest.fixture
 def client(monkeypatch: pytest.MonkeyPatch):
+    from fastapi.testclient import TestClient
+    from main import app  # import first so load_dotenv runs, then strip secrets below
+
     monkeypatch.delenv("NODE_ENV", raising=False)
     monkeypatch.delenv("ENVIRONMENT", raising=False)
-
-    from fastapi.testclient import TestClient
-    from main import app
+    monkeypatch.delenv("X402_WEBHOOK_SECRET", raising=False)
+    monkeypatch.delenv("TENDERLY_WEBHOOK_SECRET", raising=False)
 
     return TestClient(app)
 

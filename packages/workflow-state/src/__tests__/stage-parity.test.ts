@@ -20,11 +20,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { PIPELINE_STAGES } from "@hyperagent/workflow-state";
+import { PIPELINE_STAGES } from "../pipeline-states.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
+// packages/workflow-state/src/__tests__ → up 4 levels → repo root
+const REPO_ROOT = path.resolve(__dirname, "..", "..", "..", "..");
 const ORCH_ROOT = path.join(REPO_ROOT, "services/orchestrator");
 
 function* walkPy(dir: string): Generator<string> {

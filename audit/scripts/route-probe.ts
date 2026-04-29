@@ -135,7 +135,8 @@ async function main(): Promise<void> {
       .filter(
         (r) =>
           typeof r.status === "number" &&
-          (r.status < 200 || r.status >= 600),
+          !(r.status >= 200 && r.status < 300) &&
+          !(r.status >= 400 && r.status < 500),
       )
       .map((r) => `${r.path} → ${r.status}`),
   };

@@ -25,9 +25,9 @@
 | Test | Path | Catches |
 | ---- | ---- | ------- |
 | `orchestratorRouteParity.test.ts` | `apps/api-gateway/src/` | Gateway mount → orchestrator router parity (F-025/F-027 regression) |
-| `stage-parity.test.ts` | `packages/workflow-state/src/__tests__/` | TS↔Python pipeline-stage drift (F-004/F-019 regression) |
-| `proxy-vs-gateway-contract.test.ts` | `apps/studio/lib/__tests__/` | Dev proxy vs production proxy drift (F-009 regression) |
-| `route-probe.ts` (script) | `audit/scripts/` | Live-stack runtime probe; commits per-route JSON to `audit/08-runtime-proof/` |
+| `stage-parity.test.ts` | `packages/workflow-state/src/__tests__/` | TS↔Python pipeline-stage drift (F-004/F-019 regression) — moved from `apps/api-gateway/src/` to its documented home |
+| `proxy-vs-gateway-contract.test.ts` | `apps/studio/lib/__tests__/` | Dev proxy vs production proxy drift — GATEWAY_PUBLIC_PATHS paths must not be blocked by studio edge (F-009 regression) |
+| `route-probe.ts` (script) | `audit/scripts/` | Live-stack runtime probe; commits per-route JSON to `audit/08-runtime-proof/`. Fixed filter: `not_2xx_or_4xx_or_404` now correctly surfaces 3xx and 5xx responses |
 
 ## Reduce over-mocking
 

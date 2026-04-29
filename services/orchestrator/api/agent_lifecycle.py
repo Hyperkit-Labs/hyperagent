@@ -434,11 +434,10 @@ def resume_task(task_id: str) -> dict[str, Any]:
     task = store.get_a2a_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="task not found")
-    return {
-        "task_id": task_id,
-        "status": task.get("status"),
-        "message": "resume is a stub; wire checkpoint consumer if supported",
-    }
+    raise HTTPException(
+        status_code=501,
+        detail="A2A task resume is not implemented in this build. Poll task status via GET /tasks/{task_id} instead.",
+    )
 
 
 class CheckpointBody(BaseModel):

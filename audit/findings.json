@@ -25,7 +25,11 @@
       "owner": "docs/repo-root",
       "category": "drift",
       "evidence": {
-        "files": ["AGENTS.md", "CLAUDE.md", "README.md"],
+        "files": [
+          "AGENTS.md",
+          "CLAUDE.md",
+          "README.md"
+        ],
         "expected_paths_missing": [
           "apps/hyperagent-api",
           "apps/hyperagent-web",
@@ -69,15 +73,24 @@
     },
     {
       "id": "F-002",
-      "title": "AGENTS.md mandates Pre-Action reads of `.cursor/rules/`, `.cursor/wiki/`, `.cursor/skills/`, `.cursor/llm/` — none exist",
+      "title": "AGENTS.md mandates Pre-Action reads of `.cursor/rules/`, `.cursor/wiki/`, `.cursor/skills/`, `.cursor/llm/` \u00e2\u20ac\u201d none exist",
       "workstream": "WS3-drift",
       "severity": "high",
       "owner": "docs/repo-root",
       "category": "drift",
       "evidence": {
         "agents_md_lines": "Mandatory Pre-Action (Global) section in AGENTS.md and CLAUDE.md",
-        "missing_paths": [".cursor/rules/", ".cursor/wiki/", ".cursor/skills/", ".cursor/llm/", "llms.txt", ".cursorrules"],
-        "actual_files": ["llm.txt"]
+        "missing_paths": [
+          ".cursor/rules/",
+          ".cursor/wiki/",
+          ".cursor/skills/",
+          ".cursor/llm/",
+          "llms.txt",
+          ".cursorrules"
+        ],
+        "actual_files": [
+          "llm.txt"
+        ]
       },
       "observed": "Every AI agent is told to read `.cursor/...` and `llms.txt` before any code change. None of those resources exist in the repo, and the only LLM manifest is `llm.txt` (singular). This is a dead instruction surface that produces false-positive 'I followed the protocol' confidence in agents.",
       "expected": "Either provide the documented `.cursor/*` directories OR remove the Pre-Action requirement from AGENTS.md/CLAUDE.md so it does not silently fail.",
@@ -92,7 +105,12 @@
       "owner": "services/roma-service + services/orchestrator",
       "category": "stale-concept-claim",
       "evidence": {
-        "doc_references": ["AGENTS.md (`packages/spec-dictionary  # Spec Lock schemas`)", "CLAUDE.md (same)", "README.md", "docs/byok-and-run-flow.md (referenced in CLAUDE.md core principles)"],
+        "doc_references": [
+          "AGENTS.md (`packages/spec-dictionary  # Spec Lock schemas`)",
+          "CLAUDE.md (same)",
+          "README.md",
+          "docs/byok-and-run-flow.md (referenced in CLAUDE.md core principles)"
+        ],
         "code_matches": [
           "services/roma-service/main.py:32 (docstring: 'Structured specification (Spec Lock format)')",
           "services/roma-service/main.py:50 ('Turn this HyperAgent spec prompt into a structured Spec Lock JSON')",
@@ -101,11 +119,11 @@
         "missing": [
           "no class/interface named SpecLock anywhere in services/, packages/, apps/",
           "no `packages/spec-dictionary` directory",
-          "no Pydantic SpecLock model — only a generic `SpecModel(BaseModel)` in roma-service"
+          "no Pydantic SpecLock model \u00e2\u20ac\u201d only a generic `SpecModel(BaseModel)` in roma-service"
         ]
       },
       "observed": "`Spec Lock` is referenced in docs as a foundational schema/dictionary, but the actual implementation is a free-form LLM prompt asking the model to produce 'Spec Lock JSON'. There is no validation schema, no versioning, no shared type. Whatever the LLM emits is what flows downstream.",
-      "expected": "Either define a real `SpecLock` schema (Pydantic + Zod mirror in api-contracts) and validate every roma/spec output against it, OR rename the doc claim to match reality (e.g. 'spec prompt → unstructured spec JSON').",
+      "expected": "Either define a real `SpecLock` schema (Pydantic + Zod mirror in api-contracts) and validate every roma/spec output against it, OR rename the doc claim to match reality (e.g. 'spec prompt \u00e2\u2020\u2019 unstructured spec JSON').",
       "fix_action": "Tracked as F-003 in findings; out of scope for a single PR but landing a smaller follow-up: tag the existing `SpecModel` as the canonical Spec Lock contract, mirror it into `packages/api-contracts`, and validate roma output. Remove the `packages/spec-dictionary` reference from AGENTS.md/CLAUDE.md (this PR).",
       "fix_status": "doc_corrected_in_this_pr_schema_followup_tracked"
     },
@@ -117,9 +135,9 @@
       "owner": "packages/workflow-state + services/orchestrator",
       "category": "duplicate-ownership",
       "evidence": {
-        "ts": "packages/workflow-state/src/pipeline-states.ts:7-21 — `PIPELINE_STAGES` literal array",
-        "py": "services/orchestrator/workflow_state.py — `current_stage: str` (free-form)",
-        "sync_rule": "packages/workflow-state/src/pipeline-states.ts:2 — `Keep in sync with services/orchestrator nodes and workflow responses.`"
+        "ts": "packages/workflow-state/src/pipeline-states.ts:7-21 \u00e2\u20ac\u201d `PIPELINE_STAGES` literal array",
+        "py": "services/orchestrator/workflow_state.py \u00e2\u20ac\u201d `current_stage: str` (free-form)",
+        "sync_rule": "packages/workflow-state/src/pipeline-states.ts:2 \u00e2\u20ac\u201d `Keep in sync with services/orchestrator nodes and workflow responses.`"
       },
       "observed": "TS package enumerates 13 canonical stages; orchestrator stores `current_stage` as a bare `str` with no enum. The only sync mechanism is a docstring. Same class of bug as the previously-fixed `KNOWN_PATH_PREFIXES` in PR #441 (gateway).",
       "expected": "Add a parity test (TS or pytest) that statically checks `current_stage` writes in `services/orchestrator/nodes.py` against `PIPELINE_STAGES`. Same pattern as `apps/api-gateway/src/knownPaths.test.ts`.",
@@ -139,7 +157,7 @@
       },
       "observed": "The gateway mints `rt=<jwt>` based purely on signature/SIWE verification. It does not require a successful upstream identity-create round-trip before setting the cookie. A correctly-signed but unknown-to-orchestrator wallet still gets a usable Bearer token.",
       "expected": "Either: (a) require orchestrator `/api/v1/identity` lookup before issuing the cookie, OR (b) explicitly document that the cookie is signed-by-gateway only and orchestrator route handlers MUST re-validate identity. Today both behaviors coexist without a single-owner contract.",
-      "fix_action": "Track as F-005; small follow-up PR. No code change in this PR — adding a forced upstream call needs a feature flag and product decision.",
+      "fix_action": "Track as F-005; small follow-up PR. No code change in this PR \u00e2\u20ac\u201d adding a forced upstream call needs a feature flag and product decision.",
       "fix_status": "tracked_in_findings"
     },
     {
@@ -151,7 +169,7 @@
       "category": "inconsistent-error-shape",
       "evidence": {
         "file": "apps/api-gateway/src/proxy.ts",
-        "lines": "createProxyOptions onProxyRes — only rewrites body for `status >= 500`"
+        "lines": "createProxyOptions onProxyRes \u00e2\u20ac\u201d only rewrites body for `status >= 500`"
       },
       "observed": "5xx responses are normalized to `{error, message, requestId}`. 4xx responses pass through whatever the orchestrator returned, which means the public API shape is non-uniform. Studio downstream often assumes `error/message` keys but FastAPI emits `detail`.",
       "expected": "Normalize 4xx the same way 5xx is normalized (or relay verbatim) so Studio and the SDK can rely on a single error envelope.",
@@ -160,7 +178,7 @@
     },
     {
       "id": "F-007",
-      "title": "Gateway public-paths set treats `/auth/bootstrap` AND `/api/v1/auth/bootstrap` as public — duplicate enumeration",
+      "title": "Gateway public-paths set treats `/auth/bootstrap` AND `/api/v1/auth/bootstrap` as public \u00e2\u20ac\u201d duplicate enumeration",
       "workstream": "WS6-duplicate",
       "severity": "low",
       "owner": "packages/api-contracts/src/api-paths.ts",
@@ -171,8 +189,8 @@
       },
       "observed": "The gateway only mounts `/api/v1/auth/bootstrap`. The bare `/auth/bootstrap` entry is leftover from before the `/api/v1` migration; it is dead unless an undocumented legacy mount exists.",
       "expected": "Drop `/auth/bootstrap` from GATEWAY_PUBLIC_PATHS, or add the legacy mount and a parity test.",
-      "fix_action": "Removed `/auth/bootstrap` (no `/api/v1` prefix) from GATEWAY_PUBLIC_PATHS in this PR after grepping all gateway mounts to confirm no consumer.",
-      "fix_status": "fixed_in_this_pr"
+      "fix_action": "Removed `/auth/bootstrap` (no `/api/v1` prefix) from GATEWAY_PUBLIC_PATHS in this PR after grepping all gateway mounts to confirm no consumer. Also removed the same dead bare /auth/bootstrap entry from METERING_EXEMPT_PREFIXES (missed in initial fix \u2014 caught by Devin Review).",
+      "fix_status": "fixed_in_followup"
     },
     {
       "id": "F-008",
@@ -183,7 +201,7 @@
       "category": "legacy-still-mounted",
       "evidence": {
         "main_py": "services/orchestrator/main.py:358 `app.include_router(approve_spec_legacy_router)`",
-        "import": "services/orchestrator/api/__init__.py — `approve_spec_legacy_router` is one of the runs_registry exports",
+        "import": "services/orchestrator/api/__init__.py \u00e2\u20ac\u201d `approve_spec_legacy_router` is one of the runs_registry exports",
         "naming": "explicit `_legacy` suffix"
       },
       "observed": "A router explicitly named `_legacy` is mounted in production. The naming declares it as legacy with no removal date or deprecation header.",
@@ -199,8 +217,8 @@
       "owner": "apps/studio/proxy.ts AND apps/api-gateway/src/proxy.ts",
       "category": "duplicate-ownership",
       "evidence": {
-        "studio": "apps/studio/proxy.ts (~150 LOC) — Next.js dev proxy",
-        "gateway": "apps/api-gateway/src/proxy.ts (~140 LOC) — production HTTP forwarder"
+        "studio": "apps/studio/proxy.ts (~150 LOC) \u00e2\u20ac\u201d Next.js dev proxy",
+        "gateway": "apps/api-gateway/src/proxy.ts (~140 LOC) \u00e2\u20ac\u201d production HTTP forwarder"
       },
       "observed": "Two independent proxy implementations exist. Studio's dev proxy can mask gateway-side bugs in development (e.g., header forwarding, error shape). The dev experience can succeed while production fails.",
       "expected": "Studio proxy should either delegate fully to gateway or share a contract test that asserts identical behavior on the same inputs.",
@@ -216,12 +234,12 @@
       "category": "duplicate-validation",
       "evidence": {
         "gateway_router": "apps/api-gateway/src/byok.ts (mounted at /api/v1/byok)",
-        "orchestrator_router": "services/orchestrator/api/runs_registry.py — `llm_keys_router`",
+        "orchestrator_router": "services/orchestrator/api/runs_registry.py \u00e2\u20ac\u201d `llm_keys_router`",
         "studio": "apps/studio/lib references `byok` flow in chat hooks"
       },
       "observed": "Three places independently parse / validate LLM keys with their own envelope rules. Drift between the gateway BYOK envelope and the orchestrator llm_keys envelope is currently invisible to tests.",
       "expected": "Single Zod (TS) + Pydantic (Py) schema for BYOK payloads, generated from `packages/api-contracts/openapi`. Both gateway and orchestrator import from the contract.",
-      "fix_action": "Tracked. Fix is non-trivial and crosses Python ↔ TS boundary; sequencing into a follow-up after audit.",
+      "fix_action": "Tracked. Fix is non-trivial and crosses Python \u00e2\u2020\u201d TS boundary; sequencing into a follow-up after audit.",
       "fix_status": "tracked_in_findings"
     },
     {
@@ -275,7 +293,7 @@
       },
       "observed": "Studio's middleware allow-list is independently maintained from the gateway public-paths. A page that's public in the UI but not in the gateway will silently 401, and vice versa.",
       "expected": "Single source: Studio middleware imports the gateway public-paths and translates them to UI route equivalents.",
-      "fix_action": "Tracked. Mitigated by `packages/api-contracts` already exporting GATEWAY_PUBLIC_PATHS — fix is a 1-import change in middleware.",
+      "fix_action": "Tracked. Mitigated by `packages/api-contracts` already exporting GATEWAY_PUBLIC_PATHS \u00e2\u20ac\u201d fix is a 1-import change in middleware.",
       "fix_status": "tracked_in_findings"
     },
     {
@@ -296,7 +314,7 @@
     },
     {
       "id": "F-015",
-      "title": "`MAX_AUTOFIX_CYCLES = 3` hardcoded in workflow_state.py — autofix loop bound is duplicated as runtime guard elsewhere",
+      "title": "`MAX_AUTOFIX_CYCLES = 3` hardcoded in workflow_state.py \u00e2\u20ac\u201d autofix loop bound is duplicated as runtime guard elsewhere",
       "workstream": "WS6-duplicate",
       "severity": "low",
       "owner": "services/orchestrator/workflow_state.py + nodes.py",
@@ -317,7 +335,7 @@
       "owner": "services/orchestrator/api/runs_registry.py + tests/integration",
       "category": "harness-gap",
       "evidence": {
-        "file": "services/orchestrator/api/runs_registry.py — `approve_spec_legacy_router`",
+        "file": "services/orchestrator/api/runs_registry.py \u00e2\u20ac\u201d `approve_spec_legacy_router`",
         "tests": "no tests in services/orchestrator/tests/* match `approve_spec_legacy`"
       },
       "observed": "A legacy router is in production with zero test coverage. Removing or refactoring it is unsafe.",
@@ -349,28 +367,28 @@
       "category": "gating-logic-risk",
       "evidence": {
         "gateway": "apps/api-gateway/src/x402.ts",
-        "orchestrator": "services/orchestrator/api/x402_webhooks.py — `/settlement` POST handler",
+        "orchestrator": "services/orchestrator/api/x402_webhooks.py \u00e2\u20ac\u201d `/settlement` POST handler",
         "spread": "x402 referenced in 103 files (apps, services, packages, infra)"
       },
       "observed": "x402 (paid-API) gating is spread across 103 files. The gateway can mark a request as billable, but the orchestrator settlement webhook is a single POST endpoint that updates state with no signature/HMAC check evident from naming. This is the highest-risk gating surface and warrants a dedicated audit.",
-      "expected": "Single canonical x402 verifier with end-to-end test: gateway forwards billable header → orchestrator settlement HMAC verified → run state transitions → UI billing display matches DB.",
+      "expected": "Single canonical x402 verifier with end-to-end test: gateway forwards billable header \u00e2\u2020\u2019 orchestrator settlement HMAC verified \u00e2\u2020\u2019 run state transitions \u00e2\u2020\u2019 UI billing display matches DB.",
       "fix_action": "Tracked as a top-priority follow-up audit. This PR adds findings + a placeholder test in `apps/api-gateway/src/x402.test.ts` if missing.",
       "fix_status": "tracked_in_findings"
     },
     {
       "id": "F-019",
-      "title": "Orchestrator `current_stage` is `str` with no validator — any agent node can write a typo and break UI mapping",
+      "title": "Orchestrator `current_stage` is `str` with no validator \u00e2\u20ac\u201d any agent node can write a typo and break UI mapping",
       "workstream": "WS3-drift",
       "severity": "high",
       "owner": "services/orchestrator/workflow_state.py",
       "category": "weak-schema",
       "evidence": {
         "file": "services/orchestrator/workflow_state.py:46",
-        "ts_canonical": "packages/workflow-state/src/pipeline-states.ts:7-21 — 13 stages"
+        "ts_canonical": "packages/workflow-state/src/pipeline-states.ts:7-21 \u00e2\u20ac\u201d 13 stages"
       },
       "observed": "AgentState declares `current_stage: str` (no Literal). Any node that types `'desigh'` instead of `'design'` will pass typing and silently leave the UI in `idle`. This is exactly the failure mode the workflow-state package warns about in its docstring.",
       "expected": "Promote `current_stage` to `Literal[...]` mirroring `PIPELINE_STAGES`, OR add a `set_current_stage(state, stage)` setter that validates against the canonical list.",
-      "fix_action": "Three layers of defence: (a) canonical `PIPELINE_STAGES` frozenset of all 19 stages + `set_current_stage(state, stage)` validator in services/orchestrator/workflow_state.py that raises `ValueError` on unknown stages; (b) all 15 active `state['current_stage'] = ...` writes across services/orchestrator/nodes.py (12 sites including 3 multi-line conditional writes), services/orchestrator/workflow.py (1 site), and services/orchestrator/agents/debate_agent.py (1 site) migrated to `set_current_stage(...)` — the validator now gates writes at runtime; (c) TS-side parity harness in apps/api-gateway/src/pipelineStageParity.test.ts that scans every `current_stage = \"...\"` / `state[\"current_stage\"] = \"...\"` / `\"current_stage\": \"...\"` write across services/orchestrator/**/*.py and asserts each literal is in PIPELINE_STAGES — fails CI on a typo even before runtime. Initial-dict-literal sites in workflow.py:335 (`\"current_stage\": \"spec\"`) and api/runs_registry.py:138 (`\"current_stage\": \"design\"`) are left as-is; they are guarded by the parity harness because both literals are in PIPELINE_STAGES.",
+      "fix_action": "Three layers of defence: (a) canonical `PIPELINE_STAGES` frozenset of all 19 stages + `set_current_stage(state, stage)` validator in services/orchestrator/workflow_state.py that raises `ValueError` on unknown stages; (b) all 15 active `state['current_stage'] = ...` writes across services/orchestrator/nodes.py (12 sites including 3 multi-line conditional writes), services/orchestrator/workflow.py (1 site), and services/orchestrator/agents/debate_agent.py (1 site) migrated to `set_current_stage(...)` \u00e2\u20ac\u201d the validator now gates writes at runtime; (c) TS-side parity harness in packages/workflow-state/src/__tests__/stage-parity.test.ts that scans every `current_stage = \"...\"` / `state[\"current_stage\"] = \"...\"` / `\"current_stage\": \"...\"` write across services/orchestrator/**/*.py and asserts each literal is in PIPELINE_STAGES \u00e2\u20ac\u201d fails CI on a typo even before runtime. Initial-dict-literal sites in workflow.py:335 (`\"current_stage\": \"spec\"`) and api/runs_registry.py:138 (`\"current_stage\": \"design\"`) are left as-is; they are guarded by the parity harness because both literals are in PIPELINE_STAGES.",
       "fix_status": "fixed_in_this_pr"
     },
     {
@@ -381,11 +399,11 @@
       "owner": "apps/api-gateway/src/*.test.ts",
       "category": "harness-gap",
       "evidence": {
-        "tests": "10 test files, 86 tests — all unit-level, all mock the orchestrator",
+        "tests": "10 test files, 86 tests \u00e2\u20ac\u201d all unit-level, all mock the orchestrator",
         "missing": "no integration test that boots both gateway and orchestrator and exercises a single workflow lifecycle"
       },
       "observed": "Local tests are healthy (`pnpm test` green) but they cannot catch drift between the gateway proxy rules and the orchestrator routes. The previously-fixed `KNOWN_PATH_PREFIXES` issue (PR #441) is exactly this class of bug.",
-      "expected": "Add a docker-compose-driven integration suite in CI that exercises at least: bootstrap → BYOK → workflow create → spec → audit (gated) → deploy.",
+      "expected": "Add a docker-compose-driven integration suite in CI that exercises at least: bootstrap \u00e2\u2020\u2019 BYOK \u00e2\u2020\u2019 workflow create \u00e2\u2020\u2019 spec \u00e2\u2020\u2019 audit (gated) \u00e2\u2020\u2019 deploy.",
       "fix_action": "This PR adds an `audit/scripts/route-probe.ts` script that, when run against a live stack, asserts every path in `ApiPaths` returns a non-stub response. Used in `audit/08-runtime-proof/` as the harness skeleton; full integration suite tracked.",
       "fix_status": "harness_added_in_this_pr"
     },
@@ -406,7 +424,7 @@
     },
     {
       "id": "F-022",
-      "title": "`services/orchestrator/store.py` carries 3 distinct `legacy` markers — duplicate stores still wired",
+      "title": "`services/orchestrator/store.py` carries 3 distinct `legacy` markers \u00e2\u20ac\u201d duplicate stores still wired",
       "workstream": "WS5-legacy",
       "severity": "medium",
       "owner": "services/orchestrator/store.py",
@@ -421,7 +439,7 @@
     },
     {
       "id": "F-023",
-      "title": "Three `validate-pr` CI checks run on every PR — historical entries pile up after retitle",
+      "title": "Three `validate-pr` CI checks run on every PR \u00e2\u20ac\u201d historical entries pile up after retitle",
       "workstream": "WS5-legacy",
       "severity": "low",
       "owner": ".github/workflows",
@@ -440,7 +458,7 @@
       "owner": "services/orchestrator/api/pipeline.py",
       "category": "dos-risk",
       "evidence": {
-        "file": "services/orchestrator/api/pipeline.py — `@router.post('/generate')`"
+        "file": "services/orchestrator/api/pipeline.py \u00e2\u20ac\u201d `@router.post('/generate')`"
       },
       "observed": "Mirrors the SIWE/thirdweb size cap finding from PR #458, but on the prompt side. A 2 MB prompt forwards to the LLM agent stack and burns BYOK credits before any check.",
       "expected": "Add a `MAX_PROMPT_LEN` constant (e.g. 32 KB) and reject oversized prompts with `400 PROMPT_TOO_LARGE` before dispatch.",
@@ -449,7 +467,7 @@
     },
     {
       "id": "F-025",
-      "title": "agent-registry / a2a / erc8004 / user-templates / artifacts proxy mounts forward to orphaned orchestrator routers — Studio actively calls these and was 404'd",
+      "title": "agent-registry / a2a / erc8004 / user-templates / artifacts proxy mounts forward to orphaned orchestrator routers \u00e2\u20ac\u201d Studio actively calls these and was 404'd",
       "workstream": "WS3-drift",
       "severity": "high",
       "owner": "apps/api-gateway/src/index.ts + services/orchestrator/api/agent_lifecycle.py + services/orchestrator/api/user_templates.py",
@@ -458,11 +476,11 @@
         "gateway": "apps/api-gateway/src/index.ts createOrchestratorLegacyMountProxy('/agent-registry'), '/a2a', '/erc8004', '/user-templates', '/artifacts'",
         "orchestrator": "services/orchestrator/api/agent_lifecycle.py defines registry_router, a2a_router, erc8004_router with 25+ endpoints; services/orchestrator/api/user_templates.py defines router + artifacts_router with 7 endpoints; NEITHER file was imported by services/orchestrator/api/__init__.py and NEITHER router was passed to app.include_router(...) in services/orchestrator/main.py",
         "studio_callers": [
-          "apps/studio/lib/api/agentRegistry.ts — calls /api/v1/agent-registry/agents, /api/v1/agent-registry/capabilities",
-          "apps/studio/lib/api/userTemplates.ts — calls /api/v1/user-templates and /api/v1/artifacts",
-          "apps/studio/components/agents/RegistryAgentsPanel.tsx — gates ERC-8004 sync UI behind NEXT_PUBLIC_ERC8004_SYNC_ENABLED feature flag (default off) — UI _knew_ the upstream was missing"
+          "apps/studio/lib/api/agentRegistry.ts \u00e2\u20ac\u201d calls /api/v1/agent-registry/agents, /api/v1/agent-registry/capabilities",
+          "apps/studio/lib/api/userTemplates.ts \u00e2\u20ac\u201d calls /api/v1/user-templates and /api/v1/artifacts",
+          "apps/studio/components/agents/RegistryAgentsPanel.tsx \u00e2\u20ac\u201d gates ERC-8004 sync UI behind NEXT_PUBLIC_ERC8004_SYNC_ENABLED feature flag (default off) \u00e2\u20ac\u201d UI _knew_ the upstream was missing"
         ],
-        "unit_test_evidence": "services/orchestrator/tests/unit/test_agent_lifecycle_api.py mounts the routers in a private FastAPI() — proves the routers work in isolation but not in production"
+        "unit_test_evidence": "services/orchestrator/tests/unit/test_agent_lifecycle_api.py mounts the routers in a private FastAPI() \u00e2\u20ac\u201d proves the routers work in isolation but not in production"
       },
       "observed": "Gateway forwarded /agent-registry, /a2a, /erc8004, /user-templates, /artifacts traffic to /api/v1/<mount> on the orchestrator; the orchestrator returned 404 because the routers were never imported in api/__init__.py or mounted in main.py. Studio calls these endpoints today.",
       "expected": "Mount the routers in main.py and export them from api/__init__.py.",

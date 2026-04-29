@@ -16,7 +16,8 @@
   "files": ["dist", "src"],
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "xstate": "^5.19.0"
@@ -33,6 +34,7 @@
     "@types/react": "^19.2.14",
     "@xstate/react": "^5.0.0",
     "react": "^19.2.5",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "vitest": "^3.2.0"
   }
 }

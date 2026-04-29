@@ -285,4 +285,82 @@ describe("authMiddleware", () => {
     } as unknown as Request;
     expect(__clientRemoteKeyForTest(reqNothing)).toBe("unknown");
   });
+
+  it("rejects a JWT with no sub claim as invalid_token (identity-less principal)", () => {
+    // A JWT that verifies cryptographically but carries no identity must not
+    // be accepted on a protected route — downstream middlewares treat
+    // `req.userId` as the authenticated principal.
+    const verifySpy = vi.spyOn(jwt, "verify").mockReturnValue({
+      wallet_address: "0xabc",
+    } as never);
+    const { next, payload } = runAuth(
+      "/api/v1/workflows",
+      "Bearer no-sub-token",
+    );
+    expect(next).not.toHaveBeenCalled();
+    expect(payload.statusCode).toBe(401);
+    expect(payload.body).toMatchObject({
+      code: "unauthorized.invalid_token",
+    });
+    verifySpy.mockRestore();
+  });
+
+  it("rejects a JWT with empty-string sub as invalid_token", () => {
+    const verifySpy = vi.spyOn(jwt, "verify").mockReturnValue({
+      sub: "   ",
+      wallet_address: "0xabc",
+    } as never);
+    const { next, payload } = runAuth(
+      "/api/v1/workflows",
+      "Bearer blank-sub-token",
+    );
+    expect(next).not.toHaveBeenCalled();
+    expect(payload.statusCode).toBe(401);
+    expect(payload.body).toMatchObject({
+      code: "unauthorized.invalid_token",
+    });
+    verifySpy.mockRestore();
+  });
+
+  it("rejects a JWT with non-string sub as invalid_token", () => {
+    const verifySpy = vi.spyOn(jwt, "verify").mockReturnValue({
+      sub: 12345,
+    } as never);
+    const { next, payload } = runAuth(
+      "/api/v1/workflows",
+      "Bearer numeric-sub",
+    );
+    expect(next).not.toHaveBeenCalled();
+    expect(payload.statusCode).toBe(401);
+    expect(payload.body).toMatchObject({
+      code: "unauthorized.invalid_token",
+    });
+    verifySpy.mockRestore();
+  });
+
+  it("does not populate identity from a sub-less token on public paths", () => {
+    const verifySpy = vi.spyOn(jwt, "verify").mockReturnValue({
+      wallet_address: "0xabc",
+    } as never);
+    const { req, next } = runAuth("/api/v1/config", "Bearer no-sub-token");
+    expect(next).toHaveBeenCalledOnce();
+    expect(req.userId).toBeUndefined();
+    expect(req.walletAddress).toBeUndefined();
+    verifySpy.mockRestore();
+  });
+
+  it("treats malformed percent-encoded rt cookie as no credential (no 500)", () => {
+    // `decodeURIComponent("%E0%A4%A")` throws URIError. The middleware must
+    // surface a clean 401 rather than a 500 from an unhandled exception.
+    const { next, payload } = runAuth(
+      "/api/v1/workflows",
+      undefined,
+      "rt=%E0%A4%A; Path=/",
+    );
+    expect(next).not.toHaveBeenCalled();
+    expect(payload.statusCode).toBe(401);
+    expect(payload.body).toMatchObject({
+      code: "unauthorized.missing_credential",
+    });
+  });
 });

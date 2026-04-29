@@ -10,6 +10,10 @@
  * Security hardening:
  *   - JWT verification is pinned to `HS256` (the algorithm used by `authBootstrap.ts`)
  *     to prevent algorithm-confusion attacks.
+ *   - JWTs without a non-empty string `sub` claim are rejected as
+ *     `unauthorized.invalid_token`. Downstream middlewares (metering, x402,
+ *     proxy) treat `req.userId` as the authenticated principal, so an
+ *     identity-less token must never be accepted on protected routes.
  *   - 401 responses include an RFC 6750 `WWW-Authenticate: Bearer` challenge and
  *     a stable machine-readable `code` field so clients can react correctly.
  *   - Failed-auth logs are consolidated into a single structured record and
@@ -22,6 +26,7 @@ import {
   GATEWAY_PUBLIC_PATHS,
 } from "@hyperagent/api-contracts";
 import { getGatewayEnv } from "@hyperagent/config";
+import { clientRemoteIp } from "./clientIp.js";
 import { log } from "./logger.js";
 
 export interface RequestWithUser extends Request {
@@ -58,14 +63,10 @@ function isPublicPathFromReq(req: Request): boolean {
     normalizePath(req.url || ""),
   ];
 
+  const isProd = getGatewayEnv().isProduction;
   return candidates.some((p) => {
-    if (
-      p.startsWith("/auth/bootstrap/") ||
-      p.startsWith("/api/v1/auth/bootstrap/")
-    )
-      return true;
     if (PUBLIC_PATHS.has(p)) return true;
-    if (DEV_ONLY_PUBLIC_PATHS.has(p) && !getGatewayEnv().isProduction) return true;
+    if (DEV_ONLY_PUBLIC_PATHS.has(p) && !isProd) return true;
     return false;
   });
 }
@@ -82,7 +83,14 @@ function tokenFromCookieHeader(cookieHeader: string | undefined): string | null 
     if (key !== "rt") continue;
     const value = item.slice(eq + 1).trim();
     if (!value) return null;
-    return decodeURIComponent(value);
+    // Defensive: a malformed percent-encoded cookie value would throw and
+    // surface as a 500 from this middleware. Treat malformed cookies as no
+    // credential so the request falls through to the standard 401 path.
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return null;
+    }
   }
   return null;
 }
@@ -180,23 +188,9 @@ export function __authFailureSampleForTest(
   return { shouldLog, suppressed };
 }
 
-/**
- * Sample-key remote identifier. Prefer Express's `req.ip` because the gateway
- * runs with `app.set("trust proxy", 1)` (see `index.ts`) and Express derives a
- * trustworthy left-most non-trusted-proxy address from the `X-Forwarded-For`
- * chain. Reading the raw `X-Forwarded-For` header here would let an attacker
- * vary it per request, mint a unique sampler key on every call, and bypass the
- * log-flood protection the sampler is designed to provide.
- */
-function clientRemoteKey(req: Request): string {
-  if (req.ip && req.ip.length > 0) return req.ip;
-  if (req.socket?.remoteAddress) return req.socket.remoteAddress;
-  return "unknown";
-}
-
 /** Exposed for tests only. */
 export function __clientRemoteKeyForTest(req: Request): string {
-  return clientRemoteKey(req);
+  return clientRemoteIp(req);
 }
 
 /** Consolidated structured log for an auth decision. */
@@ -229,7 +223,7 @@ function logAuthEvent(
   }
 
   // Sample failures to avoid log floods from retry loops / misconfigured clients.
-  const remote = clientRemoteKey(req);
+  const remote = clientRemoteIp(req);
   const sampleKey = `${remote}|${outcome}|${path}`;
   const decision = authFailureSampleDecision(sampleKey, now);
   if (!decision.shouldLog) return;
@@ -277,6 +271,41 @@ function respondUnauthorized(
 
 /* ------------------------------------------------------------------ */
 
+interface VerifiedIdentity {
+  userId: string;
+  walletAddress?: string;
+}
+
+/**
+ * Verify a JWT and extract the identity it carries. Returns null when the
+ * token cannot be verified or when the resulting payload is not a complete
+ * principal (missing or non-string `sub`).
+ */
+function verifyAndExtractIdentity(
+  token: string,
+  secret: string,
+): VerifiedIdentity | null {
+  let payload: unknown;
+  try {
+    payload = jwt.verify(token, secret, { algorithms: JWT_ALGORITHMS });
+  } catch {
+    return null;
+  }
+  if (!payload || typeof payload !== "object") return null;
+  const claims = payload as { sub?: unknown; wallet_address?: unknown };
+  if (typeof claims.sub !== "string" || claims.sub.trim().length === 0) {
+    return null;
+  }
+  const identity: VerifiedIdentity = { userId: claims.sub };
+  if (
+    typeof claims.wallet_address === "string" &&
+    claims.wallet_address.length > 0
+  ) {
+    identity.walletAddress = claims.wallet_address;
+  }
+  return identity;
+}
+
 export function authMiddleware(
   req: RequestWithUser,
   res: Response,
@@ -290,22 +319,13 @@ export function authMiddleware(
 
   if (isPublicPathFromReq(req)) {
     if (authJwtSecret && resolved.token) {
-      try {
-        const payload = jwt.verify(resolved.token, authJwtSecret, {
-          algorithms: JWT_ALGORITHMS,
-        }) as {
-          sub?: string;
-          wallet_address?: string;
-        };
-        if (payload?.sub) req.userId = payload.sub;
-        if (
-          payload?.wallet_address &&
-          typeof payload.wallet_address === "string"
-        ) {
-          req.walletAddress = payload.wallet_address;
-        }
-      } catch {
-        /* public path: best-effort identity only */
+      // Best-effort identity on public paths: an invalid or identity-less
+      // token should not 401 (that would break health/config) but we still
+      // refuse to populate `req.userId` from a token we cannot fully trust.
+      const identity = verifyAndExtractIdentity(resolved.token, authJwtSecret);
+      if (identity) {
+        req.userId = identity.userId;
+        if (identity.walletAddress) req.walletAddress = identity.walletAddress;
       }
     }
     next();
@@ -351,22 +371,8 @@ export function authMiddleware(
     return;
   }
 
-  try {
-    const payload = jwt.verify(resolved.token, authJwtSecret, {
-      algorithms: JWT_ALGORITHMS,
-    }) as {
-      sub?: string;
-      wallet_address?: string;
-    };
-    if (payload?.sub) {
-      req.userId = payload.sub;
-    }
-    if (payload?.wallet_address && typeof payload.wallet_address === "string") {
-      req.walletAddress = payload.wallet_address;
-    }
-    logAuthEvent(req, path, requestId, true, resolved.scheme, "pass", 200);
-    next();
-  } catch {
+  const identity = verifyAndExtractIdentity(resolved.token, authJwtSecret);
+  if (!identity) {
     logAuthEvent(
       req,
       path,
@@ -386,5 +392,11 @@ export function authMiddleware(
       },
       "invalid_token",
     );
+    return;
   }
+
+  req.userId = identity.userId;
+  if (identity.walletAddress) req.walletAddress = identity.walletAddress;
+  logAuthEvent(req, path, requestId, true, resolved.scheme, "pass", 200);
+  next();
 }

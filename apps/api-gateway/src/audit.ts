@@ -27,8 +27,11 @@ interface AuditPayload {
 }
 
 function extractRequestMeta(req: Request): Pick<AuditPayload, "ip_address" | "user_agent" | "request_id"> {
+  // `req.ip` is derived from the trusted proxy chain (see `app.set("trust proxy", 1)`).
+  // Reading raw `x-forwarded-for` here would let any unauthenticated client spoof
+  // the audit-log IP, which defeats the point of the audit log.
   return {
-    ip_address: req.ip || (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress,
+    ip_address: req.ip || req.socket.remoteAddress,
     user_agent: (req.headers["user-agent"] as string) || undefined,
     request_id: (req as Request & { requestId?: string }).requestId,
   };

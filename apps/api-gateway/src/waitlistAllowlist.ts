@@ -51,7 +51,8 @@ export async function assertBetaAllowlistWallet(
   }
 
   const w = normalizeWallet(walletAddress);
-  if (!w.startsWith("0x") || w.length < 10) {
+  // EVM address: 0x + 40 lowercase hex digits (`normalizeWallet` already lowercased).
+  if (!/^0x[0-9a-f]{40}$/.test(w)) {
     return {
       ok: false,
       status: 400,

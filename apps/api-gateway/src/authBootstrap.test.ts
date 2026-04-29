@@ -4,6 +4,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import express, { json } from "express";
 import request from "supertest";
+import { resetGatewayEnvForTests } from "@hyperagent/config";
 import { isMissingTableError, isValidEip191SignatureHex } from "./authBootstrap.js";
 
 beforeAll(() => {
@@ -91,5 +92,47 @@ describe("authBootstrapHandler", () => {
     expect(res.status).toBe(503);
     expect(res.body.message).toMatch(/Auth not configured|Supabase not configured/);
     expect(["AUTH_NOT_CONFIGURED", "SUPABASE_NOT_CONFIGURED"]).toContain(res.body.code);
+  });
+
+  it("rejects siwe payloads above the size cap with SIWE_PAYLOAD_TOO_LARGE", async () => {
+    process.env.AUTH_JWT_SECRET = "x";
+    process.env.SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_KEY = "y";
+    resetGatewayEnvForTests();
+    try {
+      const app = await getApp();
+      const huge = "x".repeat(5000);
+      const res = await request(app)
+        .post("/api/v1/auth/bootstrap")
+        .send({ authMethod: "siwe", siwePayload: { message: huge, signature: "0xab" } });
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe("SIWE_PAYLOAD_TOO_LARGE");
+    } finally {
+      process.env.AUTH_JWT_SECRET = "";
+      process.env.SUPABASE_URL = "";
+      process.env.SUPABASE_SERVICE_KEY = "";
+      resetGatewayEnvForTests();
+    }
+  });
+
+  it("rejects oversize thirdweb authToken with THIRDWEB_PAYLOAD_TOO_LARGE", async () => {
+    process.env.AUTH_JWT_SECRET = "x";
+    process.env.SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_KEY = "y";
+    resetGatewayEnvForTests();
+    try {
+      const app = await getApp();
+      const oversize = "t".repeat(9_000);
+      const res = await request(app)
+        .post("/api/v1/auth/bootstrap")
+        .send({ authMethod: "thirdweb_inapp", authToken: oversize });
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe("THIRDWEB_PAYLOAD_TOO_LARGE");
+    } finally {
+      process.env.AUTH_JWT_SECRET = "";
+      process.env.SUPABASE_URL = "";
+      process.env.SUPABASE_SERVICE_KEY = "";
+      resetGatewayEnvForTests();
+    }
   });
 });

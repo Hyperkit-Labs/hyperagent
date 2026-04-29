@@ -68,6 +68,17 @@ export function isValidEip191SignatureHex(signature: string): boolean {
   return /^[0-9a-fA-F]{130}$/.test(hex);
 }
 
+/**
+ * Defensive caps on user-supplied bootstrap fields to keep parsing and crypto
+ * work bounded for unauthenticated requests. Values well above any plausible
+ * legitimate input but below pathological sizes (multi-MB) that would consume
+ * CPU before failing validation.
+ */
+const MAX_SIWE_MESSAGE_LEN = 4_096;
+const MAX_SIWE_SIGNATURE_LEN = 200; // "0x" + 130 hex + slack
+const MAX_THIRDWEB_TOKEN_LEN = 8_192;
+const MAX_WALLET_ADDRESS_LEN = 64;
+
 async function verifyThirdwebAuthToken(authToken: string): Promise<string | null> {
   const secret = getGatewayEnv().bootstrap.thirdwebSecretKey;
   if (!secret) return null;
@@ -261,6 +272,14 @@ export async function authBootstrapHandler(req: Request, res: Response): Promise
       });
       return;
     }
+    if (message.length > MAX_SIWE_MESSAGE_LEN || signature.length > MAX_SIWE_SIGNATURE_LEN) {
+      res.status(400).json({
+        error: "Bad Request",
+        code: "SIWE_PAYLOAD_TOO_LARGE",
+        message: "siwePayload.message or siwePayload.signature is too large",
+      });
+      return;
+    }
     const sigTrim = signature.trim();
     if (!isValidEip191SignatureHex(sigTrim)) {
       debugLog("authBootstrap.ts:siwe-invalid-sig-format", "rejected: signature not 65-byte hex", { hexLen: sigTrim.length, hypothesisId: "H2" });
@@ -316,6 +335,17 @@ export async function authBootstrapHandler(req: Request, res: Response): Promise
         error: "Bad Request",
         code: "THIRDWEB_TOKEN_REQUIRED",
         message: "authToken is required for thirdweb_inapp",
+      });
+      return;
+    }
+    if (
+      authToken.length > MAX_THIRDWEB_TOKEN_LEN ||
+      walletAddressFromClient.length > MAX_WALLET_ADDRESS_LEN
+    ) {
+      res.status(400).json({
+        error: "Bad Request",
+        code: "THIRDWEB_PAYLOAD_TOO_LARGE",
+        message: "authToken or walletAddress is too large",
       });
       return;
     }
@@ -380,15 +410,6 @@ export async function authBootstrapHandler(req: Request, res: Response): Promise
     return;
   }
 
-  if (!result.userId) {
-    res.status(500).json({
-      error: "Internal Server Error",
-      code: "WALLET_RECORD_FAILED",
-      message: "Critical: Failed to record wallet user in DB",
-    });
-    return;
-  }
-
   // #region agent log
   const expSec = getGatewayEnv().bootstrap.jwtExpiresInSec;
   debugLog("authBootstrap.ts:jwt-sign-success", "issuing JWT, bootstrap success", {
@@ -405,9 +426,13 @@ export async function authBootstrapHandler(req: Request, res: Response): Promise
     { expiresIn: expSec }
   );
 
-  const isSecure = req.protocol === "https" || req.headers["x-forwarded-proto"] === "https";
+  // `req.secure` honours `app.set("trust proxy", 1)` (see `index.ts`) and only
+  // returns true when Express derived `https` from a *trusted* proxy. Reading
+  // raw `x-forwarded-proto` here would let an attacker mark insecure requests
+  // "secure" by sending the header themselves.
+  const isSecure = req.secure;
   const cookieFlags = [
-    `rt=${token}`,
+    `rt=${encodeURIComponent(token)}`,
     "Path=/",
     "HttpOnly",
     isSecure ? "Secure" : "",

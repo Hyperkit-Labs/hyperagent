@@ -13,6 +13,7 @@ import { ApiPaths, GatewayLegacyMountPaths } from "@hyperagent/api-contracts";
 import { getGatewayEnv } from "@hyperagent/config";
 import { RequestWithId } from "./requestId.js";
 import { RequestWithUser } from "./auth.js";
+import { clientRemoteIp } from "./clientIp.js";
 import { log } from "./logger.js";
 
 function restUrl(): string {
@@ -267,7 +268,7 @@ export async function rateLimitMiddleware(
       next();
       return;
     }
-    const ip = req.ip || (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+    const ip = clientRemoteIp(req);
     const lim = getLimiter(redis, rl.bootstrapMaxIp, rl.bootstrapWindowSec, "bootstrap");
     const bootstrapOutcome = await checkLimit(lim, ip, rl.bootstrapWindowSec);
     if (
@@ -300,7 +301,7 @@ export async function rateLimitMiddleware(
       req.path === "/templates" ||
       req.path.startsWith("/templates/"));
   if (isLightweightRead) {
-    const ip = req.ip || (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+    const ip = clientRemoteIp(req);
     const userId = req.userId || "";
 
     if (userId) {
@@ -332,7 +333,7 @@ export async function rateLimitMiddleware(
     return;
   }
 
-  const ip = req.ip || (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+  const ip = clientRemoteIp(req);
   const userId = req.userId || "";
 
   const isByokRoute = req.path.startsWith(ApiPaths.byokPrefix);

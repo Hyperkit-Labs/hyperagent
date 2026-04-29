@@ -9,6 +9,7 @@ import jwt from "jsonwebtoken";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   __authFailureSampleForTest,
+  __clientRemoteKeyForTest,
   __resetAuthFailureCountersForTest,
   authMiddleware,
   type RequestWithUser,
@@ -245,5 +246,43 @@ describe("authMiddleware", () => {
     const next = __authFailureSampleForTest(key, t0 + 60_001);
     expect(next.shouldLog).toBe(true);
     expect(next.suppressed).toBe(0);
+  });
+
+  it("derives the sampler remote key from req.ip, ignoring spoofable XFF headers", () => {
+    // Two requests from the same upstream peer (same `req.ip`) but with
+    // attacker-controlled, per-request `X-Forwarded-For` values must produce
+    // the same sampler key, otherwise the sampler is trivially bypassed.
+    const reqA = {
+      ip: "203.0.113.10",
+      headers: {
+        "x-forwarded-for": "10.0.0.1",
+      },
+      socket: { remoteAddress: "203.0.113.10" },
+    } as unknown as Request;
+    const reqB = {
+      ip: "203.0.113.10",
+      headers: {
+        "x-forwarded-for": "evil.attacker.example, 10.0.0.99",
+      },
+      socket: { remoteAddress: "203.0.113.10" },
+    } as unknown as Request;
+
+    expect(__clientRemoteKeyForTest(reqA)).toBe("203.0.113.10");
+    expect(__clientRemoteKeyForTest(reqB)).toBe("203.0.113.10");
+    expect(__clientRemoteKeyForTest(reqA)).toBe(__clientRemoteKeyForTest(reqB));
+  });
+
+  it("falls back to socket remoteAddress only when req.ip is unavailable", () => {
+    const reqNoIp = {
+      headers: { "x-forwarded-for": "10.0.0.1" },
+      socket: { remoteAddress: "198.51.100.7" },
+    } as unknown as Request;
+    expect(__clientRemoteKeyForTest(reqNoIp)).toBe("198.51.100.7");
+
+    const reqNothing = {
+      headers: {},
+      socket: {},
+    } as unknown as Request;
+    expect(__clientRemoteKeyForTest(reqNothing)).toBe("unknown");
   });
 });

@@ -5,6 +5,8 @@
  * warnings for bots, misconfigured LLM clients, or stray proxy probes.
  *
  * Keep in sync with the `app.use(...)` / `app.get(...)` mounts in `index.ts`.
+ * The `KNOWN_PATH_PREFIXES vs index.ts mounts` test in `knownPaths.test.ts`
+ * statically parses `index.ts` and fails this list ever drifts out of sync.
  */
 export const KNOWN_PATH_PREFIXES = [
   "/health",

@@ -39,7 +39,7 @@ services:
       - "traefik.http.services.api-gateway.loadbalancer.responseForwarding.flushInterval=100ms"
       - "traefik.http.serversTransports.gw-transport.forwardingTimeouts.dialTimeout=10s"
       - "traefik.http.serversTransports.gw-transport.forwardingTimeouts.responseHeaderTimeout=130s"
-      - "traefik.http.services.api-gateway.loadbalancer.server.transport=gw-transport"
+      - "traefik.http.services.api-gateway.loadbalancer.serversTransport=gw-transport@docker"
     depends_on:
       orchestrator:
         condition: service_healthy

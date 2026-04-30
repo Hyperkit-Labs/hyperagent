@@ -26,6 +26,36 @@ interface AuditPayload {
   request_id?: string;
 }
 
+/** Pino / stdout only — Supabase `security_audit_log` keeps full values. */
+function maskIpForLog(ip: string): string {
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) {
+    const parts = ip.split(".");
+    parts[3] = "0";
+    return parts.join(".");
+  }
+  if (ip.includes(":")) return "[ipv6:redacted]";
+  return ip;
+}
+
+function shortenWalletForLog(addr: string): string {
+  return /^0x[a-fA-F0-9]{40}$/.test(addr) ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : addr;
+}
+
+function auditPayloadForLog(entry: AuditPayload): AuditPayload {
+  const out: AuditPayload = {
+    ...entry,
+    ip_address: entry.ip_address ? maskIpForLog(String(entry.ip_address)) : entry.ip_address,
+    user_agent:
+      entry.user_agent && entry.user_agent.length > 120
+        ? `${entry.user_agent.slice(0, 120)}…`
+        : entry.user_agent,
+  };
+  if (out.event_data && typeof out.event_data.wallet === "string") {
+    out.event_data = { ...out.event_data, wallet: shortenWalletForLog(out.event_data.wallet) };
+  }
+  return out;
+}
+
 function extractRequestMeta(req: Request): Pick<AuditPayload, "ip_address" | "user_agent" | "request_id"> {
   // `req.ip` is derived from the trusted proxy chain (see `app.set("trust proxy", 1)`).
   // Reading raw `x-forwarded-for` here would let any unauthenticated client spoof
@@ -52,7 +82,7 @@ export function emitAuditEvent(
     ...meta,
   };
 
-  log.info({ audit: true, ...entry }, `audit:${eventType}`);
+  log.info({ audit: true, ...auditPayloadForLog(entry) }, `audit:${eventType}`);
 
   const supabase = getSupabaseAdmin();
   if (!supabase) return;

@@ -60,6 +60,17 @@ export function createProxyOptions(
       proxyReq.setTimeout(timeoutMs, () => {
         proxyReq.destroy();
       });
+      // Avoid forwarding Datadog propagation headers: gateway sets W3C traceparent; mixed extract on Python ddtrace can log "Failed to parse LLMObs parent ID" for bad _dd.p values.
+      for (const h of [
+        "x-datadog-trace-id",
+        "x-datadog-parent-id",
+        "x-datadog-sampling-priority",
+        "x-datadog-tags",
+        "x-datadog-origin",
+        "tracebaggage",
+      ]) {
+        proxyReq.removeHeader(h);
+      }
       if (r.requestId) proxyReq.setHeader("x-request-id", r.requestId);
       const traceparent = getTraceparentHeader() || (r.headers.traceparent as string);
       if (traceparent) proxyReq.setHeader("traceparent", traceparent);

@@ -86,6 +86,7 @@ def _call_facilitator(
 
 
 from fastapi import Response
+from starlette.datastructures import State
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 logger = logging.getLogger(__name__)
@@ -617,11 +618,12 @@ class X402EnforcementMiddleware:
                     "x402_version": 2,
                 },
             )
-            state = scope.setdefault("state", {})
-            state["x402_proof"] = proof
-            state["x402_price"] = price
-            state["erc1066_code"] = x402_verifier.ERC1066_SUCCESS
-            state["x402_tx_ref"] = tx_ref
+            if "state" not in scope:
+                scope["state"] = State()
+            scope["state"].x402_proof = proof
+            scope["state"].x402_price = price
+            scope["state"].erc1066_code = x402_verifier.ERC1066_SUCCESS
+            scope["state"].x402_tx_ref = tx_ref
             await self.app(scope, receive, send)
             return
 
@@ -734,10 +736,11 @@ class X402EnforcementMiddleware:
             },
         )
 
-        state = scope.setdefault("state", {})
-        state["x402_proof"] = proof
-        state["x402_price"] = price
-        state["erc1066_code"] = erc1066_code
-        state["x402_tx_ref"] = tx_ref
+        if "state" not in scope:
+            scope["state"] = State()
+        scope["state"].x402_proof = proof
+        scope["state"].x402_price = price
+        scope["state"].erc1066_code = erc1066_code
+        scope["state"].x402_tx_ref = tx_ref
 
         await self.app(scope, receive, send)

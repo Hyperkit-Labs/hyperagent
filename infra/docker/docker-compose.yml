@@ -32,6 +32,14 @@ services:
       - "traefik.http.routers.api-gateway-http.middlewares=https-redirect"
       - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
       - "traefik.http.services.api-gateway.loadbalancer.server.port=4000"
+      # Forwarding timeouts: must exceed gateway PROXY_TIMEOUT_MS (120s) so
+      # Traefik does not close the connection while the gateway waits for the
+      # orchestrator.  Studio CONFIG_BOOTSTRAP_TIMEOUT_MS is 45s; the gateway
+      # proxy is 120s; Traefik should wait at least as long as the gateway.
+      - "traefik.http.services.api-gateway.loadbalancer.responseForwarding.flushInterval=100ms"
+      - "traefik.http.serversTransports.gw-transport.forwardingTimeouts.dialTimeout=10s"
+      - "traefik.http.serversTransports.gw-transport.forwardingTimeouts.responseHeaderTimeout=130s"
+      - "traefik.http.services.api-gateway.loadbalancer.serversTransport=gw-transport@docker"
     depends_on:
       orchestrator:
         condition: service_healthy

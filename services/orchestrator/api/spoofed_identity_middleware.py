@@ -1,4 +1,9 @@
-"""Reject spoofed X-User-Id when IDENTITY_HMAC_SECRET is set (gateway must sign identity)."""
+"""Reject spoofed X-User-Id when IDENTITY_HMAC_SECRET is set (gateway must sign identity).
+
+Pure ASGI middleware — avoids the per-request task/pipe overhead of
+``BaseHTTPMiddleware`` which compounds on single-worker uvicorn and can delay
+lightweight responses (e.g. ``/api/v1/config``) past the client-side timeout.
+"""
 
 from __future__ import annotations
 
@@ -6,9 +11,9 @@ import logging
 import os
 
 from api.common import get_caller_id
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 logger = logging.getLogger(__name__)
 
@@ -48,42 +53,63 @@ _SKIP_PREFIXES: tuple[str, ...] = (
     "/openapi.json",
     "/metrics",
     "/api/v1/storage/webhooks",
+    "/api/v1/config",
     "/favicon",
 )
 
 
-class SpoofedIdentityMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        path = request.url.path or ""
-        if any(path.startswith(p) for p in _SKIP_PREFIXES):
-            return await call_next(request)
+def _header_value(raw_headers: list[tuple[bytes, bytes]], name: bytes) -> str:
+    """Extract a single header value (case-insensitive) from raw ASGI headers."""
+    lower = name.lower()
+    for k, v in raw_headers:
+        if k.lower() == lower:
+            return v.decode("latin-1").strip()
+    return ""
 
-        uid = (
-            request.headers.get("X-User-Id") or request.headers.get("x-user-id") or ""
-        ).strip()
+
+class SpoofedIdentityMiddleware:
+    """Pure ASGI middleware that rejects spoofed X-User-Id headers."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        path: str = scope.get("path", "")
+        if any(path.startswith(p) for p in _SKIP_PREFIXES):
+            await self.app(scope, receive, send)
+            return
+
+        raw_headers: list[tuple[bytes, bytes]] = scope.get("headers", [])
+        uid = _header_value(raw_headers, b"x-user-id")
         if not uid:
-            return await call_next(request)
+            await self.app(scope, receive, send)
+            return
 
         if not _should_enforce_identity_hmac():
-            return await call_next(request)
+            await self.app(scope, receive, send)
+            return
 
+        request = Request(scope)
         trusted = get_caller_id(request)
         if trusted is None:
-            rid = (
-                request.headers.get("x-request-id")
-                or request.headers.get("X-Request-Id")
-                or ""
-            )
+            rid = _header_value(raw_headers, b"x-request-id")
             logger.warning(
                 "[security] rejected spoofed or unsigned X-User-Id path=%s request_id=%s",
                 path,
                 rid,
             )
-            return JSONResponse(
+            response = JSONResponse(
                 status_code=401,
                 content={
                     "detail": "Invalid identity signature for X-User-Id",
                     "code": "IDENTITY_SIGNATURE_REQUIRED",
                 },
             )
-        return await call_next(request)
+            await response(scope, receive, send)
+            return
+
+        await self.app(scope, receive, send)

@@ -56,10 +56,11 @@ from api import (
     x402_webhooks_router,
 )
 from api.spoofed_identity_middleware import SpoofedIdentityMiddleware
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from observability import record_latency
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from structured_logging import TraceContextFilter
 from trace_context import set_request_id
 
@@ -314,31 +315,59 @@ def _start_storage_reconciliation_schedule() -> None:
     )
 
 
-@app.middleware("http")
-async def log_request_id(request: Request, call_next):
-    """Set and log x-request-id for trace correlation. Records latency for p95 SLO.
-    When OPENTELEMETRY_ENABLED, creates request span for distributed tracing."""
-    rid = (
-        request.headers.get("x-request-id") or request.headers.get("X-Request-Id") or ""
-    ).strip() or str(uuid.uuid4())
-    set_request_id(rid)
-    logger.info("[orchestrator] request_id=%s path=%s", rid, request.url.path)
-    start = time.perf_counter()
-    from otel_spans import request_span
+class RequestIdMiddleware:
+    """Pure ASGI middleware for request-id propagation, latency recording, and OTel spans.
 
-    with request_span(
-        method=request.method or "GET",
-        path=request.url.path or "/",
-        request_id=rid,
-    ):
-        response = await call_next(request)
-    elapsed = time.perf_counter() - start
-    path = request.url.path or ""
-    if "/health" not in path and "/streaming/" not in path:
-        record_latency(elapsed)
-    response.headers["X-Request-Id"] = rid
-    response.headers["X-Response-Time-Ms"] = f"{elapsed * 1000:.0f}"
-    return response
+    Replaces ``@app.middleware("http")`` which internally wraps every response in
+    ``BaseHTTPMiddleware`` piping.  The pure ASGI version avoids per-request
+    background tasks and memory-channel overhead, keeping lightweight endpoints
+    (e.g. ``/api/v1/config``) fast on single-worker uvicorn.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        raw_headers: list[tuple[bytes, bytes]] = scope.get("headers", [])
+        rid = ""
+        for k, v in raw_headers:
+            if k.lower() in (b"x-request-id",):
+                rid = v.decode("latin-1").strip()
+                break
+        if not rid:
+            rid = str(uuid.uuid4())
+
+        set_request_id(rid)
+        path: str = scope.get("path") or "/"
+        method: str = scope.get("method") or "GET"
+        logger.info("[orchestrator] request_id=%s path=%s", rid, path)
+
+        start = time.perf_counter()
+
+        async def send_with_timing(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                elapsed = time.perf_counter() - start
+                if "/health" not in path and "/streaming/" not in path:
+                    record_latency(elapsed)
+                headers = list(message.get("headers") or [])
+                headers.append((b"x-request-id", rid.encode("latin-1")))
+                headers.append(
+                    (b"x-response-time-ms", f"{elapsed * 1000:.0f}".encode("latin-1"))
+                )
+                message["headers"] = headers
+            await send(message)
+
+        from otel_spans import request_span
+
+        with request_span(method=method, path=path, request_id=rid):
+            await self.app(scope, receive, send_with_timing)
+
+
+app.add_middleware(RequestIdMiddleware)
 
 
 # x402 enforcement middleware: intercepts protected endpoints for external callers.

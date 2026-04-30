@@ -10,6 +10,10 @@ Intercepts protected endpoints and enforces the x402 payment protocol:
 
 This is the server-side enforcement layer referenced in all_findings.md.
 Proof verification delegates to x402_verifier for cryptographic checks.
+
+Pure ASGI middleware — avoids the per-request task/pipe overhead of
+``BaseHTTPMiddleware`` which compounds on single-worker uvicorn and can delay
+lightweight responses (e.g. ``/api/v1/config``) past the client-side timeout.
 """
 
 from __future__ import annotations
@@ -18,11 +22,9 @@ import json
 import logging
 import os
 import time
-import uuid
 from typing import Any
 
 import billing
-import db
 
 # ---------------------------------------------------------------------------
 # PayAI facilitator — settles ERC-3009 TransferWithAuthorization on-chain
@@ -83,8 +85,9 @@ def _call_facilitator(
         return False, f"facilitator_unreachable:{exc}"
 
 
-from fastapi import Request, Response
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from fastapi import Response
+from starlette.datastructures import State
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 logger = logging.getLogger(__name__)
 
@@ -409,27 +412,50 @@ def _log_x402_event(
     logger.info("[x402] %s", json.dumps(payload))
 
 
-class X402EnforcementMiddleware(BaseHTTPMiddleware):
-    """FastAPI middleware that enforces x402 payment on protected endpoints."""
+def _x402_header_value(raw_headers: list[tuple[bytes, bytes]], name: bytes) -> str:
+    """Extract a single header value (case-insensitive) from raw ASGI headers."""
+    lower = name.lower()
+    for k, v in raw_headers:
+        if k.lower() == lower:
+            return v.decode("latin-1").strip()
+    return ""
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+
+def _x402_headers_dict(raw_headers: list[tuple[bytes, bytes]]) -> dict[str, str]:
+    """Build a plain dict of decoded headers from ASGI scope headers."""
+    out: dict[str, str] = {}
+    for k, v in raw_headers:
+        out[k.decode("latin-1").lower()] = v.decode("latin-1")
+    return out
+
+
+class X402EnforcementMiddleware:
+    """Pure ASGI middleware that enforces x402 payment on protected endpoints."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
         if not _is_x402_enabled():
-            return await call_next(request)
+            await self.app(scope, receive, send)
+            return
 
-        path = request.url.path.rstrip("/")
-        method = request.method.upper()
+        path = (scope.get("path") or "").rstrip("/")
+        method = (scope.get("method") or "GET").upper()
 
         price = billing.get_endpoint_price(path, method)
         if price is None:
-            return await call_next(request)
+            await self.app(scope, receive, send)
+            return
 
-        user_id = (
-            request.headers.get("X-User-Id") or request.headers.get("x-user-id") or ""
-        ).strip() or None
+        raw_headers: list[tuple[bytes, bytes]] = scope.get("headers", [])
+        user_id = _x402_header_value(raw_headers, b"x-user-id") or None
 
-        headers_dict = dict(request.headers)
+        headers_dict = _x402_headers_dict(raw_headers)
         # X402_MANDATORY_V01 disables the internal-caller bypass so Studio users
         # must also present a valid payment proof on priced routes.
         if (
@@ -437,20 +463,21 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
             and not _x402_enforce_internal()
             and not _X402_MANDATORY_V01
         ):
-            return await call_next(request)
+            await self.app(scope, receive, send)
+            return
 
-        payment_header = request.headers.get("X-Payment") or request.headers.get(
-            "x-payment"
-        )
+        payment_header = _x402_header_value(raw_headers, b"x-payment") or None
         if not payment_header:
             _log_x402_event("challenge_issued", path, extra={"price_usd": price})
             challenge = billing.x402_challenge_response(path, price)
-            return Response(
+            resp = Response(
                 content=json.dumps(challenge),
                 status_code=402,
                 media_type="application/json",
                 headers={"X-Payment-Required": "true"},
             )
+            await resp(scope, receive, send)
+            return
 
         if _replay_backend_unacceptable_for_payment():
             _log_x402_event(
@@ -458,7 +485,7 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
                 path,
                 extra={"price_usd": price},
             )
-            return Response(
+            resp = Response(
                 content=json.dumps(
                     {
                         "error": "service_unavailable",
@@ -472,11 +499,13 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
                 status_code=503,
                 media_type="application/json",
             )
+            await resp(scope, receive, send)
+            return
 
         proof = _parse_payment_header(payment_header)
         if proof is None:
             _log_x402_event("invalid_proof_format", path)
-            return Response(
+            resp = Response(
                 content=json.dumps(
                     {
                         "error": "invalid_payment_proof",
@@ -486,6 +515,8 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
                 status_code=402,
                 media_type="application/json",
             )
+            await resp(scope, receive, send)
+            return
 
         import x402_kite_facilitator
         import x402_verifier
@@ -497,7 +528,7 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
             rkey = _v2_authorization_replay_key(proof)
             if _check_replay(rkey):
                 _log_x402_event("proof_rejected", path, extra={"reason": "v2 replay"})
-                return Response(
+                resp = Response(
                     content=json.dumps(
                         {
                             "error": "payment_rejected",
@@ -511,6 +542,8 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
                     status_code=402,
                     media_type="application/json",
                 )
+                await resp(scope, receive, send)
+                return
 
             challenge = billing.x402_challenge_response(path, price)
             payment_requirements = challenge.get("paymentRequirements", {})
@@ -526,7 +559,7 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
                         path,
                         extra={"network": net, "detail": v_err},
                     )
-                    return Response(
+                    resp = Response(
                         content=json.dumps(
                             {
                                 "error": "payment_rejected",
@@ -540,6 +573,8 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
                         status_code=402,
                         media_type="application/json",
                     )
+                    await resp(scope, receive, send)
+                    return
                 settled, tx_ref = x402_kite_facilitator.settle_payment(
                     proof, payment_requirements
                 )
@@ -552,7 +587,7 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
                     path,
                     extra={"tx_ref": tx_ref, "network": net},
                 )
-                return Response(
+                resp = Response(
                     content=json.dumps(
                         {
                             "error": "payment_settlement_failed",
@@ -564,6 +599,8 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
                     status_code=402,
                     media_type="application/json",
                 )
+                await resp(scope, receive, send)
+                return
 
             pl = proof.get("payload") if isinstance(proof.get("payload"), dict) else {}
             auth = pl.get("authorization") if isinstance(pl, dict) else {}
@@ -581,11 +618,14 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
                     "x402_version": 2,
                 },
             )
-            request.state.x402_proof = proof
-            request.state.x402_price = price
-            request.state.erc1066_code = x402_verifier.ERC1066_SUCCESS
-            request.state.x402_tx_ref = tx_ref
-            return await call_next(request)
+            if "state" not in scope:
+                scope["state"] = State()
+            scope["state"].x402_proof = proof
+            scope["state"].x402_price = price
+            scope["state"].erc1066_code = x402_verifier.ERC1066_SUCCESS
+            scope["state"].x402_tx_ref = tx_ref
+            await self.app(scope, receive, send)
+            return
 
         validation_error = _validate_proof_structure(proof, path, price)
         if validation_error:
@@ -615,7 +655,7 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
                 path,
                 extra={"reason": validation_error, "erc1066_code": erc_code},
             )
-            return Response(
+            resp = Response(
                 content=json.dumps(
                     {
                         "error": "payment_rejected",
@@ -627,6 +667,8 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
                 status_code=402,
                 media_type="application/json",
             )
+            await resp(scope, receive, send)
+            return
 
         # Cryptographic verification: ECDSA/EIP-191 signature check.
         # Validates that `payer` actually signed the canonical receipt string.
@@ -638,7 +680,7 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
                 user_id=proof.get("payer"),
                 extra={"erc1066_code": erc1066_code, "nonce": proof.get("nonce")},
             )
-            return Response(
+            resp = Response(
                 content=json.dumps(
                     {
                         "error": "payment_rejected",
@@ -650,6 +692,8 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
                 status_code=402,
                 media_type="application/json",
             )
+            await resp(scope, receive, send)
+            return
 
         # On-chain settlement via PayAI facilitator.
         # The facilitator submits the ERC-3009 TransferWithAuthorization
@@ -665,8 +709,7 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
                 user_id=proof.get("payer"),
                 extra={"tx_ref": tx_ref, "nonce": proof.get("nonce")},
             )
-
-            return Response(
+            resp = Response(
                 content=json.dumps(
                     {
                         "error": "payment_settlement_failed",
@@ -678,6 +721,8 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
                 status_code=402,
                 media_type="application/json",
             )
+            await resp(scope, receive, send)
+            return
 
         _log_x402_event(
             "proof_accepted",
@@ -691,9 +736,11 @@ class X402EnforcementMiddleware(BaseHTTPMiddleware):
             },
         )
 
-        request.state.x402_proof = proof
-        request.state.x402_price = price
-        request.state.erc1066_code = erc1066_code
-        request.state.x402_tx_ref = tx_ref
+        if "state" not in scope:
+            scope["state"] = State()
+        scope["state"].x402_proof = proof
+        scope["state"].x402_price = price
+        scope["state"].erc1066_code = erc1066_code
+        scope["state"].x402_tx_ref = tx_ref
 
-        return await call_next(request)
+        await self.app(scope, receive, send)

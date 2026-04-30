@@ -79,7 +79,8 @@ services:
       - DD_TRACE_AGENT_URL=unix:///var/run/datadog/apm.socket
       - DD_DOGSTATSD_URL=unix:///var/run/datadog/dsd.socket
       - DD_TRACE_OPENAI_AGENTS_ENABLED=false
-      - DD_TRACE_PROPAGATION_STYLE_EXTRACT=tracecontext,datadog
+      # W3C traceparent from api-gateway only; datadog extract merges invalid _dd.p.llmobs_parent_id and spams "Failed to parse LLMObs parent ID"
+      - DD_TRACE_PROPAGATION_STYLE_EXTRACT=tracecontext
       - DD_LLMOBS_ENABLED=${DD_LLMOBS_ENABLED:-0}
       - DD_LLMOBS_ML_APP=${DD_LLMOBS_ML_APP:-hyperagent-orchestrator}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://dd-agent:4318

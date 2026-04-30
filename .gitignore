@@ -558,19 +558,41 @@ infra/k8s/overlays/*/secrets/*.yaml
 *.sealed-secret.yaml
 
 # ============================================================
-# Docker & Kubernetes Secrets (GitOps)
+# LOCAL SCRATCH, TOOL CACHES, INSTALL TREES (not for main)
 # ============================================================
-# Docker environment files (contain secrets)
-infra/docker/.env
-infra/docker/.env.local
-infra/docker/.env.*.local
-
-# Kubernetes secrets (never commit)
-infra/k8s/overlays/*/secrets.yaml
-infra/k8s/overlays/*/secrets/*.yaml
-*.sealed-secret.yaml
-.env*.local
-
-./github/issues/*
-./github/pr-bodies/*
-.cursor/mcp.json
+# ddtrace / pip --target scratch, local experiments
+.tmp_ddtrace/
+**/.tmp_ddtrace/
+# Python
+.venv/
+venv/
+**/.venv/
+**/venv/
+**/__pypackages__/
+# Ruff, SWC, Nx, monorepo
+**/.ruff_cache/
+**/.swc/
+.nx/
+**/.nx/cache/
+# Supabase CLI local
+supabase/.branches
+supabase/.temp
+# Site generators / Storybook (generated; commit only if your policy says so)
+**/.docusaurus/
+**/.svelte-kit/
+storybook-static/
+# Extra AI/IDE local dirs (in addition to agent list above)
+.aider*
+.aider/
+.codex/
+.serena/
+# Office temp (Windows) when docs live in tree
+~$*
+# Profiling / heap dumps
+*.heapprofile
+*.hprof
+*.dmp
+# Large local model weights
+**/*.gguf
+/models/
+/checkpoints/

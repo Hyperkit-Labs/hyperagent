@@ -28,7 +28,7 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@emotion/use-insertion-effect-with-fallbacks": "^1.2.0",
-    "@headlessui/react": "^2.2.9",
+    "@headlessui/react": "^2.2.10",
     "@heroicons/react": "^2.2.0",
     "@hyperagent/api-contracts": "workspace:*",
     "@hyperagent/config": "workspace:*",

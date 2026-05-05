@@ -23,6 +23,7 @@ services:
       - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://dd-agent:4318/v1/metrics
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=coolify"
       - "traefik.http.routers.api-gateway.rule=Host(`api.hyperkitlabs.com`)"
       - "traefik.http.routers.api-gateway.entrypoints=https"
       - "traefik.http.routers.api-gateway.tls=true"

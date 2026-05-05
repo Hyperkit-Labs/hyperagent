@@ -238,6 +238,10 @@ export async function fetchJson<T>(
   const retryDelay = 1000;
   let lastError: Error | null = null;
   const base = () => getApiBase();
+  const method = (init.method ?? "GET").toUpperCase();
+  const hasBody = init.body !== undefined && init.body !== null;
+  const isBrowserGetLike =
+    typeof window !== "undefined" && (method === "GET" || method === "HEAD");
 
   if (
     typeof window !== "undefined" &&
@@ -252,9 +256,9 @@ export async function fetchJson<T>(
     try {
       let authHeaders: Record<string, string> = {};
       try {
-        if (authHeaderProvider) {
+        if (authHeaderProvider && !isBrowserGetLike) {
           authHeaders = await authHeaderProvider();
-        } else if (typeof window !== "undefined") {
+        } else if (typeof window !== "undefined" && !isBrowserGetLike) {
           const session = getStoredSession();
           if (session?.access_token) {
             authHeaders = { Authorization: `Bearer ${session.access_token}` };
@@ -277,8 +281,8 @@ export async function fetchJson<T>(
         credentials: "include",
         headers: {
           ...authHeaders,
-          "Content-Type": "application/json",
           ...(init.headers as Record<string, string>),
+          ...(hasBody ? { "Content-Type": "application/json" } : {}),
         },
       });
 

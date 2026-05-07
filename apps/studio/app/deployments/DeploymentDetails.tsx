@@ -137,6 +137,7 @@ export function DeploymentDetails({ deployment }: DeploymentDetailsProps) {
               <button
                 type="button"
                 onClick={copyAddress}
+                aria-label="Copy contract address"
                 className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)] transition-colors"
                 title="Copy address"
               >

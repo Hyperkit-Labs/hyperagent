@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { Check, ArrowRight, X } from "lucide-react";
 
@@ -23,16 +23,11 @@ export function OnboardingChecklist({
   className = "",
 }: OnboardingChecklistProps) {
   const { steps, nextStep, completed } = useOnboarding();
-  const [dismissed, setDismissed] = useState(false);
-
-  useEffect(() => {
-    if (
+  const [dismissed, setDismissed] = useState(
+    () =>
       typeof window !== "undefined" &&
-      sessionStorage.getItem(DISMISS_KEY) === "1"
-    ) {
-      setDismissed(true);
-    }
-  }, []);
+      sessionStorage.getItem(DISMISS_KEY) === "1",
+  );
 
   if (completed) {
     return (

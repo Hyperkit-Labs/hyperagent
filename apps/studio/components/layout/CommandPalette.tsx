@@ -97,6 +97,13 @@ const ROUTE_ITEMS: PaletteItem[] = [
     description: "AI agents and capabilities",
   },
   {
+    id: "nav-deployments",
+    label: "Go to Deployments",
+    href: ROUTES.DEPLOYMENTS,
+    icon: Rocket,
+    description: "Deployment history and actions",
+  },
+  {
     id: "nav-history",
     label: "Go to History",
     href: ROUTES.HISTORY,
@@ -215,6 +222,9 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       <div
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-2xl rounded-2xl border border-white/10 bg-slate-950/90 shadow-2xl overflow-hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
       >
         <Command
           className="w-full"
@@ -235,6 +245,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                 value={search}
                 onValueChange={setSearch}
                 placeholder="Search templates, docs, workflows…"
+                aria-label="Search command palette"
                 className="flex-1 bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-600"
               />
               <kbd className="hidden sm:inline-flex h-5 items-center rounded border border-white/10 bg-slate-900/60 px-1.5 text-[10px] text-slate-500">

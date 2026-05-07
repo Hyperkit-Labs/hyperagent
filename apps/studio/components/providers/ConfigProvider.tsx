@@ -38,7 +38,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const shouldFetch = pathname !== ROUTES.LOGIN;
 
-  const { data, error, isLoading, mutate } = useSWR(
+  const { data, error, isLoading } = useSWR(
     shouldFetch ? CONFIG_SWR_KEY : null,
     getConfig,
     {

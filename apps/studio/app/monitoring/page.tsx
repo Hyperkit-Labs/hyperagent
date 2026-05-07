@@ -203,6 +203,8 @@ function MonitoringContent() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setIsPaused(!isPaused)}
+                  aria-pressed={isPaused}
+                  aria-label={isPaused ? "Resume log stream" : "Pause log stream"}
                   className="p-1.5 rounded bg-[var(--color-bg-panel)] border border-[var(--color-border-subtle)] text-[var(--color-text-secondary)] hover:text-white transition-colors"
                   title={isPaused ? "Resume stream" : "Pause stream"}
                 >
@@ -223,6 +225,7 @@ function MonitoringContent() {
                   placeholder="Search logs (regex supported)..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  aria-label="Search logs"
                   className="w-full bg-transparent border-none py-1.5 pl-8 pr-3 text-xs text-[var(--color-text-primary)] focus:ring-0 placeholder:text-[var(--color-text-muted)]"
                 />
               </div>

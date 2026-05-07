@@ -129,15 +129,21 @@ export default function HistoryPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search history, logs, or transactions..."
+              aria-label="Search history"
               className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-border-default)] focus:outline-none"
             />
           </div>
-          <div className="flex rounded-lg border border-[var(--color-border-subtle)] overflow-hidden">
+          <div
+            className="flex rounded-lg border border-[var(--color-border-subtle)] overflow-hidden"
+            role="tablist"
+            aria-label="History view"
+          >
             {(["workflows", "logs"] as HistoryTab[]).map((t) => (
               <button
                 key={t}
                 type="button"
                 onClick={() => setTab(t)}
+                aria-controls={`history-panel-${t}`}
                 className={`px-4 py-2 text-xs font-medium capitalize transition-colors ${
                   tab === t
                     ? "bg-[var(--color-bg-panel)] text-[var(--color-text-primary)]"
@@ -159,7 +165,12 @@ export default function HistoryPage() {
             <Loader2 className="w-5 h-5 animate-spin text-[var(--color-text-muted)]" />
           </div>
         ) : tab === "workflows" ? (
-          filteredWorkflows.length === 0 ? (
+          <div
+            id="history-panel-workflows"
+            role="tabpanel"
+            aria-label="Workflow history"
+          >
+            {filteredWorkflows.length === 0 ? (
             <EmptyState
               icon={
                 <History className="w-8 h-8 text-[var(--color-text-muted)]" />
@@ -181,7 +192,7 @@ export default function HistoryPage() {
                 </Link>
               }
             />
-          ) : (
+            ) : (
             <div className="glass-panel rounded-xl overflow-hidden">
               <table
                 className="min-w-full divide-y divide-[var(--color-border)]"
@@ -262,6 +273,7 @@ export default function HistoryPage() {
                               }
                             }}
                             disabled={quickDemoLoading !== null}
+                            aria-label={`Try workflow ${w.intent || w.prompt || w.workflow_id} in sandbox`}
                             className="p-1.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)] disabled:opacity-50"
                             title="Try in sandbox"
                           >
@@ -291,6 +303,7 @@ export default function HistoryPage() {
                                 }
                               }}
                               disabled={debugSandboxLoading !== null}
+                              aria-label={`Debug workflow ${w.intent || w.prompt || w.workflow_id} in sandbox`}
                               className="p-1.5 rounded text-amber-400 hover:bg-amber-500/10 disabled:opacity-50"
                               title="Debug in sandbox"
                             >
@@ -303,6 +316,7 @@ export default function HistoryPage() {
                           )}
                           <Link
                             href={`${ROUTES.HOME}?workflow=${w.workflow_id}`}
+                            aria-label={`Open workflow ${w.intent || w.prompt || w.workflow_id}`}
                             className="p-1.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
                             title="Open workflow"
                           >
@@ -315,9 +329,11 @@ export default function HistoryPage() {
                 </tbody>
               </table>
             </div>
-          )
+            )}
+          </div>
         ) : filteredLogs.length === 0 ? (
-          <EmptyState
+          <div id="history-panel-logs" role="tabpanel" aria-label="Log history">
+            <EmptyState
             icon={<Filter className="w-8 h-8 text-[var(--color-text-muted)]" />}
             title={search.trim() ? "No matching logs" : "No log entries"}
             description={
@@ -325,9 +341,15 @@ export default function HistoryPage() {
                 ? `No results for "${search}".`
                 : "Log entries appear after running workflows."
             }
-          />
+            />
+          </div>
         ) : (
-          <div className="glass-panel rounded-xl p-4 space-y-1 max-h-[600px] overflow-y-auto">
+          <div
+            id="history-panel-logs"
+            role="tabpanel"
+            aria-label="Log history"
+            className="glass-panel rounded-xl p-4 space-y-1 max-h-[600px] overflow-y-auto"
+          >
             {filteredLogs.map((log, i) => (
               <div
                 key={log.id || i}

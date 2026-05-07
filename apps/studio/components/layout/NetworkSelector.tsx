@@ -39,18 +39,28 @@ export function NetworkSelector() {
       if (ref.current && !ref.current.contains(e.target as Node))
         setOpen(false);
     }
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
   }, []);
 
   const label = selected ? selected.name : "Select Network";
 
   return (
-    <div className="relative hidden lg:block" ref={ref}>
+    <div className="relative" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         disabled={loading}
+        aria-label="Select network"
+        aria-expanded={open}
+        aria-haspopup="listbox"
         className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--color-bg-panel)] border border-[var(--color-border-default)] hover:border-[var(--color-primary-alpha-30)] transition-colors group min-w-[140px] justify-between disabled:opacity-60"
       >
         <span className="flex items-center gap-2 truncate">
@@ -70,7 +80,11 @@ export function NetworkSelector() {
       </button>
 
       {open && !loading && !error && (
-        <div className="absolute top-full right-0 mt-1.5 w-72 max-h-[360px] overflow-y-auto rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] shadow-xl z-50 py-2">
+        <div
+          className="absolute top-full right-0 mt-1.5 w-72 max-h-[360px] overflow-y-auto rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] shadow-xl z-50 py-2"
+          role="listbox"
+          aria-label="Networks"
+        >
           {popularMain.length > 0 && (
             <>
               <div className="px-3 py-1.5 text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-widest">
@@ -82,6 +96,8 @@ export function NetworkSelector() {
                     <button
                       type="button"
                       onClick={() => handleSelect(net)}
+                      role="option"
+                      aria-selected={selected?.id === net.id}
                       className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-[13px] transition-colors ${
                         selected?.id === net.id
                           ? "bg-[var(--color-primary-alpha-10)] text-[var(--color-primary-light)] border border-[var(--color-primary-alpha-20)]"
@@ -109,6 +125,8 @@ export function NetworkSelector() {
                     <button
                       type="button"
                       onClick={() => handleSelect(net)}
+                      role="option"
+                      aria-selected={selected?.id === net.id}
                       className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-[13px] transition-colors ${
                         selected?.id === net.id
                           ? "bg-[var(--color-primary-alpha-10)] text-[var(--color-primary-light)] border border-[var(--color-primary-alpha-20)]"
@@ -136,6 +154,8 @@ export function NetworkSelector() {
                     <button
                       type="button"
                       onClick={() => handleSelect(net)}
+                      role="option"
+                      aria-selected={selected?.id === net.id}
                       className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-[13px] transition-colors ${
                         selected?.id === net.id
                           ? "bg-[var(--color-primary-alpha-10)] text-[var(--color-primary-light)] border border-[var(--color-primary-alpha-20)]"
@@ -163,6 +183,8 @@ export function NetworkSelector() {
                     <button
                       type="button"
                       onClick={() => handleSelect(net)}
+                      role="option"
+                      aria-selected={selected?.id === net.id}
                       className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-[13px] transition-colors ${
                         selected?.id === net.id
                           ? "bg-[var(--color-primary-alpha-10)] text-[var(--color-primary-light)] border border-[var(--color-primary-alpha-20)]"

@@ -216,6 +216,7 @@ function ContractInteract({ contract }: { contract: ContractEntry }) {
           <select
             value={fn}
             onChange={(e) => setFn(e.target.value)}
+            aria-label="Select contract function"
             className="flex-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] px-2.5 py-2 text-xs text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-primary-alpha-50)]"
           >
             <option value="">Select function...</option>
@@ -231,6 +232,7 @@ function ContractInteract({ contract }: { contract: ContractEntry }) {
             value={fn}
             onChange={(e) => setFn(e.target.value)}
             placeholder="Function name"
+            aria-label="Function name"
             className="flex-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] px-2.5 py-2 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-primary-alpha-50)]"
           />
         )}
@@ -239,6 +241,7 @@ function ContractInteract({ contract }: { contract: ContractEntry }) {
           value={args}
           onChange={(e) => setArgs(e.target.value)}
           placeholder={paramsPlaceholder}
+          aria-label="Function arguments"
           className="flex-[2] rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] px-2.5 py-2 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-primary-alpha-50)]"
         />
       </div>
@@ -339,7 +342,7 @@ function ContractInteract({ contract }: { contract: ContractEntry }) {
 
 export default function ContractsPage() {
   const { contracts, loading, error, refetch } = useContracts();
-  const list = (contracts ?? []) as ContractEntry[];
+  const list = useMemo(() => (contracts ?? []) as ContractEntry[], [contracts]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [contractSearch, setContractSearch] = useState("");
   const [networkFilter, setNetworkFilter] = useState<string>("all");
@@ -421,6 +424,7 @@ export default function ContractsPage() {
                     <button
                       type="button"
                       onClick={() => setNetworkFilter("all")}
+                      aria-pressed={networkFilter === "all"}
                       className={`rounded-lg px-2.5 py-1 text-[10px] font-medium border transition-colors ${
                         networkFilter === "all"
                           ? "border-[var(--color-primary)] bg-[var(--color-primary-alpha-15)] text-[var(--color-primary-light)]"
@@ -434,6 +438,7 @@ export default function ContractsPage() {
                         key={net}
                         type="button"
                         onClick={() => setNetworkFilter(net)}
+                        aria-pressed={networkFilter === net}
                         className={`rounded-lg px-2.5 py-1 text-[10px] font-medium border transition-colors font-mono ${
                           networkFilter === net
                             ? "border-[var(--color-primary)] bg-[var(--color-primary-alpha-15)] text-[var(--color-primary-light)]"
@@ -486,6 +491,7 @@ export default function ContractsPage() {
                                   onClick={() =>
                                     navigator.clipboard.writeText(c.address!)
                                   }
+                                  aria-label="Copy contract address"
                                   className="text-[var(--color-text-muted)] hover:text-[var(--color-primary)] transition-colors"
                                   title="Copy address"
                                 >
@@ -514,6 +520,8 @@ export default function ContractsPage() {
                               onClick={() =>
                                 setExpandedId(expandedId === c.id ? null : c.id)
                               }
+                              aria-expanded={expandedId === c.id}
+                              aria-label={`Interact with contract ${c.name || c.workflowId || c.id}`}
                               className="text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] flex items-center gap-1"
                             >
                               <Terminal className="w-3.5 h-3.5" />
@@ -522,6 +530,7 @@ export default function ContractsPage() {
                           )}
                           <Link
                             href={ROUTES.APPS_ID(c.workflowId || c.id)}
+                            aria-label={`View app ${c.name || c.workflowId || c.id}`}
                             className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
                           >
                             <ChevronRight className="w-4 h-4" />

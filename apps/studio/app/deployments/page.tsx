@@ -9,7 +9,6 @@ import { Rocket } from "lucide-react";
 import { ShimmerTableRows } from "@/components/ai-elements";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import {
-  EmptyState,
   MetricCard,
   StatusBadge,
   TableFilterBar,
@@ -70,12 +69,18 @@ export default function DeploymentsPage() {
               <h2 className="text-sm font-medium text-[var(--color-text-primary)]">
                 All deployments
               </h2>
-              <TableFilterBar className="border-0 bg-transparent p-0 gap-1 text-[11px]">
+              <TableFilterBar
+                className="border-0 bg-transparent p-0 gap-1 text-[11px]"
+                role="group"
+                aria-label="Filter deployments"
+              >
                 {(["all", "success", "failed", "pending"] as const).map((f) => (
                   <button
                     key={f}
                     type="button"
                     onClick={() => setStatusFilter(f)}
+                    aria-pressed={statusFilter === f}
+                    aria-label={`Filter deployments by ${f}`}
                     className={cn(
                       "rounded-full px-2 py-1 capitalize transition-colors",
                       statusFilter === f
@@ -116,6 +121,8 @@ export default function DeploymentsPage() {
                       key={d.id}
                       type="button"
                       onClick={() => setSelectedId(d.id)}
+                      aria-pressed={selectedId === d.id}
+                      aria-label={`Select deployment ${d.workflowId}`}
                       className={cn(
                         "w-full flex items-center gap-2 px-3 py-2 border-l-2 border-transparent text-left transition-colors",
                         selectedId === d.id &&

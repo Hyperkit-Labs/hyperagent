@@ -45,6 +45,7 @@ export default function AppsListPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <Link
                 href={ROUTES.APPS_NEW}
+                aria-label="Create new app"
                 className="flex flex-col items-center justify-center min-h-[160px] rounded-xl border border-dashed border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] hover:bg-[var(--color-bg-panel)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition-colors"
               >
                 <Plus className="w-8 h-8 mb-2" />
@@ -55,6 +56,7 @@ export default function AppsListPage() {
                 <Link
                   key={w.workflow_id}
                   href={ROUTES.APPS_ID(w.workflow_id)}
+                  aria-label={`View app ${w.intent || w.workflow_id.slice(0, 12)}`}
                   className="flex flex-col min-h-[160px] rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] hover:bg-[var(--color-bg-panel)] p-4 transition-colors"
                 >
                   <div className="flex items-start justify-between mb-3">
@@ -88,7 +90,7 @@ export default function AppsListPage() {
               </p>
               <Link
                 href={ROUTES.CHAT}
-                className="inline-flex items-center gap-2 mt-4 text-sm font-medium text-[var(--color-primary-light)]"
+                className="inline-flex items-center gap-2 mt-4 rounded-lg border border-[var(--color-border-subtle)] px-4 py-2 text-sm font-medium text-[var(--color-primary-light)] hover:bg-[var(--color-bg-elevated)]"
               >
                 Create from idea in Chat
               </Link>

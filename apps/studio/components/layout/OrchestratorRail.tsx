@@ -181,11 +181,13 @@ export function OrchestratorRail({
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
+            aria-label="Ask HyperAgent"
             className="flex-1 bg-transparent text-xs outline-none placeholder:text-slate-500"
             placeholder="Ask HyperAgent to build, audit, or deploy…"
           />
           <button
             type="submit"
+            aria-label="Submit orchestrator prompt"
             className="h-7 w-7 rounded-full bg-violet-500 text-xs flex items-center justify-center shadow-lg shadow-violet-500/40 hover:bg-violet-400 transition-colors"
           >
             ↵

@@ -103,6 +103,7 @@ export function ContextSidebar({
           exit={{ width: 0, opacity: 0 }}
           transition={{ duration: 0.2 }}
           className="shrink-0 overflow-hidden border-l border-white/10"
+          aria-label="Resource Inspector"
         >
           <div
             className="w-[280px] h-full flex flex-col bg-[var(--color-bg-elevated)]/80 backdrop-blur-2xl border-l border-white/10"
@@ -116,7 +117,7 @@ export function ContextSidebar({
                 type="button"
                 onClick={onClose}
                 className="p-1.5 rounded-md text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)] transition-colors"
-                aria-label="Close"
+                aria-label="Close resource inspector"
               >
                 <X className="w-4 h-4" />
               </button>

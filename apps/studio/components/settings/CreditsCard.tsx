@@ -129,6 +129,7 @@ export function CreditsCard({
               value={topUpAmount}
               onChange={(e) => setTopUpAmount(e.target.value)}
               placeholder="Amount"
+              aria-label="Credit top up amount"
               className="w-24 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-border-default)] focus:outline-none"
             />
             <button

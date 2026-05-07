@@ -254,7 +254,11 @@ export default function AppDetailPage() {
               Workflow: {workflow.workflow_id}
             </p>
           </div>
-          <div className="flex gap-1 border-b border-[var(--color-border-subtle)]">
+          <div
+            className="flex gap-1 border-b border-[var(--color-border-subtle)]"
+            role="tablist"
+            aria-label="App detail sections"
+          >
             {(
               [
                 {
@@ -279,6 +283,9 @@ export default function AppDetailPage() {
                 key={tabId}
                 type="button"
                 onClick={() => setTab(tabId)}
+                role="tab"
+                aria-controls={`app-panel-${tabId}`}
+                aria-selected={tab === tabId}
                 className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-2 ${
                   tab === tabId
                     ? "bg-[var(--color-bg-panel)] text-[var(--color-text-primary)] border border-[var(--color-border-subtle)] border-b-transparent -mb-px"
@@ -291,7 +298,12 @@ export default function AppDetailPage() {
             ))}
           </div>
           {tab === "overview" && (
-            <div className="glass-panel rounded-xl p-6">
+            <div
+              className="glass-panel rounded-xl p-6"
+              role="tabpanel"
+              aria-label="App overview"
+              id="app-panel-overview"
+            >
               <div className="flex items-center gap-3 mb-4">
                 <FileCode className="w-5 h-5 text-[var(--color-semantic-violet)]" />
                 <h2 className="font-medium text-white">
@@ -357,6 +369,7 @@ export default function AppDetailPage() {
                       setPreparePayload(null);
                       setPrepareError(null);
                     }}
+                    aria-label="Deployment chain"
                     className="rounded-lg bg-[var(--color-bg-panel)] border border-[var(--color-border-default)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
                   >
                     {chainOptions.length === 0 && (
@@ -497,7 +510,12 @@ export default function AppDetailPage() {
             </div>
           )}
           {tab === "workflows" && (
-            <div className="glass-panel rounded-xl p-6">
+            <div
+              className="glass-panel rounded-xl p-6"
+              role="tabpanel"
+              aria-label="App workflows"
+              id="app-panel-workflows"
+            >
               <p className="text-sm text-[var(--color-text-tertiary)] mb-4">
                 Workflow for this app.
               </p>
@@ -511,7 +529,12 @@ export default function AppDetailPage() {
             </div>
           )}
           {tab === "deployments" && (
-            <div className="glass-panel rounded-xl p-6">
+            <div
+              className="glass-panel rounded-xl p-6"
+              role="tabpanel"
+              aria-label="App deployments"
+              id="app-panel-deployments"
+            >
               <h3 className="font-medium text-white text-sm mb-2">
                 Deployments
               </h3>
@@ -537,7 +560,12 @@ export default function AppDetailPage() {
             </div>
           )}
           {tab === "activity" && (
-            <div className="glass-panel rounded-xl p-6">
+            <div
+              className="glass-panel rounded-xl p-6"
+              role="tabpanel"
+              aria-label="App activity"
+              id="app-panel-activity"
+            >
               <div className="flex items-center gap-2 mb-4">
                 <Terminal className="w-4 h-4 text-[var(--color-text-muted)]" />
                 <h3 className="font-medium text-white text-sm">Activity log</h3>

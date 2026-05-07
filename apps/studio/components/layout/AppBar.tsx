@@ -30,7 +30,7 @@ const PATH_LABELS: Record<string, string> = {
   [ROUTES.ANALYTICS]: "Analytics",
   [ROUTES.PAYMENTS]: "Payments",
   [ROUTES.NETWORKS]: "Networks",
-  [ROUTES.MONITORING]: "Logs",
+  [ROUTES.MONITORING]: "Logs & Monitoring",
   [ROUTES.SECURITY]: "Security",
   [ROUTES.SETTINGS]: "Settings",
   [ROUTES.APPS]: "Apps",
@@ -68,6 +68,7 @@ function Breadcrumb() {
           )}
           <Link
             href={s.href}
+            aria-current={i === segments.length - 1 ? "page" : undefined}
             className="hover:text-[var(--color-text-primary)] transition-colors truncate max-w-[200px]"
           >
             {s.label}
@@ -143,6 +144,7 @@ export function AppBar() {
               <button
                 type="button"
                 onClick={toggleContextSidebar}
+                aria-expanded={contextSidebarOpen}
                 className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs transition-colors ${
                   contextSidebarOpen
                     ? "bg-[var(--color-bg-hover)] text-[var(--color-text-primary)]"

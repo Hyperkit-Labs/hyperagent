@@ -52,7 +52,7 @@ export function useOnboarding() {
   const { hasSession } = useSession();
   const { workflows } = useWorkflows({ filters: { limit: 1 } });
   const [llmConfigured, setLlmConfigured] = useState<boolean | null>(null);
-  const [sessionKeyActive, setSessionKeyActive] = useState(false);
+  const [sessionKeyActive, setSessionKeyActive] = useState(hasSessionKey);
 
   const refetchLlm = useCallback(() => {
     fetchLlmConfig().then(setLlmConfigured);
@@ -70,8 +70,7 @@ export function useOnboarding() {
 
   useEffect(() => {
     if (hasSession) refetchLlm();
-    refreshSessionKey();
-  }, [hasSession, refetchLlm, refreshSessionKey]);
+  }, [hasSession, refetchLlm]);
 
   useEffect(() => {
     const onByok = () => refetchLlm();
@@ -87,7 +86,7 @@ export function useOnboarding() {
     };
   }, [refetchLlm, refreshSessionKey]);
 
-  const step1 = !!account;
+  const step1 = !!account || hasSession;
   const step2 = llmConfigured === true || sessionKeyActive;
   // x402 payment is automatic via wallet signature on supported networks.
   // Step 3 is complete once the wallet is connected on a SKALE Base network

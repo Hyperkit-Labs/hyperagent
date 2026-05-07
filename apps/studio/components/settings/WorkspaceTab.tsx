@@ -113,6 +113,7 @@ export function WorkspaceTab({
                       e.target.value,
                     );
                   }}
+                  aria-label="Default network"
                   className="rounded-lg bg-[var(--color-bg-base)] border border-[var(--color-border-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] w-full"
                 >
                   <option value="">Auto (first testnet)</option>

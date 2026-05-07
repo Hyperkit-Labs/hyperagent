@@ -204,6 +204,7 @@ export function PaymentTopUpCard({
         <select
           value={token}
           onChange={(e) => setToken(e.target.value as Token)}
+          aria-label="Select stablecoin"
           className="rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-border-default)] focus:outline-none"
         >
           <option value="USDC">USDC</option>
@@ -216,6 +217,7 @@ export function PaymentTopUpCard({
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           placeholder="Amount"
+          aria-label="Top up amount"
           className="w-24 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-border-default)] focus:outline-none"
         />
         <button

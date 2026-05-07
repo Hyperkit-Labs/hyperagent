@@ -2,7 +2,6 @@
 
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { toast } from "sonner";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import { useSearchParams } from "next/navigation";
 import { ROUTES } from "@/constants/routes";
@@ -140,6 +139,7 @@ function TemplatesContent() {
               placeholder="Search templates by name or id..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
+              aria-label="Search templates"
               onKeyDown={(e) =>
                 e.key === "Enter" && setSearchQuery(searchInput.trim())
               }
@@ -392,6 +392,7 @@ function TemplatesContent() {
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => toggleCompare(item.id)}
+                      aria-label={`Select template ${item.name || item.id} for comparison`}
                       className="w-4 h-4 rounded border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] text-[var(--color-primary)] focus:ring-[var(--color-primary-alpha-50)] cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
                       title="Compare"
                     />

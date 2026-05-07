@@ -38,14 +38,23 @@ function Dropdown({
       if (ref.current && !ref.current.contains(e.target as Node))
         setOpen(false);
     };
+    const escapeHandler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
     document.addEventListener("click", handler);
-    return () => document.removeEventListener("click", handler);
+    document.addEventListener("keydown", escapeHandler);
+    return () => {
+      document.removeEventListener("click", handler);
+      document.removeEventListener("keydown", escapeHandler);
+    };
   }, []);
   return (
     <div ref={ref} className={cn("relative", className)}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-haspopup="menu"
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--color-border-subtle)] text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] transition-colors"
       >
         {label}
@@ -60,6 +69,7 @@ function Dropdown({
         <div
           className="absolute left-0 top-full mt-1 z-50 py-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] shadow-xl min-w-[140px]"
           onClick={() => setOpen(false)}
+          role="menu"
         >
           {children}
         </div>
@@ -82,12 +92,17 @@ export function MonitoringFilterBar({
 
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <div className="flex items-center gap-1 rounded-lg border border-[var(--color-border-subtle)] p-0.5 bg-[var(--color-bg-subtle)]">
+      <div
+        className="flex items-center gap-1 rounded-lg border border-[var(--color-border-subtle)] p-0.5 bg-[var(--color-bg-subtle)]"
+        role="group"
+        aria-label="Filter logs by level"
+      >
         {LEVEL_OPTIONS.map((opt) => (
           <button
             key={opt}
             type="button"
             onClick={() => onLevelChange(opt)}
+            aria-pressed={level === opt}
             className={cn(
               "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
               level === opt
@@ -111,6 +126,8 @@ export function MonitoringFilterBar({
             key={value}
             type="button"
             onClick={() => onTimeRangeChange(value)}
+            role="menuitemradio"
+            aria-checked={timeRange === value}
             className={cn(
               "w-full px-3 py-2 text-left text-xs flex items-center gap-2",
               timeRange === value
@@ -130,6 +147,8 @@ export function MonitoringFilterBar({
             <button
               type="button"
               onClick={() => onServiceChange("")}
+              role="menuitemradio"
+              aria-checked={!service}
               className={cn(
                 "w-full px-3 py-2 text-left text-xs flex items-center gap-2",
                 !service
@@ -145,6 +164,8 @@ export function MonitoringFilterBar({
                 key={s}
                 type="button"
                 onClick={() => onServiceChange(s)}
+                role="menuitemradio"
+                aria-checked={service === s}
                 className={cn(
                   "w-full px-3 py-2 text-left text-xs flex items-center gap-2",
                   service === s

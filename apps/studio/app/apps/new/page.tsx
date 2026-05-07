@@ -203,6 +203,7 @@ export default function NewAppPage() {
               <button
                 type="submit"
                 disabled={loading}
+                aria-label="Create app"
                 className="px-4 py-2 rounded-lg btn-primary-gradient text-[var(--color-text-primary)] text-sm font-medium disabled:opacity-50 flex items-center gap-2"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}

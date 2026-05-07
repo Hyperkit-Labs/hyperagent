@@ -131,7 +131,6 @@ function StatusDockInner({
 }
 
 function StatusDockFallback() {
-  const pathname = usePathname();
   const { defaultNetworkId } = useConfig();
   const { networks, loading: networksLoading } = useNetworks();
   const currentNetwork = networks?.find(

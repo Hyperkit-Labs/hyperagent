@@ -167,6 +167,7 @@ export default function AgentsPage() {
                       selectedAgents.size === agents.length
                     }
                     onChange={selectAll}
+                    aria-label="Select all agents"
                     className="w-4 h-4 rounded border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] text-[var(--color-primary)] focus:ring-[var(--color-primary-alpha-50)] cursor-pointer"
                     title="Select all"
                   />
@@ -178,6 +179,7 @@ export default function AgentsPage() {
                     placeholder="Filter agents..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
+                    aria-label="Filter agents"
                     className="w-full bg-[var(--color-bg-panel)] border border-[var(--color-border-subtle)] rounded-lg py-1.5 pl-9 pr-4 text-xs text-[var(--color-text-primary)] focus:border-[var(--color-primary-alpha-50)] focus:ring-1 focus:ring-[var(--color-primary-alpha-20)] transition-all placeholder:text-[var(--color-text-muted)]"
                   />
                 </div>
@@ -189,10 +191,16 @@ export default function AgentsPage() {
                   className="gap-1.5"
                 />
                 <div className="flex-1" />
-                <div className="flex items-center gap-1">
+                <div
+                  className="flex items-center gap-1"
+                  role="group"
+                  aria-label="Agent view mode"
+                >
                   <button
                     type="button"
                     title="List view"
+                    aria-label="Switch to list view"
+                    aria-pressed={viewMode === "list"}
                     onClick={() => setViewMode("list")}
                     className={`p-1.5 rounded-md transition-colors ${
                       viewMode === "list"
@@ -205,6 +213,8 @@ export default function AgentsPage() {
                   <button
                     type="button"
                     title="Grid view"
+                    aria-label="Switch to grid view"
+                    aria-pressed={viewMode === "grid"}
                     onClick={() => setViewMode("grid")}
                     className={`p-1.5 rounded-md transition-colors ${
                       viewMode === "grid"
@@ -353,6 +363,7 @@ export default function AgentsPage() {
                           type="checkbox"
                           checked={isChecked}
                           onChange={() => toggleSelectAgent(name)}
+                          aria-label={`Select agent ${name}`}
                           className="w-4 h-4 rounded border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] text-[var(--color-primary)] focus:ring-[var(--color-primary-alpha-50)] cursor-pointer"
                         />
                       </div>
@@ -413,6 +424,7 @@ export default function AgentsPage() {
                         <button
                           type="button"
                           title="Run agent"
+                          aria-label={`Run agent ${name}`}
                           onClick={(e) => {
                             e.stopPropagation();
                             router.push(
@@ -427,6 +439,7 @@ export default function AgentsPage() {
                           type="button"
                           className="p-2 rounded-md hover:bg-[var(--color-bg-hover)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition-colors"
                           title="View details"
+                          aria-label={`View details for agent ${name}`}
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedName(name);
@@ -438,6 +451,7 @@ export default function AgentsPage() {
                           href={ROUTES.MONITORING}
                           className="p-2 rounded-md hover:bg-[var(--color-bg-hover)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition-colors"
                           title="View logs"
+                          aria-label={`View logs for agent ${name}`}
                           onClick={(e) => e.stopPropagation()}
                         >
                           <FileText className="w-4 h-4" />

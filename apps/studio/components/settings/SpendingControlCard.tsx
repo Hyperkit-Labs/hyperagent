@@ -140,6 +140,7 @@ export function SpendingControlCard({
               setBudgetAmount(v);
               onValuesChange?.(v, period);
             }}
+            aria-label="Budget per period"
             className="w-full max-w-[200px] px-3 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] text-[var(--color-text-primary)] text-sm"
           />
           <span className="ml-2 text-xs text-[var(--color-text-muted)]">
@@ -161,6 +162,7 @@ export function SpendingControlCard({
               setPeriod(v);
               onValuesChange?.(budgetAmount, v);
             }}
+            aria-label="Spending period"
             className="w-full max-w-[200px] px-3 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] text-[var(--color-text-primary)] text-sm"
           >
             <option value="daily">Daily</option>
@@ -182,6 +184,7 @@ export function SpendingControlCard({
             max="100"
             value={alertPercent}
             onChange={(e) => setAlertPercent(parseInt(e.target.value, 10) || 0)}
+            aria-label="Alert threshold percent"
             className="w-full max-w-[120px] px-3 py-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] text-[var(--color-text-primary)] text-sm"
           />
         </div>

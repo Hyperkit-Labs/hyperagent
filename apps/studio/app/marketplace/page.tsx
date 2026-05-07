@@ -163,6 +163,7 @@ export default function MarketplacePage() {
                             handleOneClickDeploy(item.id, item.name || item.id)
                           }
                           disabled={isDeploying}
+                          aria-label={`One-click deploy template ${item.name || item.id}`}
                           className="w-full btn-primary-gradient text-xs py-2 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
                         >
                           {isDeploying ? (

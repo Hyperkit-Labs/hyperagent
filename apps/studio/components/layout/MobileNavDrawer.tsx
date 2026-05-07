@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -22,6 +22,7 @@ import {
   Server,
   BookOpen,
   X,
+  ChevronDown,
 } from "lucide-react";
 import { ROUTES, CLI_VERSION } from "@/constants/routes";
 
@@ -51,6 +52,33 @@ const resourceItems = [
 
 const NAV_LINK_BASE =
   "flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] min-h-[40px] transition-colors";
+
+function SectionHeader({
+  label,
+  sectionKey,
+  isOpen,
+  onToggle,
+}: {
+  label: string;
+  sectionKey: "core" | "tools" | "resources";
+  isOpen: boolean;
+  onToggle: (key: "core" | "tools" | "resources") => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(sectionKey)}
+      className="w-full px-3 py-2 flex items-center justify-between text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider"
+      aria-expanded={isOpen}
+      aria-controls={`mobile-nav-${sectionKey}`}
+    >
+      <span>{label}</span>
+      <ChevronDown
+        className={`w-3.5 h-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`}
+      />
+    </button>
+  );
+}
 
 function NavLink({
   href,
@@ -98,6 +126,11 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
   const searchParams = useSearchParams();
   const fullPath =
     pathname + (searchParams.toString() ? "?" + searchParams.toString() : "");
+  const [sectionsOpen, setSectionsOpen] = useState({
+    core: true,
+    tools: true,
+    resources: true,
+  });
 
   useEffect(() => {
     if (open) {
@@ -109,6 +142,10 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
       document.body.style.overflow = "";
     };
   }, [open]);
+
+  const toggleSection = (key: "core" | "tools" | "resources") => {
+    setSectionsOpen((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   return (
     <AnimatePresence>
@@ -166,52 +203,73 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
             </div>
             <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-4">
               <div className="space-y-1">
-                <span className="px-3 py-2 text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider block">
-                  Core
-                </span>
-                {coreNavItems.map(({ href, label, icon }) => (
-                  <NavLink
-                    key={href + label}
-                    href={href}
-                    label={label}
-                    icon={icon}
-                    pathname={pathname}
-                    fullPath={fullPath}
-                    onNavigate={onClose}
-                  />
-                ))}
+                <SectionHeader
+                  label="Core"
+                  sectionKey="core"
+                  isOpen={sectionsOpen.core}
+                  onToggle={toggleSection}
+                />
+                {sectionsOpen.core && (
+                  <div id="mobile-nav-core" className="space-y-1">
+                    {coreNavItems.map(({ href, label, icon }) => (
+                      <NavLink
+                        key={href + label}
+                        href={href}
+                        label={label}
+                        icon={icon}
+                        pathname={pathname}
+                        fullPath={fullPath}
+                        onNavigate={onClose}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="space-y-1">
-                <span className="px-3 py-2 text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider block">
-                  Tools
-                </span>
-                {toolsNavItems.map(({ href, label, icon }) => (
-                  <NavLink
-                    key={href + label}
-                    href={href}
-                    label={label}
-                    icon={icon}
-                    pathname={pathname}
-                    fullPath={fullPath}
-                    onNavigate={onClose}
-                  />
-                ))}
+                <SectionHeader
+                  label="Tools"
+                  sectionKey="tools"
+                  isOpen={sectionsOpen.tools}
+                  onToggle={toggleSection}
+                />
+                {sectionsOpen.tools && (
+                  <div id="mobile-nav-tools" className="space-y-1">
+                    {toolsNavItems.map(({ href, label, icon }) => (
+                      <NavLink
+                        key={href + label}
+                        href={href}
+                        label={label}
+                        icon={icon}
+                        pathname={pathname}
+                        fullPath={fullPath}
+                        onNavigate={onClose}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="space-y-1">
-                <span className="px-3 py-2 text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider block">
-                  Resources
-                </span>
-                {resourceItems.map(({ href, label, icon }) => (
-                  <NavLink
-                    key={href}
-                    href={href}
-                    label={label}
-                    icon={icon}
-                    pathname={pathname}
-                    fullPath={fullPath}
-                    onNavigate={onClose}
-                  />
-                ))}
+                <SectionHeader
+                  label="Resources"
+                  sectionKey="resources"
+                  isOpen={sectionsOpen.resources}
+                  onToggle={toggleSection}
+                />
+                {sectionsOpen.resources && (
+                  <div id="mobile-nav-resources" className="space-y-1">
+                    {resourceItems.map(({ href, label, icon }) => (
+                      <NavLink
+                        key={href}
+                        href={href}
+                        label={label}
+                        icon={icon}
+                        pathname={pathname}
+                        fullPath={fullPath}
+                        onNavigate={onClose}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             </nav>
             <div className="shrink-0 px-4 py-3 border-t border-[var(--color-border-subtle)] text-[11px] text-[var(--color-text-dim)]">

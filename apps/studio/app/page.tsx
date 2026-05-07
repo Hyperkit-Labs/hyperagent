@@ -192,6 +192,7 @@ function SpecReviewPanel({
             value={clarification}
             onChange={(e) => setClarification(e.target.value)}
             placeholder="Request changes or ask questions..."
+            aria-label="Request clarification"
             className="flex-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] px-3 py-1.5 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
           />
           <button
@@ -567,6 +568,7 @@ function ChatPageContent() {
               <select
                 value={buildNetwork}
                 onChange={(e) => setBuildNetwork(e.target.value)}
+                aria-label="Select target network"
                 className="bg-transparent border-none text-[11px] text-[var(--color-text-primary)] focus:outline-none"
               >
                 {testnets.length === 0 && (
@@ -597,6 +599,7 @@ function ChatPageContent() {
             <button
               type="button"
               onClick={() => setShellView("code")}
+              aria-pressed={shellView === "code"}
               className={`flex items-center gap-2 px-2 py-1.5 w-full text-left rounded-md transition-colors ${
                 shellView === "code"
                   ? "text-[var(--color-text-primary)] bg-[var(--color-bg-panel)]"
@@ -609,6 +612,7 @@ function ChatPageContent() {
             <button
               type="button"
               onClick={() => setShellView("data")}
+              aria-pressed={shellView === "data"}
               className={`flex items-center gap-2 px-2 py-1.5 w-full text-left rounded-md transition-colors ${
                 shellView === "data"
                   ? "text-[var(--color-text-primary)] bg-[var(--color-bg-panel)]"

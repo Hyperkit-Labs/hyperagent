@@ -85,6 +85,9 @@ function DashboardCTAs({
         <button
           type="button"
           onClick={() => setMoreOpen(!moreOpen)}
+          aria-expanded={moreOpen}
+          aria-haspopup="menu"
+          aria-label="Open dashboard actions"
           className="px-3 py-2 rounded-lg border border-[var(--color-border-subtle)] text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] transition-colors flex items-center gap-1"
         >
           More{" "}
@@ -99,7 +102,11 @@ function DashboardCTAs({
               onClick={() => setMoreOpen(false)}
               aria-hidden
             />
-            <div className="absolute right-0 top-full mt-1 z-50 py-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] shadow-xl min-w-[140px]">
+            <div
+              className="absolute right-0 top-full mt-1 z-50 py-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] shadow-xl min-w-[140px]"
+              role="menu"
+              aria-label="Dashboard actions"
+            >
               <button
                 type="button"
                 onClick={() => {
@@ -107,6 +114,7 @@ function DashboardCTAs({
                   setMoreOpen(false);
                 }}
                 disabled={quickDemoLoading || workflows.length === 0}
+                role="menuitem"
                 title={
                   workflows.length === 0 ? "Create a workflow first" : undefined
                 }
@@ -122,6 +130,7 @@ function DashboardCTAs({
               <Link
                 href={ROUTES.MONITORING}
                 onClick={() => setMoreOpen(false)}
+                role="menuitem"
                 className="block px-3 py-2 text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
               >
                 View logs
@@ -406,19 +415,19 @@ export default function DashboardPage() {
                     trend: deployments.length > 0 ? ("up" as const) : undefined,
                   },
                   {
-                    label: "Metrics",
+                    label: "Contracts",
                     value: dashboardLoading
                       ? "..."
-                      : typeof metrics?.workflows?.total === "number"
-                        ? metrics.workflows.total
-                        : "-",
-                    sublabel: "From API",
+                      : typeof metrics?.contracts?.deployed === "number"
+                        ? metrics.contracts.deployed
+                        : 0,
+                    sublabel: "Deployed",
                     icon: (
                       <HardDrive className="w-4 h-4 text-[var(--color-semantic-violet)]" />
                     ),
                     animateValue:
                       !dashboardLoading &&
-                      typeof metrics?.workflows?.total === "number",
+                      typeof metrics?.contracts?.deployed === "number",
                   },
                   {
                     label: "Status",
@@ -692,7 +701,7 @@ export default function DashboardPage() {
                       Traffic Overview
                     </h3>
                   </div>
-                  <div className="flex-1 min-h-0 w-full">
+                  <div className="flex-1 min-h-[220px] w-full min-w-0">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={trafficData}
@@ -846,6 +855,7 @@ export default function DashboardPage() {
                             key={id}
                             type="button"
                             onClick={() => setDeployTableFilter(id)}
+                            aria-pressed={deployTableFilter === id}
                             className={`rounded-lg px-2.5 py-1 text-[10px] font-medium border transition-colors ${
                               deployTableFilter === id
                                 ? "border-[var(--color-primary)] bg-[var(--color-primary-alpha-15)] text-[var(--color-primary-light)]"

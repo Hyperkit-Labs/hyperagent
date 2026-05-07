@@ -103,6 +103,9 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => setTab("workspace")}
+                    aria-controls="settings-panel-workspace"
+                    aria-label="Open Workspace settings"
+                    aria-pressed={tab === "workspace"}
                     className={`flex h-full w-full flex-col gap-1 p-4 text-left transition-colors hover:bg-[var(--color-bg-hover)]/50 ${tab === "workspace" ? "ring-1 ring-[var(--color-primary-alpha-30)]" : ""}`}
                   >
                     <Folder className="h-4 w-4 text-[var(--color-primary-light)]" />
@@ -118,6 +121,9 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => setTab("byok")}
+                    aria-controls="settings-panel-byok"
+                    aria-label="Open LLM keys settings"
+                    aria-pressed={tab === "byok"}
                     className={`flex h-full w-full flex-col gap-1 p-4 text-left transition-colors hover:bg-[var(--color-bg-hover)]/50 ${tab === "byok" ? "ring-1 ring-[var(--color-primary-alpha-30)]" : ""}`}
                   >
                     <Key className="h-4 w-4 text-[var(--color-primary-light)]" />
@@ -133,6 +139,9 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => setTab("x402")}
+                    aria-controls="settings-panel-x402"
+                    aria-label="Open x402 spending settings"
+                    aria-pressed={tab === "x402"}
                     className={`flex h-full w-full flex-col gap-1 p-4 text-left transition-colors hover:bg-[var(--color-bg-hover)]/50 ${tab === "x402" ? "ring-1 ring-[var(--color-primary-alpha-30)]" : ""}`}
                   >
                     <DollarSign className="h-4 w-4 text-[var(--color-primary-light)]" />
@@ -148,6 +157,9 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => setTab("plan")}
+                    aria-controls="settings-panel-plan"
+                    aria-label="Open plan and pricing settings"
+                    aria-pressed={tab === "plan"}
                     className={`flex h-full w-full flex-col gap-1 p-4 text-left transition-colors hover:bg-[var(--color-bg-hover)]/50 ${tab === "plan" ? "ring-1 ring-[var(--color-primary-alpha-30)]" : ""}`}
                   >
                     <CreditCard className="h-4 w-4 text-[var(--color-primary-light)]" />
@@ -163,6 +175,9 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => setTab("integrations")}
+                    aria-controls="settings-panel-integrations"
+                    aria-label="Open integrations settings"
+                    aria-pressed={tab === "integrations"}
                     className={`flex h-full w-full flex-col gap-1 p-4 text-left transition-colors hover:bg-[var(--color-bg-hover)]/50 ${tab === "integrations" ? "ring-1 ring-[var(--color-primary-alpha-30)]" : ""}`}
                   >
                     <Plug className="h-4 w-4 text-[var(--color-primary-light)]" />
@@ -181,11 +196,19 @@ export default function SettingsPage() {
 
             <div className="flex flex-col md:flex-row gap-8">
               <aside className="w-full md:w-64 shrink-0">
-                <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
+                <nav
+                  className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-2 md:pb-0"
+                  role="tablist"
+                  aria-label="Settings sections"
+                >
                   <button
                     type="button"
                     onClick={() => setTab("workspace")}
                     className={tabClass("workspace")}
+                    role="tab"
+                    aria-controls="settings-panel-workspace"
+                    aria-label="Open Workspace settings"
+                    aria-selected={tab === "workspace"}
                   >
                     <Folder className="w-4 h-4" />
                     Workspace
@@ -194,6 +217,10 @@ export default function SettingsPage() {
                     type="button"
                     onClick={() => setTab("byok")}
                     className={tabClass("byok")}
+                    role="tab"
+                    aria-controls="settings-panel-byok"
+                    aria-label="Open LLM keys settings"
+                    aria-selected={tab === "byok"}
                   >
                     <Key className="w-4 h-4" />
                     LLM keys (BYOK)
@@ -202,6 +229,10 @@ export default function SettingsPage() {
                     type="button"
                     onClick={() => setTab("x402")}
                     className={tabClass("x402")}
+                    role="tab"
+                    aria-controls="settings-panel-x402"
+                    aria-label="Open x402 spending settings"
+                    aria-selected={tab === "x402"}
                   >
                     <DollarSign className="w-4 h-4" />
                     x402 & Spending
@@ -210,6 +241,10 @@ export default function SettingsPage() {
                     type="button"
                     onClick={() => setTab("plan")}
                     className={tabClass("plan")}
+                    role="tab"
+                    aria-controls="settings-panel-plan"
+                    aria-label="Open plan and pricing settings"
+                    aria-selected={tab === "plan"}
                   >
                     <CreditCard className="w-4 h-4" />
                     Plan & Pricing
@@ -218,6 +253,10 @@ export default function SettingsPage() {
                     type="button"
                     onClick={() => setTab("integrations")}
                     className={tabClass("integrations")}
+                    role="tab"
+                    aria-controls="settings-panel-integrations"
+                    aria-label="Open integrations settings"
+                    aria-selected={tab === "integrations"}
                   >
                     <Plug className="w-4 h-4" />
                     Integrations
@@ -237,6 +276,11 @@ export default function SettingsPage() {
 
               <main className="flex-1 min-w-0 space-y-6">
                 {tab === "workspace" && (
+                  <div
+                    id="settings-panel-workspace"
+                    role="tabpanel"
+                    aria-label="Workspace settings"
+                  >
                   <WorkspaceTab
                     config={config}
                     configError={configError}
@@ -247,10 +291,16 @@ export default function SettingsPage() {
                     setDefaultNetwork={setDefaultNetwork}
                     refetchWorkspace={refetchWorkspace}
                   />
+                  </div>
                 )}
 
                 {tab === "byok" && (
-                  <div className="glass-panel rounded-xl p-6">
+                  <div
+                    id="settings-panel-byok"
+                    role="tabpanel"
+                    aria-label="LLM keys settings"
+                    className="glass-panel rounded-xl p-6"
+                  >
                     <LLMKeysCard />
                     <p className="text-xs text-[var(--color-text-muted)] mt-4">
                       You can also manage API keys from the Chat page via the
@@ -260,6 +310,11 @@ export default function SettingsPage() {
                 )}
 
                 {tab === "x402" && (
+                  <div
+                    id="settings-panel-x402"
+                    role="tabpanel"
+                    aria-label="x402 and spending settings"
+                  >
                   <X402SpendingTab
                     x402Enabled={x402Enabled}
                     x402Loading={x402Loading}
@@ -269,9 +324,15 @@ export default function SettingsPage() {
                     config={config}
                     refetchX402={refetchX402}
                   />
+                  </div>
                 )}
 
                 {tab === "plan" && (
+                  <div
+                    id="settings-panel-plan"
+                    role="tabpanel"
+                    aria-label="Plan and pricing settings"
+                  >
                   <PlanPricingTab
                     plans={plans}
                     resources={resources}
@@ -280,13 +341,20 @@ export default function SettingsPage() {
                     planError={planError}
                     refetchPlan={refetchPlan}
                   />
+                  </div>
                 )}
 
                 {tab === "integrations" && (
+                  <div
+                    id="settings-panel-integrations"
+                    role="tabpanel"
+                    aria-label="Integrations settings"
+                  >
                   <IntegrationsTab
                     config={config}
                     networksCount={networks.length}
                   />
+                  </div>
                 )}
 
                 {/* Danger Zone */}

@@ -6,27 +6,13 @@ jest.mock("@/config/environment", () => ({
 
 describe("fetchJson request shaping", () => {
   const originalFetch = globalThis.fetch;
-  const originalWindow = globalThis.window;
 
   beforeEach(() => {
     setAuthHeaderProvider(null);
-    Object.defineProperty(globalThis, "window", {
-      configurable: true,
-      value: { location: { origin: "https://ai.hyperkitlabs.com" } },
-    });
   });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
-    if (originalWindow === undefined) {
-      // @ts-expect-error test cleanup for Node runtime
-      delete globalThis.window;
-    } else {
-      Object.defineProperty(globalThis, "window", {
-        configurable: true,
-        value: originalWindow,
-      });
-    }
     setAuthHeaderProvider(null);
   });
 

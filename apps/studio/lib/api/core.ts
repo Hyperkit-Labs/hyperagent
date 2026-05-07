@@ -246,7 +246,6 @@ export async function fetchJson<T>(
   const retryDelay = 1000;
   let lastError: Error | null = null;
   const base = () => getApiBase();
-  const method = (init.method ?? "GET").toUpperCase();
   const hasBody = init.body !== undefined && init.body !== null;
 
   if (

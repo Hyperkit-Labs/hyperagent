@@ -9,8 +9,6 @@ import { ExternalLink, Loader2, Bug } from "lucide-react";
 import {
   Search,
   Activity,
-  ArrowDown,
-  MoreVertical,
   ArrowRightLeft,
   Image as ImageIcon,
   Landmark,
@@ -236,6 +234,7 @@ export default function WorkflowsPage() {
                     placeholder="Filter projects..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
+                    aria-label="Filter projects"
                     className="w-full bg-[var(--color-bg-panel)] border border-[var(--color-border-subtle)] rounded-lg py-1.5 pl-9 pr-4 text-xs text-[var(--color-text-primary)] focus:border-[var(--color-primary-alpha-50)] focus:ring-1 focus:ring-[var(--color-primary-alpha-20)] transition-all placeholder:text-[var(--color-text-muted)]"
                   />
                 </div>
@@ -257,6 +256,7 @@ export default function WorkflowsPage() {
                 <select
                   value={networkFilter}
                   onChange={(e) => setNetworkFilter(e.target.value)}
+                  aria-label="Filter by network"
                   className="px-3 py-1.5 rounded-lg bg-[var(--color-bg-panel)] border border-[var(--color-border-subtle)] hover:bg-[var(--color-bg-hover)] text-xs text-[var(--color-text-secondary)] transition-colors"
                 >
                   <option value="">All Networks</option>
@@ -269,6 +269,7 @@ export default function WorkflowsPage() {
                 <select
                   value={typeFilter}
                   onChange={(e) => setTypeFilter(e.target.value)}
+                  aria-label="Filter by type"
                   className="px-3 py-1.5 rounded-lg bg-[var(--color-bg-panel)] border border-[var(--color-border-subtle)] hover:bg-[var(--color-bg-hover)] text-xs text-[var(--color-text-secondary)] transition-colors"
                 >
                   <option value="">All Types</option>
@@ -279,10 +280,16 @@ export default function WorkflowsPage() {
                   ))}
                 </select>
                 <div className="flex-1" />
-                <div className="flex items-center gap-1 bg-[var(--color-bg-panel)] p-1 rounded-lg border border-[var(--color-border-subtle)]">
+                <div
+                  className="flex items-center gap-1 bg-[var(--color-bg-panel)] p-1 rounded-lg border border-[var(--color-border-subtle)]"
+                  role="group"
+                  aria-label="Workflow view mode"
+                >
                   <button
                     type="button"
                     onClick={() => setViewMode("grid")}
+                    aria-label="Switch to grid view"
+                    aria-pressed={viewMode === "grid"}
                     className={`p-1.5 rounded text-xs transition-colors ${viewMode === "grid" ? "bg-[var(--color-bg-hover)] text-[var(--color-text-primary)]" : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"}`}
                   >
                     Grid
@@ -290,6 +297,8 @@ export default function WorkflowsPage() {
                   <button
                     type="button"
                     onClick={() => setViewMode("kanban")}
+                    aria-label="Switch to kanban view"
+                    aria-pressed={viewMode === "kanban"}
                     className={`p-1.5 rounded text-xs transition-colors ${viewMode === "kanban" ? "bg-[var(--color-bg-hover)] text-[var(--color-text-primary)]" : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"}`}
                   >
                     Kanban
@@ -302,6 +311,7 @@ export default function WorkflowsPage() {
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as SortField)}
+                    aria-label="Sort workflows"
                     className="bg-transparent text-xs font-medium text-[var(--color-text-primary)] border-none focus:ring-0 cursor-pointer"
                   >
                     <option value="updated_at">Last Active</option>
@@ -480,6 +490,7 @@ export default function WorkflowsPage() {
                                 onChange={() =>
                                   toggleSelectWorkflow(w.workflow_id)
                                 }
+                                aria-label={`Select workflow ${w.intent?.slice(0, 32) || w.name || w.workflow_id}`}
                                 className="w-4 h-4 rounded border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] text-[var(--color-primary)] focus:ring-[var(--color-primary-alpha-50)] cursor-pointer"
                               />
                             </div>
@@ -579,6 +590,7 @@ export default function WorkflowsPage() {
                                     }
                                   }}
                                   disabled={quickDemoLoading !== null}
+                                  aria-label={`Try workflow ${w.intent?.slice(0, 32) || w.name || w.workflow_id} in sandbox`}
                                   className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-[var(--color-border-subtle)] text-[10px] font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] disabled:opacity-50"
                                   title="Try in sandbox"
                                 >
@@ -622,6 +634,7 @@ export default function WorkflowsPage() {
                                       }
                                     }}
                                     disabled={debugSandboxLoading !== null}
+                                    aria-label={`Debug workflow ${w.intent?.slice(0, 32) || w.name || w.workflow_id} in sandbox`}
                                     className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-amber-500/30 text-[10px] font-medium text-amber-400 hover:bg-amber-500/10 disabled:opacity-50"
                                     title="Debug in sandbox"
                                   >
@@ -636,6 +649,7 @@ export default function WorkflowsPage() {
                               </div>
                               <Link
                                 href={ROUTES.WORKFLOW_ID(w.workflow_id)}
+                                aria-label={`Open workflow ${w.intent?.slice(0, 32) || w.name || w.workflow_id} in Studio`}
                                 className="btn-primary-gradient px-4 py-1.5 rounded-full text-xs font-medium text-white transition-all hover:scale-105 w-fit"
                                 onClick={(e) => e.stopPropagation()}
                               >

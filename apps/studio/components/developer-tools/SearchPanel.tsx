@@ -167,6 +167,7 @@ export function SearchPanel() {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={MODE_PLACEHOLDERS[mode]}
+          aria-label="Search query"
           disabled={state.loading}
           className="flex-1 bg-[var(--color-bg-base)] border border-[var(--color-border-subtle)] rounded-lg px-3 py-1.5 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-primary-alpha-40)] transition-colors disabled:opacity-50"
         />

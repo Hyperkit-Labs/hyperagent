@@ -102,7 +102,7 @@ export default function DocsPage() {
               </div>
             </a>
             <a
-              href="https://github.com/AiHyperKit"
+              href="https://github.com/Hyperkit-Labs/hyperagent"
               target="_blank"
               rel="noopener noreferrer"
               className="glass-panel rounded-xl p-6 glass-panel-hover transition-all flex items-start gap-4"

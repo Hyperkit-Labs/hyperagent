@@ -126,6 +126,7 @@ function AnalyticsContent() {
             <TimeRangeFilter value={timeRange} onChange={setTimeRange} />
             <button
               type="button"
+              aria-label="Export analytics"
               onClick={() => {
                 const data = {
                   total,
@@ -150,11 +151,13 @@ function AnalyticsContent() {
               <Download className="w-3.5 h-3.5" />
               Export
             </button>
-            <div className="flex gap-1">
+            <div className="flex gap-1" role="tablist" aria-label="Analytics view">
               {Object.entries(VIEW_LABELS).map(([v, { label }]) => (
                 <Link
                   key={v}
                   href={`${ROUTES.ANALYTICS}?view=${v}`}
+                  role="tab"
+                  aria-selected={view === v}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                     view === v
                       ? "bg-[var(--color-primary-alpha-20)] text-[var(--color-primary-light)]"
@@ -229,7 +232,7 @@ function AnalyticsContent() {
                 <TrendingUp className="w-4 h-4 text-[var(--color-semantic-info)]" />
                 Workflow breakdown
               </h3>
-              <LiquidGlass className="h-48 p-3">
+              <LiquidGlass className="h-48 min-h-[192px] min-w-0 p-3">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={[

@@ -23,8 +23,8 @@ export function TeamSelector({
   return (
     <div
       className={cn("flex flex-wrap gap-2", className)}
-      role="listbox"
-      aria-label="Select item"
+      role="group"
+      aria-label="Select category"
     >
       {members.map((m) => {
         const sel = selectedId === m.id;
@@ -32,8 +32,7 @@ export function TeamSelector({
           <button
             key={m.id}
             type="button"
-            role="option"
-            aria-selected={sel}
+            aria-pressed={sel}
             onClick={() => onSelect(m.id)}
             className={cn(
               "flex items-center gap-2 rounded-xl border px-3 py-2 text-left transition-all min-w-[140px]",

@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
 import { Bell } from "lucide-react";
 import { getWorkflows } from "@/lib/api";
+import { ROUTES } from "@/constants/routes";
 
 export function NotificationsDropdown() {
   const [open, setOpen] = useState(false);
@@ -45,10 +47,16 @@ export function NotificationsDropdown() {
       if (ref.current && !ref.current.contains(e.target as Node))
         setOpen(false);
     }
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
     if (open) {
       document.addEventListener("mousedown", handleClickOutside);
-      return () =>
+      document.addEventListener("keydown", handleEscape);
+      return () => {
         document.removeEventListener("mousedown", handleClickOutside);
+        document.removeEventListener("keydown", handleEscape);
+      };
     }
   }, [open]);
 
@@ -60,6 +68,7 @@ export function NotificationsDropdown() {
         className="text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition-colors relative p-1"
         aria-label="Notifications"
         aria-expanded={open}
+        aria-haspopup="menu"
       >
         <Bell className="w-5 h-5" />
         {notifications.length > 0 && (
@@ -67,7 +76,11 @@ export function NotificationsDropdown() {
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1.5 w-72 max-h-[320px] overflow-y-auto rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] shadow-xl z-50 py-2">
+        <div
+          className="absolute right-0 top-full mt-1.5 w-72 max-h-[320px] overflow-y-auto rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] shadow-xl z-50 py-2"
+          role="menu"
+          aria-label="Notifications menu"
+        >
           <div className="px-3 py-1.5 text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-widest">
             Notifications
           </div>
@@ -83,15 +96,20 @@ export function NotificationsDropdown() {
           ) : (
             <ul className="py-1">
               {notifications.map((n) => (
-                <li key={n.id}>
-                  <div className="px-4 py-2 hover:bg-[var(--color-bg-panel)] text-[13px] text-[var(--color-text-primary)]">
+                <li key={n.id} role="none">
+                  <Link
+                    href={`${ROUTES.HOME}?workflow=${encodeURIComponent(n.id)}`}
+                    role="menuitem"
+                    className="w-full px-4 py-2 hover:bg-[var(--color-bg-panel)] text-[13px] text-[var(--color-text-primary)] text-left"
+                    onClick={() => setOpen(false)}
+                  >
                     {n.title}
                     {n.time && (
                       <span className="block text-[11px] text-[var(--color-text-dim)] mt-0.5">
                         {n.time}
                       </span>
                     )}
-                  </div>
+                  </Link>
                 </li>
               ))}
             </ul>

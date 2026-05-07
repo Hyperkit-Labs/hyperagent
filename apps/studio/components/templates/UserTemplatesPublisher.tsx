@@ -143,12 +143,14 @@ export function UserTemplatesPublisher() {
               value={createName}
               onChange={(e) => setCreateName(e.target.value)}
               placeholder="Name"
+              aria-label="Template name"
             />
             <input
               className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] px-3 py-2 text-xs text-[var(--color-text-primary)]"
               value={createDesc}
               onChange={(e) => setCreateDesc(e.target.value)}
               placeholder="Description"
+              aria-label="Template description"
             />
             <button
               type="button"
@@ -166,6 +168,7 @@ export function UserTemplatesPublisher() {
               className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] px-3 py-2 text-xs text-[var(--color-text-primary)]"
               value={selectedId ?? ""}
               onChange={(e) => setSelectedId(e.target.value || null)}
+              aria-label="Select template"
             >
               <option value="">Select…</option>
               {rows.map((r) => (
@@ -202,6 +205,7 @@ export function UserTemplatesPublisher() {
                   setValidationErrors([]);
                 }
               }}
+              aria-label="Canonical package JSON"
               spellCheck={false}
             />
             {validationErrors.length > 0 && (

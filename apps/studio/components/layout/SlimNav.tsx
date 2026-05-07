@@ -78,7 +78,7 @@ const toolsNavItems = [
   { href: ROUTES.ANALYTICS, label: "Analytics", icon: BarChart3 },
   { href: ROUTES.HISTORY, label: "History", icon: History },
   { href: ROUTES.PAYMENTS, label: "Payments", icon: DollarSign },
-  { href: ROUTES.MONITORING, label: "Logs", icon: FileText },
+  { href: ROUTES.MONITORING, label: "Logs & Monitoring", icon: FileText },
   { href: ROUTES.SECURITY, label: "Security", icon: Shield },
 ] as const;
 
@@ -141,16 +141,8 @@ function NavItem({
 
 export function SlimNav() {
   const pathname = usePathname();
-  const [sidebarState, setSidebarState] = useState(() => ({
-    expanded: true,
-    width: SIDEBAR_EXPANDED,
-  }));
+  const [sidebarState, setSidebarState] = useState(loadSidebarState);
   const { expanded, width } = sidebarState;
-
-  useEffect(() => {
-    const saved = loadSidebarState();
-    setSidebarState(saved);
-  }, []);
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 

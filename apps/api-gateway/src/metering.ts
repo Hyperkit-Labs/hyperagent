@@ -5,7 +5,7 @@
  * Optional payment hints on 402 only when X402 is enabled and a merchant address exists.
  */
 import type { Request, Response, NextFunction } from "express";
-import { METERING_EXEMPT_PREFIXES } from "@hyperagent/api-contracts";
+import { ApiPaths, METERING_EXEMPT_PREFIXES } from "@hyperagent/api-contracts";
 import { getGatewayEnv } from "@hyperagent/config";
 import { getSupabaseAdmin } from "./authBootstrap.js";
 import type { RequestWithUser } from "./auth.js";
@@ -24,6 +24,7 @@ function normalizePath(input: string): string {
 }
 
 const EXEMPT_PREFIXES = [...METERING_EXEMPT_PREFIXES];
+const READ_ONLY_EXEMPT_PREFIXES = [ApiPaths.workflows, "/workflows"];
 
 /**
  * Exported for unit tests. True when this request should not consume credit preflight.
@@ -31,6 +32,11 @@ const EXEMPT_PREFIXES = [...METERING_EXEMPT_PREFIXES];
 export function isMeteringExemptPath(path: string, method: string): boolean {
   if (method === "OPTIONS") return true;
   const p = normalizePath(path);
+  if (method === "GET" || method === "HEAD") {
+    for (const prefix of READ_ONLY_EXEMPT_PREFIXES) {
+      if (p === prefix || p.startsWith(`${prefix}/`)) return true;
+    }
+  }
   for (const prefix of EXEMPT_PREFIXES) {
     if (p === prefix || p.startsWith(`${prefix}/`)) return true;
   }

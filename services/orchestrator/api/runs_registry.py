@@ -622,9 +622,10 @@ def _require_user_id_for_byok(x_user_id: str | None) -> None:
 def _resolve_byok_user_id(request: Request, x_user_id: str | None) -> str | None:
     from .common import get_caller_id
 
-    if x_user_id and x_user_id.strip():
-        return x_user_id.strip()
-    return get_caller_id(request)
+    resolved = get_caller_id(request)
+    if resolved:
+        return resolved
+    return (x_user_id or "").strip() or None
 
 
 def _trace_llm_keys(

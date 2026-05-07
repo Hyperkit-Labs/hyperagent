@@ -139,6 +139,13 @@ def get_caller_id(request: Request) -> str | None:
     if _IDENTITY_HMAC_SECRET:
         sig = (request.headers.get("x-user-id-sig") or "").strip()
         if not _verify_user_id_hmac(user_id, sig):
+            bearer_user_id = _get_user_id_from_bearer(request)
+            if bearer_user_id:
+                logger.warning(
+                    "[security] X-User-Id HMAC verification failed; falling back to bearer sub path=%s",
+                    request.url.path,
+                )
+                return bearer_user_id
             logger.warning(
                 "[security] X-User-Id HMAC verification failed for user_id=%s path=%s",
                 user_id[:16],

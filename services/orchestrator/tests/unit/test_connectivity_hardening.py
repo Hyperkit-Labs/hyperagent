@@ -85,7 +85,7 @@ def test_get_caller_id_falls_back_to_bearer_sub_when_header_missing(
     assert common.get_caller_id(_Req()) == "550e8400-e29b-41d4-a716-446655440000"
 
 
-def test_get_caller_id_does_not_use_bearer_when_spoofed_header_present(
+def test_get_caller_id_falls_back_to_bearer_when_spoofed_header_present(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     common = _load_common_module()
@@ -105,7 +105,7 @@ def test_get_caller_id_does_not_use_bearer_when_spoofed_header_present(
                 "Url", (), {"path": "/api/v1/workspaces/current/llm-keys"}
             )()
 
-    assert common.get_caller_id(_Req()) is None
+    assert common.get_caller_id(_Req()) == "550e8400-e29b-41d4-a716-446655440000"
 
 
 def _mint_hs256_jwt(payload: dict[str, str], secret: str) -> str:

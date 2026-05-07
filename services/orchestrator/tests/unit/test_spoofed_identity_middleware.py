@@ -7,6 +7,7 @@ import hmac
 import importlib
 import os
 import sys
+from base64 import urlsafe_b64encode
 
 import pytest
 from fastapi import FastAPI
@@ -20,6 +21,21 @@ sys.path.insert(
 def _user_id_sig(user_id: str, secret: str) -> str:
     sig = hmac.new(secret.encode(), user_id.encode(), hashlib.sha256).hexdigest()
     return f"{user_id}.{sig}"
+
+
+def _mint_hs256_jwt(payload: dict[str, str], secret: str) -> str:
+    import json
+
+    def _b64(data: bytes) -> str:
+        return urlsafe_b64encode(data).decode().rstrip("=")
+
+    header = {"alg": "HS256", "typ": "JWT"}
+    h_b64 = _b64(json.dumps(header, separators=(",", ":")).encode())
+    p_b64 = _b64(json.dumps(payload, separators=(",", ":")).encode())
+    signing_input = f"{h_b64}.{p_b64}".encode()
+    sig = hmac.new(secret.encode(), signing_input, hashlib.sha256).digest()
+    s_b64 = _b64(sig)
+    return f"{h_b64}.{p_b64}.{s_b64}"
 
 
 def _client_with_middleware(monkeypatch: pytest.MonkeyPatch) -> TestClient:
@@ -75,3 +91,22 @@ def test_no_user_header_skips_middleware(
     client = _client_with_middleware(monkeypatch)
     r = client.get("/api/v1/workflows")
     assert r.status_code == 200
+
+
+def test_invalid_x_user_id_signature_falls_back_to_valid_bearer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _client_with_middleware(monkeypatch)
+    token = _mint_hs256_jwt(
+        {"sub": "550e8400-e29b-41d4-a716-446655440000"},
+        "unit-test-secret",
+    )
+    r = client.get(
+        "/api/v1/workflows",
+        headers={
+            "X-User-Id": "spoofed-user-id",
+            "authorization": f"Bearer {token}",
+        },
+    )
+    assert r.status_code == 200
+    assert r.json() == {"ok": True}

@@ -223,6 +223,28 @@ describe("authMiddleware", () => {
     verifySpy.mockRestore();
   });
 
+  it("allows protected paths with hyperagent_session_token cookie JWT when Authorization header is missing", () => {
+    const verifySpy = vi.spyOn(jwt, "verify").mockReturnValue({
+      sub: "user-session-cookie",
+      wallet_address: "0x123",
+    } as never);
+    const { req, next, payload } = runAuth(
+      "/api/v1/workflows",
+      undefined,
+      "hyperagent_session_token=session-cookie-token; Path=/",
+    );
+    expect(next).toHaveBeenCalledOnce();
+    expect(payload.statusCode).toBe(200);
+    expect(req.userId).toBe("user-session-cookie");
+    expect(req.walletAddress).toBe("0x123");
+    expect(verifySpy).toHaveBeenCalledWith(
+      "session-cookie-token",
+      "unit-test-key",
+      expect.objectContaining({ algorithms: ["HS256"] }),
+    );
+    verifySpy.mockRestore();
+  });
+
   it("samples repeated auth-failure logs from the same source", () => {
     const key = "10.0.0.1|401_missing_header|/api/v1/workflows";
     const now = 1_700_000_000_000;

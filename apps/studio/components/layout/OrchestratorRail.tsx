@@ -177,7 +177,12 @@ export function OrchestratorRail({
           }}
           className="flex items-center gap-2 rounded-xl bg-slate-900/80 px-2 py-1.5 border border-white/5"
         >
+          <label htmlFor="orchestrator-prompt" className="sr-only">
+            Ask HyperAgent
+          </label>
           <input
+            id="orchestrator-prompt"
+            name="orchestratorPrompt"
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}

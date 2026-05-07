@@ -71,6 +71,8 @@ function isPublicPathFromReq(req: Request): boolean {
   });
 }
 
+const SESSION_COOKIE_TOKEN_NAMES = ["rt", "hyperagent_session_token"] as const;
+
 function tokenFromCookieHeader(cookieHeader: string | undefined): string | null {
   if (!cookieHeader) return null;
   const parts = cookieHeader.split(";");
@@ -80,7 +82,9 @@ function tokenFromCookieHeader(cookieHeader: string | undefined): string | null 
     const eq = item.indexOf("=");
     if (eq <= 0) continue;
     const key = item.slice(0, eq).trim();
-    if (key !== "rt") continue;
+    if (!SESSION_COOKIE_TOKEN_NAMES.includes(key as (typeof SESSION_COOKIE_TOKEN_NAMES)[number])) {
+      continue;
+    }
     const value = item.slice(eq + 1).trim();
     if (!value) return null;
     // Defensive: a malformed percent-encoded cookie value would throw and

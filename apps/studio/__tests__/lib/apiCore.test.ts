@@ -23,7 +23,7 @@ describe("fetchJson request shaping", () => {
     } as Response;
   }
 
-  it("keeps auth on browser GET requests but skips content-type without a body", async () => {
+  it("uses cookie auth on browser GET requests and skips content-type without a body", async () => {
     const fetchMock = jest.fn(async () => okResponse({ ok: true }));
     globalThis.fetch = fetchMock as typeof fetch;
     setAuthHeaderProvider(async () => ({ Authorization: "Bearer test-token" }));
@@ -33,12 +33,10 @@ describe("fetchJson request shaping", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [, options] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(options.credentials).toBe("include");
-    expect(options.headers).toEqual({
-      Authorization: "Bearer test-token",
-    });
+    expect(options.headers).toEqual({});
   });
 
-  it("adds auth and content-type for browser POST requests with a body", async () => {
+  it("uses cookie auth but still adds content-type for browser POST requests with a body", async () => {
     const fetchMock = jest.fn(async () => okResponse({ ok: true }));
     globalThis.fetch = fetchMock as typeof fetch;
     setAuthHeaderProvider(async () => ({ Authorization: "Bearer test-token" }));
@@ -52,7 +50,6 @@ describe("fetchJson request shaping", () => {
     const [, options] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(options.credentials).toBe("include");
     expect(options.headers).toEqual({
-      Authorization: "Bearer test-token",
       "Content-Type": "application/json",
     });
   });

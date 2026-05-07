@@ -281,6 +281,7 @@ function FamilyDrawerClose({
 }: FamilyDrawerCloseProps) {
   const defaultClose = (
     <button
+      aria-label="Close dialog"
       data-vaul-no-drag=""
       className={clsx(
         "absolute top-7 right-8 z-10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-[var(--color-bg-elevated)] text-[var(--color-text-muted)] transition-transform focus:scale-95 focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:outline-none active:scale-75",
@@ -319,12 +320,16 @@ function FamilyDrawerHeader({
   return (
     <header className={clsx("mt-[21px]", className)}>
       {icon}
-      <h2 className="mt-2.5 text-[22px] font-semibold text-[var(--color-text-primary)] md:font-medium">
-        {title}
-      </h2>
-      <p className="mt-3 text-[17px] leading-[24px] font-medium text-[var(--color-text-muted)] md:font-normal">
-        {description}
-      </p>
+      <Drawer.Title asChild>
+        <h2 className="mt-2.5 text-[22px] font-semibold text-[var(--color-text-primary)] md:font-medium">
+          {title}
+        </h2>
+      </Drawer.Title>
+      <Drawer.Description asChild>
+        <p className="mt-3 text-[17px] leading-[24px] font-medium text-[var(--color-text-muted)] md:font-normal">
+          {description}
+        </p>
+      </Drawer.Description>
     </header>
   );
 }

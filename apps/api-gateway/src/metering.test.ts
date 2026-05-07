@@ -31,7 +31,7 @@ describe("metering", () => {
     expect(isMeteringExemptPath("/tokens/stablecoins", "GET")).toBe(true);
   });
 
-  it("exempts read-only workflow GETs but not workflow writes", () => {
+  it("exempts read-only GETs but not mutating workflow writes", () => {
     expect(isMeteringExemptPath("/api/v1/workflows", "GET")).toBe(true);
     expect(isMeteringExemptPath("/api/v1/workflows?limit=10", "GET")).toBe(
       true,
@@ -40,6 +40,13 @@ describe("metering", () => {
       true,
     );
     expect(isMeteringExemptPath("/workflows/abc", "GET")).toBe(true);
+    expect(isMeteringExemptPath("/api/v1/agents", "GET")).toBe(true);
+    expect(isMeteringExemptPath("/api/v1/metrics?time_range=7d", "GET")).toBe(
+      true,
+    );
+    expect(isMeteringExemptPath("/api/v1/logs?page=1&page_size=50", "GET")).toBe(
+      true,
+    );
     expect(isMeteringExemptPath("/api/v1/workflows/generate", "POST")).toBe(
       false,
     );

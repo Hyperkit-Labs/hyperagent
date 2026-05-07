@@ -24,7 +24,6 @@ function normalizePath(input: string): string {
 }
 
 const EXEMPT_PREFIXES = [...METERING_EXEMPT_PREFIXES];
-const READ_ONLY_EXEMPT_PREFIXES = [ApiPaths.workflows, "/workflows"];
 
 /**
  * Exported for unit tests. True when this request should not consume credit preflight.
@@ -32,11 +31,10 @@ const READ_ONLY_EXEMPT_PREFIXES = [ApiPaths.workflows, "/workflows"];
 export function isMeteringExemptPath(path: string, method: string): boolean {
   if (method === "OPTIONS") return true;
   const p = normalizePath(path);
-  if (method === "GET" || method === "HEAD") {
-    for (const prefix of READ_ONLY_EXEMPT_PREFIXES) {
-      if (p === prefix || p.startsWith(`${prefix}/`)) return true;
-    }
-  }
+  // Browser/UI reads must not be blocked on credits. Billable actions are
+  // modeled as explicit mutating endpoints (e.g. workflow generate, deploy
+  // prepare) and handled separately by x402 / workflow pricing.
+  if (method === "GET" || method === "HEAD") return true;
   for (const prefix of EXEMPT_PREFIXES) {
     if (p === prefix || p.startsWith(`${prefix}/`)) return true;
   }

@@ -240,8 +240,6 @@ export async function fetchJson<T>(
   const base = () => getApiBase();
   const method = (init.method ?? "GET").toUpperCase();
   const hasBody = init.body !== undefined && init.body !== null;
-  const isBrowserGetLike =
-    typeof window !== "undefined" && (method === "GET" || method === "HEAD");
 
   if (
     typeof window !== "undefined" &&
@@ -256,9 +254,9 @@ export async function fetchJson<T>(
     try {
       let authHeaders: Record<string, string> = {};
       try {
-        if (authHeaderProvider && !isBrowserGetLike) {
+        if (authHeaderProvider) {
           authHeaders = await authHeaderProvider();
-        } else if (typeof window !== "undefined" && !isBrowserGetLike) {
+        } else if (typeof window !== "undefined") {
           const session = getStoredSession();
           if (session?.access_token) {
             authHeaders = { Authorization: `Bearer ${session.access_token}` };

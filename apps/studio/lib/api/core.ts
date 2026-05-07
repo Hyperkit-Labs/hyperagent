@@ -7,12 +7,20 @@ import { isOptionalPublicApiPathForLogging } from "@hyperagent/api-contracts";
 import { getServiceUrl } from "@/config/environment";
 import { getStoredSession } from "@/lib/session-store";
 
-export const getApiBase = (): string =>
-  getServiceUrl("backend").replace(/\/$/, "");
+function getDirectBackendApiBase(): string {
+  return getServiceUrl("backend").replace(/\/$/, "");
+}
+
+export const getApiBase = (): string => {
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}/api/gateway/api/v1`;
+  }
+  return getDirectBackendApiBase();
+};
 
 /** Gateway origin (scheme + host + port) for bootstrap. */
 export const getGatewayOrigin = (): string => {
-  const base = getApiBase();
+  const base = getDirectBackendApiBase();
   return base.replace(/\/api\/v1\/?$/, "") || base;
 };
 
@@ -34,7 +42,7 @@ export const getDocsUrl = (): string => {
     typeof process !== "undefined" && process.env.NEXT_PUBLIC_DOCS_URL;
   const url = (env && typeof env === "string" ? env.trim() : "") || "";
   if (url) return url.replace(/\/$/, "");
-  const apiBase = getApiBase();
+  const apiBase = getDirectBackendApiBase();
   const root = apiBase.replace(/\/api\/v1\/?$/, "");
   return root ? `${root}/docs` : `${apiBase}/../docs`;
 };

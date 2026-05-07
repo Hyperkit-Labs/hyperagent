@@ -13,17 +13,10 @@ import {
 import { usePathname } from "next/navigation";
 import {
   getStoredSession,
-  clearStoredSession,
   SESSION_CHANGE_EVENT,
 } from "@/lib/session-store";
-import { fetchConfigStrict } from "@/lib/api";
-import type { ApiErrorWithStatus } from "@/lib/api";
 import { ROUTES } from "@/constants/routes";
 import { redirectToLoginWithNext } from "@/lib/authRedirect";
-import {
-  bootstrapConfigFailureMessage,
-  getErrorRequestId,
-} from "@/lib/sadPathCopy";
 
 export type BootstrapStatus = "pending" | "success" | "failed";
 
@@ -31,7 +24,7 @@ export interface SessionContextValue {
   hasSession: boolean;
   bootstrapStatus: BootstrapStatus;
   isReady: boolean;
-  /** User-safe message when bootstrap failed without invalidating the JWT (e.g. 503/429). */
+  /** Reserved for route-level gating errors; local data loaders own fetch errors. */
   bootstrapError: string | null;
   recheckBootstrap: () => Promise<void>;
 }
@@ -88,8 +81,9 @@ function logAuth(...args: unknown[]) {
 }
 
 /**
- * Single owner of session + authenticated bootstrap (GET /api/v1/config).
- * Clears session and redirects only on 401/403. 503/429 stay logged-in with bootstrapError + retry.
+ * Single owner of session presence + route gating.
+ * Protected routes require a stored session, but do not block on `/api/v1/config`.
+ * Individual providers/cards own their own fetch lifecycle and error UI.
  */
 export function SessionProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -98,7 +92,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     useState<BootstrapStatus>("pending");
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
-  const bootstrapInFlight = useRef(false);
   const redirectingRef = useRef(false);
 
   const safeRedirectToLogin = useCallback(() => {
@@ -122,54 +115,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       safeRedirectToLogin();
       return;
     }
-
-    if (bootstrapInFlight.current) {
-      logAuth("runBootstrap skipped (in flight)");
-      return;
-    }
-
-    bootstrapInFlight.current = true;
-    setBootstrapStatus("pending");
+    setBootstrapStatus("success");
     setBootstrapError(null);
-    logAuth("fetchConfigStrict start pathname=", path);
-
-    try {
-      await fetchConfigStrict();
-      setBootstrapStatus("success");
-      setBootstrapError(null);
-      redirectingRef.current = false;
-      logAuth("fetchConfigStrict success");
-    } catch (err) {
-      const status = (err as ApiErrorWithStatus)?.status;
-      const code = (err as ApiErrorWithStatus & { code?: string })?.code;
-      logAuth(
-        "fetchConfigStrict failed status=",
-        status,
-        "code=",
-        code,
-        "err=",
-        (err as Error)?.message,
-      );
-      setBootstrapStatus("failed");
-
-      if (status === 401 || status === 403) {
-        clearStoredSession();
-        setBootstrapError(null);
-        safeRedirectToLogin();
-        return;
-      }
-
-      const requestId = getErrorRequestId(err);
-      const rawMessage =
-        err instanceof Error && err.message
-          ? err.message
-          : "Could not verify your session with the server.";
-      setBootstrapError(
-        bootstrapConfigFailureMessage(status, code, rawMessage, requestId),
-      );
-    } finally {
-      bootstrapInFlight.current = false;
-    }
+    redirectingRef.current = false;
+    logAuth("bootstrap gate passed pathname=", path);
   }, [pathname, safeRedirectToLogin]);
 
   const recheckBootstrap = useCallback(async () => {

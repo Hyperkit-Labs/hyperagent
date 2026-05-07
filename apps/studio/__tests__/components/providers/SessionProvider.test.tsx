@@ -1,6 +1,5 @@
 /**
- * SessionProvider: bootstrap fail-closed regression tests.
- * 401 clears session and redirects. 503/429 fail bootstrap with message, no redirect. 500/network fail closed.
+ * SessionProvider: route gating should depend on session presence, not `/api/v1/config`.
  */
 
 import React from "react";
@@ -15,13 +14,7 @@ jest.mock("@/lib/session-store", () => ({
     access_token: "tok",
     expires_at: Date.now() / 1000 + 3600,
   })),
-  clearStoredSession: jest.fn(),
   SESSION_CHANGE_EVENT: "hyperagent_session_change",
-}));
-
-const mockFetchConfigStrict = jest.fn();
-jest.mock("@/lib/api", () => ({
-  fetchConfigStrict: (...args: unknown[]) => mockFetchConfigStrict(...args),
 }));
 
 jest.mock("@/lib/authRedirect", () => ({
@@ -50,13 +43,9 @@ function SessionStatus() {
 describe("SessionProvider", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockFetchConfigStrict.mockReset();
   });
 
-  it("sets bootstrapStatus=success when fetchConfigStrict resolves", async () => {
-    mockFetchConfigStrict.mockImplementation(() =>
-      Promise.resolve({ version: "1.0" }),
-    );
+  it("sets bootstrapStatus=success when a protected route has a stored session", async () => {
     const { getByTestId } = render(
       <SessionProvider>
         <SessionStatus />
@@ -67,9 +56,11 @@ describe("SessionProvider", () => {
     );
   });
 
-  it("sets bootstrapStatus=failed on 401 and redirects to login", async () => {
-    const err = Object.assign(new Error("Unauthorized"), { status: 401 });
-    mockFetchConfigStrict.mockImplementation(() => Promise.reject(err));
+  it("sets bootstrapStatus=failed and redirects when a protected route has no session", async () => {
+    const { getStoredSession } = jest.requireMock("@/lib/session-store") as {
+      getStoredSession: jest.Mock;
+    };
+    getStoredSession.mockReturnValueOnce(null);
     const { getByTestId } = render(
       <SessionProvider>
         <SessionStatus />
@@ -81,53 +72,19 @@ describe("SessionProvider", () => {
     expect(redirectToLoginWithNext).toHaveBeenCalled();
   });
 
-  it("sets bootstrapStatus=failed on 500 (fail-closed, not success)", async () => {
-    const err = Object.assign(new Error("Internal Server Error"), {
-      status: 500,
-    });
-    mockFetchConfigStrict.mockImplementation(() => Promise.reject(err));
+  it("does not gate the login route", async () => {
+    const { usePathname } = jest.requireMock("next/navigation") as {
+      usePathname: jest.Mock;
+    };
+    usePathname.mockReturnValue("/login");
     const { getByTestId } = render(
       <SessionProvider>
         <SessionStatus />
       </SessionProvider>,
     );
     await waitFor(() =>
-      expect(getByTestId("status").textContent).toBe("failed"),
-    );
-  });
-
-  it("sets bootstrapStatus=failed on network error (fail-closed)", async () => {
-    mockFetchConfigStrict.mockImplementation(() =>
-      Promise.reject(new TypeError("Failed to fetch")),
-    );
-    const { getByTestId } = render(
-      <SessionProvider>
-        <SessionStatus />
-      </SessionProvider>,
-    );
-    await waitFor(() =>
-      expect(getByTestId("status").textContent).toBe("failed"),
-    );
-  });
-
-  it("503 does not redirect to login (session preserved for retry)", async () => {
-    const err = Object.assign(new Error("Service Unavailable"), {
-      status: 503,
-    });
-    mockFetchConfigStrict.mockImplementation(() => Promise.reject(err));
-    const { getByTestId } = render(
-      <SessionProvider>
-        <SessionStatus />
-      </SessionProvider>,
-    );
-    await waitFor(() =>
-      expect(getByTestId("status").textContent).toBe("failed"),
+      expect(getByTestId("status").textContent).toBe("success"),
     );
     expect(redirectToLoginWithNext).not.toHaveBeenCalled();
-    await waitFor(() =>
-      expect(getByTestId("bootstrap-err").textContent.length).toBeGreaterThan(
-        0,
-      ),
-    );
   });
 });

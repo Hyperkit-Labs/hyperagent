@@ -150,7 +150,7 @@ export default function AgentsPage() {
             <div className="flex flex-col gap-6 mb-8 animate-enter">
               <div className="flex justify-between items-end">
                 <PageTitle
-                  title="HyperAgent Workflows"
+                  title="HyperAgent Agents"
                   subtitle="Manage and monitor your autonomous AI agents."
                 />
               </div>

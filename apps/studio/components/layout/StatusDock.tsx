@@ -119,7 +119,7 @@ function StatusDockInner({
           {networksAvailable ? networkLabel : "Networks unavailable"}
         </span>
         <Link
-          href={ROUTES.MONITORING}
+          href={ROUTES.HISTORY}
           className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors"
         >
           <FileText className="w-3.5 h-3.5" />
@@ -158,7 +158,7 @@ function StatusDockFallback() {
           {networksAvailable ? networkLabel : "Networks unavailable"}
         </span>
         <Link
-          href={ROUTES.MONITORING}
+          href={ROUTES.HISTORY}
           className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors"
         >
           <FileText className="w-3.5 h-3.5" />

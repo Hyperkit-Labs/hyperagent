@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import { usePathname } from "next/navigation";
 import useSWR from "swr";
 import { getConfig } from "@/lib/api";
@@ -15,6 +21,10 @@ const CONFIG_STALE_TIME_MS = 24 * 60 * 60 * 1000;
 interface ConfigContextValue {
   config: RuntimeConfig | null;
   loading: boolean;
+  /** Set when GET /api/v1/config fails (transport, 4xx/5xx). Never masked as fake success. */
+  configError: Error | null;
+  /** SWR-backed retry (e.g. after auth or network recovery). */
+  retryConfig: () => void;
   defaultNetworkId: string | undefined;
   defaultChainId: number | undefined;
 }
@@ -22,6 +32,8 @@ interface ConfigContextValue {
 const ConfigContext = createContext<ConfigContextValue>({
   config: null,
   loading: true,
+  configError: null,
+  retryConfig: () => {},
   defaultNetworkId: undefined,
   defaultChainId: undefined,
 });
@@ -38,7 +50,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const shouldFetch = pathname !== ROUTES.LOGIN;
 
-  const { data, error, isLoading } = useSWR(
+  const { data, error, isLoading, mutate } = useSWR(
     shouldFetch ? CONFIG_SWR_KEY : null,
     getConfig,
     {
@@ -46,10 +58,15 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
       revalidateOnReconnect: true,
       revalidateOnMount: true,
       dedupingInterval: CONFIG_STALE_TIME_MS,
-      errorRetryCount: 1,
-      keepPreviousData: true,
+      errorRetryCount: 3,
+      errorRetryInterval: 2_000,
+      keepPreviousData: false,
     },
   );
+
+  const retryConfig = useCallback(() => {
+    void mutate();
+  }, [mutate]);
 
   useEffect(() => {
     if (pathname === ROUTES.LOGIN) {
@@ -77,15 +94,25 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
 
   const config = pathname === ROUTES.LOGIN ? null : (data ?? null);
   const loading = pathname === ROUTES.LOGIN ? false : isLoading;
+  const configError =
+    pathname === ROUTES.LOGIN
+      ? null
+      : error instanceof Error
+        ? error
+        : error
+          ? new Error(String(error))
+          : null;
 
   const value: ConfigContextValue = useMemo(
     () => ({
       config,
       loading,
+      configError,
+      retryConfig,
       defaultNetworkId: config?.default_network_id,
       defaultChainId: config?.default_chain_id,
     }),
-    [config, loading],
+    [config, loading, configError, retryConfig],
   );
 
   return (

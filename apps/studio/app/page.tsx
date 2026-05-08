@@ -268,7 +268,12 @@ function ChatPageContent() {
     return () => window.removeEventListener("focus", onFocus);
   }, []);
 
-  const { networks } = useNetworks();
+  const {
+    networks,
+    loading: networksLoading,
+    error: networksError,
+    refetch: refetchNetworks,
+  } = useNetworks();
   const {
     selectedNetworkId: buildNetwork,
     setSelectedNetworkId: setBuildNetwork,
@@ -566,20 +571,49 @@ function ChatPageContent() {
                 Target network
               </span>
               <select
-                value={buildNetwork}
+                id="home-target-network"
+                name="homeTargetNetwork"
+                value={buildNetwork || defaultNetwork}
                 onChange={(e) => setBuildNetwork(e.target.value)}
+                disabled={networksLoading || Boolean(networksError)}
                 aria-label="Select target network"
-                className="bg-transparent border-none text-[11px] text-[var(--color-text-primary)] focus:outline-none"
+                aria-busy={networksLoading}
+                className="bg-transparent border-none text-[11px] text-[var(--color-text-primary)] focus:outline-none disabled:opacity-60"
               >
-                {testnets.length === 0 && (
-                  <option value={defaultNetwork}>Default</option>
-                )}
-                {testnets.map((n) => (
-                  <option key={n.id} value={n.id}>
-                    {n.name ?? n.id}
+                {networksLoading && (
+                  <option value={buildNetwork || defaultNetwork}>
+                    Loading networks…
                   </option>
-                ))}
+                )}
+                {!networksLoading && networksError && (
+                  <option value={buildNetwork || defaultNetwork}>
+                    Network list unavailable
+                  </option>
+                )}
+                {!networksLoading &&
+                  !networksError &&
+                  testnets.length === 0 && (
+                    <option value={defaultNetwork}>
+                      No testnets — check registry
+                    </option>
+                  )}
+                {!networksLoading &&
+                  !networksError &&
+                  testnets.map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {n.name ?? n.id}
+                    </option>
+                  ))}
               </select>
+              {networksError && (
+                <button
+                  type="button"
+                  onClick={() => void refetchNetworks()}
+                  className="text-[10px] text-amber-400 hover:underline ml-1"
+                >
+                  Retry
+                </button>
+              )}
             </div>
           )}
           <ConnectWalletNav />

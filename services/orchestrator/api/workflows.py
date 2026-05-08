@@ -607,13 +607,24 @@ def prepare_deploy_api(
     chain_id: int | None = None,
 ) -> dict[str, Any]:
     """Compile first contract and return deploy payload for client to sign. Mainnet guarded."""
-    from mainnet_guard import check_mainnet_guard, is_mainnet
+    from mainnet_guard import (
+        check_mainnet_guard,
+        check_security_verdict_deploy_gate,
+        check_simulation_deploy_gate,
+        is_mainnet,
+    )
 
     chain_id = chain_id if chain_id is not None else get_default_chain_id()
     w = get_workflow(workflow_id)
     if not w:
         raise HTTPException(status_code=404, detail="Workflow not found")
     assert_workflow_owner(w, request)
+    allowed, reason = check_security_verdict_deploy_gate(w)
+    if not allowed:
+        raise HTTPException(status_code=403, detail=reason)
+    allowed, reason = check_simulation_deploy_gate(w)
+    if not allowed:
+        raise HTTPException(status_code=403, detail=reason)
     allowed, reason = check_mainnet_guard(w, chain_id)
     if not allowed:
         raise HTTPException(status_code=403, detail=reason)

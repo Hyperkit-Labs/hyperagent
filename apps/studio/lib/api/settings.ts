@@ -2,10 +2,6 @@
  * Settings API: config, llm-keys.
  */
 
-import {
-  FALLBACK_DEFAULT_NETWORK_ID,
-  FALLBACK_DEFAULT_CHAIN_ID,
-} from "@/constants/defaults";
 import { ApiPaths } from "@hyperagent/api-contracts";
 import {
   fetchJson,
@@ -60,23 +56,17 @@ function fetchConfigShared(): Promise<RuntimeConfig> {
   return configFetchInflight;
 }
 
+/**
+ * GET /api/v1/config for SWR and bootstrap. **Throws** on transport/HTTP failure
+ * so callers surface retryable errors instead of masking outages with fake defaults.
+ */
 export async function getConfig(): Promise<RuntimeConfig> {
-  return fetchConfigShared().catch((e) => {
+  try {
+    return await fetchConfigShared();
+  } catch (e) {
     reportApiError(e, { path: ApiPaths.config });
-    return {
-      x402_enabled: false,
-      monitoring_enabled: false,
-      merchant_wallet_address: null,
-      credits_enabled: false,
-      integrations: {
-        tenderly_configured: false,
-        pinata_configured: false,
-        qdrant_configured: false,
-      },
-      default_network_id: FALLBACK_DEFAULT_NETWORK_ID,
-      default_chain_id: FALLBACK_DEFAULT_CHAIN_ID,
-    };
-  });
+    throw e;
+  }
 }
 
 const CONFIG_BOOTSTRAP_MAX_ATTEMPTS = 3;

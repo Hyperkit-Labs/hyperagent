@@ -13,7 +13,26 @@ import { StatusDock } from "@/components/layout/StatusDock";
 import { OrchestratorRail } from "@/components/layout/OrchestratorRail";
 import { useLayout } from "@/components/providers/LayoutProvider";
 import { useSession } from "@/hooks/useSession";
+import { useNetworks } from "@/hooks/useNetworks";
+import { useSelectedNetwork } from "@/components/providers/SelectedNetworkProvider";
 import { FULL_PAGE_ROUTES, PUBLIC_ROUTE } from "@/constants/routes";
+
+function OrchestratorRailWithNetwork() {
+  const { selectedNetworkId } = useSelectedNetwork();
+  const {
+    getNetworkById,
+    loading: networksLoading,
+    error: networksError,
+  } = useNetworks();
+  const n = getNetworkById(selectedNetworkId);
+  const networkLabel = networksError
+    ? "Networks failed to load"
+    : networksLoading
+      ? "Loading networks…"
+      : (n?.name ?? n?.id ?? selectedNetworkId ?? "No network selected");
+
+  return <OrchestratorRail networkLabel={networkLabel} />;
+}
 
 function ContextSidebarWrapper() {
   const { contextSidebarOpen, setContextSidebarOpen } = useLayout();
@@ -89,7 +108,7 @@ export function LayoutSwitcher({ children }: { children: React.ReactNode }) {
             <StatusDock />
             <FloatingLogsPill />
           </div>
-          <OrchestratorRail />
+          <OrchestratorRailWithNetwork />
           <Suspense fallback={null}>
             <ContextSidebarWrapper />
           </Suspense>

@@ -98,12 +98,16 @@ export function LLMKeysCard() {
     isLoading: isSigningIn,
     error: signInError,
   } = useWalletAuth();
-  const { hasSession } = useSession();
+  const { hasSession, isReady } = useSession();
 
   const isUnauthorized = Boolean(error && isAuthError(error));
 
   const refetchKeys = useCallback(() => {
     setError(null);
+    if (!isReady) {
+      setLoading(true);
+      return;
+    }
     if (!hasSession) {
       setConfigured([]);
       setLoading(false);
@@ -117,7 +121,7 @@ export function LLMKeysCard() {
       })
       .catch((e) => setError(handleApiError(e)))
       .finally(() => setLoading(false));
-  }, [hasSession]);
+  }, [hasSession, isReady]);
 
   useEffect(() => {
     refetchKeys();

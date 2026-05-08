@@ -56,7 +56,12 @@ function StatusDockInner({
       : null;
   const { workflow } = useWorkflowPolling(workflowId);
   const { defaultNetworkId } = useConfig();
-  const { networks, loading: networksLoading } = useNetworks();
+  const {
+    networks,
+    loading: networksLoading,
+    error: networksError,
+    refetch: refetchNetworks,
+  } = useNetworks();
 
   const resolved = workflow
     ? {
@@ -75,7 +80,15 @@ function StatusDockInner({
   const networkLabel =
     currentNetwork?.name ??
     (defaultNetworkId ? `Chain ${defaultNetworkId}` : "No network");
-  const networksAvailable = !networksLoading && (networks?.length ?? 0) > 0;
+  const networksReady = !networksLoading;
+  const networksAvailable = networksReady && (networks?.length ?? 0) > 0;
+  const networkStatusText = !networksReady
+    ? "Loading networks…"
+    : networksError
+      ? "Networks failed to load"
+      : networksAvailable
+        ? networkLabel
+        : "No networks configured";
 
   return (
     <footer className="flex items-center justify-between h-10 px-4 border-t border-white/5 bg-slate-950/80 backdrop-blur shrink-0">
@@ -115,9 +128,28 @@ function StatusDockInner({
             <span>{resolved.issuesCount} issues</span>
           </Link>
         )}
-        <span className={!networksAvailable ? "text-amber-400/80" : ""}>
-          {networksAvailable ? networkLabel : "Networks unavailable"}
+        <span
+          className={
+            networksError
+              ? "text-red-400/90"
+              : !networksReady
+                ? "text-slate-500"
+                : !networksAvailable
+                  ? "text-amber-400/80"
+                  : ""
+          }
+        >
+          {networkStatusText}
         </span>
+        {networksError && (
+          <button
+            type="button"
+            onClick={() => void refetchNetworks()}
+            className="text-[11px] text-amber-300 hover:underline"
+          >
+            Retry
+          </button>
+        )}
         <Link
           href={ROUTES.HISTORY}
           className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors"
@@ -132,7 +164,12 @@ function StatusDockInner({
 
 function StatusDockFallback() {
   const { defaultNetworkId } = useConfig();
-  const { networks, loading: networksLoading } = useNetworks();
+  const {
+    networks,
+    loading: networksLoading,
+    error: networksError,
+    refetch: refetchNetworks,
+  } = useNetworks();
   const currentNetwork = networks?.find(
     (n) =>
       String(n.id) === String(defaultNetworkId) ||
@@ -141,7 +178,15 @@ function StatusDockFallback() {
   const networkLabel =
     currentNetwork?.name ??
     (defaultNetworkId ? `Chain ${defaultNetworkId}` : "No network");
-  const networksAvailable = !networksLoading && (networks?.length ?? 0) > 0;
+  const networksReady = !networksLoading;
+  const networksAvailable = networksReady && (networks?.length ?? 0) > 0;
+  const networkStatusText = !networksReady
+    ? "Loading networks…"
+    : networksError
+      ? "Networks failed to load"
+      : networksAvailable
+        ? networkLabel
+        : "No networks configured";
   return (
     <footer className="flex items-center justify-between h-10 px-4 border-t border-white/5 bg-slate-950/80 backdrop-blur shrink-0">
       <Link
@@ -153,9 +198,28 @@ function StatusDockFallback() {
         <span className="text-slate-500">Logs &amp; Monitoring</span>
       </Link>
       <div className="flex items-center gap-3 text-xs text-slate-400">
-        <span className={!networksAvailable ? "text-amber-400/80" : ""}>
-          {networksAvailable ? networkLabel : "Networks unavailable"}
+        <span
+          className={
+            networksError
+              ? "text-red-400/90"
+              : !networksReady
+                ? "text-slate-500"
+                : !networksAvailable
+                  ? "text-amber-400/80"
+                  : ""
+          }
+        >
+          {networkStatusText}
         </span>
+        {networksError && (
+          <button
+            type="button"
+            onClick={() => void refetchNetworks()}
+            className="text-[11px] text-amber-300 hover:underline"
+          >
+            Retry
+          </button>
+        )}
         <Link
           href={ROUTES.HISTORY}
           className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors"

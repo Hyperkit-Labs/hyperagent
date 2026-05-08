@@ -55,10 +55,10 @@ function readPublicTimeoutMs(envName: string, fallbackMs: number): number {
   return Number.isFinite(n) && n > 0 ? n : fallbackMs;
 }
 
-/** Request timeout (ms). Override with `NEXT_PUBLIC_API_REQUEST_TIMEOUT_MS`. */
+/** Request timeout (ms). Override with `NEXT_PUBLIC_API_REQUEST_TIMEOUT_MS`. Default 30s: cold gateway + proxy chain often exceeds 10s in production. */
 const API_REQUEST_TIMEOUT_MS = readPublicTimeoutMs(
   "NEXT_PUBLIC_API_REQUEST_TIMEOUT_MS",
-  10_000,
+  30_000,
 );
 
 /** BYOK (Settings llm-keys). Override with `NEXT_PUBLIC_BYOK_REQUEST_TIMEOUT_MS`. */

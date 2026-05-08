@@ -7,7 +7,17 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const UPSTREAM_TIMEOUT_MS = 60_000;
+/** Must exceed gateway→orchestrator proxy timeout (~120s) so Studio does not abort first. */
+const UPSTREAM_TIMEOUT_MS = readUpstreamTimeoutMs();
+
+function readUpstreamTimeoutMs(): number {
+  const raw = process.env.STUDIO_GATEWAY_PROXY_TIMEOUT_MS?.trim();
+  if (raw) {
+    const n = Number.parseInt(raw, 10);
+    if (Number.isFinite(n) && n >= 15_000 && n <= 180_000) return n;
+  }
+  return 125_000;
+}
 
 function gatewayOrigin(): string {
   const apiBase = getServiceUrl("backend").replace(/\/$/, "");
@@ -52,6 +62,7 @@ async function proxy(request: NextRequest, path: string[]) {
       body,
       signal: controller.signal,
       redirect: "manual",
+      cache: "no-store",
     });
 
     const responseHeaders = new Headers();
@@ -70,8 +81,7 @@ async function proxy(request: NextRequest, path: string[]) {
       headers: responseHeaders,
     });
   } catch (error) {
-    const isTimeout =
-      error instanceof Error && error.name === "AbortError";
+    const isTimeout = error instanceof Error && error.name === "AbortError";
     return NextResponse.json(
       {
         error: isTimeout ? "Gateway Timeout" : "Bad Gateway",

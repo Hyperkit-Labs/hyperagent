@@ -492,7 +492,9 @@ export async function getDetailedHealth(): Promise<{
   status: string;
   services?: Record<string, { status: string }>;
 }> {
-  return fetchJsonAuthed(ApiPaths.apiHealthDetailed);
+  return fetchJsonAuthed(ApiPaths.apiHealthDetailed, {
+    timeoutMs: 45_000,
+  });
 }
 
 export interface DomainRecord {
@@ -545,10 +547,7 @@ export async function getLogs(filters?: LogsFilters): Promise<LogsResponse> {
     params.set("page_size", String(filters.page_size));
   const query = params.toString();
   const path = query ? `${ApiPaths.logs}?${query}` : ApiPaths.logs;
-  return fetchJsonAuthed<LogsResponse>(path).catch((e) => {
-    reportApiError(e, { path });
-    return { logs: [], total: 0, page: 1, page_size: 50 } as LogsResponse;
-  });
+  return fetchJsonAuthed<LogsResponse>(path);
 }
 
 export async function getLogServices(): Promise<string[]> {

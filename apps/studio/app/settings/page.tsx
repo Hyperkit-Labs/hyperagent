@@ -51,7 +51,12 @@ export default function SettingsPage() {
   const [revokeLoading, setRevokeLoading] = useState(false);
   const [signOutLoading, setSignOutLoading] = useState(false);
   const x402Enabled = isFeatureEnabled("x402");
-  const { config, loading: configLoading } = useConfig();
+  const {
+    config,
+    loading: configLoading,
+    configError: runtimeConfigError,
+    retryConfig,
+  } = useConfig();
   const {
     networks,
     loading: networksLoading,
@@ -75,7 +80,9 @@ export default function SettingsPage() {
     refetch: refetchX402,
   } = useSettingsX402Data({ enabled: tab === "x402" });
 
-  const configError = networksError ?? null;
+  const configError =
+    networksError ??
+    (runtimeConfigError ? String(runtimeConfigError.message) : null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -133,6 +140,24 @@ export default function SettingsPage() {
                   withUnderbeam
                 />
               </div>
+              {runtimeConfigError && (
+                <div
+                  role="alert"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100"
+                >
+                  <span>
+                    Runtime configuration could not be loaded:{" "}
+                    {runtimeConfigError.message}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => retryConfig()}
+                    className="rounded-md border border-amber-400/40 px-3 py-1 text-xs font-medium text-amber-50 hover:bg-amber-500/20"
+                  >
+                    Retry config
+                  </button>
+                </div>
+              )}
 
               <BentoGrid className="lg:gap-3">
                 <BentoCard className="!p-0">
@@ -317,16 +342,16 @@ export default function SettingsPage() {
                     role="tabpanel"
                     aria-label="Workspace settings"
                   >
-                  <WorkspaceTab
-                    config={config}
-                    configError={configError}
-                    configLoading={configLoading}
-                    networks={networks}
-                    networksLoading={networksLoading}
-                    defaultNetwork={defaultNetwork}
-                    setDefaultNetwork={setDefaultNetwork}
-                    refetchWorkspace={refetchWorkspace}
-                  />
+                    <WorkspaceTab
+                      config={config}
+                      configError={configError}
+                      configLoading={configLoading}
+                      networks={networks}
+                      networksLoading={networksLoading}
+                      defaultNetwork={defaultNetwork}
+                      setDefaultNetwork={setDefaultNetwork}
+                      refetchWorkspace={refetchWorkspace}
+                    />
                   </div>
                 )}
 
@@ -351,15 +376,15 @@ export default function SettingsPage() {
                     role="tabpanel"
                     aria-label="x402 and spending settings"
                   >
-                  <X402SpendingTab
-                    x402Enabled={x402Enabled}
-                    x402Loading={x402Loading}
-                    x402Error={x402Error}
-                    x402Balance={x402Balance}
-                    x402Control={x402Control}
-                    config={config}
-                    refetchX402={refetchX402}
-                  />
+                    <X402SpendingTab
+                      x402Enabled={x402Enabled}
+                      x402Loading={x402Loading}
+                      x402Error={x402Error}
+                      x402Balance={x402Balance}
+                      x402Control={x402Control}
+                      config={config}
+                      refetchX402={refetchX402}
+                    />
                   </div>
                 )}
 
@@ -369,14 +394,14 @@ export default function SettingsPage() {
                     role="tabpanel"
                     aria-label="Plan and pricing settings"
                   >
-                  <PlanPricingTab
-                    plans={plans}
-                    resources={resources}
-                    usage={usage}
-                    planLoading={planLoading}
-                    planError={planError}
-                    refetchPlan={refetchPlan}
-                  />
+                    <PlanPricingTab
+                      plans={plans}
+                      resources={resources}
+                      usage={usage}
+                      planLoading={planLoading}
+                      planError={planError}
+                      refetchPlan={refetchPlan}
+                    />
                   </div>
                 )}
 
@@ -386,10 +411,10 @@ export default function SettingsPage() {
                     role="tabpanel"
                     aria-label="Integrations settings"
                   >
-                  <IntegrationsTab
-                    config={config}
-                    networksCount={networks.length}
-                  />
+                    <IntegrationsTab
+                      config={config}
+                      networksCount={networks.length}
+                    />
                   </div>
                 )}
 

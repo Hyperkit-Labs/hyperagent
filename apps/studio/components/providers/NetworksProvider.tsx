@@ -38,8 +38,9 @@ export function NetworksProvider({ children }: { children: React.ReactNode }) {
       revalidateOnReconnect: true,
       revalidateOnMount: true,
       dedupingInterval: NETWORKS_STALE_TIME_MS,
-      errorRetryCount: 1,
-      keepPreviousData: true,
+      errorRetryCount: 3,
+      errorRetryInterval: 2_000,
+      keepPreviousData: false,
     },
   );
 

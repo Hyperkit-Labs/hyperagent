@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { ApiAuthProvider } from "@/components/providers/ApiAuthProvider";
 import { ConfigProvider } from "@/components/providers/ConfigProvider";
+import { StudioBootstrapAlert } from "@/components/providers/StudioBootstrapAlert";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { LayoutProvider } from "@/components/providers/LayoutProvider";
 import { NetworksProvider } from "@/components/providers/NetworksProvider";
@@ -37,6 +38,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
           <SessionProvider>
             <ConfigProvider>
               <ApiAuthProvider>
+                <StudioBootstrapAlert />
                 <NetworksProvider>
                   <SelectedNetworkProvider>
                     <PipelineStateProvider>

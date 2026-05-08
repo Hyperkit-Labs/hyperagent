@@ -51,7 +51,12 @@ function MonitoringContent() {
     refetch: refetchLogs,
     services,
   } = useLogs();
-  const { health, loading: healthLoading, error: healthError } = useHealth();
+  const {
+    health,
+    loading: healthLoading,
+    error: healthError,
+    refetch: refetchHealth,
+  } = useHealth();
   const healthStatus = health?.status;
   const filters = useMonitoringFilters();
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") ?? "");
@@ -136,11 +141,20 @@ function MonitoringContent() {
                 </span>
                 <div className="text-white font-medium text-sm">
                   {healthLoading
-                    ? "..."
+                    ? "Loading…"
                     : healthError
                       ? "unreachable"
                       : (healthStatus ?? "healthy")}
                 </div>
+                {healthError && (
+                  <button
+                    type="button"
+                    onClick={() => void refetchHealth()}
+                    className="mt-1 text-[10px] text-amber-400 hover:underline"
+                  >
+                    Retry health
+                  </button>
+                )}
               </div>
             </div>
             <div className="h-8 w-px bg-[var(--color-border-subtle)]" />
@@ -151,7 +165,7 @@ function MonitoringContent() {
                   Pipeline
                 </span>
                 <div className="text-white font-medium text-sm">
-                  {healthLoading ? "..." : pipelineStatus}
+                  {healthLoading ? "Loading…" : pipelineStatus}
                 </div>
               </div>
             </div>
@@ -167,7 +181,7 @@ function MonitoringContent() {
                   Audit Engine
                 </span>
                 <div className="text-white font-medium text-sm">
-                  {healthLoading ? "..." : auditStatus}
+                  {healthLoading ? "Loading…" : auditStatus}
                 </div>
               </div>
             </div>
@@ -222,7 +236,9 @@ function MonitoringContent() {
                 <button
                   onClick={() => setIsPaused(!isPaused)}
                   aria-pressed={isPaused}
-                  aria-label={isPaused ? "Resume log stream" : "Pause log stream"}
+                  aria-label={
+                    isPaused ? "Resume log stream" : "Pause log stream"
+                  }
                   className="p-1.5 rounded bg-[var(--color-bg-panel)] border border-[var(--color-border-subtle)] text-[var(--color-text-secondary)] hover:text-white transition-colors"
                   title={isPaused ? "Resume stream" : "Pause stream"}
                 >

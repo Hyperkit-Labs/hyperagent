@@ -63,13 +63,18 @@ export function buildUpstreamHeaders(request: HeadersCarrier): Headers {
   const xAgentSession = request.headers.get("x-agent-session");
   if (xAgentSession) headers.set("x-agent-session", xAgentSession);
 
+  const traceparent = request.headers.get("traceparent");
+  if (traceparent) headers.set("traceparent", traceparent);
+
   const authorization = request.headers.get("authorization");
   if (authorization) {
     headers.set("authorization", authorization);
     return headers;
   }
 
-  const cookieToken = sessionTokenFromCookieHeader(request.headers.get("cookie"));
+  const cookieToken = sessionTokenFromCookieHeader(
+    request.headers.get("cookie"),
+  );
   if (cookieToken) {
     headers.set("authorization", `Bearer ${cookieToken}`);
   }

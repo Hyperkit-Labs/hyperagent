@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -59,3 +60,46 @@ def test_check_simulation_deploy_gate_enforced(monkeypatch):
 
     ok2, _ = check_simulation_deploy_gate({"simulation_passed": True})
     assert ok2 is True
+
+
+def test_prepare_deploy_api_blocks_rejected_security_verdict(monkeypatch):
+    from api.workflows import prepare_deploy_api
+
+    workflow = {
+        "security_verdict": {"approvedForDeploy": False, "finalDecision": "REJECTED"},
+        "simulation_passed": True,
+        "contracts": {"Token.sol": "contract Token {}"},
+    }
+    monkeypatch.setattr("api.workflows.get_workflow", lambda workflow_id: workflow)
+    monkeypatch.setattr("api.workflows.assert_workflow_owner", lambda w, request: None)
+    monkeypatch.setattr("api.workflows.get_default_chain_id", lambda: 84532)
+
+    request = SimpleNamespace()
+    with pytest.raises(Exception) as exc_info:
+        prepare_deploy_api("wf_123", request, chain_id=84532)
+
+    exc = exc_info.value
+    assert getattr(exc, "status_code", None) == 403
+    assert "security policy verdict" in str(getattr(exc, "detail", "")).lower()
+
+
+def test_prepare_deploy_api_blocks_when_simulation_gate_enforced(monkeypatch):
+    from api.workflows import prepare_deploy_api
+
+    workflow = {
+        "security_verdict": {"approvedForDeploy": True, "finalDecision": "APPROVED"},
+        "simulation_passed": False,
+        "contracts": {"Token.sol": "contract Token {}"},
+    }
+    monkeypatch.setattr("api.workflows.get_workflow", lambda workflow_id: workflow)
+    monkeypatch.setattr("api.workflows.assert_workflow_owner", lambda w, request: None)
+    monkeypatch.setattr("api.workflows.get_default_chain_id", lambda: 84532)
+    monkeypatch.setenv("ENFORCE_SIMULATION_BEFORE_DEPLOY", "1")
+
+    request = SimpleNamespace()
+    with pytest.raises(Exception) as exc_info:
+        prepare_deploy_api("wf_123", request, chain_id=84532)
+
+    exc = exc_info.value
+    assert getattr(exc, "status_code", None) == 403
+    assert "simulation" in str(getattr(exc, "detail", "")).lower()

@@ -16,6 +16,9 @@ export interface PromptInputTextareaProps {
   disabled?: boolean;
   className?: string;
   onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  id?: string;
+  name?: string;
+  ariaLabel?: string;
 }
 
 export function PromptInputTextarea({
@@ -25,6 +28,9 @@ export function PromptInputTextarea({
   disabled = false,
   className = "",
   onKeyDown,
+  id,
+  name,
+  ariaLabel,
 }: PromptInputTextareaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
@@ -41,9 +47,12 @@ export function PromptInputTextarea({
   return (
     <textarea
       ref={textareaRef}
+      id={id}
+      name={name}
       value={value}
       onChange={onChange}
       placeholder={placeholder}
+      aria-label={ariaLabel}
       disabled={disabled}
       rows={MIN_ROWS}
       className={`${textareaBaseClass} ${className}`}
@@ -111,6 +120,9 @@ export interface PromptInputProps {
   footer?: React.ReactNode;
   children?: React.ReactNode;
   className?: string;
+  inputId?: string;
+  inputName?: string;
+  inputAriaLabel?: string;
 }
 
 export function PromptInput({
@@ -123,6 +135,9 @@ export function PromptInput({
   footer,
   children,
   className = "",
+  inputId,
+  inputName,
+  inputAriaLabel,
 }: PromptInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const handleSubmit = (e: React.FormEvent) => {
@@ -165,9 +180,12 @@ export function PromptInput({
         {attachments}
         <textarea
           ref={textareaRef}
+          id={inputId}
+          name={inputName}
           value={value}
           onChange={(e) => onChange?.(e.target.value)}
           placeholder={placeholder}
+          aria-label={inputAriaLabel}
           disabled={disabled}
           rows={MIN_ROWS}
           className={textareaBaseClass}

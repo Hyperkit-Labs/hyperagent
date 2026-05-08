@@ -369,6 +369,7 @@ See LICENSE file for details.
 ## Learned User Preferences
 
 - When running strict spec or implementation-executor mode, treat the ordered checklist as binding: do not de-scope, soften mandatory items to optional, or replace implementation with documentation unless that exact change is explicitly authorized; mark incomplete items NOT DONE and true blockers BLOCKED with a precise explanation.
+- When the user asks for production-ready or mandatory full completion, treat partial wiring, placeholders, local-only or visual-only wins, and unverified behavior as not done; require real integration plus build or test proof and real-runtime verification before calling an item PASS, and use explicit BLOCKED with dependency and impact when work truly cannot proceed—no “mostly done,” deferred fixes without a blocker, or GO without production proof.
 
 ## Learned Workspace Facts
 
@@ -376,4 +377,5 @@ See LICENSE file for details.
 - Studio Thirdweb `defineChain` defaults can pick bundled RPC URLs that return 403 for unauthenticated callers; keep explicit `rpc` values on supported chains aligned with `infra/registries/network/chains.yaml` and orchestrator registry metadata.
 - On some Windows dev machines, Studio Jest runs that load Next may fail with a missing SWC native binary; treat that as an environment or toolchain issue when interpreting test failures.
 - Studio edge path exclusions (`isExcludedFromStudioEdge`) must stay consistent with `GATEWAY_PUBLIC_PATHS` from `@hyperagent/api-contracts` so public gateway routes are not dropped before traffic reaches the api-gateway.
+- In some Cursor agent Shell sessions, commands have returned empty stdout/stderr with ~0 ms duration while still reporting exit code 0; for definitive logs (e.g. monorepo builds), rely on files written under the repo, Read/Grep on those files, or a local terminal run.
 

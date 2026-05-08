@@ -158,6 +158,9 @@ export function ChatCommandBar({
           onSubmit={handleSubmit}
           disabled={disabled}
           placeholder={placeholder}
+          inputId="chat-command-prompt"
+          inputName="chatCommandPrompt"
+          inputAriaLabel="Chat command prompt"
           className="!p-0 !border-0 !bg-transparent"
           footer={
             <PromptInputFooter className="flex items-center justify-between px-2 pb-2 pt-1">

@@ -96,6 +96,8 @@ def test_no_user_header_skips_middleware(
 def test_invalid_x_user_id_signature_falls_back_to_valid_bearer(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # Bearer fallback in get_caller_id uses AUTH_JWT_SECRET (not IDENTITY_HMAC_SECRET).
+    monkeypatch.setenv("AUTH_JWT_SECRET", "unit-test-secret")
     client = _client_with_middleware(monkeypatch)
     token = _mint_hs256_jwt(
         {"sub": "550e8400-e29b-41d4-a716-446655440000"},

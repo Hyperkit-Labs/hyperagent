@@ -1,12 +1,12 @@
 # Gitleaks: secret scanning in git history and working tree.
-name: Gitleaks
+name: gitleaks
 
 on:
-  workflow_dispatch: {}
   pull_request:
-    branches: [main, development]
   push:
-    branches: [main, development]
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * *" # run once a day at 4 AM
 
 concurrency:
   group: gitleaks-${{ github.workflow }}-${{ github.ref }}
@@ -18,14 +18,14 @@ permissions:
 
 jobs:
   scan:
-    name: Secret scan
+    name: gitleaks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }} # Only required for Organizations, not personal accounts.

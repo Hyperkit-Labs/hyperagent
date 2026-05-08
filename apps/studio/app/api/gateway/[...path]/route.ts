@@ -4,6 +4,7 @@ import { getServiceUrl } from "@/config/environment";
 export const dynamic = "force-dynamic";
 
 const UPSTREAM_TIMEOUT_MS = 60_000;
+const SESSION_TOKEN_COOKIE_NAME = "hyperagent_session_token";
 
 function gatewayOrigin(): string {
   const apiBase = getServiceUrl("backend").replace(/\/$/, "");
@@ -26,6 +27,26 @@ function stripHopByHop(headers: Headers): Headers {
   return nextHeaders;
 }
 
+function sessionTokenFromCookieHeader(cookieHeader: string | null): string | null {
+  if (!cookieHeader) return null;
+  for (const part of cookieHeader.split(";")) {
+    const item = part.trim();
+    if (!item) continue;
+    const eq = item.indexOf("=");
+    if (eq <= 0) continue;
+    const key = item.slice(0, eq).trim();
+    if (key !== SESSION_TOKEN_COOKIE_NAME) continue;
+    const value = item.slice(eq + 1).trim();
+    if (!value) return null;
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+  return null;
+}
+
 async function proxy(request: NextRequest, path: string[]) {
   const origin = gatewayOrigin();
   const joined = path.join("/");
@@ -37,6 +58,13 @@ async function proxy(request: NextRequest, path: string[]) {
   try {
     const method = request.method.toUpperCase();
     const headers = stripHopByHop(request.headers);
+    const cookieHeader = request.headers.get("cookie");
+    const cookieToken = sessionTokenFromCookieHeader(cookieHeader);
+    const hasAuthorization = headers.has("authorization");
+    if (!hasAuthorization && cookieToken) {
+      headers.set("authorization", `Bearer ${cookieToken}`);
+    }
+    headers.delete("cookie");
     const body =
       method === "GET" || method === "HEAD"
         ? undefined

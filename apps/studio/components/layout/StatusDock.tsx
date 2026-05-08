@@ -101,7 +101,7 @@ function StatusDockInner({
             <span>
               {resolved.runStatus === "failed" ? "Pipeline failed" : "Idle"}
             </span>
-            <span className="text-slate-500">Logs</span>
+            <span className="text-slate-500">Logs &amp; Monitoring</span>
           </>
         )}
       </Link>
@@ -150,7 +150,7 @@ function StatusDockFallback() {
       >
         <span className="h-2 w-2 rounded-full bg-slate-500" />
         <span>Idle</span>
-        <span className="text-slate-500">Logs</span>
+        <span className="text-slate-500">Logs &amp; Monitoring</span>
       </Link>
       <div className="flex items-center gap-3 text-xs text-slate-400">
         <span className={!networksAvailable ? "text-amber-400/80" : ""}>

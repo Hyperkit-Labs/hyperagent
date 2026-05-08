@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import { FeatureErrorBoundary } from "@/components/providers/FeatureErrorBoundary";
 import {
@@ -34,10 +35,21 @@ import { BentoGrid, BentoCard, GridBeam } from "@/components/ui";
 type SettingsTab = "workspace" | "byok" | "x402" | "integrations" | "plan";
 
 export default function SettingsPage() {
-  const [tab, setTab] = useState<SettingsTab>("byok");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const [tab, setTab] = useState<SettingsTab>(
+    tabParam === "workspace" ||
+      tabParam === "byok" ||
+      tabParam === "x402" ||
+      tabParam === "integrations" ||
+      tabParam === "plan"
+      ? tabParam
+      : "byok",
+  );
   const [revokeLoading, setRevokeLoading] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [signOutLoading, setSignOutLoading] = useState(false);
   const x402Enabled = isFeatureEnabled("x402");
   const { config, loading: configLoading } = useConfig();
   const {
@@ -71,6 +83,30 @@ export default function SettingsPage() {
       queueMicrotask(() => setDefaultNetwork(stored));
     }
   }, []);
+
+  useEffect(() => {
+    if (
+      tabParam === "workspace" ||
+      tabParam === "byok" ||
+      tabParam === "x402" ||
+      tabParam === "integrations" ||
+      tabParam === "plan"
+    ) {
+      setTab(tabParam);
+      return;
+    }
+    setTab("byok");
+  }, [tabParam]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (params.get("tab") === tab) return;
+    params.set("tab", tab);
+    router.replace(
+      params.size > 0 ? `${pathname}?${params.toString()}` : pathname,
+      { scroll: false },
+    );
+  }, [pathname, router, searchParams, tab]);
 
   const refetchWorkspace = () => {
     refetchNetworks();
@@ -409,72 +445,39 @@ export default function SettingsPage() {
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div>
                         <h4 className="text-sm font-medium text-[var(--color-text-primary)]">
-                          Delete Workspace
+                          Sign out of this workspace
                         </h4>
                         <p className="text-xs text-[var(--color-text-muted)] mt-1">
-                          Permanently delete this workspace and all associated
-                          data.
+                          Clear your current API session on this device and
+                          return to login.
                         </p>
                       </div>
-                      {!deleteConfirm ? (
-                        <button
-                          type="button"
-                          onClick={() => setDeleteConfirm(true)}
-                          className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-lg transition-colors shrink-0"
-                        >
-                          Delete Workspace
-                        </button>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-red-400">
-                            Type &quot;delete&quot; in the prompt to confirm.
-                          </span>
-                          <button
-                            type="button"
-                            disabled={deleteLoading}
-                            onClick={async () => {
-                              const answer = window.prompt(
-                                'Type "delete" to permanently delete this workspace:',
-                              );
-                              if (answer?.toLowerCase() !== "delete") {
-                                setDeleteConfirm(false);
-                                return;
-                              }
-                              setDeleteLoading(true);
-                              try {
-                                await deleteLLMKeys();
-                                clearStoredSession();
-                                toast.success(
-                                  "Workspace data cleared. You have been signed out.",
-                                );
-                                window.location.href = "/login";
-                              } catch (err) {
-                                toast.error(
-                                  err instanceof Error
-                                    ? err.message
-                                    : "Failed to delete workspace.",
-                                );
-                              } finally {
-                                setDeleteLoading(false);
-                                setDeleteConfirm(false);
-                              }
-                            }}
-                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg transition-colors shrink-0 disabled:opacity-50 inline-flex items-center gap-2"
-                          >
-                            {deleteLoading && (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            )}
-                            Confirm Delete
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeleteConfirm(false)}
-                            className="px-3 py-2 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      )}
+                      <button
+                        type="button"
+                        disabled={signOutLoading}
+                        onClick={async () => {
+                          setSignOutLoading(true);
+                          try {
+                            clearStoredSession();
+                            toast.success("Signed out of the workspace.");
+                            window.location.href = ROUTES.LOGIN;
+                          } catch (err) {
+                            toast.error(
+                              err instanceof Error
+                                ? err.message
+                                : "Failed to sign out of the workspace.",
+                            );
+                          } finally {
+                            setSignOutLoading(false);
+                          }
+                        }}
+                        className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-lg transition-colors shrink-0 disabled:opacity-50 inline-flex items-center gap-2"
+                      >
+                        {signOutLoading && (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        )}
+                        Sign Out
+                      </button>
                     </div>
                   </div>
                 </div>

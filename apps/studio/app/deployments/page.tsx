@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import { ROUTES } from "@/constants/routes";
 import { useDeployments } from "@/hooks/useDeployments";
@@ -19,8 +20,44 @@ import { cn } from "@/lib/utils";
 type StatusFilter = "all" | "success" | "failed" | "pending";
 
 export default function DeploymentsPage() {
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(
+    searchParams.get("status") === "success" ||
+      searchParams.get("status") === "failed" ||
+      searchParams.get("status") === "pending"
+      ? (searchParams.get("status") as StatusFilter)
+      : "all",
+  );
+  const [selectedId, setSelectedId] = useState<string | null>(
+    searchParams.get("deployment") ?? null,
+  );
+
+  useEffect(() => {
+    setStatusFilter(
+      searchParams.get("status") === "success" ||
+        searchParams.get("status") === "failed" ||
+        searchParams.get("status") === "pending"
+        ? (searchParams.get("status") as StatusFilter)
+        : "all",
+    );
+    setSelectedId(searchParams.get("deployment") ?? null);
+  }, [searchParams]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (statusFilter === "all") params.delete("status");
+    else params.set("status", statusFilter);
+    if (selectedId) params.set("deployment", selectedId);
+    else params.delete("deployment");
+    const next = params.toString();
+    const current = searchParams.toString();
+    if (next === current) return;
+    router.replace(next ? `${pathname}?${next}` : pathname, {
+      scroll: false,
+    });
+  }, [pathname, router, searchParams, selectedId, statusFilter]);
 
   const { deployments, stats, loading, error, refetch } = useDeployments({
     status: statusFilter === "all" ? undefined : statusFilter,

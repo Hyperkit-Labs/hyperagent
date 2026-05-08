@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import { useLogs } from "@/hooks/useLogs";
 import { useHealth } from "@/hooks/useHealth";
@@ -14,7 +14,7 @@ import {
   Pause,
   Play,
 } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Shimmer, Terminal } from "@/components/ai-elements";
 import { FaultyTerminal } from "@/components/ui";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
@@ -39,6 +39,8 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 function MonitoringContent() {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const typeParam = searchParams.get("type") ?? "";
   const typeLabel = TYPE_LABELS[typeParam] ?? "";
@@ -52,7 +54,7 @@ function MonitoringContent() {
   const { health, loading: healthLoading, error: healthError } = useHealth();
   const healthStatus = health?.status;
   const filters = useMonitoringFilters();
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") ?? "");
   const [isPaused, setIsPaused] = useState(false);
   const pipelineStatus = health?.services?.orchestrator?.status ?? "unknown";
   const auditStatus = health?.services?.audit?.status ?? "unknown";
@@ -93,6 +95,22 @@ function MonitoringContent() {
   const recentErrors = useMemo(() => {
     return (logs ?? []).filter((l: LogEntry) => l.level === "error").length;
   }, [logs]);
+
+  useEffect(() => {
+    setSearchQuery(searchParams.get("q") ?? "");
+  }, [searchParams]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (searchQuery.trim()) params.set("q", searchQuery.trim());
+    else params.delete("q");
+    const next = params.toString();
+    const current = searchParams.toString();
+    if (next === current) return;
+    router.replace(next ? `${pathname}?${next}` : pathname, {
+      scroll: false,
+    });
+  }, [pathname, router, searchParams, searchQuery]);
 
   return (
     <div className="p-6 lg:p-8">

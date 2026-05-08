@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { FunctionSquare, X } from "lucide-react";
@@ -79,6 +80,7 @@ export function ContextSidebar({
 }: ContextSidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const isChat = pathname === ROUTES.HOME || pathname === "/";
   const hasWorkflow = isChat && (searchParams.get("workflow") || workflowId);
   const isContracts =
@@ -93,6 +95,22 @@ export function ContextSidebar({
       }
     />
   );
+
+  useEffect(() => {
+    if (!open) return;
+    const timer = window.setTimeout(() => closeButtonRef.current?.focus(), 0);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open, onClose]);
 
   return (
     <AnimatePresence>
@@ -114,6 +132,7 @@ export function ContextSidebar({
                 Resource Inspector
               </span>
               <button
+                ref={closeButtonRef}
                 type="button"
                 onClick={onClose}
                 className="p-1.5 rounded-md text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)] transition-colors"

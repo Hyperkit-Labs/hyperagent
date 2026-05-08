@@ -1,9 +1,15 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import {
+  useState,
+  useMemo,
+  useCallback,
+  useEffect,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import Link from "next/link";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Search,
   List,
@@ -65,14 +71,57 @@ function categoryLabel(cat: AgentCategory): string {
 }
 
 export default function AgentsPage() {
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState<AgentCategory>("all");
-  const [viewMode, setViewMode] = useState<"list" | "grid" | "graph">("list");
-  const [selectedName, setSelectedName] = useState<string | null>(null);
-  const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set());
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [search, setSearch] = useState(searchParams.get("q") ?? "");
+  const [category, setCategory] = useState<AgentCategory>(
+    searchParams.get("category") === "generators" ||
+      searchParams.get("category") === "auditors" ||
+      searchParams.get("category") === "deployers"
+      ? (searchParams.get("category") as AgentCategory)
+      : "all",
+  );
+  const [viewMode, setViewMode] = useState<"list" | "grid" | "graph">(
+    searchParams.get("view") === "grid" ? "grid" : "list",
+  );
+  const [selectedName, setSelectedName] = useState<string | null>(
+    searchParams.get("agent") ?? null,
+  );
+  const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set());
   const { agents, loading, error, refetch } = useAgents();
   const { metrics } = useMetrics({ timeRange: "7d" });
+
+  useEffect(() => {
+    setSearch(searchParams.get("q") ?? "");
+    setCategory(
+      searchParams.get("category") === "generators" ||
+        searchParams.get("category") === "auditors" ||
+        searchParams.get("category") === "deployers"
+        ? (searchParams.get("category") as AgentCategory)
+        : "all",
+    );
+    setViewMode(searchParams.get("view") === "grid" ? "grid" : "list");
+    setSelectedName(searchParams.get("agent") ?? null);
+  }, [searchParams]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (search.trim()) params.set("q", search.trim());
+    else params.delete("q");
+    if (category !== "all") params.set("category", category);
+    else params.delete("category");
+    if (viewMode === "grid") params.set("view", "grid");
+    else params.delete("view");
+    if (selectedName) params.set("agent", selectedName);
+    else params.delete("agent");
+    const next = params.toString();
+    const current = searchParams.toString();
+    if (next === current) return;
+    router.replace(next ? `${pathname}?${next}` : pathname, {
+      scroll: false,
+    });
+  }, [category, pathname, router, search, searchParams, selectedName, viewMode]);
 
   const toggleSelectAgent = useCallback((name: string) => {
     setSelectedAgents((prev) => {
@@ -244,13 +293,12 @@ export default function AgentsPage() {
                     : "Agents appear here after your first pipeline run."
                 }
                 action={
-                  <button
-                    type="button"
-                    onClick={() => (window.location.href = "/")}
+                  <Link
+                    href={ROUTES.HOME}
                     className="btn-primary-gradient text-xs px-4 py-1.5 rounded-lg"
                   >
                     Create a workflow
-                  </button>
+                  </Link>
                 }
               />
             )}
@@ -339,12 +387,6 @@ export default function AgentsPage() {
                   return (
                     <div
                       key={agent.name ?? i}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setSelectedName(agent.name ?? null)}
-                      onKeyDown={(e) =>
-                        e.key === "Enter" && setSelectedName(agent.name ?? null)
-                      }
                       className={`animate-enter group relative rounded-xl p-4 flex items-center gap-4 transition-all border ${
                         i === 0
                           ? "delay-75"
@@ -452,7 +494,9 @@ export default function AgentsPage() {
                           className="p-2 rounded-md hover:bg-[var(--color-bg-hover)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition-colors"
                           title="View logs"
                           aria-label={`View logs for agent ${name}`}
-                          onClick={(e) => e.stopPropagation()}
+                          onClick={(e: ReactMouseEvent<HTMLAnchorElement>) =>
+                            e.stopPropagation()
+                          }
                         >
                           <FileText className="w-4 h-4" />
                         </Link>

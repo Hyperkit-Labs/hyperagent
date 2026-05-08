@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import {
   History,
@@ -46,8 +47,13 @@ interface WorkflowItem {
 type HistoryTab = "workflows" | "logs";
 
 export default function HistoryPage() {
-  const [tab, setTab] = useState<HistoryTab>("workflows");
-  const [search, setSearch] = useState("");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const initialTab: HistoryTab = tabParam === "logs" ? "logs" : "workflows";
+  const [tab, setTab] = useState<HistoryTab>(initialTab);
+  const [search, setSearch] = useState(searchParams.get("q") ?? "");
   const [workflows, setWorkflows] = useState<WorkflowItem[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,6 +92,35 @@ export default function HistoryPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    setTab(tabParam === "logs" ? "logs" : "workflows");
+  }, [tabParam]);
+
+  useEffect(() => {
+    setSearch(searchParams.get("q") ?? "");
+  }, [searchParams]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "workflows") {
+      params.delete("tab");
+    } else {
+      params.set("tab", tab);
+    }
+    const trimmed = search.trim();
+    if (trimmed) {
+      params.set("q", trimmed);
+    } else {
+      params.delete("q");
+    }
+    const next = params.toString();
+    const current = searchParams.toString();
+    if (next === current) return;
+    router.replace(next ? `${pathname}?${next}` : pathname, {
+      scroll: false,
+    });
+  }, [pathname, router, search, searchParams, tab]);
 
   const filteredWorkflows = search.trim()
     ? workflows.filter(

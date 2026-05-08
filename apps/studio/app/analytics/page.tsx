@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import Link from "next/link";
 import { useMetrics } from "@/hooks/useMetrics";
@@ -94,10 +94,40 @@ function MetricCard({
 }
 
 function AnalyticsContent() {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const view = searchParams.get("view") ?? "project";
   const viewConfig = VIEW_LABELS[view] ?? VIEW_LABELS.project;
-  const [timeRange, setTimeRange] = useState<TimeRangeKey>("30d");
+  const [timeRange, setTimeRange] = useState<TimeRangeKey>(
+    searchParams.get("range") === "7d" ||
+      searchParams.get("range") === "90d" ||
+      searchParams.get("range") === "24h"
+      ? (searchParams.get("range") as TimeRangeKey)
+      : "30d",
+  );
+
+  useEffect(() => {
+    setTimeRange(
+      searchParams.get("range") === "7d" ||
+        searchParams.get("range") === "90d" ||
+        searchParams.get("range") === "24h"
+        ? (searchParams.get("range") as TimeRangeKey)
+        : "30d",
+    );
+  }, [searchParams]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (timeRange === "30d") params.delete("range");
+    else params.set("range", timeRange);
+    const next = params.toString();
+    const current = searchParams.toString();
+    if (next === current) return;
+    router.replace(next ? `${pathname}?${next}` : pathname, {
+      scroll: false,
+    });
+  }, [pathname, router, searchParams, timeRange]);
   const { metrics, loading, error, refetch } = useMetrics({ timeRange });
   const m =
     metrics && typeof metrics === "object"
@@ -155,7 +185,11 @@ function AnalyticsContent() {
               {Object.entries(VIEW_LABELS).map(([v, { label }]) => (
                 <Link
                   key={v}
-                  href={`${ROUTES.ANALYTICS}?view=${v}`}
+                  href={
+                    timeRange === "30d"
+                      ? `${ROUTES.ANALYTICS}?view=${v}`
+                      : `${ROUTES.ANALYTICS}?view=${v}&range=${timeRange}`
+                  }
                   role="tab"
                   aria-selected={view === v}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${

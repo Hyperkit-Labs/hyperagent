@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import { ROUTES } from "@/constants/routes";
 import { useMetrics } from "@/hooks/useMetrics";
@@ -24,6 +25,9 @@ import {
 import { Shimmer } from "@/components/ai-elements";
 
 export default function SecurityPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { metrics, loading, error, refetch } = useMetrics();
   const {
     findings,
@@ -32,13 +36,31 @@ export default function SecurityPage() {
     refetch: refetchFindings,
   } = useSecurityFindings({ limit: 100 });
   const { networks } = useNetworks();
-  const [expandedReport, setExpandedReport] = useState<string | null>(null);
+  const [expandedReport, setExpandedReport] = useState<string | null>(
+    searchParams.get("report"),
+  );
   const total = metrics?.workflows?.total ?? 0;
   const completed = metrics?.workflows?.completed ?? 0;
   const failed = metrics?.workflows?.failed ?? 0;
   const hasData = total > 0;
   const securityScore = metrics?.security?.score ?? null;
   const hasFindings = findings.length > 0;
+
+  useEffect(() => {
+    setExpandedReport(searchParams.get("report"));
+  }, [searchParams]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (expandedReport) params.set("report", expandedReport);
+    else params.delete("report");
+    const next = params.toString();
+    const current = searchParams.toString();
+    if (next === current) return;
+    router.replace(next ? `${pathname}?${next}` : pathname, {
+      scroll: false,
+    });
+  }, [expandedReport, pathname, router, searchParams]);
 
   return (
     <RequireApiSession>

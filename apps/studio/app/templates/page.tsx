@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ROUTES } from "@/constants/routes";
 import { searchTemplates, type TemplateItem } from "@/lib/api";
 import { useTemplatesData } from "@/hooks/useTemplatesData";
@@ -50,6 +50,8 @@ function filterByCategory(
 }
 
 function TemplatesContent() {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const category = searchParams.get("category")?.toLowerCase() ?? "all";
   const {
@@ -58,8 +60,8 @@ function TemplatesContent() {
     error: loadError,
     refetch: loadTemplates,
   } = useTemplatesData();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") ?? "");
+  const [searchInput, setSearchInput] = useState(searchParams.get("q") ?? "");
 
   const [searchResults, setSearchResults] = useState<TemplateItem[] | null>(
     null,
@@ -75,6 +77,24 @@ function TemplatesContent() {
       return next;
     });
   };
+
+  useEffect(() => {
+    const q = searchParams.get("q") ?? "";
+    setSearchInput(q);
+    setSearchQuery(q);
+  }, [searchParams]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (searchQuery.trim()) params.set("q", searchQuery.trim());
+    else params.delete("q");
+    const next = params.toString();
+    const current = searchParams.toString();
+    if (next === current) return;
+    router.replace(next ? `${pathname}?${next}` : pathname, {
+      scroll: false,
+    });
+  }, [pathname, router, searchParams, searchQuery]);
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -161,11 +181,13 @@ function TemplatesContent() {
           ).map((cat) => (
             <Link
               key={cat}
-              href={
-                cat === "all"
-                  ? ROUTES.TEMPLATES
-                  : `${ROUTES.TEMPLATES}?category=${cat}`
-              }
+              href={(() => {
+                const params = new URLSearchParams(searchParams.toString());
+                if (cat === "all") params.delete("category");
+                else params.set("category", cat);
+                const next = params.toString();
+                return next ? `${ROUTES.TEMPLATES}?${next}` : ROUTES.TEMPLATES;
+              })()}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 category === cat || (!category && cat === "all")
                   ? "bg-[var(--color-primary)] text-white"
@@ -240,6 +262,7 @@ function TemplatesContent() {
                 Compare Selected
               </button>
               <button
+                type="button"
                 onClick={() => setCompareIds(new Set())}
                 className="p-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
               >
@@ -262,6 +285,9 @@ function TemplatesContent() {
                 onClick={() => setCompareModalOpen(false)}
               >
                 <div
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Template comparison"
                   className="glass-panel rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-auto border border-[var(--color-border-subtle)] shadow-xl"
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -270,6 +296,7 @@ function TemplatesContent() {
                       Template Comparison
                     </h2>
                     <button
+                      type="button"
                       onClick={() => setCompareModalOpen(false)}
                       className="p-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] rounded-lg"
                     >

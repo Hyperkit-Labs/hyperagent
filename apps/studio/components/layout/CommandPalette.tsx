@@ -1,28 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Command } from "cmdk";
-import {
-  Folder,
-  Shield,
-  BarChart3,
-  Rocket,
-  FileCode,
-  Plus,
-  Search,
-  LayoutDashboard,
-  Globe,
-  FileText,
-  Bot,
-  AppWindow,
-  History,
-  DollarSign,
-  Settings,
-  BookOpen,
-  LayoutTemplate,
-} from "lucide-react";
+import { Shield, Rocket, Plus, Search } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
+import { getCommandPaletteRouteItems } from "@/constants/navigation";
 
 interface PaletteItem {
   id: string;
@@ -32,113 +15,15 @@ interface PaletteItem {
   description?: string;
 }
 
-const ROUTE_ITEMS: PaletteItem[] = [
-  {
-    id: "nav-dashboard",
-    label: "Go to Dashboard",
-    href: ROUTES.DASHBOARD,
-    icon: LayoutDashboard,
-    description: "Overview of projects and activity",
-  },
-  {
-    id: "nav-workflows",
-    label: "Go to Projects",
-    href: ROUTES.WORKFLOWS,
-    icon: Folder,
-    description: "Manage workflows and runs",
-  },
-  {
-    id: "nav-networks",
-    label: "Go to Networks",
-    href: ROUTES.NETWORKS,
-    icon: Globe,
-    description: "Configure blockchain networks",
-  },
-  {
-    id: "nav-security",
-    label: "Go to Security",
-    href: ROUTES.SECURITY,
-    icon: Shield,
-    description: "Security audits and findings",
-  },
-  {
-    id: "nav-monitoring",
-    label: "Go to Logs",
-    href: ROUTES.MONITORING,
-    icon: FileText,
-    description: "Pipeline logs and history",
-  },
-  {
-    id: "nav-analytics",
-    label: "Go to Analytics",
-    href: ROUTES.ANALYTICS,
-    icon: BarChart3,
-    description: "Usage and performance metrics",
-  },
-  {
-    id: "nav-contracts",
-    label: "Go to Contracts",
-    href: ROUTES.CONTRACTS,
-    icon: FileCode,
-    description: "Deployed contract addresses",
-  },
-  {
-    id: "nav-apps",
-    label: "Go to Apps",
-    href: ROUTES.APPS,
-    icon: AppWindow,
-    description: "Manage deployed applications",
-  },
-  {
-    id: "nav-agents",
-    label: "Go to Agents",
-    href: ROUTES.AGENTS,
-    icon: Bot,
-    description: "AI agents and capabilities",
-  },
-  {
-    id: "nav-deployments",
-    label: "Go to Deployments",
-    href: ROUTES.DEPLOYMENTS,
-    icon: Rocket,
-    description: "Deployment history and actions",
-  },
-  {
-    id: "nav-history",
-    label: "Go to History",
-    href: ROUTES.HISTORY,
-    icon: History,
-    description: "Past workflow runs",
-  },
-  {
-    id: "nav-payments",
-    label: "Go to Payments",
-    href: ROUTES.PAYMENTS,
-    icon: DollarSign,
-    description: "x402 payments and spending",
-  },
-  {
-    id: "nav-settings",
-    label: "Go to Settings",
-    href: ROUTES.SETTINGS,
-    icon: Settings,
-    description: "Workspace and API keys",
-  },
-  {
-    id: "nav-docs",
-    label: "Go to Docs",
-    href: ROUTES.DOCS,
-    icon: BookOpen,
-    description: "API reference and guides",
-  },
-  {
-    id: "nav-templates",
-    label: "Go to Templates",
-    href: ROUTES.TEMPLATES,
-    icon: LayoutTemplate,
-    description: "Pre-built contract templates",
-  },
-];
+const ROUTE_ITEMS: PaletteItem[] = getCommandPaletteRouteItems().map(
+  (item) => ({
+    id: `nav-${item.href.replace(/\//g, "-") || "home"}`,
+    label: `Go to ${item.label}`,
+    href: item.href,
+    icon: item.icon,
+    description: item.description,
+  }),
+);
 
 const ACTION_ITEMS: PaletteItem[] = [
   {
@@ -181,6 +66,8 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const [search, setSearch] = useState("");
   const [selectedValue, setSelectedValue] = useState("");
   const [selectedItem, setSelectedItem] = useState<PaletteItem | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -194,6 +81,21 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   }, [open, onOpenChange]);
 
   useEffect(() => {
+    if (open) {
+      previousFocusRef.current =
+        typeof document !== "undefined"
+          ? (document.activeElement as HTMLElement | null)
+          : null;
+      const timer = window.setTimeout(() => {
+        const input = dialogRef.current?.querySelector("input");
+        if (input instanceof HTMLElement) {
+          input.focus();
+        }
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    previousFocusRef.current?.focus?.();
     if (!open) {
       // Reset state when palette closes; deferred to avoid cascading renders
       const t = setTimeout(() => {
@@ -220,6 +122,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       onClick={(e) => e.target === e.currentTarget && onOpenChange(false)}
     >
       <div
+        ref={dialogRef}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-2xl rounded-2xl border border-white/10 bg-slate-950/90 shadow-2xl overflow-hidden"
         role="dialog"
@@ -235,7 +138,32 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             setSelectedItem(findItemByValue(v));
           }}
           onKeyDown={(e) => {
-            if (e.key === "Escape") onOpenChange(false);
+            if (e.key === "Escape") {
+              onOpenChange(false);
+              return;
+            }
+
+            if (e.key !== "Tab") return;
+            const root = dialogRef.current;
+            if (!root) return;
+            const focusable = Array.from(
+              root.querySelectorAll<HTMLElement>(
+                'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+              ),
+            );
+            if (focusable.length === 0) return;
+
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            const active = document.activeElement as HTMLElement | null;
+
+            if (e.shiftKey && active === first) {
+              e.preventDefault();
+              last.focus();
+            } else if (!e.shiftKey && active === last) {
+              e.preventDefault();
+              first.focus();
+            }
           }}
         >
           <div className="flex border-b border-white/5">

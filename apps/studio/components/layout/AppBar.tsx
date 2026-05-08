@@ -16,48 +16,13 @@ import { NetworkSelector } from "@/components/layout/NetworkSelector";
 import { NotificationsDropdown } from "@/components/layout/NotificationsDropdown";
 import { useLayout } from "@/components/providers/LayoutProvider";
 import { ROUTES } from "@/constants/routes";
+import { getBreadcrumbItems, getRouteLabel } from "@/constants/navigation";
 import { ActionSearchBar, ExpandableToolbar } from "@/components/ui";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
-const PATH_LABELS: Record<string, string> = {
-  [ROUTES.DASHBOARD]: "Overview",
-  [ROUTES.WORKFLOWS]: "Projects",
-  [ROUTES.WORKFLOW_CREATE]: "New Project",
-  [ROUTES.AGENTS]: "Agents",
-  [ROUTES.DEPLOYMENTS]: "Deployments",
-  [ROUTES.CONTRACTS]: "Contracts",
-  [ROUTES.TEMPLATES]: "Templates",
-  [ROUTES.ANALYTICS]: "Analytics",
-  [ROUTES.PAYMENTS]: "Payments",
-  [ROUTES.NETWORKS]: "Networks",
-  [ROUTES.MONITORING]: "Logs & Monitoring",
-  [ROUTES.SECURITY]: "Security",
-  [ROUTES.SETTINGS]: "Settings",
-  [ROUTES.APPS]: "Apps",
-  [ROUTES.APPS_NEW]: "New App",
-  [ROUTES.HISTORY]: "History",
-  [ROUTES.DOMAINS]: "Infrastructure",
-  [ROUTES.DOCS]: "Docs",
-};
-
 function Breadcrumb() {
   const pathname = usePathname();
-  const segments = useMemo(() => {
-    if (!pathname || pathname === "/")
-      return [{ label: "Chat", href: ROUTES.HOME }];
-    const parts = pathname.split("/").filter(Boolean);
-    const segments: { label: string; href: string }[] = [];
-    for (let i = 0; i < parts.length; i++) {
-      const href = "/" + parts.slice(0, i + 1).join("/");
-      const label =
-        PATH_LABELS[href] ??
-        (i === parts.length - 1 ? parts[i] : parts[i].slice(0, 8) + "...");
-      segments.push({ label, href });
-    }
-    return segments.length
-      ? segments
-      : [{ label: "Overview", href: ROUTES.DASHBOARD }];
-  }, [pathname]);
+  const segments = useMemo(() => getBreadcrumbItems(pathname), [pathname]);
 
   return (
     <nav className="flex items-center gap-1.5 text-sm text-[var(--color-text-tertiary)]">
@@ -85,8 +50,11 @@ export function AppBar() {
     toggleContextSidebar,
     openCommandPalette,
     toggleMobileNav,
+    mobileNavOpen,
   } = useLayout();
   const compactTools = useMediaQuery("(max-width: 1023px)");
+  const pathname = usePathname();
+  const currentLabel = getRouteLabel(pathname);
 
   return (
     <header className="h-16 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)]/90 backdrop-blur-md flex items-center justify-between px-4 sm:px-6 z-40 shrink-0">
@@ -96,6 +64,8 @@ export function AppBar() {
           onClick={toggleMobileNav}
           className="md:hidden p-2 rounded-lg text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)] transition-colors"
           aria-label="Open navigation menu"
+          aria-controls="mobile-navigation-drawer"
+          aria-expanded={mobileNavOpen}
         >
           <Menu className="w-5 h-5" />
         </button>
@@ -117,7 +87,7 @@ export function AppBar() {
         <div className="hidden lg:flex flex-1 min-w-0 justify-center px-4">
           <ActionSearchBar
             onClick={openCommandPalette}
-            placeholder="Search workspace, open routes…"
+            placeholder={`Search workspace, open routes, or jump from ${currentLabel}…`}
             className="max-w-md w-full"
           />
         </div>

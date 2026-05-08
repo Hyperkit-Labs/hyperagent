@@ -1,54 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  LayoutDashboard,
-  Folder,
-  LayoutTemplate,
-  Bot,
-  Rocket,
-  FileText,
-  Blocks,
-  FileCode,
-  Globe,
-  Shield,
-  DollarSign,
-  BarChart3,
-  AppWindow,
-  History,
-  Server,
-  BookOpen,
-  X,
-  ChevronDown,
-} from "lucide-react";
+import { Blocks, X, ChevronDown } from "lucide-react";
 import { ROUTES, CLI_VERSION } from "@/constants/routes";
-
-const coreNavItems = [
-  { href: ROUTES.DASHBOARD, label: "Overview", icon: LayoutDashboard },
-  { href: ROUTES.WORKFLOWS, label: "Projects", icon: Folder },
-];
-
-const toolsNavItems = [
-  { href: ROUTES.AGENTS, label: "Agents", icon: Bot },
-  { href: ROUTES.DEPLOYMENTS, label: "Deployments", icon: Rocket },
-  { href: ROUTES.CONTRACTS, label: "Contracts", icon: FileCode },
-  { href: ROUTES.APPS, label: "Apps", icon: AppWindow },
-  { href: ROUTES.NETWORKS, label: "Networks", icon: Globe },
-  { href: ROUTES.ANALYTICS, label: "Analytics", icon: BarChart3 },
-  { href: ROUTES.HISTORY, label: "History", icon: History },
-  { href: ROUTES.PAYMENTS, label: "Payments", icon: DollarSign },
-  { href: ROUTES.MONITORING, label: "Logs & Monitoring", icon: FileText },
-  { href: ROUTES.SECURITY, label: "Security", icon: Shield },
-];
-
-const resourceItems = [
-  { href: ROUTES.TEMPLATES, label: "Templates", icon: LayoutTemplate },
-  { href: ROUTES.DOMAINS, label: "Infrastructure", icon: Server },
-  { href: ROUTES.DOCS, label: "Docs", icon: BookOpen },
-];
+import {
+  getStudioNavItems,
+  isNavRouteActive,
+  STUDIO_NAV_GROUPS,
+  type StudioNavGroupKey,
+} from "@/constants/navigation";
 
 const NAV_LINK_BASE =
   "flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] min-h-[40px] transition-colors";
@@ -98,8 +61,7 @@ function NavLink({
   const hasQuery = href.includes("?");
   const isActive = hasQuery
     ? fullPath === href
-    : pathname === href ||
-      (href !== ROUTES.DASHBOARD && pathname.startsWith(href));
+    : isNavRouteActive(pathname, href);
   return (
     <Link
       href={href}
@@ -126,6 +88,9 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
   const searchParams = useSearchParams();
   const fullPath =
     pathname + (searchParams.toString() ? "?" + searchParams.toString() : "");
+  const drawerRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
   const [sectionsOpen, setSectionsOpen] = useState({
     core: true,
     tools: true,
@@ -134,18 +99,67 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
 
   useEffect(() => {
     if (open) {
+      previousFocusRef.current =
+        typeof document !== "undefined"
+          ? (document.activeElement as HTMLElement | null)
+          : null;
       document.body.style.overflow = "hidden";
+      window.setTimeout(() => closeButtonRef.current?.focus(), 0);
     } else {
       document.body.style.overflow = "";
+      previousFocusRef.current?.focus?.();
     }
     return () => {
       document.body.style.overflow = "";
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+      const root = drawerRef.current;
+      if (!root) return;
+      const focusable = Array.from(
+        root.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
+
   const toggleSection = (key: "core" | "tools" | "resources") => {
     setSectionsOpen((prev) => ({ ...prev, [key]: !prev[key] }));
   };
+
+  const navGroups: { key: StudioNavGroupKey; label: string }[] = [
+    { key: "core", label: STUDIO_NAV_GROUPS.core },
+    { key: "tools", label: STUDIO_NAV_GROUPS.tools },
+    { key: "resources", label: STUDIO_NAV_GROUPS.resources },
+  ];
 
   return (
     <AnimatePresence>
@@ -161,6 +175,8 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
             aria-hidden
           />
           <motion.aside
+            id="mobile-navigation-drawer"
+            ref={drawerRef}
             initial={{ x: "-104%" }}
             animate={{ x: 0 }}
             exit={{ x: "-104%" }}
@@ -172,6 +188,7 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
             }}
             className="fixed inset-y-0 left-0 z-50 w-64 bg-[var(--color-bg-elevated)] border-r border-[var(--color-border-subtle)] shadow-2xl flex flex-col md:hidden"
             role="dialog"
+            aria-modal="true"
             aria-label="Navigation menu"
           >
             <div className="shrink-0 p-4 border-b border-[var(--color-border-subtle)] flex flex-col gap-3">
@@ -180,6 +197,7 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
                   Navigation
                 </h2>
                 <button
+                  ref={closeButtonRef}
                   type="button"
                   onClick={onClose}
                   className="p-2 rounded-lg hover:bg-[var(--color-bg-hover)] text-[var(--color-text-tertiary)]"
@@ -202,75 +220,34 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
               </Link>
             </div>
             <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-4">
-              <div className="space-y-1">
-                <SectionHeader
-                  label="Core"
-                  sectionKey="core"
-                  isOpen={sectionsOpen.core}
-                  onToggle={toggleSection}
-                />
-                {sectionsOpen.core && (
-                  <div id="mobile-nav-core" className="space-y-1">
-                    {coreNavItems.map(({ href, label, icon }) => (
-                      <NavLink
-                        key={href + label}
-                        href={href}
-                        label={label}
-                        icon={icon}
-                        pathname={pathname}
-                        fullPath={fullPath}
-                        onNavigate={onClose}
-                      />
-                    ))}
+              {navGroups.map((group) => {
+                const items = getStudioNavItems(group.key);
+                return (
+                  <div key={group.key} className="space-y-1">
+                    <SectionHeader
+                      label={group.label}
+                      sectionKey={group.key}
+                      isOpen={sectionsOpen[group.key]}
+                      onToggle={toggleSection}
+                    />
+                    {sectionsOpen[group.key] && (
+                      <div id={`mobile-nav-${group.key}`} className="space-y-1">
+                        {items.map(({ href, label, icon }) => (
+                          <NavLink
+                            key={href}
+                            href={href}
+                            label={label}
+                            icon={icon}
+                            pathname={pathname}
+                            fullPath={fullPath}
+                            onNavigate={onClose}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              <div className="space-y-1">
-                <SectionHeader
-                  label="Tools"
-                  sectionKey="tools"
-                  isOpen={sectionsOpen.tools}
-                  onToggle={toggleSection}
-                />
-                {sectionsOpen.tools && (
-                  <div id="mobile-nav-tools" className="space-y-1">
-                    {toolsNavItems.map(({ href, label, icon }) => (
-                      <NavLink
-                        key={href + label}
-                        href={href}
-                        label={label}
-                        icon={icon}
-                        pathname={pathname}
-                        fullPath={fullPath}
-                        onNavigate={onClose}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="space-y-1">
-                <SectionHeader
-                  label="Resources"
-                  sectionKey="resources"
-                  isOpen={sectionsOpen.resources}
-                  onToggle={toggleSection}
-                />
-                {sectionsOpen.resources && (
-                  <div id="mobile-nav-resources" className="space-y-1">
-                    {resourceItems.map(({ href, label, icon }) => (
-                      <NavLink
-                        key={href}
-                        href={href}
-                        label={label}
-                        icon={icon}
-                        pathname={pathname}
-                        fullPath={fullPath}
-                        onNavigate={onClose}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
+                );
+              })}
             </nav>
             <div className="shrink-0 px-4 py-3 border-t border-[var(--color-border-subtle)] text-[11px] text-[var(--color-text-dim)]">
               {`Hyperkit CLI v${CLI_VERSION}`}

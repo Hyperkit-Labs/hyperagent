@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useActiveAccount } from "thirdweb/react";
@@ -43,8 +43,17 @@ type AppTab = "overview" | "workflows" | "deployments" | "activity";
 
 export default function AppDetailPage() {
   const params = useParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const id = params?.id as string;
-  const [tab, setTab] = useState<AppTab>("overview");
+  const [tab, setTab] = useState<AppTab>(
+    searchParams.get("tab") === "workflows" ||
+      searchParams.get("tab") === "deployments" ||
+      searchParams.get("tab") === "activity"
+      ? (searchParams.get("tab") as AppTab)
+      : "overview",
+  );
   const { networks } = useNetworks();
   const {
     workflow,
@@ -94,6 +103,28 @@ export default function AppDetailPage() {
     }>
   >([]);
   const [activityLoading, setActivityLoading] = useState(false);
+
+  useEffect(() => {
+    setTab(
+      searchParams.get("tab") === "workflows" ||
+        searchParams.get("tab") === "deployments" ||
+        searchParams.get("tab") === "activity"
+        ? (searchParams.get("tab") as AppTab)
+        : "overview",
+    );
+  }, [searchParams]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "overview") params.delete("tab");
+    else params.set("tab", tab);
+    const next = params.toString();
+    const current = searchParams.toString();
+    if (next === current) return;
+    router.replace(next ? `${pathname}?${next}` : pathname, {
+      scroll: false,
+    });
+  }, [pathname, router, searchParams, tab]);
 
   useEffect(() => {
     if (tab !== "activity" || !workflow?.workflow_id) return;
@@ -568,15 +599,22 @@ export default function AppDetailPage() {
             >
               <div className="flex items-center gap-2 mb-4">
                 <Terminal className="w-4 h-4 text-[var(--color-text-muted)]" />
-                <h3 className="font-medium text-white text-sm">Activity log</h3>
+                <h3 className="font-medium text-white text-sm">
+                  Workspace activity
+                </h3>
               </div>
+              <p className="mb-4 text-xs text-[var(--color-text-muted)]">
+                This feed shows the latest workspace log stream while this app
+                is selected. App-scoped logs are not exposed separately by the
+                current backend route contract.
+              </p>
               {activityLoading ? (
                 <div className="text-[var(--color-text-tertiary)] text-sm">
                   Loading activity...
                 </div>
               ) : activityLogs.length === 0 ? (
                 <p className="text-sm text-[var(--color-text-tertiary)]">
-                  No activity recorded yet. Run the workflow to generate logs.
+                  No recent workspace activity recorded yet.
                 </p>
               ) : (
                 <ul className="space-y-2 text-sm font-mono">

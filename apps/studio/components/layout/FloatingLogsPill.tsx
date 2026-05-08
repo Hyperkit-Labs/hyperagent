@@ -40,7 +40,7 @@ export function FloatingLogsPill() {
           }`}
         />
         <span className="text-xs font-medium text-[var(--color-text-primary)]">
-          {hasNewLogs ? "Live" : "Logs"}
+          {hasNewLogs ? "Live" : "Monitoring"}
         </span>
         <ChevronUp
           className={`w-4 h-4 text-[var(--color-text-tertiary)] transition-transform ${expanded ? "rotate-180" : ""}`}
@@ -60,7 +60,7 @@ export function FloatingLogsPill() {
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-[var(--color-text-muted)]" />
                 <span className="text-xs font-medium text-[var(--color-text-primary)]">
-                  Recent logs
+                  Logs &amp; Monitoring
                 </span>
                 {hasNewLogs && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-medium">

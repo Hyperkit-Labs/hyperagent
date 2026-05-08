@@ -3,28 +3,13 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  Folder,
-  LayoutTemplate,
-  Bot,
-  Rocket,
-  FileText,
-  Blocks,
-  FileCode,
-  Globe,
-  Shield,
-  DollarSign,
-  BarChart3,
-  AppWindow,
-  History,
-  Server,
-  BookOpen,
-  PanelLeftClose,
-  PanelLeft,
-  GripVertical,
-} from "lucide-react";
+import { Blocks, PanelLeftClose, PanelLeft, GripVertical } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
+import {
+  getStudioNavItems,
+  isNavRouteActive,
+  STUDIO_NAV_GROUPS,
+} from "@/constants/navigation";
 import {
   Tooltip,
   TooltipContent,
@@ -64,32 +49,6 @@ function saveSidebarState(expanded: boolean, width: number) {
   }
 }
 
-const coreNavItems = [
-  { href: ROUTES.DASHBOARD, label: "Overview", icon: LayoutDashboard },
-  { href: ROUTES.WORKFLOWS, label: "Projects", icon: Folder },
-] as const;
-
-const toolsNavItems = [
-  { href: ROUTES.AGENTS, label: "Agents", icon: Bot },
-  { href: ROUTES.DEPLOYMENTS, label: "Deployments", icon: Rocket },
-  { href: ROUTES.CONTRACTS, label: "Contracts", icon: FileCode },
-  { href: ROUTES.APPS, label: "Apps", icon: AppWindow },
-  { href: ROUTES.NETWORKS, label: "Networks", icon: Globe },
-  { href: ROUTES.ANALYTICS, label: "Analytics", icon: BarChart3 },
-  { href: ROUTES.HISTORY, label: "History", icon: History },
-  { href: ROUTES.PAYMENTS, label: "Payments", icon: DollarSign },
-  { href: ROUTES.MONITORING, label: "Logs & Monitoring", icon: FileText },
-  { href: ROUTES.SECURITY, label: "Security", icon: Shield },
-] as const;
-
-const resourceItems = [
-  { href: ROUTES.TEMPLATES, label: "Templates", icon: LayoutTemplate },
-  { href: ROUTES.DOMAINS, label: "Infrastructure", icon: Server },
-  { href: ROUTES.DOCS, label: "Docs", icon: BookOpen },
-] as const;
-
-const allNavItems = [...coreNavItems, ...toolsNavItems, ...resourceItems];
-
 function NavItem({
   href,
   label,
@@ -103,9 +62,7 @@ function NavItem({
   pathname: string;
   expanded: boolean;
 }) {
-  const isActive =
-    pathname === href ||
-    (href !== ROUTES.DASHBOARD && pathname.startsWith(href));
+  const isActive = isNavRouteActive(pathname, href);
 
   const link = (
     <Link
@@ -141,6 +98,11 @@ function NavItem({
 
 export function SlimNav() {
   const pathname = usePathname();
+  const navGroups = [
+    { key: "core" as const, label: STUDIO_NAV_GROUPS.core },
+    { key: "tools" as const, label: STUDIO_NAV_GROUPS.tools },
+    { key: "resources" as const, label: STUDIO_NAV_GROUPS.resources },
+  ];
   const [sidebarState, setSidebarState] = useState(loadSidebarState);
   const { expanded, width } = sidebarState;
   const [isResizing, setIsResizing] = useState(false);
@@ -220,16 +182,31 @@ export function SlimNav() {
           expanded ? "items-stretch px-2" : "items-center"
         }`}
       >
-        {allNavItems.map((item) => (
-          <NavItem
-            key={item.href + item.label}
-            href={item.href}
-            label={item.label}
-            icon={item.icon}
-            pathname={pathname ?? ""}
-            expanded={expanded}
-          />
-        ))}
+        {navGroups.map((group) => {
+          const items = getStudioNavItems(group.key);
+          return (
+            <div
+              key={group.key}
+              className={`flex flex-col gap-1 ${expanded ? "px-1" : ""}`}
+            >
+              {expanded ? (
+                <p className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  {group.label}
+                </p>
+              ) : null}
+              {items.map((item) => (
+                <NavItem
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  icon={item.icon}
+                  pathname={pathname ?? ""}
+                  expanded={expanded}
+                />
+              ))}
+            </div>
+          );
+        })}
       </nav>
 
       <div className="shrink-0 border-t border-white/5 flex flex-col">

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { PaymentHistoryTable } from "@/components/analytics/PaymentHistoryTable";
@@ -104,8 +105,32 @@ function PaymentsHeroMetric({
 }
 
 export default function PaymentsPage() {
-  const [page, setPage] = useState(1);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [page, setPage] = useState(() => {
+    const raw = Number.parseInt(searchParams.get("page") ?? "1", 10);
+    return Number.isFinite(raw) && raw > 0 ? raw : 1;
+  });
   const pageSize = 20;
+
+  useEffect(() => {
+    const raw = Number.parseInt(searchParams.get("page") ?? "1", 10);
+    const nextPage = Number.isFinite(raw) && raw > 0 ? raw : 1;
+    setPage(nextPage);
+  }, [searchParams]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (page <= 1) params.delete("page");
+    else params.set("page", String(page));
+    const next = params.toString();
+    const current = searchParams.toString();
+    if (next === current) return;
+    router.replace(next ? `${pathname}?${next}` : pathname, {
+      scroll: false,
+    });
+  }, [page, pathname, router, searchParams]);
 
   const { data, loading, error, refetch } = usePaymentsDashboard({
     page,
@@ -161,7 +186,7 @@ export default function PaymentsPage() {
 
           <ApiErrorBanner error={error} onRetry={refetch} />
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <PaymentsHeroMetric
               label="Balance"
               value={balanceValue}

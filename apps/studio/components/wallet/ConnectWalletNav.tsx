@@ -64,8 +64,13 @@ export function ConnectWalletNav() {
   } = useSignInWithWallet();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const itemRefs = useRef<Array<HTMLAnchorElement | HTMLButtonElement | null>>(
+    [],
+  );
   const isDashboard = pathname === ROUTES.DASHBOARD;
   const { hasSession } = useSession();
+  const menuId = "studio-wallet-menu";
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -79,6 +84,20 @@ export function ConnectWalletNav() {
         document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const timer = window.setTimeout(() => itemRefs.current[0]?.focus(), 0);
+    return () => window.clearTimeout(timer);
+  }, [open, hasSession, isDashboard]);
+
+  function focusItem(nextIndex: number) {
+    const items = itemRefs.current.filter(Boolean);
+    if (items.length === 0) return;
+    const safeIndex =
+      ((nextIndex % items.length) + items.length) % items.length;
+    items[safeIndex]?.focus();
+  }
 
   const handleConnect = () => {
     if (client) {
@@ -132,14 +151,32 @@ export function ConnectWalletNav() {
   };
 
   if (account) {
+    let menuItemIndex = 0;
+    itemRefs.current = [];
     return (
       <div className="relative" ref={menuRef}>
         <button
+          ref={triggerRef}
           type="button"
           onClick={() => setOpen((v) => !v)}
+          onKeyDown={(event) => {
+            if (
+              event.key === "ArrowDown" ||
+              event.key === "Enter" ||
+              event.key === " "
+            ) {
+              event.preventDefault();
+              setOpen(true);
+            } else if (event.key === "Escape") {
+              event.preventDefault();
+              setOpen(false);
+            }
+          }}
           className={walletPillClass}
           aria-expanded={open}
-          aria-haspopup="true"
+          aria-haspopup="menu"
+          aria-controls={menuId}
+          aria-label="Wallet session controls"
         >
           <div className="w-7 h-7 rounded-full bg-gradient-to-r from-purple-500 to-indigo-600 p-[1px]">
             <div className="w-full h-full rounded-full bg-black flex items-center justify-center">
@@ -152,14 +189,53 @@ export function ConnectWalletNav() {
         </button>
         {open && (
           <div
+            id={menuId}
             className="absolute right-0 top-full mt-2 min-w-[180px] rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] py-1 shadow-lg z-50"
             role="menu"
+            onKeyDown={(event) => {
+              const currentIndex = itemRefs.current.findIndex(
+                (item) => item === document.activeElement,
+              );
+              switch (event.key) {
+                case "ArrowDown":
+                  event.preventDefault();
+                  focusItem(currentIndex < 0 ? 0 : currentIndex + 1);
+                  break;
+                case "ArrowUp":
+                  event.preventDefault();
+                  focusItem(
+                    currentIndex < 0
+                      ? itemRefs.current.length - 1
+                      : currentIndex - 1,
+                  );
+                  break;
+                case "Home":
+                  event.preventDefault();
+                  focusItem(0);
+                  break;
+                case "End":
+                  event.preventDefault();
+                  focusItem(itemRefs.current.length - 1);
+                  break;
+                case "Escape":
+                  event.preventDefault();
+                  setOpen(false);
+                  triggerRef.current?.focus();
+                  break;
+                default:
+                  break;
+              }
+            }}
           >
             {!isDashboard && (
               <Link
+                ref={(node: HTMLAnchorElement | null) => {
+                  itemRefs.current[menuItemIndex++] = node;
+                }}
                 href={ROUTES.DASHBOARD}
                 className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)]"
                 role="menuitem"
+                tabIndex={-1}
                 onClick={() => setOpen(false)}
               >
                 Dashboard
@@ -174,9 +250,13 @@ export function ConnectWalletNav() {
                   Signed in
                 </div>
                 <button
+                  ref={(node) => {
+                    itemRefs.current[menuItemIndex++] = node;
+                  }}
                   type="button"
                   className="flex w-full items-center gap-2 px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)]"
                   role="menuitem"
+                  tabIndex={-1}
                   onClick={handleSignOut}
                 >
                   Sign out
@@ -184,9 +264,13 @@ export function ConnectWalletNav() {
               </>
             ) : (
               <button
+                ref={(node) => {
+                  itemRefs.current[menuItemIndex++] = node;
+                }}
                 type="button"
                 className="flex w-full items-center gap-2 px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)]"
                 role="menuitem"
+                tabIndex={-1}
                 onClick={handleSignInWithWallet}
                 disabled={isSigningIn}
               >
@@ -194,9 +278,13 @@ export function ConnectWalletNav() {
               </button>
             )}
             <button
+              ref={(node) => {
+                itemRefs.current[menuItemIndex++] = node;
+              }}
               type="button"
               className="flex w-full items-center gap-2 px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)]"
               role="menuitem"
+              tabIndex={-1}
               onClick={handleDisconnect}
             >
               Disconnect wallet

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, useMemo } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
@@ -23,11 +23,31 @@ import { TableFilterBar } from "@/components/ui";
 
 export default function MarketplacePage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { templates, loading, error, refetch } = useTemplatesData();
   const { selectedNetworkId } = useSelectedNetwork();
   const networkId = selectedNetworkId || DEFAULT_NETWORK;
   const [deployingId, setDeployingId] = useState<string | null>(null);
-  const [marketplaceSearch, setMarketplaceSearch] = useState("");
+  const [marketplaceSearch, setMarketplaceSearch] = useState(
+    searchParams.get("q") ?? "",
+  );
+
+  useEffect(() => {
+    setMarketplaceSearch(searchParams.get("q") ?? "");
+  }, [searchParams]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (marketplaceSearch.trim()) params.set("q", marketplaceSearch.trim());
+    else params.delete("q");
+    const next = params.toString();
+    const current = searchParams.toString();
+    if (next === current) return;
+    router.replace(next ? `${pathname}?${next}` : pathname, {
+      scroll: false,
+    });
+  }, [marketplaceSearch, pathname, router, searchParams]);
 
   const filteredTemplates = useMemo(() => {
     const q = marketplaceSearch.trim().toLowerCase();

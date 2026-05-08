@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart,
@@ -72,6 +72,26 @@ function DashboardCTAs({
   onQuickDemo: () => Promise<void>;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const itemRefs = useRef<Array<HTMLButtonElement | HTMLAnchorElement | null>>(
+    [],
+  );
+  const menuId = "dashboard-actions-menu";
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const timer = window.setTimeout(() => itemRefs.current[0]?.focus(), 0);
+    return () => window.clearTimeout(timer);
+  }, [moreOpen]);
+
+  function focusItem(nextIndex: number) {
+    const items = itemRefs.current.filter(Boolean);
+    if (items.length === 0) return;
+    const safeIndex = ((nextIndex % items.length) + items.length) % items.length;
+    items[safeIndex]?.focus();
+  }
+
+  itemRefs.current = [];
   return (
     <div className="flex items-center gap-2">
       <Link
@@ -83,10 +103,25 @@ function DashboardCTAs({
       </Link>
       <div className="relative">
         <button
+          ref={triggerRef}
           type="button"
           onClick={() => setMoreOpen(!moreOpen)}
+          onKeyDown={(event) => {
+            if (
+              event.key === "ArrowDown" ||
+              event.key === "Enter" ||
+              event.key === " "
+            ) {
+              event.preventDefault();
+              setMoreOpen(true);
+            } else if (event.key === "Escape") {
+              event.preventDefault();
+              setMoreOpen(false);
+            }
+          }}
           aria-expanded={moreOpen}
           aria-haspopup="menu"
+          aria-controls={menuId}
           aria-label="Open dashboard actions"
           className="px-3 py-2 rounded-lg border border-[var(--color-border-subtle)] text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] transition-colors flex items-center gap-1"
         >
@@ -103,11 +138,47 @@ function DashboardCTAs({
               aria-hidden
             />
             <div
+              id={menuId}
               className="absolute right-0 top-full mt-1 z-50 py-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] shadow-xl min-w-[140px]"
               role="menu"
               aria-label="Dashboard actions"
+              onKeyDown={(event) => {
+                const currentIndex = itemRefs.current.findIndex(
+                  (item) => item === document.activeElement,
+                );
+                switch (event.key) {
+                  case "ArrowDown":
+                    event.preventDefault();
+                    focusItem(currentIndex < 0 ? 0 : currentIndex + 1);
+                    break;
+                  case "ArrowUp":
+                    event.preventDefault();
+                    focusItem(
+                      currentIndex < 0 ? itemRefs.current.length - 1 : currentIndex - 1,
+                    );
+                    break;
+                  case "Home":
+                    event.preventDefault();
+                    focusItem(0);
+                    break;
+                  case "End":
+                    event.preventDefault();
+                    focusItem(itemRefs.current.length - 1);
+                    break;
+                  case "Escape":
+                    event.preventDefault();
+                    setMoreOpen(false);
+                    triggerRef.current?.focus();
+                    break;
+                  default:
+                    break;
+                }
+              }}
             >
               <button
+                ref={(node) => {
+                  itemRefs.current[0] = node;
+                }}
                 type="button"
                 onClick={() => {
                   onQuickDemo();
@@ -115,6 +186,7 @@ function DashboardCTAs({
                 }}
                 disabled={quickDemoLoading || workflows.length === 0}
                 role="menuitem"
+                tabIndex={-1}
                 title={
                   workflows.length === 0 ? "Create a workflow first" : undefined
                 }
@@ -128,9 +200,13 @@ function DashboardCTAs({
                 Try demo
               </button>
               <Link
+                ref={(node: HTMLAnchorElement | null) => {
+                  itemRefs.current[1] = node;
+                }}
                 href={ROUTES.MONITORING}
                 onClick={() => setMoreOpen(false)}
                 role="menuitem"
+                tabIndex={-1}
                 className="block px-3 py-2 text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
               >
                 View logs
@@ -145,6 +221,8 @@ function DashboardCTAs({
 
 export default function DashboardPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const client = getThirdwebClient();
   const [quickDemoLoading, setQuickDemoLoading] = useState(false);
   const [quickDemoError, setQuickDemoError] = useState<string | null>(null);
@@ -165,7 +243,31 @@ export default function DashboardPage() {
   const recentDeployments = deployments.slice(0, 5);
   const [deployTableFilter, setDeployTableFilter] = useState<
     "all" | "ok" | "bad"
-  >("all");
+  >(
+    searchParams.get("deploy") === "ok" || searchParams.get("deploy") === "bad"
+      ? (searchParams.get("deploy") as "ok" | "bad")
+      : "all",
+  );
+
+  useEffect(() => {
+    setDeployTableFilter(
+      searchParams.get("deploy") === "ok" || searchParams.get("deploy") === "bad"
+        ? (searchParams.get("deploy") as "ok" | "bad")
+        : "all",
+    );
+  }, [searchParams]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (deployTableFilter === "all") params.delete("deploy");
+    else params.set("deploy", deployTableFilter);
+    const next = params.toString();
+    const current = searchParams.toString();
+    if (next === current) return;
+    router.replace(next ? `${pathname}?${next}` : pathname, {
+      scroll: false,
+    });
+  }, [deployTableFilter, pathname, router, searchParams]);
   const filteredRecentDeployments = useMemo(() => {
     return recentDeployments.filter((d) => {
       const s = (d.status || "").toLowerCase();

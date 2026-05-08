@@ -1,9 +1,14 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import {
+  useEffect,
+  useState,
+  useMemo,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import Link from "next/link";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { ExternalLink, Loader2, Bug } from "lucide-react";
 import {
@@ -17,7 +22,12 @@ import {
 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import { useWorkflows } from "@/hooks/useWorkflows";
-import { cancelWorkflow, createQuickDemo, createDebugSandbox } from "@/lib/api";
+import {
+  cancelWorkflow,
+  createQuickDemo,
+  createDebugSandbox,
+  retryWorkflow,
+} from "@/lib/api";
 import { toast } from "sonner";
 import type { Workflow } from "@/lib/types";
 import { hasAuditOrSimFailure } from "@/lib/types";
@@ -119,14 +129,26 @@ function getWorkflowCodePreview(workflow: Workflow): string | null {
 
 export default function WorkflowsPage() {
   const router = useRouter();
-  const [viewMode, setViewMode] = useState<"grid" | "kanban">("grid");
-  const [statusFilter, setStatusFilter] = useState<string>("");
-  const [networkFilter, setNetworkFilter] = useState<string>("");
-  const [typeFilter, setTypeFilter] = useState<string>("");
-  const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState<SortField>("updated_at");
-  const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(
-    null,
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [viewMode, setViewMode] = useState<"grid" | "kanban">(
+    searchParams.get("view") === "kanban" ? "kanban" : "grid",
+  );
+  const [statusFilter, setStatusFilter] = useState<string>(
+    searchParams.get("status") ?? "",
+  );
+  const [networkFilter, setNetworkFilter] = useState<string>(
+    searchParams.get("network") ?? "",
+  );
+  const [typeFilter, setTypeFilter] = useState<string>(
+    searchParams.get("type") ?? "",
+  );
+  const [search, setSearch] = useState(searchParams.get("q") ?? "");
+  const [sortBy, setSortBy] = useState<SortField>(
+    searchParams.get("sort") === "created_at" ||
+      searchParams.get("sort") === "name"
+      ? (searchParams.get("sort") as SortField)
+      : "updated_at",
   );
   const [selectedWorkflows, setSelectedWorkflows] = useState<Set<string>>(
     new Set(),
@@ -140,6 +162,53 @@ export default function WorkflowsPage() {
   const { workflows, loading, error, refetch } = useWorkflows({
     filters: { limit: 100, status: statusFilter || undefined },
   });
+
+  useEffect(() => {
+    setViewMode(searchParams.get("view") === "kanban" ? "kanban" : "grid");
+    setStatusFilter(searchParams.get("status") ?? "");
+    setNetworkFilter(searchParams.get("network") ?? "");
+    setTypeFilter(searchParams.get("type") ?? "");
+    setSearch(searchParams.get("q") ?? "");
+    setSortBy(
+      searchParams.get("sort") === "created_at" ||
+        searchParams.get("sort") === "name"
+        ? (searchParams.get("sort") as SortField)
+        : "updated_at",
+    );
+  }, [searchParams]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (viewMode === "kanban") params.set("view", "kanban");
+    else params.delete("view");
+    if (statusFilter) params.set("status", statusFilter);
+    else params.delete("status");
+    if (networkFilter) params.set("network", networkFilter);
+    else params.delete("network");
+    if (typeFilter) params.set("type", typeFilter);
+    else params.delete("type");
+    if (search.trim()) params.set("q", search.trim());
+    else params.delete("q");
+    if (sortBy !== "updated_at") params.set("sort", sortBy);
+    else params.delete("sort");
+
+    const next = params.toString();
+    const current = searchParams.toString();
+    if (next === current) return;
+    router.replace(next ? `${pathname}?${next}` : pathname, {
+      scroll: false,
+    });
+  }, [
+    pathname,
+    router,
+    search,
+    searchParams,
+    sortBy,
+    statusFilter,
+    typeFilter,
+    viewMode,
+    networkFilter,
+  ]);
   const networkOptions = useMemo(
     () => extractWorkflowNetworks(workflows),
     [workflows],
@@ -375,15 +444,8 @@ export default function WorkflowsPage() {
                         let ok = 0;
                         let fail = 0;
                         for (const id of selectedWorkflows) {
-                          const wf = workflows.find(
-                            (w) => w.workflow_id === id,
-                          );
-                          if (!wf?.intent) {
-                            fail++;
-                            continue;
-                          }
                           try {
-                            await createQuickDemo(id);
+                            await retryWorkflow(id);
                             ok++;
                           } catch {
                             fail++;
@@ -469,13 +531,7 @@ export default function WorkflowsPage() {
                       return (
                         <div
                           key={w.workflow_id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => setSelectedWorkflow(w)}
-                          onKeyDown={(e) =>
-                            e.key === "Enter" && setSelectedWorkflow(w)
-                          }
-                          className={`animate-enter relative group cursor-pointer ${i === 0 ? "delay-75" : i === 1 ? "delay-100" : i === 2 ? "delay-150" : "delay-200"} ${selectedWorkflow?.workflow_id === w.workflow_id ? "ring-2 ring-[var(--color-primary-alpha-50)] rounded-xl" : ""}`}
+                          className={`animate-enter relative group ${i === 0 ? "delay-75" : i === 1 ? "delay-100" : i === 2 ? "delay-150" : "delay-200"} ${isSelected ? "ring-2 ring-[var(--color-primary-alpha-50)] rounded-xl" : ""}`}
                         >
                           <div
                             className={`glass-panel glass-panel-hover p-5 rounded-xl flex flex-col h-full transition-all ${isSelected ? "border-[var(--color-primary)] bg-[var(--color-primary-alpha-10)]" : ""}`}
@@ -502,15 +558,21 @@ export default function WorkflowsPage() {
                                   {iconForWorkflow(w)}
                                 </div>
                                 <div>
-                                  <motion.h3
-                                    layoutId={`workflow-title-${w.workflow_id}`}
-                                    className="text-sm font-semibold text-[var(--color-text-primary)] truncate max-w-[140px]"
+                                  <Link
+                                    href={ROUTES.WORKFLOW_ID(w.workflow_id)}
+                                    className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-alpha-50)] rounded"
+                                    aria-label={`Open workflow ${w.intent?.slice(0, 32) || w.name || w.workflow_id}`}
                                   >
-                                    {w.intent?.slice(0, 32) ||
-                                      w.name ||
-                                      "Untitled"}
-                                    {(w.intent?.length || 0) > 32 ? "..." : ""}
-                                  </motion.h3>
+                                    <motion.h3
+                                      layoutId={`workflow-title-${w.workflow_id}`}
+                                      className="text-sm font-semibold text-[var(--color-text-primary)] truncate max-w-[140px] hover:text-[var(--color-primary-light)]"
+                                    >
+                                      {w.intent?.slice(0, 32) ||
+                                        w.name ||
+                                        "Untitled"}
+                                      {(w.intent?.length || 0) > 32 ? "..." : ""}
+                                    </motion.h3>
+                                  </Link>
                                   <div className="text-[10px] text-[var(--color-text-tertiary)]">
                                     {formatUpdatedAt(w.updated_at)}
                                   </div>
@@ -651,7 +713,9 @@ export default function WorkflowsPage() {
                                 href={ROUTES.WORKFLOW_ID(w.workflow_id)}
                                 aria-label={`Open workflow ${w.intent?.slice(0, 32) || w.name || w.workflow_id} in Studio`}
                                 className="btn-primary-gradient px-4 py-1.5 rounded-full text-xs font-medium text-white transition-all hover:scale-105 w-fit"
-                                onClick={(e) => e.stopPropagation()}
+                                onClick={(e: ReactMouseEvent<HTMLAnchorElement>) =>
+                                  e.stopPropagation()
+                                }
                               >
                                 Open in Studio
                               </Link>
@@ -699,14 +763,10 @@ export default function WorkflowsPage() {
                             </div>
                             <div className="custom-scrollbar flex-1 space-y-3 overflow-y-auto pr-2">
                               {statusWorkflows.map((w) => (
-                                <div
+                                <Link
                                   key={w.workflow_id}
+                                  href={ROUTES.WORKFLOW_ID(w.workflow_id)}
                                   className="glass-panel cursor-pointer rounded-lg border border-[var(--color-border-subtle)] p-3 transition-colors hover:border-[var(--color-primary-alpha-50)]"
-                                  onClick={() =>
-                                    router.push(
-                                      ROUTES.WORKFLOW_ID(w.workflow_id),
-                                    )
-                                  }
                                 >
                                   <div className="mb-2 flex items-center justify-between">
                                     <span className="block w-full truncate text-xs font-medium text-[var(--color-text-primary)]">
@@ -723,7 +783,7 @@ export default function WorkflowsPage() {
                                       {w.network || "Default"}
                                     </span>
                                   </div>
-                                </div>
+                                </Link>
                               ))}
                             </div>
                           </ScrollStackCard>

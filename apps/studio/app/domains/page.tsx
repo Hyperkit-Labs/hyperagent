@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
 import { Server, Globe, Loader2, Plus } from "lucide-react";
@@ -18,6 +18,7 @@ export default function DomainsPage() {
   const [adding, setAdding] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [domainError, setDomainError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const {
     data: domains = [],
@@ -50,6 +51,22 @@ export default function DomainsPage() {
       setAdding(false);
     }
   };
+
+  useEffect(() => {
+    if (!addModalOpen) return;
+    const timer = window.setTimeout(() => inputRef.current?.focus(), 0);
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setAddModalOpen(false);
+      }
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [addModalOpen]);
 
   return (
     <RequireApiSession>
@@ -88,6 +105,9 @@ export default function DomainsPage() {
               onClick={() => setAddModalOpen(false)}
             >
               <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Add custom domain"
                 className="glass-panel rounded-xl p-6 max-w-md w-full border border-[var(--color-border-subtle)] shadow-xl"
                 onClick={(e) => e.stopPropagation()}
               >
@@ -95,6 +115,7 @@ export default function DomainsPage() {
                   Add custom domain
                 </h3>
                 <input
+                  ref={inputRef}
                   type="text"
                   value={domainInput}
                   onChange={(e) => {

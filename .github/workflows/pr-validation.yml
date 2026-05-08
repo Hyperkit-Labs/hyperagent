@@ -53,7 +53,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.0'
           cache: 'pnpm'
       
       - name: Install dependencies
@@ -109,7 +109,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.0'
           cache: 'pnpm'
 
       - name: Install workspace deps
@@ -146,7 +146,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.0'
           cache: 'pnpm'
       
       - name: Install dependencies
@@ -185,7 +185,7 @@ jobs:
         if: steps.paths.outputs.contract == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.0'
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -285,9 +285,11 @@ jobs:
           fetch-depth: 0
       
       - name: Check PR size
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          files_changed=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | wc -l)
-          lines_changed=$(git diff --shortstat origin/${{ github.base_ref }}...HEAD | awk '{print $4+$6}')
+          files_changed=$(git diff --name-only "origin/$BASE_REF...HEAD" | wc -l)
+          lines_changed=$(git diff --shortstat "origin/$BASE_REF...HEAD" | awk '{print $4+$6}')
           
           echo "Files changed: $files_changed"
           echo "Lines changed: $lines_changed"
@@ -309,9 +311,11 @@ jobs:
           fetch-depth: 0
       
       - name: Check commit messages
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
           pip install gitlint
-          git log --format=%B origin/${{ github.base_ref }}..HEAD | gitlint --config .gitlint 2>/dev/null || true
+          git log --format=%B "origin/$BASE_REF..HEAD" | gitlint --config .gitlint 2>/dev/null || true
         continue-on-error: true
 
   build-docker:

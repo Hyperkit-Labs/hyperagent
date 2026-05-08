@@ -170,6 +170,7 @@ export interface RunDetail {
   id: string;
   workflow_id?: string;
   status?: string;
+  current_stage?: string;
   [key: string]: unknown;
 }
 

@@ -21,6 +21,13 @@
       "fixture": "fixtures/agent-outputs/trace-payload-valid.json",
       "stability": "stable",
       "description": "Minimal trace blob aligned with trace_writer.build_trace_payload"
+    },
+    {
+      "id": "spec-contracts.spec-lock.v1",
+      "path": "spec-contracts/v1/spec-lock.schema.json",
+      "fixture": "fixtures/spec-contracts/spec-lock-valid.json",
+      "stability": "stable",
+      "description": "Canonical Spec Lock contract generated from services/roma-service/spec_contract.py"
     }
   ]
 }

@@ -29,10 +29,14 @@ jobs:
           python-version: "3.12"
 
       - name: Validate
+        env:
+          PROFILE: ${{ inputs.profile }}
+          MODE: ${{ inputs.mode }}
+          ENV_FILE: ${{ inputs.env-file }}
         run: |
           pip install --disable-pip-version-check -q pyyaml
-          ARGS=(--profile "${{ inputs.profile }}" --mode "${{ inputs.mode }}")
-          if [ -n "${{ inputs.env-file }}" ]; then
-            ARGS+=(--env-file "${{ inputs.env-file }}")
+          ARGS=(--profile "$PROFILE" --mode "$MODE")
+          if [ -n "$ENV_FILE" ]; then
+            ARGS+=(--env-file "$ENV_FILE")
           fi
           python scripts/deploy/validate_env.py "${ARGS[@]}"

@@ -74,7 +74,7 @@ function nextWithCsp(request: NextRequest, nonce: string): NextResponse {
 
 function applySecurityHeaders(res: NextResponse, nonce: string): void {
   res.headers.set("Content-Security-Policy", buildContentSecurityPolicy(nonce));
-  res.headers.set("X-Frame-Options", "DENY");
+  res.headers.set("X-Frame-Options", "DENY"); // nosemgrep: javascript.express.security.x-frame-options-misconfiguration.x-frame-options-misconfiguration -- intentional legacy fallback for CSP frame-ancestors 'none'
   res.headers.set("X-Content-Type-Options", "nosniff");
   res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   res.headers.set(

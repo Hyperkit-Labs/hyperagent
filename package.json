@@ -9,6 +9,12 @@
     "lint": "pnpm turbo lint",
     "typecheck": "pnpm turbo typecheck",
     "test": "pnpm turbo test",
+    "contracts:generate": "pnpm --filter @hyperagent/api-contracts run generate",
+    "schema:validate": "python3 scripts/schema/validate_registry.py",
+    "spec-contract:check": "python3 scripts/schema/export_spec_contract.py --check",
+    "test:contracts:schemathesis": "bash scripts/api/run_schemathesis.sh",
+    "security:semgrep": "semgrep scan --config .semgrep/hyperagent.yml --config p/ci --config p/r2c-security-audit --config p/python --config p/typescript --config p/secrets .",
+    "openapi:lint": "pnpm --package=@redocly/cli@2 dlx redocly lint orchestrator@v1 --config redocly.yaml",
     "test:minimal": "node scripts/minimal-suite/run.mjs",
     "test:minimal:all": "node scripts/minimal-suite/run.mjs --all",
     "test:ai-tools": "pnpm turbo run build test --filter=@hyperagent/ai-tools",
@@ -53,7 +59,7 @@
   },
   "packageManager": "pnpm@10.26.0",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.19.0"
   },
   "resolutions": {
     "react": "19.2.5",

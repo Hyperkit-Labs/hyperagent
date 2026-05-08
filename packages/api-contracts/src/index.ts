@@ -55,6 +55,14 @@ export {
   type OrchestratorPublicConfig,
 } from "./zod/public-config.js";
 export {
+  specLockChainTargetSchema,
+  specLockExample,
+  specLockJsonSchema,
+  specLockRiskProfileSchema,
+  specLockSchema,
+  type SpecLock,
+} from "./zod/spec-lock.js";
+export {
   pinataWebhookPayloadSchema,
   pinataWebhookResponseSchema,
   type PinataWebhookResponse,

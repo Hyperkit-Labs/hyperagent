@@ -41,7 +41,9 @@ function decryptApiKeys(encB64: string, key: Buffer): Record<string, string> {
   const nonce = raw.subarray(0, 12);
   const authTag = raw.subarray(-16);
   const ciphertext = raw.subarray(12, -16);
-  const decipher = crypto.createDecipheriv("aes-256-gcm", key, nonce);
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, nonce, {
+    authTagLength: 16,
+  });
   decipher.setAuthTag(authTag);
   const plain = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf-8");
   return JSON.parse(plain) as Record<string, string>;

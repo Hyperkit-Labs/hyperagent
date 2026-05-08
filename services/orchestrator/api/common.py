@@ -25,8 +25,8 @@ _SECRET_LIKE = re.compile(
 logger = logging.getLogger(__name__)
 
 _IDENTITY_HMAC_SECRET = os.environ.get("IDENTITY_HMAC_SECRET", "").strip()
-_TRUE_QUERY_VALUES = {"1", "true", "yes", "on"}
-_FALSE_QUERY_VALUES = {"0", "false", "no", "off"}
+_TRUE_QUERY_VALUES = {"true"}
+_FALSE_QUERY_VALUES = {"false"}
 
 
 def _verify_user_id_hmac(user_id: str, sig_header: str) -> bool:
@@ -275,12 +275,23 @@ def normalize_optional_query_text(value: Any) -> str | None:
     return normalized
 
 
+def _query_validation_detail(name: str, message: str) -> list[dict[str, Any]]:
+    return [{"loc": ["query", name], "msg": message, "type": "value_error"}]
+
+
 def ensure_allowed_query_keys(request: Request, allowed: set[str]) -> None:
     unsupported = sorted({key for key in request.query_params.keys() if key not in allowed})
     if unsupported:
         raise HTTPException(
             status_code=422,
-            detail=f"Unsupported query parameter(s): {', '.join(unsupported)}",
+            detail=[
+                {
+                    "loc": ["query", key],
+                    "msg": "Unsupported query parameter",
+                    "type": "value_error",
+                }
+                for key in unsupported
+            ],
         )
 
 
@@ -296,12 +307,17 @@ def parse_bounded_int_query_param(
     if raw is None:
         return default
     if not re.fullmatch(r"-?\d+", raw):
-        raise HTTPException(status_code=422, detail=f"{name} must be an integer")
+        raise HTTPException(
+            status_code=422,
+            detail=_query_validation_detail(name, f"{name} must be an integer"),
+        )
     value = int(raw)
     if value < minimum or value > maximum:
         raise HTTPException(
             status_code=422,
-            detail=f"{name} must be between {minimum} and {maximum}",
+            detail=_query_validation_detail(
+                name, f"{name} must be between {minimum} and {maximum}"
+            ),
         )
     return value
 
@@ -312,9 +328,26 @@ def parse_bool_query_param(
     *,
     default: bool = False,
 ) -> bool:
-    raw = normalize_optional_query_text(request.query_params.get(name))
-    if raw is None:
+    raw_input = request.query_params.get(name)
+    if raw_input is None:
         return default
+    raw = str(raw_input).strip()
+    lowered = raw.lower()
+    if not raw or lowered in {"null", "undefined"}:
+        raise HTTPException(
+            status_code=422,
+            detail=_query_validation_detail(
+                name, f"{name} must be one of: true, false"
+            ),
+        )
+    raw = normalize_optional_query_text(raw)
+    if raw is None:
+        raise HTTPException(
+            status_code=422,
+            detail=_query_validation_detail(
+                name, f"{name} must be one of: true, false"
+            ),
+        )
     lowered = raw.lower()
     if lowered in _TRUE_QUERY_VALUES:
         return True
@@ -322,7 +355,9 @@ def parse_bool_query_param(
         return False
     raise HTTPException(
         status_code=422,
-        detail=f"{name} must be one of: true, false, 1, 0, yes, no, on, off",
+        detail=_query_validation_detail(
+            name, f"{name} must be one of: true, false"
+        ),
     )
 
 
@@ -339,7 +374,9 @@ def parse_enum_query_param(
     if lowered not in allowed:
         raise HTTPException(
             status_code=422,
-            detail=f"{name} must be one of: {', '.join(sorted(allowed))}",
+            detail=_query_validation_detail(
+                name, f"{name} must be one of: {', '.join(sorted(allowed))}"
+            ),
         )
     return lowered
 

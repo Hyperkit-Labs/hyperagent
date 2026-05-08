@@ -5,7 +5,7 @@ on:
       node-version:
         required: false
         type: string
-        default: "20"
+        default: "20.19.0"
       pnpm-version:
         required: false
         type: string

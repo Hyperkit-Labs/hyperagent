@@ -10,7 +10,13 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import ValidationError
+from spec_contract import (
+    SpecModel,
+    SpecRequest,
+    SpecResponse,
+    normalize_spec_payload,
+)
 
 ROMA_API_URL = os.environ.get("ROMA_API_URL", "").strip()
 ROMA_PROFILE = os.environ.get("ROMA_PROFILE", "general").strip() or "general"
@@ -21,36 +27,14 @@ AGENT_RUNTIME_URL = (os.environ.get("AGENT_RUNTIME_URL") or "http://localhost:40
 logger = logging.getLogger(__name__)
 app = FastAPI(title="HyperAgent ROMA Service", version="0.1.0")
 
-
-class SpecRequest(BaseModel):
-    prompt: str = Field(..., description="Natural language specification prompt")
-    context: dict[str, Any] | None = Field(None, description="Agent context (apiKeys, userId, etc.) for local fallback")
-    agent_session_jwt: str | None = Field(None, description="JWT for agent-runtime auth when using local fallback")
-
-
-class SpecModel(BaseModel):
-    """Structured specification (Spec Lock format)."""
-
-    version: str
-    chains: list[str] = Field(default_factory=list)
-    token_type: str
-    features: list[str] = Field(default_factory=list)
-    invariants: list[dict] = Field(default_factory=list)
-    risk_profile: str = "medium"
-    template_id: str | None = None
-
-
-class SpecResponse(BaseModel):
-    spec: SpecModel
-    reasoning: str | None = None
-
-
 def _build_roma_goal(prompt: str) -> str:
     return (
         "Turn this HyperAgent spec prompt into a structured Spec Lock JSON. "
         "Output only valid JSON matching: version (string), chains (list of chain names), "
         "token_type (e.g. ERC20, ERC721), features (list), invariants (list of objects), "
-        "risk_profile (low|medium|high), template_id (optional string). "
+        "risk_profile (low|medium|high|critical), template_id (optional string), "
+        "wizard_options (optional object), app_type (optional string), multi_contract (optional boolean), "
+        "roles (optional list), oracles (optional list), frontend_actions (optional list). "
         "Prompt:\n\n" + (prompt or "")
     )
 
@@ -98,6 +82,12 @@ async def _agent_runtime_spec(prompt: str, context: dict | None, agent_session_j
         "invariants": list(data.get("invariants") or []),
         "risk_profile": str(data.get("risk_profile", "medium")),
         "template_id": data.get("template_id"),
+        "app_type": data.get("app_type"),
+        "multi_contract": data.get("multi_contract"),
+        "roles": list(data.get("roles") or []),
+        "oracles": list(data.get("oracles") or []),
+        "frontend_actions": list(data.get("frontend_actions") or []),
+        "wizard_options": data.get("wizard_options"),
     }
 
 
@@ -111,16 +101,10 @@ async def invoke_roma_spec(req: SpecRequest) -> SpecResponse:
 
     if not ROMA_API_URL:
         try:
-            spec_data = await _agent_runtime_spec(req.prompt, req.context, req.agent_session_jwt)
-            spec_data = spec_data or {
-                "version": "1.0",
-                "chains": ["mantle"],
-                "token_type": "ERC20",
-                "features": [],
-                "invariants": [],
-                "risk_profile": "medium",
-                "template_id": None,
-            }
+            spec_data = normalize_spec_payload(
+                await _agent_runtime_spec(req.prompt, req.context, req.agent_session_jwt),
+                default_chain="mantle",
+            )
             spec = SpecModel(**spec_data)
             return SpecResponse(spec=spec, reasoning="(local fallback via agent-runtime)")
         except Exception as e:
@@ -173,15 +157,7 @@ async def invoke_roma_spec(req: SpecRequest) -> SpecResponse:
         )
 
     try:
-        spec = SpecModel(
-            version=str(spec_data.get("version", "1.0")),
-            chains=list(spec_data.get("chains") or []),
-            token_type=str(spec_data.get("token_type", "ERC20")),
-            features=list(spec_data.get("features") or []),
-            invariants=list(spec_data.get("invariants") or []),
-            risk_profile=str(spec_data.get("risk_profile", "medium")),
-            template_id=spec_data.get("template_id"),
-        )
+        spec = SpecModel(**normalize_spec_payload(spec_data))
     except (ValidationError, TypeError) as e:
         logger.warning("ROMA spec validation failed: %s", e)
         raise HTTPException(

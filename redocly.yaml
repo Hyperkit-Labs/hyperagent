@@ -1,0 +1,12 @@
+apis:
+  orchestrator@v1:
+    root: ./packages/api-contracts/openapi/openapi.json
+
+extends:
+  - minimal
+
+rules:
+  operation-operationId: error
+  operation-operationId-unique: error
+  no-unused-components: warn
+  path-not-include-query: error

@@ -26,12 +26,15 @@ jobs:
       - name: Install Semgrep
         run: pip install semgrep
 
-      - name: Run Semgrep (CI + security-audit + Python)
+      - name: Run Semgrep (repo custom rules + OSS rulesets)
         run: |
           semgrep scan \
+            --config .semgrep/hyperagent.yml \
             --config p/ci \
             --config p/r2c-security-audit \
             --config p/python \
+            --config p/typescript \
+            --config p/secrets \
             --sarif \
             --output semgrep.sarif \
             .

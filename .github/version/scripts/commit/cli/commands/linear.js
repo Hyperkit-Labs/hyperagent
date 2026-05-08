@@ -4,12 +4,12 @@
  * Requires: linear CLI on PATH (linear --version).
  */
 
-const { execSync, spawn } = require('child_process');
-const { ok, warn, fail, arrow } = require('../lib/output');
+const { execFileSync } = require('child_process');
+const { warn } = require('../lib/output');
 
 function hasLinear() {
   try {
-    execSync('linear --version', { stdio: 'pipe' });
+    execFileSync('linear', ['--version'], { stdio: 'pipe' });
     return true;
   } catch {
     return false;
@@ -19,7 +19,7 @@ function hasLinear() {
 async function getIssueId() {
   if (!hasLinear()) return null;
   try {
-    const out = execSync('linear issue id', { encoding: 'utf8' });
+    const out = execFileSync('linear', ['issue', 'id'], { encoding: 'utf8' });
     return (out || '').trim() || null;
   } catch {
     return null;
@@ -29,7 +29,9 @@ async function getIssueId() {
 function describeIssue(issueId) {
   if (!hasLinear() || !issueId) return null;
   try {
-    const out = execSync(`linear issue describe ${issueId}`, { encoding: 'utf8' });
+    const out = execFileSync('linear', ['issue', 'describe', issueId], {
+      encoding: 'utf8',
+    });
     return (out || '').trim() || null;
   } catch {
     return null;

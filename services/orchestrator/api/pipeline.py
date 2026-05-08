@@ -255,8 +255,8 @@ def _run_workflow_pipeline_job(
     finally:
         try:
             api_keys.clear()
-        except Exception as clear_err:
-            logger.debug("[pipeline] api_keys.clear() failed: %s", clear_err)
+        except Exception:
+            logger.debug("[pipeline] api_keys.clear() failed")
 
 
 class CreateWorkflowBody(BaseModel):
@@ -286,7 +286,8 @@ def workflows_generate(
 
     Phase 2: create workflow + DB run, enqueue background pipeline job, return quickly with workflow_id.
     Studio polls /api/v1/workflows/{id} and /api/v1/runs/{id}/steps for progress.
-    Credit-based: when credits_supabase is configured, deducts credits per run (CREDITS_PER_RUN); insufficient balance returns 402.
+    When X402_MANDATORY_V01 is enabled, priced workflow start requires a valid
+    X-Payment proof and skips the legacy credits deduction path.
     """
     x_user_id = (
         request.headers.get("X-User-Id") or request.headers.get("x-user-id") or ""
@@ -295,15 +296,14 @@ def workflows_generate(
     user_id = x_user_id or "anonymous"
     project_id = body.project_id or workflow_id
 
-    # v0.1.0 launch contract: when X402_MANDATORY_V01 is set, pipeline start requires
-    # either a valid X-Payment proof (x402 path) or a credits balance (credits path).
-    # This runs before credits deduction so we fail fast without touching balances.
+    # v0.1.0 launch contract: when X402_MANDATORY_V01 is set, priced workflow
+    # start must use x402 and must not also consume legacy credits.
     _x402_mandatory_v01 = os.environ.get("X402_MANDATORY_V01", "").strip().lower() in (
         "1",
         "true",
         "yes",
     )
-    if _x402_mandatory_v01 and not credits_supabase.is_configured():
+    if _x402_mandatory_v01:
         payment_header = (
             request.headers.get("X-Payment") or request.headers.get("x-payment") or ""
         ).strip()
@@ -312,11 +312,16 @@ def workflows_generate(
                 status_code=402,
                 detail=(
                     "Payment required. Attach a valid X-Payment proof header "
-                    "(x402) or configure workspace credits."
+                    "(x402) to start this priced workflow."
                 ),
             )
 
-    if credits_supabase.is_configured() and user_id and db._is_uuid(user_id):
+    if (
+        not _x402_mandatory_v01
+        and credits_supabase.is_configured()
+        and user_id
+        and db._is_uuid(user_id)
+    ):
         if not credits_supabase.has_sufficient_credits(user_id, CREDITS_PER_RUN):
             bal = credits_supabase.get_balance(user_id)
             raise HTTPException(

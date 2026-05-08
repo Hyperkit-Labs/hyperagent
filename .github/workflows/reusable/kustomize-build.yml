@@ -20,9 +20,11 @@ jobs:
           version: v1.31.0
 
       - name: kustomize build
+        env:
+          OVERLAY_PATH: ${{ inputs.overlay-path }}
         run: |
           set -euo pipefail
-          kubectl kustomize "${{ inputs.overlay-path }}" > /tmp/rendered.yaml
+          kubectl kustomize "$OVERLAY_PATH" > /tmp/rendered.yaml
           test -s /tmp/rendered.yaml
           echo "Rendered $(wc -l < /tmp/rendered.yaml) lines"
           head -n 40 /tmp/rendered.yaml

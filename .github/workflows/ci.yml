@@ -31,7 +31,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.0'
       
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -129,7 +129,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.0'
           cache: 'pnpm'
           cache-dependency-path: pnpm-lock.yaml
 
@@ -169,7 +169,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.0'
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -232,7 +232,7 @@ jobs:
       - name: Set up Node.js (for DB migrations)
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.0'
           cache: 'pnpm'
 
       - name: Install workspace deps (migration scripts)
@@ -273,7 +273,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.0'
           cache: 'pnpm'
       
       - name: Install dependencies
@@ -299,7 +299,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.0'
           cache: 'pnpm'
       
       - name: Install dependencies
@@ -322,7 +322,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.0'
           cache: 'pnpm'
       
       - name: Install dependencies
@@ -424,7 +424,7 @@ jobs:
         if: steps.paths.outputs.contract == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.0'
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -598,4 +598,3 @@ jobs:
           echo "ai-tools Tenderly contract: ${{ needs.ai-tools-tenderly-contract.result }}"
           echo "Docker Build: ${{ needs.build-docker.result }}"
           echo "Docker Compose: ${{ needs.docker-compose-test.result }}"
-

@@ -1,0 +1,30 @@
+rules:
+  - id: hyperagent.no-current-stage-from-status
+    message: Do not map current_stage from status; return the real persisted stage.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - /services/orchestrator/api/*.py
+    pattern: '"current_stage": $OBJ.get("status")'
+
+  - id: hyperagent.no-gateway-byok-mount
+    message: Legacy /api/v1/byok gateway mounts are forbidden; use /api/v1/workspaces/current/llm-keys.
+    severity: ERROR
+    languages: [typescript]
+    paths:
+      include:
+        - /apps/api-gateway/src/index.ts
+    pattern: app.use("/api/v1/byok", $$$ARGS)
+
+  - id: hyperagent.no-x-user-id-billing-bypass
+    message: Do not treat X-User-Id as an internal billing/x402 bypass. Only X-Internal-Token may bypass.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - /services/orchestrator/billing.py
+    patterns:
+      - pattern-either:
+          - pattern: request_headers.get("X-User-Id")
+          - pattern: request_headers.get("x-user-id")

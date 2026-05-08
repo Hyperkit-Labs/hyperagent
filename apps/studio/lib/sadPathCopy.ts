@@ -193,7 +193,7 @@ export function workflowCreateFailureMessage(err: unknown): string {
       "Your session expired. Sign in again to resume. Your draft text on this page is saved in this browser until you send it.";
   } else if (status === 402) {
     base =
-      "Not enough credits to start a run. Add budget in Payments, then try again. Your draft is still here.";
+      "Payment is required to start this run. Complete the x402 payment flow, then try again. Your draft is still here.";
   } else if (status === 408) {
     base =
       "Starting the workflow timed out. Your draft is still here. Try again.";

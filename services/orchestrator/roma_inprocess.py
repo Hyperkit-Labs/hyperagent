@@ -6,6 +6,8 @@ ROMA is non-negotiable: always returns a spec.
 
 import logging
 import os
+import sys
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -26,13 +28,21 @@ AGENT_RUNTIME_URL = (
     os.environ.get("AGENT_RUNTIME_URL") or "http://localhost:4001"
 ).rstrip("/")
 
+_ROMA_SERVICE_ROOT = Path(__file__).resolve().parent.parent / "roma-service"
+if str(_ROMA_SERVICE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROMA_SERVICE_ROOT))
+
+from spec_contract import normalize_spec_payload
+
 
 def _build_roma_goal(prompt: str) -> str:
     return (
         "Turn this HyperAgent spec prompt into a structured Spec Lock JSON. "
         "Output only valid JSON matching: version (string), chains (list of chain names), "
         "token_type (e.g. ERC20, ERC721), features (list), invariants (list of objects), "
-        "risk_profile (low|medium|high), template_id (optional string). "
+        "risk_profile (low|medium|high|critical), template_id (optional string), "
+        "wizard_options (optional object), app_type (optional string), multi_contract (optional boolean), "
+        "roles (optional list), oracles (optional list), frontend_actions (optional list). "
         "Prompt:\n\n" + (prompt or "")
     )
 
@@ -76,17 +86,23 @@ async def _agent_runtime_spec(
         chains = [
             c.get("network_name") or str(c.get("chain_id", "")) for c in chains if c
         ]
-    out: dict[str, Any] = {
-        "version": str(data.get("version", "1.0")),
-        "chains": chains,
-        "token_type": str(data.get("token_type", "ERC20")),
-        "features": list(data.get("features") or []),
-        "invariants": list(data.get("invariants") or []),
-        "risk_profile": str(data.get("risk_profile", "medium")),
-        "template_id": data.get("template_id"),
-    }
-    if isinstance(data.get("wizard_options"), dict):
-        out["wizard_options"] = data["wizard_options"]
+    out: dict[str, Any] = normalize_spec_payload(
+        {
+            "version": data.get("version", "1.0"),
+            "chains": chains,
+            "token_type": data.get("token_type", "ERC20"),
+            "features": list(data.get("features") or []),
+            "invariants": list(data.get("invariants") or []),
+            "risk_profile": data.get("risk_profile", "medium"),
+            "template_id": data.get("template_id"),
+            "app_type": data.get("app_type"),
+            "multi_contract": data.get("multi_contract"),
+            "roles": list(data.get("roles") or []),
+            "oracles": list(data.get("oracles") or []),
+            "frontend_actions": list(data.get("frontend_actions") or []),
+            "wizard_options": data.get("wizard_options"),
+        }
+    )
     return out
 
 
@@ -120,18 +136,23 @@ async def invoke_roma_spec(
                     spec = data.get("spec") or {}
                     if not spec:
                         return None
-                    result: dict[str, Any] = {
-                        "version": str(spec.get("version", "1.0")),
-                        "chains": list(spec.get("chains") or []),
-                        "token_type": str(spec.get("token_type", "ERC20")),
-                        "features": list(spec.get("features") or []),
-                        "invariants": list(spec.get("invariants") or []),
-                        "risk_profile": "high",
-                        "template_id": spec.get("template_id"),
-                    }
-                    if isinstance(spec.get("wizard_options"), dict):
-                        result["wizard_options"] = spec["wizard_options"]
-                    return result
+                    return normalize_spec_payload(
+                        {
+                            "version": spec.get("version", "1.0"),
+                            "chains": list(spec.get("chains") or []),
+                            "token_type": spec.get("token_type", "ERC20"),
+                            "features": list(spec.get("features") or []),
+                            "invariants": list(spec.get("invariants") or []),
+                            "risk_profile": spec.get("risk_profile", "high"),
+                            "template_id": spec.get("template_id"),
+                            "app_type": spec.get("app_type"),
+                            "multi_contract": spec.get("multi_contract"),
+                            "roles": list(spec.get("roles") or []),
+                            "oracles": list(spec.get("oracles") or []),
+                            "frontend_actions": list(spec.get("frontend_actions") or []),
+                            "wizard_options": spec.get("wizard_options"),
+                        }
+                    )
 
             breaker = get_breaker("roma")
             out = await breaker.call(_call_roma)
@@ -155,12 +176,14 @@ async def invoke_roma_spec(
     except Exception:
         anchor_chain = "skalebase-sepolia"
 
-    return {
-        "version": "1.0",
-        "chains": [anchor_chain],
-        "token_type": "ERC20",
-        "features": [],
-        "invariants": [],
-        "risk_profile": "medium",
-        "template_id": None,
-    }
+    return normalize_spec_payload(
+        {
+            "version": "1.0",
+            "chains": [anchor_chain],
+            "token_type": "ERC20",
+            "features": [],
+            "invariants": [],
+            "risk_profile": "medium",
+            "template_id": None,
+        }
+    )

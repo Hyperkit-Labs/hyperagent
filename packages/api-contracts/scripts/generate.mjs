@@ -12,6 +12,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = join(__dirname, "..");
 const repoRoot = join(pkgRoot, "..", "..");
 const orchestratorRoot = join(repoRoot, "services", "orchestrator");
+const specContractExportScript = join(
+  repoRoot,
+  "scripts",
+  "schema",
+  "export_spec_contract.py",
+);
 const outDir = join(pkgRoot, "openapi");
 const outJson = join(outDir, "openapi.json");
 const genPath = join(pkgRoot, "src", "generated", "schema.ts");
@@ -19,12 +25,17 @@ const genPath = join(pkgRoot, "src", "generated", "schema.ts");
 mkdirSync(outDir, { recursive: true });
 mkdirSync(join(pkgRoot, "src", "generated"), { recursive: true });
 
-const py = process.env.PYTHON ?? "python";
+const py = process.env.PYTHON ?? "python3";
 execFileSync(
   py,
   [join(orchestratorRoot, "scripts", "export_openapi.py"), "--out", outJson],
   { stdio: "inherit", cwd: orchestratorRoot },
 );
+
+execFileSync(py, [specContractExportScript], {
+  stdio: "inherit",
+  cwd: repoRoot,
+});
 
 execFileSync(
   process.execPath,

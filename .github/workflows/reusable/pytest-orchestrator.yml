@@ -51,9 +51,10 @@ jobs:
 
       - name: Run pytest
         working-directory: services/orchestrator
-        run: pytest ${{ inputs.pytest-args }}
         env:
+          PYTEST_ARGS: ${{ inputs.pytest-args }}
           DATABASE_URL: postgresql://test_user:test_password@localhost:5432/hyperagent_test
           ENVIRONMENT: test
           EIGENDA_ENABLED: "0"
           EIGENDA_PRIVATE_KEY: ""
+        run: pytest $PYTEST_ARGS

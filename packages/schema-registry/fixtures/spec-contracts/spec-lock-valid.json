@@ -1,0 +1,39 @@
+{
+  "version": "1.0",
+  "chains": [
+    {
+      "chain_id": 84532,
+      "network_name": "base-sepolia"
+    }
+  ],
+  "token_type": "ERC20",
+  "features": [
+    "mintable",
+    "burnable"
+  ],
+  "invariants": [
+    {
+      "name": "supply_cap",
+      "description": "Total minted supply must not exceed configured cap."
+    }
+  ],
+  "risk_profile": "medium",
+  "template_id": "erc20-standard",
+  "app_type": "token",
+  "multi_contract": false,
+  "roles": [
+    "owner",
+    "minter"
+  ],
+  "oracles": [],
+  "frontend_actions": [
+    "mint",
+    "transfer"
+  ],
+  "wizard_options": {
+    "name": "HyperToken",
+    "symbol": "HYP",
+    "premint": "1000000",
+    "mintable": true
+  }
+}

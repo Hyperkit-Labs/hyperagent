@@ -1,6 +1,6 @@
 # Schema registry
 
-Canonical **JSON Schema** definitions for payloads that are **not** fully modeled in OpenAPI: workflow stream events, inbound storage webhooks, and trace/agent output blobs.
+Canonical **JSON Schema** definitions for payloads that are **not** fully modeled in OpenAPI: workflow stream events, inbound storage webhooks, trace/agent output blobs, and canonical non-REST contract payloads such as Spec Lock.
 
 ## Layout
 
@@ -9,6 +9,7 @@ manifest.json              # Index of schemas (id, path, stability)
 workflow-events/v1/        # SSE / pipeline JSON events
 storage-webhooks/v1/       # Pinata and compatible providers
 agent-outputs/v1/        # Trace blobs and structured outputs
+spec-contracts/v1/         # Canonical generated non-REST contracts
 fixtures/                  # Valid examples; validated in CI
 ```
 

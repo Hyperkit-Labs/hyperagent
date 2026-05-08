@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { useActiveAccount } from "thirdweb/react";
 import { useSignInWithWallet } from "@/hooks/useSignInWithWallet";
 import { clearStoredSession, getStoredSession } from "@/lib/session-store";
 import { redirectToLoginWithNext } from "@/lib/authRedirect";
+import { ROUTES } from "@/constants/routes";
 
 /**
  * Proactive session bootstrap.
@@ -12,11 +14,13 @@ import { redirectToLoginWithNext } from "@/lib/authRedirect";
  * On failure: clears session and redirects to /login to close ghost-state window.
  */
 export function useAutoBootstrap(): void {
+  const pathname = usePathname();
   const account = useActiveAccount();
   const { signIn } = useSignInWithWallet();
   const bootstrappingRef = useRef(false);
 
   useEffect(() => {
+    if (pathname === ROUTES.LOGIN) return;
     if (!account) return;
     const session = getStoredSession();
     if (session) return;
@@ -37,5 +41,5 @@ export function useAutoBootstrap(): void {
       .finally(() => {
         bootstrappingRef.current = false;
       });
-  }, [account?.address, signIn]);
+  }, [account?.address, pathname, signIn]);
 }

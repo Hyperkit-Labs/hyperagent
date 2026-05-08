@@ -247,9 +247,6 @@ export async function fetchJson<T>(
   let lastError: Error | null = null;
   const base = () => getApiBase();
   const hasBody = init.body !== undefined && init.body !== null;
-  const shouldPreferCookieAuth =
-    typeof window !== "undefined" &&
-    base() === `${window.location.origin}/api/gateway/api/v1`;
 
   if (
     typeof window !== "undefined" &&
@@ -264,9 +261,7 @@ export async function fetchJson<T>(
     try {
       let authHeaders: Record<string, string> = {};
       try {
-        if (shouldPreferCookieAuth) {
-          authHeaders = {};
-        } else if (authHeaderProvider) {
+        if (authHeaderProvider) {
           authHeaders = await authHeaderProvider();
         } else if (typeof window !== "undefined") {
           const session = getStoredSession();

@@ -1,6 +1,7 @@
 type HeadersCarrier = { headers: Headers };
 
-const SESSION_TOKEN_COOKIE_NAME = "hyperagent_session_token";
+const SESSION_TOKEN_COOKIE_NAMES = ["hyperagent_session_token", "rt"] as const;
+const SAFE_PATH_SEGMENT = /^[A-Za-z0-9._:-]{1,128}$/;
 
 export function sessionTokenFromCookieHeader(
   cookieHeader: string | null,
@@ -12,16 +13,40 @@ export function sessionTokenFromCookieHeader(
     const eq = item.indexOf("=");
     if (eq <= 0) continue;
     const key = item.slice(0, eq).trim();
-    if (key !== SESSION_TOKEN_COOKIE_NAME) continue;
+    if (
+      !SESSION_TOKEN_COOKIE_NAMES.includes(
+        key as (typeof SESSION_TOKEN_COOKIE_NAMES)[number],
+      )
+    ) {
+      continue;
+    }
     const value = item.slice(eq + 1).trim();
     if (!value) return null;
     try {
       return decodeURIComponent(value);
     } catch {
-      return value;
+      return null;
     }
   }
   return null;
+}
+
+export function sanitizeGatewayPathSegments(path: string[]): string[] {
+  if (!Array.isArray(path) || path.length === 0) {
+    throw new Error("gateway.invalid_path");
+  }
+  return path.map((segment) => {
+    const normalized = segment.trim();
+    if (
+      !normalized ||
+      normalized === "." ||
+      normalized === ".." ||
+      !SAFE_PATH_SEGMENT.test(normalized)
+    ) {
+      throw new Error("gateway.invalid_path_segment");
+    }
+    return normalized;
+  });
 }
 
 export function buildUpstreamHeaders(request: HeadersCarrier): Headers {

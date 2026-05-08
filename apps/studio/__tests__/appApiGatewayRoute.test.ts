@@ -1,5 +1,6 @@
 import {
   buildUpstreamHeaders,
+  sanitizeGatewayPathSegments,
   sessionTokenFromCookieHeader,
 } from "@/app/api/gateway/[...path]/route-helpers";
 
@@ -10,6 +11,9 @@ describe("Studio gateway route helpers", () => {
         "foo=bar; hyperagent_session_token=abc123; Path=/",
       ),
     ).toBe("abc123");
+    expect(sessionTokenFromCookieHeader("rt=legacy-token; Path=/")).toBe(
+      "legacy-token",
+    );
   });
 
   it("prefers an explicit authorization header over cookie translation", () => {
@@ -38,5 +42,23 @@ describe("Studio gateway route helpers", () => {
     expect(headers.get("authorization")).toBe("Bearer cookie-token");
     expect(headers.get("accept")).toBe("*/*");
     expect(headers.get("cookie")).toBeNull();
+  });
+
+  it("treats malformed cookie encoding as no credential", () => {
+    expect(
+      sessionTokenFromCookieHeader("hyperagent_session_token=%E0%A4%A"),
+    ).toBeNull();
+  });
+
+  it("sanitizes gateway path segments before proxying upstream", () => {
+    expect(
+      sanitizeGatewayPathSegments(["api", "v1", "workspaces", "current"]),
+    ).toEqual(["api", "v1", "workspaces", "current"]);
+    expect(() => sanitizeGatewayPathSegments(["api", "..", "workflows"])).toThrow(
+      "gateway.invalid_path_segment",
+    );
+    expect(() => sanitizeGatewayPathSegments(["bad segment"])).toThrow(
+      "gateway.invalid_path_segment",
+    );
   });
 });

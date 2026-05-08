@@ -23,6 +23,7 @@ from registries import (
     get_x402_resources,
 )
 from store import count_workflows
+from .common import ensure_allowed_query_keys, get_caller_id, parse_bounded_int_query_param
 
 logger = logging.getLogger(__name__)
 
@@ -62,21 +63,24 @@ credits_router = APIRouter(prefix="/api/v1/credits", tags=["billing", "credits"]
 
 @credits_router.get("/balance")
 def credits_balance_api(
-    x_user_id: str | None = Header(None, alias="X-User-Id"),
+    request: Request,
 ) -> dict[str, Any]:
     """Return current credit balance for the authenticated user."""
-    if not x_user_id:
-        return {"balance": 0.0, "currency": "USD", "message": "X-User-Id required"}
-    return credits_supabase.get_balance(x_user_id)
+    ensure_allowed_query_keys(request, set())
+    caller = get_caller_id(request)
+    if not caller:
+        raise HTTPException(status_code=401, detail="X-User-Id required")
+    return credits_supabase.get_balance(caller)
 
 
 @credits_router.post("/top-up")
 def credits_top_up_api(
     body: CreditsTopUpBody,
-    x_user_id: str | None = Header(None, alias="X-User-Id"),
+    request: Request,
 ) -> dict[str, Any]:
     """Record a credit top-up. When amount is in USD, multiplied by CREDITS_PER_USD."""
-    if not x_user_id:
+    caller = get_caller_id(request)
+    if not caller:
         raise HTTPException(status_code=401, detail="X-User-Id required")
     if not credits_supabase.is_configured():
         raise HTTPException(status_code=503, detail="Credits not configured")
@@ -87,7 +91,7 @@ def credits_top_up_api(
     ) or (body.currency or "").upper() == "USD"
     credits_to_add = body.amount * CREDITS_PER_USD if is_usd_input else body.amount
     result = credits_supabase.top_up(
-        x_user_id,
+        caller,
         amount=credits_to_add,
         currency=body.currency or "USD",
         reference_id=body.reference_id,
@@ -114,49 +118,66 @@ payments_router = APIRouter(prefix="/api/v1/payments", tags=["billing", "payment
 @payments_router.get("/history")
 def payments_history_api(
     request: Request,
-    x_user_id: str | None = Header(None, alias="X-User-Id"),
-    limit: int = 50,
-    offset: int = 0,
 ) -> dict[str, Any]:
     """Return payment history for the authenticated user."""
-    if not x_user_id:
-        return {"items": [], "total": 0, "message": "X-User-Id required"}
+    ensure_allowed_query_keys(request, {"limit", "offset"})
+    caller = get_caller_id(request)
+    if not caller:
+        raise HTTPException(status_code=401, detail="X-User-Id required")
+    limit = parse_bounded_int_query_param(
+        request,
+        "limit",
+        default=50,
+        minimum=1,
+        maximum=100,
+    )
+    offset = parse_bounded_int_query_param(
+        request,
+        "offset",
+        default=0,
+        minimum=0,
+        maximum=10_000,
+    )
     if not payments_supabase.is_configured():
         return {"items": [], "total": 0}
     items, total = payments_supabase.get_payment_history(
-        x_user_id, limit=min(100, max(1, limit)), offset=max(0, offset)
+        caller, limit=limit, offset=offset
     )
     return {"items": items, "total": total}
 
 
 @payments_router.get("/summary")
 def payments_summary_api(
-    x_user_id: str | None = Header(None, alias="X-User-Id"),
+    request: Request,
 ) -> dict[str, Any]:
     """Return payment summary (total spent, count) for the authenticated user."""
-    if not x_user_id:
-        return {"total": "0", "currency": "USD", "total_count": 0}
+    ensure_allowed_query_keys(request, set())
+    caller = get_caller_id(request)
+    if not caller:
+        raise HTTPException(status_code=401, detail="X-User-Id required")
     if not payments_supabase.is_configured():
         return {"total": "0", "currency": "USD", "total_count": 0}
-    return payments_supabase.get_payment_summary(x_user_id)
+    return payments_supabase.get_payment_summary(caller)
 
 
 @payments_router.get("/spending-control")
 def payments_spending_control_get_api(
-    x_user_id: str | None = Header(None, alias="X-User-Id"),
+    request: Request,
 ) -> dict[str, Any]:
     """Return spending control (budget, period, alert) for the authenticated user."""
     try:
-        if not x_user_id:
-            return _spending_control_default()
+        ensure_allowed_query_keys(request, set())
+        caller = get_caller_id(request)
+        if not caller:
+            raise HTTPException(status_code=401, detail="X-User-Id required")
         if not payments_supabase.is_configured():
             return _spending_control_default()
-        row = payments_supabase.get_spending_control(x_user_id)
+        row = payments_supabase.get_spending_control(caller)
         if not row:
             return _spending_control_default()
         spent = "0"
         try:
-            summary = payments_supabase.get_payment_summary(x_user_id)
+            summary = payments_supabase.get_payment_summary(caller)
             spent = str(summary.get("total", "0") or "0")
         except Exception:
             pass
@@ -169,6 +190,8 @@ def payments_spending_control_get_api(
             ),
             "spent": spent,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.warning("[payments] spending-control GET error: %s", e, exc_info=True)
         return _spending_control_default()
@@ -177,10 +200,11 @@ def payments_spending_control_get_api(
 @payments_router.patch("/spending-control")
 def payments_spending_control_patch_api(
     body: SpendingControlBody,
-    x_user_id: str | None = Header(None, alias="X-User-Id"),
+    request: Request,
 ) -> dict[str, Any]:
     """Update spending control for the authenticated user."""
-    if not x_user_id:
+    caller = get_caller_id(request)
+    if not caller:
         raise HTTPException(status_code=401, detail="X-User-Id required")
     if not payments_supabase.is_configured():
         raise HTTPException(status_code=503, detail="Spending controls not configured")
@@ -188,7 +212,7 @@ def payments_spending_control_patch_api(
     row = None
     for api_attempt in range(3):
         row = payments_supabase.upsert_spending_control(
-            x_user_id,
+            caller,
             budget_amount=body.budget_amount,
             budget_currency=body.budget_currency or "USD",
             period=period,

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceUrl } from "@/config/environment";
-import { buildUpstreamHeaders } from "./route-helpers";
+import {
+  buildUpstreamHeaders,
+  sanitizeGatewayPathSegments,
+} from "./route-helpers";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +16,19 @@ function gatewayOrigin(): string {
 
 async function proxy(request: NextRequest, path: string[]) {
   const origin = gatewayOrigin();
-  const joined = path.join("/");
+  let joined = "";
+  try {
+    joined = sanitizeGatewayPathSegments(path).join("/");
+  } catch {
+    return NextResponse.json(
+      {
+        error: "Bad Request",
+        code: "gateway.invalid_path",
+        message: "Invalid gateway path",
+      },
+      { status: 400, headers: { "Cache-Control": "no-store" } },
+    );
+  }
   const search = request.nextUrl.search || "";
   const url = `${origin}/${joined}${search}`;
   const controller = new AbortController();
@@ -54,13 +69,23 @@ async function proxy(request: NextRequest, path: string[]) {
       status: upstream.status,
       headers: responseHeaders,
     });
-  } catch {
+  } catch (error) {
+    const isTimeout =
+      error instanceof Error && error.name === "AbortError";
     return NextResponse.json(
       {
-        error: "Bad Gateway",
-        message: "gateway_proxy_unreachable",
+        error: isTimeout ? "Gateway Timeout" : "Bad Gateway",
+        code: isTimeout
+          ? "gateway.upstream_timeout"
+          : "gateway.upstream_unreachable",
+        message: isTimeout
+          ? "Upstream request timed out"
+          : "Upstream request failed",
       },
-      { status: 502, headers: { "Cache-Control": "no-store" } },
+      {
+        status: isTimeout ? 504 : 502,
+        headers: { "Cache-Control": "no-store" },
+      },
     );
   } finally {
     clearTimeout(timeout);

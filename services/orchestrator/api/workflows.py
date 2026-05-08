@@ -34,7 +34,11 @@ from .common import (
     _get_keys_for_run,
     _run_status_for_store,
     assert_workflow_owner,
+    ensure_allowed_query_keys,
     get_caller_id,
+    parse_bounded_int_query_param,
+    parse_enum_query_param,
+    parse_safe_resource_id,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,6 +46,17 @@ logger = logging.getLogger(__name__)
 COMPILE_SERVICE_URL = os.environ.get(
     "COMPILE_SERVICE_URL", "http://localhost:8004"
 ).rstrip("/")
+WORKFLOW_LIST_STATUSES = {
+    "draft",
+    "pending",
+    "running",
+    "processing",
+    "building",
+    "completed",
+    "failed",
+    "cancelled",
+    "resuming",
+}
 
 
 def _workflow_list_item(w: dict[str, Any]) -> dict[str, Any]:
@@ -429,11 +444,24 @@ router = APIRouter(prefix="/api/v1/workflows", tags=["workflows"])
 
 @router.get("")
 def list_workflows_api(
-    limit: int = 50, status: str | None = None, request: Request = None
+    request: Request,
 ) -> dict[str, Any]:
     """List workflows for Studio. Newest first. Scoped to authenticated user."""
+    ensure_allowed_query_keys(request, {"limit", "status"})
+    limit = parse_bounded_int_query_param(
+        request,
+        "limit",
+        default=50,
+        minimum=1,
+        maximum=100,
+    )
+    status = parse_enum_query_param(
+        request,
+        "status",
+        allowed=WORKFLOW_LIST_STATUSES,
+    )
     items = list_workflows(limit=min(limit, 100), status=status)
-    caller = get_caller_id(request) if request else None
+    caller = get_caller_id(request)
     if caller:
         items = [i for i in items if (i.get("user_id") or "") == caller]
     else:
@@ -444,6 +472,7 @@ def list_workflows_api(
 @router.get("/{workflow_id}")
 def get_workflow_api(workflow_id: str, request: Request = None) -> dict[str, Any]:
     """Return single workflow by id. Validates caller owns the workflow."""
+    workflow_id = parse_safe_resource_id(workflow_id, "workflow_id")
     w = get_workflow(workflow_id)
     if not w:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -463,6 +492,7 @@ def get_workflow_status_api(
     workflow_id: str, request: Request = None
 ) -> dict[str, str]:
     """Return workflow status only."""
+    workflow_id = parse_safe_resource_id(workflow_id, "workflow_id")
     w = get_workflow(workflow_id)
     if not w:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -476,6 +506,7 @@ def get_workflow_contracts_api(
     workflow_id: str, request: Request = None
 ) -> list[dict[str, Any]]:
     """Return generated contracts for a workflow."""
+    workflow_id = parse_safe_resource_id(workflow_id, "workflow_id")
     w = get_workflow(workflow_id)
     if not w:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -496,6 +527,7 @@ def get_workflow_contracts_api(
 @router.get("/{workflow_id}/tarball")
 def get_workflow_tarball_api(workflow_id: str, request: Request = None) -> Response:
     """Return workflow as tarball for Docker sandbox dynamic source."""
+    workflow_id = parse_safe_resource_id(workflow_id, "workflow_id")
     w = get_workflow(workflow_id)
     if not w:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -512,6 +544,7 @@ def get_workflow_deployments_api(
     workflow_id: str, request: Request = None
 ) -> dict[str, Any]:
     """Return deployments for a workflow."""
+    workflow_id = parse_safe_resource_id(workflow_id, "workflow_id")
     w = get_workflow(workflow_id)
     if not w:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -525,6 +558,7 @@ def get_workflow_ui_schema_api(
     workflow_id: str, request: Request = None
 ) -> dict[str, Any]:
     """Return UI schema for contract interaction if generated."""
+    workflow_id = parse_safe_resource_id(workflow_id, "workflow_id")
     w = get_workflow(workflow_id)
     if not w:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -541,6 +575,7 @@ async def generate_workflow_ui_schema_api(
     workflow_id: str, request: Request = None
 ) -> dict[str, Any]:
     """Generate UI schema from first deployment and contract; store and return."""
+    workflow_id = parse_safe_resource_id(workflow_id, "workflow_id")
     w = get_workflow(workflow_id)
     if not w:
         raise HTTPException(status_code=404, detail="Workflow not found")

@@ -33,6 +33,11 @@ from .common import (
     _get_keys_for_run,
     _run_status_for_store,
     assert_workflow_owner,
+    ensure_allowed_query_keys,
+    get_caller_id,
+    parse_bool_query_param,
+    parse_bounded_int_query_param,
+    parse_safe_resource_id,
 )
 
 BYOK_DB_TIMEOUT_SEC = float(os.environ.get("BYOK_DB_TIMEOUT_SEC", "25"))
@@ -64,6 +69,7 @@ runs_router = APIRouter(prefix="/api/v1/runs", tags=["runs"])
 @runs_router.get("/{run_id}")
 def get_run_api(run_id: str, request: Request = None) -> dict[str, Any]:
     """Return run detail; run_id is workflow_id."""
+    run_id = parse_safe_resource_id(run_id, "run_id")
     w = get_workflow(run_id)
     if not w:
         raise HTTPException(status_code=404, detail="Run not found")
@@ -81,6 +87,7 @@ def get_run_api(run_id: str, request: Request = None) -> dict[str, Any]:
 @runs_router.get("/{run_id}/steps")
 def get_run_steps_api(run_id: str, request: Request = None) -> dict[str, Any]:
     """Return step-level audit for a run. trace_verifiable is false when any step lacks a persisted trace blob."""
+    run_id = parse_safe_resource_id(run_id, "run_id")
     w = get_workflow(run_id)
     if not w:
         raise HTTPException(status_code=404, detail="Run not found")
@@ -202,15 +209,26 @@ security_router = APIRouter(prefix="/api/v1/security", tags=["security"])
 @security_router.get("/findings")
 def get_security_findings_api(
     request: Request,
-    x_user_id: str | None = Header(None, alias="X-User-Id"),
-    run_id: str | None = None,
-    limit: int = 100,
 ) -> dict[str, Any]:
     """Return security findings for authenticated user's runs."""
+    ensure_allowed_query_keys(request, {"run_id", "limit"})
+    caller = get_caller_id(request)
+    if not caller:
+        raise HTTPException(status_code=401, detail="authentication required")
+    run_id = request.query_params.get("run_id")
+    if run_id is not None:
+        run_id = parse_safe_resource_id(run_id, "run_id")
+    limit = parse_bounded_int_query_param(
+        request,
+        "limit",
+        default=100,
+        minimum=1,
+        maximum=200,
+    )
     findings = db.list_security_findings(
-        wallet_user_id=x_user_id if (x_user_id and x_user_id.strip()) else None,
+        wallet_user_id=caller,
         run_id=run_id,
-        limit=min(200, max(1, limit)),
+        limit=limit,
     )
     return {"findings": findings}
 
@@ -220,17 +238,32 @@ registry_router = APIRouter(prefix="/api/v1", tags=["registry"])
 
 
 @registry_router.get("/networks")
-def get_networks_api(skale: bool = False) -> list[dict[str, Any]]:
+def get_networks_api(request: Request) -> list[dict[str, Any]]:
     """Return networks from chain registry."""
+    ensure_allowed_query_keys(request, {"skale"})
+    skale = parse_bool_query_param(request, "skale", default=False)
     return get_networks_for_api(skale=skale)
 
 
 @registry_router.get("/networks/rpc-test")
 async def rpc_test_api(
-    network_id: str = "", chain_id: int | None = None
+    request: Request,
 ) -> dict[str, Any]:
     """Test RPC connectivity by calling eth_blockNumber."""
-    cid = chain_id
+    ensure_allowed_query_keys(request, {"network_id", "chain_id"})
+    network_id = request.query_params.get("network_id") or ""
+    if network_id:
+        network_id = parse_safe_resource_id(network_id, "network_id")
+    raw_chain_id = request.query_params.get("chain_id")
+    cid = None
+    if raw_chain_id is not None:
+        cid = parse_bounded_int_query_param(
+            request,
+            "chain_id",
+            default=1,
+            minimum=1,
+            maximum=2**31 - 1,
+        )
     if cid is None and network_id:
         cid = get_chain_id_by_network_slug(network_id.strip())
     if cid is None:
@@ -434,8 +467,23 @@ logs_router = APIRouter(prefix="/api/v1/logs", tags=["logs"])
 
 
 @logs_router.get("")
-def logs_api(page: int = 1, page_size: int = 50) -> dict[str, Any]:
+def logs_api(request: Request) -> dict[str, Any]:
     """Recent activity from run_steps. Returns empty list when Supabase not configured."""
+    ensure_allowed_query_keys(request, {"page", "page_size"})
+    page = parse_bounded_int_query_param(
+        request,
+        "page",
+        default=1,
+        minimum=1,
+        maximum=10_000,
+    )
+    page_size = parse_bounded_int_query_param(
+        request,
+        "page_size",
+        default=50,
+        minimum=1,
+        maximum=100,
+    )
     try:
         logs = db.get_recent_activity_logs(limit=min(page_size * 2, 100))
         total = len(logs)
@@ -443,26 +491,30 @@ def logs_api(page: int = 1, page_size: int = 50) -> dict[str, Any]:
         end = start + page_size
         page_logs = logs[start:end] if total else []
         return {"logs": page_logs, "total": total, "page": page, "page_size": page_size}
-    except Exception:
-        return {"logs": [], "total": 0, "page": 1, "page_size": page_size}
+    except Exception as exc:
+        logger.warning("[logs] recent activity unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail="activity logs unavailable")
 
 
 @logs_router.get("/services")
-def logs_services_api() -> list[str]:
+def logs_services_api(request: Request) -> list[str]:
     """Return distinct service names from recent activity."""
+    ensure_allowed_query_keys(request, set())
     try:
         logs = db.get_recent_activity_logs(limit=100)
         services = sorted(
             {str(e.get("service", "orchestrator")) for e in logs if e.get("service")}
         )
         return services if services else ["orchestrator"]
-    except Exception:
-        return ["orchestrator"]
+    except Exception as exc:
+        logger.warning("[logs] services unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail="activity log services unavailable")
 
 
 @logs_router.get("/hosts")
-def logs_hosts_api() -> list[str]:
+def logs_hosts_api(request: Request) -> list[str]:
     """Return distinct log sources from run_steps and agent_logs."""
+    ensure_allowed_query_keys(request, set())
     try:
         entries = db.get_recent_activity_logs(limit=200)
         hosts = sorted({str(e.get("service", "")) for e in entries if e.get("service")})
@@ -471,12 +523,9 @@ def logs_hosts_api() -> list[str]:
         if env_host and env_host not in out:
             out.insert(0, env_host)
         return out
-    except Exception:
-        return (
-            ["orchestrator"]
-            if (os.environ.get("ORCHESTRATOR_HOST") or "").strip()
-            else []
-        )
+    except Exception as exc:
+        logger.warning("[logs] hosts unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail="activity log hosts unavailable")
 
 
 # Agents router
@@ -663,6 +712,7 @@ async def get_llm_keys(
     x_user_id: str | None = Header(None, alias="X-User-Id"),
 ) -> dict[str, Any]:
     """Return configured provider names only (no key values)."""
+    ensure_allowed_query_keys(request, set())
     import llm_keys_supabase
     from llm_keys_store import get_configured_providers
 

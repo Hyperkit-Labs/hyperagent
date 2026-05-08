@@ -14,6 +14,7 @@ from fastapi import HTTPException, Request
 
 _SAFE_IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
 _SAFE_NAME = re.compile(r"^[A-Za-z0-9 _\-]{1,64}$")
+_SAFE_RESOURCE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 _SECRET_LIKE = re.compile(
     r"(sk-[a-zA-Z0-9]{10,}|xox[baprs]-[a-zA-Z0-9-]{10,}|"
     r"api[_-]?key\s*[=:]\s*\S+|Bearer\s+[a-zA-Z0-9._-]{20,}|"
@@ -24,6 +25,8 @@ _SECRET_LIKE = re.compile(
 logger = logging.getLogger(__name__)
 
 _IDENTITY_HMAC_SECRET = os.environ.get("IDENTITY_HMAC_SECRET", "").strip()
+_TRUE_QUERY_VALUES = {"1", "true", "yes", "on"}
+_FALSE_QUERY_VALUES = {"0", "false", "no", "off"}
 
 
 def _verify_user_id_hmac(user_id: str, sig_header: str) -> bool:
@@ -261,3 +264,95 @@ def assert_workflow_owner(w: dict[str, Any], request: Request) -> None:
             raise HTTPException(status_code=403, detail="Access denied")
         if caller != owner and caller != wallet_owner:
             raise HTTPException(status_code=403, detail="Access denied")
+
+
+def normalize_optional_query_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    normalized = str(value).strip()
+    if not normalized or normalized.lower() in {"null", "undefined"}:
+        return None
+    return normalized
+
+
+def ensure_allowed_query_keys(request: Request, allowed: set[str]) -> None:
+    unsupported = sorted({key for key in request.query_params.keys() if key not in allowed})
+    if unsupported:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unsupported query parameter(s): {', '.join(unsupported)}",
+        )
+
+
+def parse_bounded_int_query_param(
+    request: Request,
+    name: str,
+    *,
+    default: int,
+    minimum: int,
+    maximum: int,
+) -> int:
+    raw = normalize_optional_query_text(request.query_params.get(name))
+    if raw is None:
+        return default
+    if not re.fullmatch(r"-?\d+", raw):
+        raise HTTPException(status_code=422, detail=f"{name} must be an integer")
+    value = int(raw)
+    if value < minimum or value > maximum:
+        raise HTTPException(
+            status_code=422,
+            detail=f"{name} must be between {minimum} and {maximum}",
+        )
+    return value
+
+
+def parse_bool_query_param(
+    request: Request,
+    name: str,
+    *,
+    default: bool = False,
+) -> bool:
+    raw = normalize_optional_query_text(request.query_params.get(name))
+    if raw is None:
+        return default
+    lowered = raw.lower()
+    if lowered in _TRUE_QUERY_VALUES:
+        return True
+    if lowered in _FALSE_QUERY_VALUES:
+        return False
+    raise HTTPException(
+        status_code=422,
+        detail=f"{name} must be one of: true, false, 1, 0, yes, no, on, off",
+    )
+
+
+def parse_enum_query_param(
+    request: Request,
+    name: str,
+    *,
+    allowed: set[str],
+) -> str | None:
+    raw = normalize_optional_query_text(request.query_params.get(name))
+    if raw is None:
+        return None
+    lowered = raw.lower()
+    if lowered not in allowed:
+        raise HTTPException(
+            status_code=422,
+            detail=f"{name} must be one of: {', '.join(sorted(allowed))}",
+        )
+    return lowered
+
+
+def parse_safe_resource_id(value: str, field_name: str) -> str:
+    normalized = (value or "").strip()
+    if not normalized:
+        raise HTTPException(status_code=422, detail=f"{field_name} is required")
+    if not _SAFE_RESOURCE_ID.fullmatch(normalized):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"{field_name} must contain only letters, numbers, '.', '_', '-', or ':'"
+            ),
+        )
+    return normalized

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { rewriteMountToUpstreamPath } from "./proxy.js";
+import {
+  isTimeoutLikeProxyError,
+  normalizeProxyErrorResponse,
+  rewriteMountToUpstreamPath,
+} from "./proxy.js";
 
 describe("rewriteMountToUpstreamPath", () => {
   it("restores /api/v1 prefix after strip mount", () => {
@@ -34,5 +38,52 @@ describe("rewriteMountToUpstreamPath", () => {
 
   it("trims trailing slash on prefix only", () => {
     expect(rewriteMountToUpstreamPath("/x", "/api/v1/")).toBe("/api/v1/x");
+  });
+});
+
+describe("normalizeProxyErrorResponse", () => {
+  it("normalizes upstream validation errors into a stable envelope", () => {
+    expect(
+      normalizeProxyErrorResponse(
+        422,
+        "req-123",
+        JSON.stringify({ detail: [{ msg: "limit must be <= 100" }] }),
+      ),
+    ).toEqual({
+      error: "Unprocessable Entity",
+      code: "request.validation_failed",
+      message: "limit must be <= 100",
+      requestId: "req-123",
+      retryable: false,
+      status: 422,
+    });
+  });
+
+  it("does not leak raw upstream 5xx bodies", () => {
+    expect(
+      normalizeProxyErrorResponse(
+        503,
+        "req-456",
+        JSON.stringify({ detail: "postgres password=secret exploded" }),
+      ),
+    ).toEqual({
+      error: "Service Unavailable",
+      code: "upstream.unavailable",
+      message: "Backend unavailable. Try again shortly.",
+      requestId: "req-456",
+      retryable: true,
+      status: 503,
+    });
+  });
+});
+
+describe("isTimeoutLikeProxyError", () => {
+  it("detects timeout-class proxy failures", () => {
+    const err = new Error("socket timed out") as Error & { code?: string };
+    err.code = "ETIMEDOUT";
+    expect(isTimeoutLikeProxyError(err)).toBe(true);
+    expect(isTimeoutLikeProxyError(new Error("other transport failure"))).toBe(
+      false,
+    );
   });
 });

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
 import sys
 
@@ -12,9 +14,20 @@ sys.path.insert(
     0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
 
+IDENTITY_SECRET = "unit-test-secret"
+
+
+def _signed_user_headers(user_id: str) -> dict[str, str]:
+    sig = hmac.new(
+        IDENTITY_SECRET.encode(), user_id.encode(), hashlib.sha256
+    ).hexdigest()
+    return {"X-User-Id": user_id, "x-user-id-sig": f"{user_id}.{sig}"}
+
 
 @pytest.fixture
-def client():
+def client(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("IDENTITY_HMAC_SECRET", IDENTITY_SECRET)
+    monkeypatch.setenv("ENFORCE_IDENTITY_HMAC", "1")
     from fastapi.testclient import TestClient
     from main import app
 
@@ -69,7 +82,11 @@ def test_health_live(client):
 
 def test_workflows_list_accepts_x_user_id(client):
     """X-User-Id header is accepted; list returns 200."""
-    r = client.get("/api/v1/workflows", headers={"X-User-Id": "test-user-123"})
+    r = client.get(
+        "/api/v1/workflows",
+        headers=_signed_user_headers("test-user-123"),
+        params={"limit": "10"},
+    )
     assert r.status_code == 200
     j = r.json()
     assert "workflows" in j
@@ -78,10 +95,71 @@ def test_workflows_list_accepts_x_user_id(client):
 
 def test_workflows_list_without_auth(client):
     """List without X-User-Id returns 200 (anonymous allowed)."""
-    r = client.get("/api/v1/workflows")
+    r = client.get("/api/v1/workflows", params={"limit": "1"})
     assert r.status_code == 200
     j = r.json()
     assert "workflows" in j
+
+
+def test_llm_keys_read_with_user_header(client):
+    r = client.get(
+        "/api/v1/workspaces/current/llm-keys",
+        headers=_signed_user_headers("test-user-123"),
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert "configured_providers" in body
+    assert isinstance(body["configured_providers"], list)
+
+
+def test_logs_routes_return_real_payloads(client, monkeypatch):
+    import api.runs_registry as runs_registry_api
+
+    monkeypatch.setattr(
+        runs_registry_api.db,
+        "get_recent_activity_logs",
+        lambda limit=100: [
+            {
+                "service": "orchestrator",
+                "message": "workflow queued",
+                "timestamp": "2026-05-08T00:00:00Z",
+            }
+        ],
+    )
+
+    logs = client.get("/api/v1/logs", params={"page": "1", "page_size": "5"})
+    assert logs.status_code == 200
+    assert logs.json()["page_size"] == 5
+    assert isinstance(logs.json()["logs"], list)
+
+    services = client.get("/api/v1/logs/services")
+    assert services.status_code == 200
+    assert services.json() == ["orchestrator"]
+
+    hosts = client.get("/api/v1/logs/hosts")
+    assert hosts.status_code == 200
+    assert hosts.json() == ["orchestrator"]
+
+
+def test_logs_routes_fail_explicitly_when_backend_unavailable(client, monkeypatch):
+    import api.runs_registry as runs_registry_api
+
+    def _boom(limit=100):
+        raise RuntimeError("db unavailable")
+
+    monkeypatch.setattr(runs_registry_api.db, "get_recent_activity_logs", _boom)
+
+    logs = client.get("/api/v1/logs")
+    assert logs.status_code == 503
+    assert logs.json()["detail"] == "activity logs unavailable"
+
+    services = client.get("/api/v1/logs/services")
+    assert services.status_code == 503
+    assert services.json()["detail"] == "activity log services unavailable"
+
+    hosts = client.get("/api/v1/logs/hosts")
+    assert hosts.status_code == 503
+    assert hosts.json()["detail"] == "activity log hosts unavailable"
 
 
 def test_metrics_rejects_invalid_time_range(client):
@@ -106,7 +184,10 @@ def test_domains_list(client, monkeypatch):
         ],
     )
 
-    r = client.get("/api/v1/infra/domains", headers={"X-User-Id": "user-123"})
+    r = client.get(
+        "/api/v1/infra/domains",
+        headers=_signed_user_headers("user-123"),
+    )
     assert r.status_code == 200
     assert r.json()[0]["domain"] == "example.com"
 
@@ -117,7 +198,7 @@ def test_add_domain_validates_input(client, monkeypatch):
     monkeypatch.setattr(infra_api.db, "is_configured", lambda: True)
     r = client.post(
         "/api/v1/infra/domains",
-        headers={"X-User-Id": "user-123"},
+        headers=_signed_user_headers("user-123"),
         json={"domain": "https://bad.example"},
     )
     assert r.status_code == 400

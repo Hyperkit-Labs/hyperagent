@@ -4,6 +4,8 @@ Gateway sets x-user-id from JWT sub; orchestrator uses it for workflows, credits
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
 import sys
 
@@ -13,9 +15,20 @@ sys.path.insert(
     0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
 
+IDENTITY_SECRET = "unit-test-secret"
+
+
+def _signed_user_headers(user_id: str) -> dict[str, str]:
+    sig = hmac.new(
+        IDENTITY_SECRET.encode(), user_id.encode(), hashlib.sha256
+    ).hexdigest()
+    return {"X-User-Id": user_id, "x-user-id-sig": f"{user_id}.{sig}"}
+
 
 @pytest.fixture
-def client():
+def client(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("IDENTITY_HMAC_SECRET", IDENTITY_SECRET)
+    monkeypatch.setenv("ENFORCE_IDENTITY_HMAC", "1")
     from fastapi.testclient import TestClient
     from main import app
 
@@ -25,7 +38,7 @@ def client():
 def test_workflows_list_with_x_user_id_returns_user_scoped(client):
     """Gateway passes X-User-Id; orchestrator uses it for workflow listing."""
     user_id = "550e8400-e29b-41d4-a716-446655440000"
-    r = client.get("/api/v1/workflows", headers={"X-User-Id": user_id})
+    r = client.get("/api/v1/workflows", headers=_signed_user_headers(user_id))
     assert r.status_code == 200
     j = r.json()
     assert "workflows" in j
@@ -46,7 +59,7 @@ def test_generate_accepts_x_user_id(client):
     r = client.post(
         "/api/v1/workflows/generate",
         json={"nlp_input": "Create an ERC20 token", "api_keys": {"openai": "sk-test"}},
-        headers={"X-User-Id": user_id},
+        headers=_signed_user_headers(user_id),
     )
     assert r.status_code in (200, 402, 422, 503)
     if r.status_code == 200:

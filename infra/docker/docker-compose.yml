@@ -50,6 +50,23 @@ services:
       retries: 3
       start_period: 10s
 
+  # --- Core state / replay protection ---
+  redis:
+    image: redis:7-alpine
+    container_name: hyperagent-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    networks:
+      - hyperagent
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   # --- Core ---
   orchestrator:
     build:
@@ -62,6 +79,7 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       - REGISTRIES_PATH=/app/services/orchestrator/registries
       - AGENT_RUNTIME_URL=http://agent-runtime:4001
       - COMPILE_SERVICE_URL=http://compile:8004
@@ -97,6 +115,8 @@ services:
       retries: 5
       start_period: 60s
     depends_on:
+      redis:
+        condition: service_healthy
       agent-runtime:
         condition: service_healthy
       simulation:
@@ -469,9 +489,10 @@ services:
 
 networks:
   hyperagent:
-    driver: bridge
 
 volumes:
+  redis-data:
+    name: hyperagent_redis-data
   sandbox-data:
     name: hyperagent_sandbox-data
   qdrant_data:

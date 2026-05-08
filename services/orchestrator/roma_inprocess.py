@@ -6,8 +6,6 @@ ROMA is non-negotiable: always returns a spec.
 
 import logging
 import os
-import sys
-from pathlib import Path
 from typing import Any
 
 import httpx
@@ -27,10 +25,6 @@ ROMA_MAX_DEPTH = int(os.environ.get("ROMA_MAX_DEPTH", "1"))
 AGENT_RUNTIME_URL = (
     os.environ.get("AGENT_RUNTIME_URL") or "http://localhost:4001"
 ).rstrip("/")
-
-_ROMA_SERVICE_ROOT = Path(__file__).resolve().parent.parent / "roma-service"
-if str(_ROMA_SERVICE_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROMA_SERVICE_ROOT))
 
 from spec_contract import normalize_spec_payload
 

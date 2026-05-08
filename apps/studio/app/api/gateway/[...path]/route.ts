@@ -1,50 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceUrl } from "@/config/environment";
+import { buildUpstreamHeaders } from "./route-helpers";
 
 export const dynamic = "force-dynamic";
 
 const UPSTREAM_TIMEOUT_MS = 60_000;
-const SESSION_TOKEN_COOKIE_NAME = "hyperagent_session_token";
 
 function gatewayOrigin(): string {
   const apiBase = getServiceUrl("backend").replace(/\/$/, "");
   return apiBase.replace(/\/api\/v1\/?$/, "");
-}
-
-function stripHopByHop(headers: Headers): Headers {
-  const nextHeaders = new Headers();
-  for (const [key, value] of headers.entries()) {
-    const lower = key.toLowerCase();
-    if (
-      lower === "host" ||
-      lower === "content-length" ||
-      lower === "connection"
-    ) {
-      continue;
-    }
-    nextHeaders.set(key, value);
-  }
-  return nextHeaders;
-}
-
-function sessionTokenFromCookieHeader(cookieHeader: string | null): string | null {
-  if (!cookieHeader) return null;
-  for (const part of cookieHeader.split(";")) {
-    const item = part.trim();
-    if (!item) continue;
-    const eq = item.indexOf("=");
-    if (eq <= 0) continue;
-    const key = item.slice(0, eq).trim();
-    if (key !== SESSION_TOKEN_COOKIE_NAME) continue;
-    const value = item.slice(eq + 1).trim();
-    if (!value) return null;
-    try {
-      return decodeURIComponent(value);
-    } catch {
-      return value;
-    }
-  }
-  return null;
 }
 
 async function proxy(request: NextRequest, path: string[]) {
@@ -57,14 +21,11 @@ async function proxy(request: NextRequest, path: string[]) {
 
   try {
     const method = request.method.toUpperCase();
-    const headers = stripHopByHop(request.headers);
-    const cookieHeader = request.headers.get("cookie");
-    const cookieToken = sessionTokenFromCookieHeader(cookieHeader);
-    const hasAuthorization = headers.has("authorization");
-    if (!hasAuthorization && cookieToken) {
-      headers.set("authorization", `Bearer ${cookieToken}`);
+    const headers = buildUpstreamHeaders(request);
+    const incomingContentType = request.headers.get("content-type");
+    if (incomingContentType && method !== "GET" && method !== "HEAD") {
+      headers.set("content-type", incomingContentType);
     }
-    headers.delete("cookie");
     const body =
       method === "GET" || method === "HEAD"
         ? undefined

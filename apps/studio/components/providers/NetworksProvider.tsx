@@ -36,7 +36,7 @@ export function NetworksProvider({ children }: { children: React.ReactNode }) {
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: true,
-      revalidateOnMount: false,
+      revalidateOnMount: true,
       dedupingInterval: NETWORKS_STALE_TIME_MS,
       errorRetryCount: 1,
       keepPreviousData: true,

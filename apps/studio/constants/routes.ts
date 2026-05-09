@@ -33,11 +33,94 @@ export const ROUTES = {
   DOCS: "/docs",
 } as const;
 
+export const LEGACY_ROUTE_REDIRECTS = {
+  "/chat": ROUTES.HOME,
+  "/logs": ROUTES.MONITORING,
+} as const;
+
+export const PUBLIC_STUDIO_ROUTES = [ROUTES.LOGIN] as const;
+export const PUBLIC_STUDIO_API_PREFIXES = [
+  "/api/auth/",
+  "/api/gateway-health/",
+] as const;
+
+export const SHELLLESS_STUDIO_ROUTES = [ROUTES.HOME, ROUTES.LOGIN] as const;
+
+const STATIC_STUDIO_PROTECTED_ROUTES = Array.from(
+  new Set(
+    Object.values(ROUTES).filter(
+      (route): route is string =>
+        typeof route === "string" && route !== ROUTES.LOGIN,
+    ),
+  ),
+);
+
+const DYNAMIC_STUDIO_PROTECTED_ROUTE_PREFIXES = [
+  "/workflows/",
+  "/apps/",
+] as const;
+
+const LEGACY_STUDIO_PROTECTED_ROUTES = Object.keys(
+  LEGACY_ROUTE_REDIRECTS,
+) as readonly string[];
+
+export type StudioShellMode = "public" | "shellless" | "shared";
+
+export function isPublicStudioRoute(
+  pathname: string | null | undefined,
+): boolean {
+  return Boolean(
+    pathname &&
+    PUBLIC_STUDIO_ROUTES.includes(
+      pathname as (typeof PUBLIC_STUDIO_ROUTES)[number],
+    ),
+  );
+}
+
+export function isShelllessStudioRoute(
+  pathname: string | null | undefined,
+): boolean {
+  return Boolean(
+    pathname &&
+    SHELLLESS_STUDIO_ROUTES.includes(
+      pathname as (typeof SHELLLESS_STUDIO_ROUTES)[number],
+    ),
+  );
+}
+
+export function isProtectedStudioRoute(
+  pathname: string | null | undefined,
+): boolean {
+  if (!pathname || isPublicStudioRoute(pathname)) return false;
+  if (STATIC_STUDIO_PROTECTED_ROUTES.includes(pathname)) return true;
+  if (LEGACY_STUDIO_PROTECTED_ROUTES.includes(pathname)) return true;
+  return DYNAMIC_STUDIO_PROTECTED_ROUTE_PREFIXES.some((prefix) =>
+    pathname.startsWith(prefix),
+  );
+}
+
+export function getStudioShellMode(
+  pathname: string | null | undefined,
+): StudioShellMode {
+  if (isPublicStudioRoute(pathname)) return "public";
+  if (isShelllessStudioRoute(pathname)) return "shellless";
+  return "shared";
+}
+
+export function isPublicStudioApiPath(
+  pathname: string | null | undefined,
+): boolean {
+  if (!pathname) return false;
+  return PUBLIC_STUDIO_API_PREFIXES.some((prefix) =>
+    pathname.startsWith(prefix),
+  );
+}
+
 /** Hyperkit CLI version shown in sidebar. Align with root package.json. */
 export const CLI_VERSION = "0.1.0";
 
 /** Routes that render full-page (no AppBar/Sidebar). */
-export const FULL_PAGE_ROUTES: string[] = [ROUTES.HOME, ROUTES.LOGIN];
+export const FULL_PAGE_ROUTES: string[] = [...SHELLLESS_STUDIO_ROUTES];
 
 /** Only route accessible without session. All other routes require connect + sign in. */
 export const PUBLIC_ROUTE = ROUTES.LOGIN;
@@ -47,24 +130,7 @@ export const PUBLIC_ROUTE = ROUTES.LOGIN;
  * LayoutSwitcher: if no wallet on a protected route, redirect to LOGIN.
  */
 export const PROTECTED_PATH_PREFIXES: string[] = [
-  ROUTES.HOME,
-  ROUTES.DASHBOARD,
-  ROUTES.WORKFLOWS,
-  ROUTES.WORKFLOW_CREATE,
-  ROUTES.AGENTS,
-  ROUTES.DEPLOYMENTS,
-  ROUTES.CONTRACTS,
-  ROUTES.TEMPLATES,
-  ROUTES.MARKETPLACE,
-  ROUTES.ANALYTICS,
-  ROUTES.PAYMENTS,
-  ROUTES.NETWORKS,
-  ROUTES.MONITORING,
-  ROUTES.SECURITY,
-  ROUTES.SETTINGS,
-  ROUTES.APPS,
-  ROUTES.HISTORY,
-  ROUTES.DOMAINS,
-  ROUTES.DOCS,
-  "/apps/",
+  ...STATIC_STUDIO_PROTECTED_ROUTES,
+  ...DYNAMIC_STUDIO_PROTECTED_ROUTE_PREFIXES,
+  ...LEGACY_STUDIO_PROTECTED_ROUTES,
 ];

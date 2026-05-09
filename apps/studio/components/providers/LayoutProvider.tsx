@@ -18,6 +18,7 @@ interface LayoutContextValue {
   commandPaletteOpen: boolean;
   setCommandPaletteOpen: (v: boolean) => void;
   openCommandPalette: () => void;
+  toggleCommandPalette: () => void;
   mobileNavOpen: boolean;
   setMobileNavOpen: (v: boolean) => void;
   toggleMobileNav: () => void;
@@ -44,20 +45,25 @@ export function LayoutProvider({ children }: { children: React.ReactNode }) {
     setCommandPaletteOpen(true);
   }, []);
 
+  const toggleCommandPalette = useCallback(() => {
+    setCommandPaletteOpen((value) => !value);
+  }, []);
+
   const toggleMobileNav = useCallback(() => {
     setMobileNavOpen((v) => !v);
   }, []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (e.repeat) return;
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        openCommandPalette();
+        toggleCommandPalette();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [openCommandPalette]);
+  }, [toggleCommandPalette]);
 
   const value: LayoutContextValue = {
     contextSidebarOpen,
@@ -66,6 +72,7 @@ export function LayoutProvider({ children }: { children: React.ReactNode }) {
     commandPaletteOpen,
     setCommandPaletteOpen,
     openCommandPalette,
+    toggleCommandPalette,
     mobileNavOpen,
     setMobileNavOpen,
     toggleMobileNav,

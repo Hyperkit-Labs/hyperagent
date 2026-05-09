@@ -16,6 +16,10 @@ import {
 import { networkRegistryFailureMessage } from "@/lib/sadPathCopy";
 import { POLLING } from "@/constants/defaults";
 import { useNetworksContext } from "@/components/providers/NetworksProvider";
+import {
+  CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+  withAsyncTimeout,
+} from "@/lib/runtime-timeouts";
 
 export interface NetworkStats {
   chainId: number;
@@ -68,9 +72,17 @@ export function useNetworks(
         setError(null);
 
         const [data, metrics] = await Promise.all([
-          getNetworks(undefined, signal),
+          withAsyncTimeout(
+            getNetworks(undefined, signal),
+            CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+            "Networks",
+          ),
           includeStats
-            ? getMetrics(undefined, signal).catch(() => null)
+            ? withAsyncTimeout(
+                getMetrics(undefined, signal).catch(() => null),
+                CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+                "Network metrics",
+              )
             : Promise.resolve(null),
         ]);
 

@@ -161,6 +161,49 @@ export function SlimNav() {
     }));
   }, []);
 
+  const resizeSidebar = useCallback((nextWidth: number) => {
+    const clampedWidth = Math.min(
+      SIDEBAR_MAX,
+      Math.max(SIDEBAR_MIN, nextWidth),
+    );
+    setSidebarState((state) => ({
+      ...state,
+      expanded: clampedWidth > SIDEBAR_COLLAPSED,
+      width: clampedWidth,
+    }));
+  }, []);
+
+  const handleResizeKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      switch (event.key) {
+        case "ArrowLeft":
+          event.preventDefault();
+          resizeSidebar(currentWidth - 16);
+          break;
+        case "ArrowRight":
+          event.preventDefault();
+          resizeSidebar(currentWidth + 16);
+          break;
+        case "Home":
+          event.preventDefault();
+          resizeSidebar(SIDEBAR_MIN);
+          break;
+        case "End":
+          event.preventDefault();
+          resizeSidebar(SIDEBAR_MAX);
+          break;
+        case "Enter":
+        case " ":
+          event.preventDefault();
+          toggleExpand();
+          break;
+        default:
+          break;
+      }
+    },
+    [currentWidth, resizeSidebar, toggleExpand],
+  );
+
   return (
     <aside
       ref={sidebarRef}
@@ -178,6 +221,7 @@ export function SlimNav() {
       </Link>
 
       <nav
+        id="studio-sidebar-nav"
         className={`flex-1 flex flex-col gap-2 py-4 min-w-0 overflow-x-hidden overflow-y-auto ${
           expanded ? "items-stretch px-2" : "items-center"
         }`}
@@ -224,13 +268,21 @@ export function SlimNav() {
           )}
         </button>
         <div
-          role="separator"
+          role="slider"
           aria-orientation="vertical"
+          aria-controls="studio-sidebar-nav"
+          aria-valuemin={SIDEBAR_MIN}
+          aria-valuemax={SIDEBAR_MAX}
+          aria-valuenow={currentWidth}
+          aria-valuetext={`${currentWidth}px sidebar width`}
+          aria-label="Sidebar width"
+          tabIndex={0}
           onMouseDown={handleMouseDown}
+          onKeyDown={handleResizeKeyDown}
           className={`flex items-center justify-center h-8 cursor-col-resize text-slate-500 hover:text-slate-400 hover:bg-white/5 transition-colors ${
             isResizing ? "bg-white/5" : ""
           }`}
-          title="Drag to resize sidebar"
+          title="Resize sidebar"
         >
           <GripVertical className="w-4 h-4" />
         </div>

@@ -27,25 +27,25 @@ const ROUTE_ITEMS: PaletteItem[] = getCommandPaletteRouteItems().map(
 
 const ACTION_ITEMS: PaletteItem[] = [
   {
-    id: "action-new-workflow",
-    label: "New Workflow",
+    id: "action-open-chat-workspace",
+    label: "Prompt preset: Empty chat workspace",
     href: ROUTES.CHAT,
     icon: Plus,
-    description: "Start a new build with HyperAgent",
+    description: "Open the main chat workspace to start a new build",
   },
   {
-    id: "action-deploy-base",
-    label: "Deploy to Base",
-    href: ROUTES.DEPLOYMENTS,
+    id: "action-prefill-deploy-base",
+    label: "Prompt preset: Deploy to Base",
+    href: `${ROUTES.CHAT}?q=${encodeURIComponent("Deploy my contract to Base and show me the required steps.")}`,
     icon: Rocket,
-    description: "Deploy contracts to Base network",
+    description: "Open Chat with a deploy-to-Base prompt prefilled",
   },
   {
-    id: "action-audit",
-    label: "Start OpenSandbox Audit",
-    href: ROUTES.CHAT,
+    id: "action-prefill-audit",
+    label: "Prompt preset: OpenSandbox audit",
+    href: `${ROUTES.CHAT}?q=${encodeURIComponent("Run an OpenSandbox-style audit on my contract and explain the findings.")}`,
     icon: Shield,
-    description: "Run security audit on a contract",
+    description: "Open Chat with an audit prompt prefilled",
   },
 ];
 
@@ -68,17 +68,6 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const [selectedItem, setSelectedItem] = useState<PaletteItem | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    const down = (e: KeyboardEvent) => {
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        onOpenChange(!open);
-      }
-    };
-    document.addEventListener("keydown", down);
-    return () => document.removeEventListener("keydown", down);
-  }, [open, onOpenChange]);
 
   useEffect(() => {
     if (open) {
@@ -187,7 +176,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                 <Command.Empty className="py-6 text-center text-sm text-slate-500">
                   No results found.
                 </Command.Empty>
-                <Command.Group heading="Actions" className="mb-2">
+                <Command.Group heading="Prompt Presets" className="mb-2">
                   {ACTION_ITEMS.map((item) => (
                     <Command.Item
                       key={item.id}

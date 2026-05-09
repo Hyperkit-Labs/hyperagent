@@ -82,7 +82,7 @@ export default function AgentsPage() {
       ? (searchParams.get("category") as AgentCategory)
       : "all",
   );
-  const [viewMode, setViewMode] = useState<"list" | "grid" | "graph">(
+  const [viewMode, setViewMode] = useState<"list" | "grid">(
     searchParams.get("view") === "grid" ? "grid" : "list",
   );
   const [selectedName, setSelectedName] = useState<string | null>(
@@ -121,7 +121,15 @@ export default function AgentsPage() {
     router.replace(next ? `${pathname}?${next}` : pathname, {
       scroll: false,
     });
-  }, [category, pathname, router, search, searchParams, selectedName, viewMode]);
+  }, [
+    category,
+    pathname,
+    router,
+    search,
+    searchParams,
+    selectedName,
+    viewMode,
+  ]);
 
   const toggleSelectAgent = useCallback((name: string) => {
     setSelectedAgents((prev) => {
@@ -349,7 +357,9 @@ export default function AgentsPage() {
                           title="Run agent"
                           onClick={() =>
                             router.push(
-                              `${ROUTES.HOME}?agent=${encodeURIComponent(agent.name ?? "")}`,
+                              `${ROUTES.HOME}?q=${encodeURIComponent(
+                                `Use the ${agent.name ?? "selected"} agent for this task`,
+                              )}`,
                             )
                           }
                         >
@@ -470,7 +480,9 @@ export default function AgentsPage() {
                           onClick={(e) => {
                             e.stopPropagation();
                             router.push(
-                              `${ROUTES.HOME}?agent=${encodeURIComponent(name)}`,
+                              `${ROUTES.HOME}?q=${encodeURIComponent(
+                                `Use the ${name} agent for this task`,
+                              )}`,
                             );
                           }}
                           className="p-2 rounded-md transition-colors hover:bg-[var(--color-primary-alpha-10)] text-[var(--color-text-tertiary)] hover:text-[var(--color-semantic-violet)]"
@@ -567,7 +579,7 @@ export default function AgentsPage() {
 
                 <div>
                   <div className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] font-semibold mb-3">
-                    Pipeline totals (Last 7 Days)
+                    Workspace workflow totals (Last 7 Days)
                   </div>
                   <div className="h-24 bg-[var(--color-bg-panel)] rounded-lg border border-[var(--color-border-subtle)] p-3 flex items-center justify-center gap-6">
                     <div className="text-center">

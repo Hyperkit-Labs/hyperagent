@@ -5,6 +5,10 @@ import { Coins, Loader2, Plus } from "lucide-react";
 import { getCreditsBalance, topUpCredits, handleApiError } from "@/lib/api";
 import { useSession } from "@/hooks/useSession";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
+import {
+  CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+  withAsyncTimeout,
+} from "@/lib/runtime-timeouts";
 
 export interface CreditsCardProps {
   /** Increment to trigger a refetch (e.g. after on-chain top-up). */
@@ -36,7 +40,11 @@ export function CreditsCard({
   const fetchBalance = useCallback(() => {
     setError(null);
     setLoading(true);
-    getCreditsBalance()
+    withAsyncTimeout(
+      getCreditsBalance(),
+      CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+      "Credits balance",
+    )
       .then((res) => {
         setBalance({
           balance: res.balance ?? 0,

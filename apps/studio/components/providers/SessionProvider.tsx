@@ -11,11 +11,8 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname } from "next/navigation";
-import {
-  getStoredSession,
-  SESSION_CHANGE_EVENT,
-} from "@/lib/session-store";
-import { ROUTES } from "@/constants/routes";
+import { getStoredSession, SESSION_CHANGE_EVENT } from "@/lib/session-store";
+import { isProtectedStudioRoute, ROUTES } from "@/constants/routes";
 import { redirectToLoginWithNext } from "@/lib/authRedirect";
 
 export type BootstrapStatus = "pending" | "success" | "failed";
@@ -37,37 +34,6 @@ export function useSessionContext(): SessionContextValue {
     throw new Error("useSessionContext must be used within SessionProvider");
   }
   return ctx;
-}
-
-const PROTECTED_PATHS: (string | ((p: string) => boolean))[] = [
-  ROUTES.HOME,
-  ROUTES.DASHBOARD,
-  ROUTES.WORKFLOWS,
-  ROUTES.WORKFLOW_CREATE,
-  ROUTES.PAYMENTS,
-  ROUTES.SETTINGS,
-  ROUTES.AGENTS,
-  ROUTES.DEPLOYMENTS,
-  ROUTES.CONTRACTS,
-  ROUTES.TEMPLATES,
-  ROUTES.MARKETPLACE,
-  ROUTES.ANALYTICS,
-  ROUTES.NETWORKS,
-  ROUTES.MONITORING,
-  ROUTES.SECURITY,
-  ROUTES.APPS,
-  ROUTES.HISTORY,
-  ROUTES.DOMAINS,
-  ROUTES.DOCS,
-  (p) => p.startsWith("/workflows/"),
-  (p) => p.startsWith("/apps/"),
-];
-
-function isProtectedPath(pathname: string): boolean {
-  if (pathname === ROUTES.LOGIN) return false;
-  return PROTECTED_PATHS.some((p) =>
-    typeof p === "function" ? p(pathname) : pathname === p,
-  );
 }
 
 function logAuth(...args: unknown[]) {
@@ -102,7 +68,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const runBootstrap = useCallback(async () => {
     const path = pathname ?? "";
-    if (!isProtectedPath(path)) {
+    if (!isProtectedStudioRoute(path)) {
       setBootstrapStatus("success");
       setBootstrapError(null);
       return;
@@ -157,7 +123,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       "";
     logAuth("route effect pathname=", path, "hasSession=", hasSession);
 
-    if (!isProtectedPath(path)) {
+    if (!isProtectedStudioRoute(path)) {
       setBootstrapStatus("success");
       setBootstrapError(null);
       return;

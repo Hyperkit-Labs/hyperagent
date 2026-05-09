@@ -1,6 +1,11 @@
 "use client";
 
-import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  useParams,
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useActiveAccount } from "thirdweb/react";
@@ -343,15 +348,16 @@ export default function AppDetailPage() {
               </div>
               {loading && (
                 <div className="text-[var(--color-text-tertiary)] text-sm">
-                  Loading contracts...
+                  Loading app-linked contracts and deployments...
                 </div>
               )}
               {!loading &&
                 contracts.length === 0 &&
                 deployments.length === 0 && (
                   <p className="text-[var(--color-text-tertiary)] text-sm">
-                    No contracts or deployments yet. Run the workflow to
-                    generate and deploy.
+                    No contracts or deployments are linked to this
+                    workflow-backed app yet. Run the workflow to generate and
+                    deploy them.
                   </p>
                 )}
               {!loading && (contracts.length > 0 || deployments.length > 0) && (
@@ -610,7 +616,7 @@ export default function AppDetailPage() {
               </p>
               {activityLoading ? (
                 <div className="text-[var(--color-text-tertiary)] text-sm">
-                  Loading activity...
+                  Loading workspace activity related to this app...
                 </div>
               ) : activityLogs.length === 0 ? (
                 <p className="text-sm text-[var(--color-text-tertiary)]">

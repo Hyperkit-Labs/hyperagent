@@ -4,13 +4,21 @@ import { createContext, useContext, useCallback, useMemo } from "react";
 import useSWR from "swr";
 import { getNetworks, type NetworkConfig } from "@/lib/api";
 import { networkRegistryFailureMessage } from "@/lib/sadPathCopy";
+import {
+  CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+  withAsyncTimeout,
+} from "@/lib/runtime-timeouts";
 
 const NETWORKS_SWR_KEY = "networks";
 /** Cache networks for 24h. Network list rarely changes; reduces API load by ~90%. */
 const NETWORKS_STALE_TIME_MS = 24 * 60 * 60 * 1000;
 
 async function fetcherNetworks(): Promise<NetworkConfig[]> {
-  const data = await getNetworks();
+  const data = await withAsyncTimeout(
+    getNetworks(),
+    CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+    "Networks",
+  );
   return data;
 }
 

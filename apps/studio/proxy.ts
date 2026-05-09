@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { buildStudioConnectSrcDirective } from "@hyperagent/config";
-import { ROUTES } from "@/constants/routes";
+import {
+  getStudioShellMode,
+  isPublicStudioApiPath,
+  isProtectedStudioRoute,
+  isPublicStudioRoute,
+  ROUTES,
+} from "@/constants/routes";
 
 const SESSION_COOKIE_NAME = "hyperagent_has_session";
 const SESSION_EXPIRES_COOKIE_NAME = "hyperagent_session_expires";
@@ -93,7 +99,10 @@ function applySecurityHeaders(res: NextResponse, nonce: string): void {
 function redirectToLogin(request: NextRequest): NextResponse {
   const url = request.nextUrl.clone();
   url.pathname = ROUTES.LOGIN;
-  url.searchParams.set("next", request.nextUrl.pathname);
+  url.searchParams.set(
+    "next",
+    `${request.nextUrl.pathname}${request.nextUrl.search}`,
+  );
   return NextResponse.redirect(url);
 }
 
@@ -150,16 +159,14 @@ function e2eBypassEnvAllowed(): boolean {
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const pathname = request.nextUrl.pathname;
   const nonce = generateNonce();
+  const shellMode = getStudioShellMode(pathname);
 
-  if (pathname === ROUTES.LOGIN) {
+  if (isPublicStudioRoute(pathname)) {
     return nextWithCsp(request, nonce);
   }
 
   if (pathname.startsWith("/api/")) {
-    /** Public routes: auth callbacks + same-origin gateway health proxies (login page, no session yet). */
-    const PUBLIC_API_PREFIXES = ["/api/auth/", "/api/gateway-health/"];
-    const isPublicApi = PUBLIC_API_PREFIXES.some((p) => pathname.startsWith(p));
-    if (isPublicApi) {
+    if (isPublicStudioApiPath(pathname)) {
       return nextWithCsp(request, nonce);
     }
 
@@ -193,6 +200,10 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     return res;
   }
 
+  if (!isProtectedStudioRoute(pathname)) {
+    return nextWithCsp(request, nonce);
+  }
+
   const hasSession = request.cookies.get(SESSION_COOKIE_NAME)?.value === "1";
   if (!hasSession) {
     return redirectToLogin(request);
@@ -222,7 +233,9 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  return nextWithCsp(request, nonce);
+  return shellMode === "shared" || shellMode === "shellless"
+    ? nextWithCsp(request, nonce)
+    : nextWithCsp(request, nonce);
 }
 
 /**

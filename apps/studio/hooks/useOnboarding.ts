@@ -7,6 +7,10 @@ import { useWorkflows } from "@/hooks/useWorkflows";
 import { useSession } from "@/hooks/useSession";
 import { ROUTES } from "@/constants/routes";
 import {
+  CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+  withAsyncTimeout,
+} from "@/lib/runtime-timeouts";
+import {
   BYOK_UPDATED_EVENT,
   SESSION_LLM_PASS_THROUGH_UPDATED_EVENT,
   getSessionOnlyLLMKey,
@@ -37,7 +41,11 @@ function hasSessionKey(): boolean {
 }
 
 async function fetchLlmConfig(): Promise<boolean> {
-  return getConfiguredLLMProviders()
+  return withAsyncTimeout(
+    getConfiguredLLMProviders(),
+    CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+    "LLM key status",
+  )
     .then(
       (r) =>
         Array.isArray(r?.configured_providers) &&
@@ -86,7 +94,7 @@ export function useOnboarding() {
     };
   }, [refetchLlm, refreshSessionKey]);
 
-  const step1 = !!account || hasSession;
+  const step1 = !!account;
   const step2 = llmConfigured === true || sessionKeyActive;
   // x402 payment is automatic via wallet signature on supported networks.
   // Step 3 is complete once the wallet is connected on a SKALE Base network

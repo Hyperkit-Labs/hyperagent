@@ -9,6 +9,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { getWorkflows, getErrorMessage, isAbortError } from "@/lib/api";
 import { POLLING } from "@/constants/defaults";
+import {
+  CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+  withAsyncTimeout,
+} from "@/lib/runtime-timeouts";
 import type { Workflow } from "@/lib/types";
 
 export interface UseWorkflowsOptions {
@@ -53,21 +57,35 @@ export function useWorkflows(
       try {
         setError(null);
 
-        const data = await getWorkflows(
-          {
-            status: filters.status,
-            limit: filters.limit,
-          },
-          signal,
+        const resolved = await withAsyncTimeout(
+          getWorkflows(
+            {
+              status: filters.status,
+              limit: filters.limit,
+            },
+            signal,
+          ),
+          CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+          "Workflows list",
         );
 
         if (isMounted.current) {
-          const list = Array.isArray(data) ? data : (data?.workflows ?? []);
-          const totalFromApi = (data as unknown as { total?: number }).total;
+          const list = Array.isArray(resolved)
+            ? resolved
+            : (resolved?.workflows ?? []);
+          const filteredList = normalizedNetworkFilter
+            ? list.filter((workflow) =>
+                (workflow.network ?? "")
+                  .toLowerCase()
+                  .includes(normalizedNetworkFilter),
+              )
+            : list;
+          const totalFromApi = (resolved as unknown as { total?: number })
+            .total;
           const count =
             typeof totalFromApi === "number" ? totalFromApi : list.length;
-          setWorkflows(list);
-          setTotal(count);
+          setWorkflows(filteredList);
+          setTotal(normalizedNetworkFilter ? filteredList.length : count);
         }
       } catch (err: unknown) {
         if (isMounted.current && !isAbortError(err)) {
@@ -79,7 +97,7 @@ export function useWorkflows(
         }
       }
     },
-    [filters.status, filters.limit],
+    [filters.status, filters.limit, normalizedNetworkFilter],
   );
 
   // Manual refetch function
@@ -136,3 +154,4 @@ export function useWorkflows(
     total,
   };
 }
+const normalizedNetworkFilter = filters.network?.trim().toLowerCase() ?? "";

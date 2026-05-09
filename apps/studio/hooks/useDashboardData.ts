@@ -10,6 +10,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { getMetrics, getWorkflows, getErrorMessage } from "@/lib/api";
+import {
+  CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+  withAsyncTimeout,
+} from "@/lib/runtime-timeouts";
 import { transformWorkflowToDeployment } from "@/lib/transformers";
 import type { Workflow } from "@/lib/types";
 import type { Deployment } from "@/lib/transformers";
@@ -46,6 +50,11 @@ const DEFAULT_METRICS: SystemMetrics = {
   },
 };
 
+function coerceMetricValue(value: unknown): number {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
 function normalizeMetrics(raw: unknown): SystemMetrics {
   if (!raw || typeof raw !== "object") return DEFAULT_METRICS;
   const m = raw as Record<string, unknown>;
@@ -54,23 +63,29 @@ function normalizeMetrics(raw: unknown): SystemMetrics {
   const d = (m.deployments as Record<string, number>) ?? {};
   return {
     workflows: {
-      total: Number(w.total) ?? 0,
-      active: Number(w.active) ?? 0,
-      completed: Number(w.completed) ?? 0,
-      failed: Number(w.failed) ?? 0,
+      total: coerceMetricValue(w.total),
+      active: coerceMetricValue(w.active),
+      completed: coerceMetricValue(w.completed),
+      failed: coerceMetricValue(w.failed),
     },
     contracts: {
-      total: Number(c.total) ?? 0,
-      deployed: Number(c.deployed) ?? 0,
-      verified: Number(c.verified) ?? 0,
+      total: coerceMetricValue(c.total),
+      deployed: coerceMetricValue(c.deployed),
+      verified: coerceMetricValue(c.verified),
     },
     deployments: {
-      total: Number(d.total) ?? 0,
-      successful: Number(d.successful ?? d.success_rate) ?? 0,
-      successRate: Number(d.success_rate) ?? 0,
+      total: coerceMetricValue(d.total),
+      successful: coerceMetricValue(d.successful ?? d.success_rate),
+      successRate: coerceMetricValue(d.success_rate),
     },
-    security: DEFAULT_METRICS.security,
-    performance: DEFAULT_METRICS.performance,
+    security:
+      typeof m.security === "object" && m.security
+        ? (m.security as SystemMetrics["security"])
+        : DEFAULT_METRICS.security,
+    performance:
+      typeof m.performance === "object" && m.performance
+        ? (m.performance as SystemMetrics["performance"])
+        : DEFAULT_METRICS.performance,
   };
 }
 
@@ -97,23 +112,55 @@ export function useDashboardData(options?: {
     setLoading(true);
     setError(null);
     try {
-      const [metricsRes, workflowsRes] = await Promise.all([
-        getMetrics(),
-        getWorkflows({ limit }),
+      const [metricsRes, workflowsRes] = await Promise.allSettled([
+        withAsyncTimeout(
+          getMetrics(),
+          CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+          "Dashboard metrics",
+        ),
+        withAsyncTimeout(
+          getWorkflows({ limit }),
+          CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+          "Dashboard workflows",
+        ),
       ]);
-      const wData = workflowsRes as WorkflowApiResponse;
-      const list = Array.isArray(workflowsRes)
-        ? workflowsRes
-        : (wData?.workflows ?? []);
-      const total =
-        typeof (workflowsRes as unknown as { total?: number }).total ===
-        "number"
-          ? (workflowsRes as unknown as { total: number }).total
-          : list.length;
-      setMetrics(normalizeMetrics(metricsRes));
-      setWorkflows(list);
-      setWorkflowsTotal(total);
-      setDeployments(workflowsToDeployments(list));
+
+      if (metricsRes.status === "fulfilled") {
+        setMetrics(normalizeMetrics(metricsRes.value));
+      } else {
+        setMetrics(DEFAULT_METRICS);
+      }
+
+      if (workflowsRes.status === "fulfilled") {
+        const wData = workflowsRes.value as WorkflowApiResponse;
+        const list = Array.isArray(workflowsRes.value)
+          ? workflowsRes.value
+          : (wData?.workflows ?? []);
+        const total =
+          typeof (workflowsRes.value as unknown as { total?: number }).total ===
+          "number"
+            ? (workflowsRes.value as unknown as { total: number }).total
+            : list.length;
+        setWorkflows(list);
+        setWorkflowsTotal(total);
+        setDeployments(workflowsToDeployments(list));
+      } else {
+        setWorkflows([]);
+        setWorkflowsTotal(0);
+        setDeployments([]);
+      }
+
+      const failures = [metricsRes, workflowsRes]
+        .filter(
+          (result): result is PromiseRejectedResult =>
+            result.status === "rejected",
+        )
+        .map((result) =>
+          getErrorMessage(result.reason, "Failed to load dashboard"),
+        );
+      if (failures.length > 0) {
+        setError(failures.join("\n"));
+      }
     } catch (err) {
       setError(getErrorMessage(err, "Failed to load dashboard"));
     } finally {

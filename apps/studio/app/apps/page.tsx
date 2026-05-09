@@ -19,7 +19,7 @@ export default function AppsListPage() {
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <PageTitle
               title="Apps"
-              subtitle="Apps are built from workflows. Create a workflow from Chat or the wizard, then view it here."
+              subtitle="Apps currently mirror workflow outputs. Create a workflow from Chat or the wizard, then review the generated app surfaces here."
             />
             <Link
               href={ROUTES.APPS_NEW}
@@ -50,7 +50,9 @@ export default function AppsListPage() {
               >
                 <Plus className="w-8 h-8 mb-2" />
                 <span className="text-sm font-medium">New app</span>
-                <span className="text-xs mt-1">Start from wizard</span>
+                <span className="text-xs mt-1">
+                  Start from app workflow wizard
+                </span>
               </Link>
               {workflows.map((w) => (
                 <Link
@@ -86,7 +88,7 @@ export default function AppsListPage() {
             <div className="rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] p-8 text-center">
               <Layers className="w-12 h-12 text-[var(--color-text-muted)] mx-auto mb-4" />
               <p className="text-sm text-[var(--color-text-tertiary)]">
-                No apps yet.
+                No generated app workflows yet.
               </p>
               <Link
                 href={ROUTES.CHAT}

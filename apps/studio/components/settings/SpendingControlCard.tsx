@@ -7,6 +7,10 @@ import {
   type SpendingControlWithBudget,
 } from "@/lib/api";
 import { useSession } from "@/hooks/useSession";
+import {
+  CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+  withAsyncTimeout,
+} from "@/lib/runtime-timeouts";
 
 export interface SpendingControlCardProps {
   /** When provided (e.g. from Payments page consolidated fetch), skip internal fetch. */
@@ -65,7 +69,11 @@ export function SpendingControlCard({
       return;
     }
     setLoading(true);
-    getSpendingControlWithBudget()
+    withAsyncTimeout(
+      getSpendingControlWithBudget(),
+      CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+      "Spending controls",
+    )
       .then((data) => {
         setControl(data);
         const init = initFromControl(data);

@@ -27,10 +27,22 @@ export function useTemplatesData(): UseTemplatesDataReturn {
     setLoading(true);
     setError(null);
     try {
-      const [tArr, bArr] = await Promise.all([
-        getTemplates().catch(() => []),
-        getBlueprints().catch(() => []),
+      const [templatesResult, blueprintsResult] = await Promise.allSettled([
+        getTemplates(),
+        getBlueprints(),
       ]);
+      const failures = [templatesResult, blueprintsResult]
+        .filter(
+          (result): result is PromiseRejectedResult =>
+            result.status === "rejected",
+        )
+        .map((result) =>
+          getErrorMessage(result.reason, "Failed to load templates"),
+        );
+      const tArr =
+        templatesResult.status === "fulfilled" ? templatesResult.value : [];
+      const bArr =
+        blueprintsResult.status === "fulfilled" ? blueprintsResult.value : [];
       const t = Array.isArray(tArr) ? tArr : [];
       const b = Array.isArray(bArr) ? bArr : [];
       const byId = new Map<string, TemplateItem>();
@@ -45,6 +57,9 @@ export function useTemplatesData(): UseTemplatesDataReturn {
           : undefined,
       );
       setTemplates(Array.from(byId.values()));
+      if (failures.length > 0) {
+        setError(failures.join("\n"));
+      }
     } catch (err) {
       setError(getErrorMessage(err, "Failed to load templates"));
     } finally {

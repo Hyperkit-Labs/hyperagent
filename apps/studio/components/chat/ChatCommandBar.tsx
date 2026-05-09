@@ -57,25 +57,25 @@ export function ChatCommandBar({
   const defaultPills: ActionPill[] = [
     {
       id: "audit",
-      label: "Audit",
+      label: "Prompt: Audit",
       onClick: () => onChange("Audit my smart contract for security issues"),
       icon: <Shield className="w-3.5 h-3.5" />,
     },
     {
       id: "debug",
-      label: "Debug",
+      label: "Prompt: Debug",
       onClick: () => onChange("Debug and fix the issues in my contract"),
       icon: <Wrench className="w-3.5 h-3.5" />,
     },
     {
       id: "deploy",
-      label: "Deploy",
+      label: "Prompt: Deploy",
       onClick: () => onChange("Deploy my contract to the testnet"),
       icon: <Rocket className="w-3.5 h-3.5" />,
     },
     {
       id: "create",
-      label: "Create",
+      label: "Prompt: Create",
       onClick: () =>
         onChange("Create an ERC20 token with name MyToken and symbol MTK"),
       icon: <Code2 className="w-3.5 h-3.5" />,

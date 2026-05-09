@@ -9,6 +9,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { getMetrics, getErrorMessage, isAbortError } from "@/lib/api";
 import { POLLING } from "@/constants/defaults";
+import {
+  CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+  withAsyncTimeout,
+} from "@/lib/runtime-timeouts";
 
 export interface SystemMetrics {
   workflows: {
@@ -139,9 +143,10 @@ export function useMetrics(options: UseMetricsOptions = {}): UseMetricsReturn {
       try {
         setError(null);
 
-        const raw = (await getMetrics(
-          { time_range: timeRange },
-          signal,
+        const raw = (await withAsyncTimeout(
+          getMetrics({ time_range: timeRange }, signal),
+          CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+          "Metrics",
         )) as MetricsApiResponse;
 
         if (isMounted.current) {

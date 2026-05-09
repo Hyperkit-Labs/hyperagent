@@ -24,6 +24,7 @@ import {
 import { StatusBadge, EmptyState } from "@/components/ui";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { hasAuditOrSimFailure } from "@/lib/types";
+import { toast } from "sonner";
 
 interface LogEntry {
   id?: string;
@@ -193,6 +194,19 @@ export default function HistoryPage() {
           </div>
         </div>
 
+        {tab === "workflows" && (
+          <p className="text-xs text-[var(--color-text-muted)]">
+            Showing the latest 100 workflows. Older records require pagination
+            support that is not yet exposed on this page.
+          </p>
+        )}
+        {tab === "logs" && (
+          <p className="text-xs text-[var(--color-text-muted)]">
+            Showing the latest 100 log records. Older records require pagination
+            support that is not yet exposed on this page.
+          </p>
+        )}
+
         {error && <ApiErrorBanner error={error} onRetry={fetchData} />}
 
         {loading ? (
@@ -206,125 +220,97 @@ export default function HistoryPage() {
             aria-label="Workflow history"
           >
             {filteredWorkflows.length === 0 ? (
-            <EmptyState
-              icon={
-                <History className="w-8 h-8 text-[var(--color-text-muted)]" />
-              }
-              title={
-                search.trim() ? "No matching workflows" : "No workflow history"
-              }
-              description={
-                search.trim()
-                  ? `No results for "${search}".`
-                  : "Create a workflow to see it here."
-              }
-              action={
-                <Link
-                  href={ROUTES.HOME}
-                  className="btn-primary-gradient text-xs px-4 py-1.5 rounded-lg"
-                >
-                  Create workflow
-                </Link>
-              }
-            />
+              <EmptyState
+                icon={
+                  <History className="w-8 h-8 text-[var(--color-text-muted)]" />
+                }
+                title={
+                  search.trim()
+                    ? "No matching workflows"
+                    : "No workflow history"
+                }
+                description={
+                  search.trim()
+                    ? `No results for "${search}".`
+                    : "Create a workflow to see it here."
+                }
+                action={
+                  <Link
+                    href={ROUTES.HOME}
+                    className="btn-primary-gradient text-xs px-4 py-1.5 rounded-lg"
+                  >
+                    Create workflow
+                  </Link>
+                }
+              />
             ) : (
-            <div className="glass-panel rounded-xl overflow-hidden">
-              <table
-                className="min-w-full divide-y divide-[var(--color-border)]"
-                aria-label="Workflow history"
-              >
-                <thead className="bg-[var(--color-bg-panel)]">
-                  <tr>
-                    <th
-                      scope="col"
-                      className="px-4 py-3 text-left text-xs font-medium text-[var(--color-text-tertiary)] uppercase"
-                    >
-                      Prompt
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-4 py-3 text-left text-xs font-medium text-[var(--color-text-tertiary)] uppercase"
-                    >
-                      Status
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-4 py-3 text-left text-xs font-medium text-[var(--color-text-tertiary)] uppercase"
-                    >
-                      Network
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-4 py-3 text-left text-xs font-medium text-[var(--color-text-tertiary)] uppercase"
-                    >
-                      Created
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-4 py-3 text-right text-xs font-medium text-[var(--color-text-tertiary)] uppercase"
-                    >
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--color-border)]">
-                  {filteredWorkflows.map((w) => (
-                    <tr
-                      key={w.workflow_id}
-                      className="hover:bg-[var(--color-bg-panel)] transition-colors"
-                    >
-                      <td className="px-4 py-3 text-sm text-[var(--color-text-primary)] max-w-xs truncate">
-                        {w.intent || w.prompt || w.workflow_id}
-                      </td>
-                      <td className="px-4 py-3">
-                        <StatusBadge status={w.status || "unknown"} />
-                      </td>
-                      <td className="px-4 py-3 text-xs text-[var(--color-text-tertiary)]">
-                        {w.network || "-"}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-[var(--color-text-tertiary)]">
-                        {w.created_at
-                          ? new Date(w.created_at).toLocaleString()
-                          : "-"}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              setQuickDemoLoading(w.workflow_id);
-                              try {
-                                const res = await createQuickDemo(
-                                  w.workflow_id,
-                                );
-                                if (res.url)
-                                  window.open(
-                                    res.url,
-                                    "_blank",
-                                    "noopener,noreferrer",
-                                  );
-                              } finally {
-                                setQuickDemoLoading(null);
-                              }
-                            }}
-                            disabled={quickDemoLoading !== null}
-                            aria-label={`Try workflow ${w.intent || w.prompt || w.workflow_id} in sandbox`}
-                            className="p-1.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)] disabled:opacity-50"
-                            title="Try in sandbox"
-                          >
-                            {quickDemoLoading === w.workflow_id ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                          {hasAuditOrSimFailure(w) && (
+              <div className="glass-panel rounded-xl overflow-hidden">
+                <table
+                  className="min-w-full divide-y divide-[var(--color-border)]"
+                  aria-label="Workflow history"
+                >
+                  <thead className="bg-[var(--color-bg-panel)]">
+                    <tr>
+                      <th
+                        scope="col"
+                        className="px-4 py-3 text-left text-xs font-medium text-[var(--color-text-tertiary)] uppercase"
+                      >
+                        Prompt
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-4 py-3 text-left text-xs font-medium text-[var(--color-text-tertiary)] uppercase"
+                      >
+                        Status
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-4 py-3 text-left text-xs font-medium text-[var(--color-text-tertiary)] uppercase"
+                      >
+                        Network
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-4 py-3 text-left text-xs font-medium text-[var(--color-text-tertiary)] uppercase"
+                      >
+                        Created
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-4 py-3 text-right text-xs font-medium text-[var(--color-text-tertiary)] uppercase"
+                      >
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--color-border)]">
+                    {filteredWorkflows.map((w) => (
+                      <tr
+                        key={w.workflow_id}
+                        className="hover:bg-[var(--color-bg-panel)] transition-colors"
+                      >
+                        <td className="px-4 py-3 text-sm text-[var(--color-text-primary)] max-w-xs truncate">
+                          {w.intent || w.prompt || w.workflow_id}
+                        </td>
+                        <td className="px-4 py-3">
+                          <StatusBadge status={w.status || "unknown"} />
+                        </td>
+                        <td className="px-4 py-3 text-xs text-[var(--color-text-tertiary)]">
+                          {w.network || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-[var(--color-text-tertiary)]">
+                          {w.created_at
+                            ? new Date(w.created_at).toLocaleString()
+                            : "-"}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
                             <button
                               type="button"
                               onClick={async () => {
-                                setDebugSandboxLoading(w.workflow_id);
+                                setQuickDemoLoading(w.workflow_id);
                                 try {
-                                  const res = await createDebugSandbox(
+                                  const res = await createQuickDemo(
                                     w.workflow_id,
                                   );
                                   if (res.url)
@@ -333,49 +319,101 @@ export default function HistoryPage() {
                                       "_blank",
                                       "noopener,noreferrer",
                                     );
+                                  else
+                                    toast.error(
+                                      "Quick demo did not return a sandbox URL.",
+                                    );
+                                } catch (error) {
+                                  toast.error(
+                                    error instanceof Error
+                                      ? error.message
+                                      : "Quick demo failed",
+                                  );
                                 } finally {
-                                  setDebugSandboxLoading(null);
+                                  setQuickDemoLoading(null);
                                 }
                               }}
-                              disabled={debugSandboxLoading !== null}
-                              aria-label={`Debug workflow ${w.intent || w.prompt || w.workflow_id} in sandbox`}
-                              className="p-1.5 rounded text-amber-400 hover:bg-amber-500/10 disabled:opacity-50"
-                              title="Debug in sandbox"
+                              disabled={quickDemoLoading !== null}
+                              aria-label={`Try workflow ${w.intent || w.prompt || w.workflow_id} in sandbox`}
+                              className="p-1.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-panel)] disabled:opacity-50"
+                              title="Try in sandbox"
                             >
-                              {debugSandboxLoading === w.workflow_id ? (
+                              {quickDemoLoading === w.workflow_id ? (
                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
                               ) : (
-                                <Bug className="w-3.5 h-3.5" />
+                                <ExternalLink className="w-3.5 h-3.5" />
                               )}
                             </button>
-                          )}
-                          <Link
-                            href={`${ROUTES.HOME}?workflow=${w.workflow_id}`}
-                            aria-label={`Open workflow ${w.intent || w.prompt || w.workflow_id}`}
-                            className="p-1.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
-                            title="Open workflow"
-                          >
-                            <ChevronRight className="w-4 h-4" />
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                            {hasAuditOrSimFailure(w) && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  setDebugSandboxLoading(w.workflow_id);
+                                  try {
+                                    const res = await createDebugSandbox(
+                                      w.workflow_id,
+                                    );
+                                    if (res.url)
+                                      window.open(
+                                        res.url,
+                                        "_blank",
+                                        "noopener,noreferrer",
+                                      );
+                                    else
+                                      toast.error(
+                                        "Debug sandbox did not return a sandbox URL.",
+                                      );
+                                  } catch (error) {
+                                    toast.error(
+                                      error instanceof Error
+                                        ? error.message
+                                        : "Debug sandbox failed",
+                                    );
+                                  } finally {
+                                    setDebugSandboxLoading(null);
+                                  }
+                                }}
+                                disabled={debugSandboxLoading !== null}
+                                aria-label={`Debug workflow ${w.intent || w.prompt || w.workflow_id} in sandbox`}
+                                className="p-1.5 rounded text-amber-400 hover:bg-amber-500/10 disabled:opacity-50"
+                                title="Debug in sandbox"
+                              >
+                                {debugSandboxLoading === w.workflow_id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Bug className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            )}
+                            <Link
+                              href={`${ROUTES.HOME}?workflow=${w.workflow_id}`}
+                              aria-label={`Open workflow ${w.intent || w.prompt || w.workflow_id}`}
+                              className="p-1.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+                              title="Open workflow"
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         ) : filteredLogs.length === 0 ? (
           <div id="history-panel-logs" role="tabpanel" aria-label="Log history">
             <EmptyState
-            icon={<Filter className="w-8 h-8 text-[var(--color-text-muted)]" />}
-            title={search.trim() ? "No matching logs" : "No log entries"}
-            description={
-              search.trim()
-                ? `No results for "${search}".`
-                : "Log entries appear after running workflows."
-            }
+              icon={
+                <Filter className="w-8 h-8 text-[var(--color-text-muted)]" />
+              }
+              title={search.trim() ? "No matching logs" : "No log entries"}
+              description={
+                search.trim()
+                  ? `No results for "${search}".`
+                  : "Log entries appear after running workflows."
+              }
             />
           </div>
         ) : (

@@ -15,7 +15,11 @@ import { useLayout } from "@/components/providers/LayoutProvider";
 import { useSession } from "@/hooks/useSession";
 import { useNetworks } from "@/hooks/useNetworks";
 import { useSelectedNetwork } from "@/components/providers/SelectedNetworkProvider";
-import { FULL_PAGE_ROUTES, PUBLIC_ROUTE } from "@/constants/routes";
+import {
+  getStudioShellMode,
+  isProtectedStudioRoute,
+  PUBLIC_ROUTE,
+} from "@/constants/routes";
 
 function OrchestratorRailWithNetwork() {
   const { selectedNetworkId } = useSelectedNetwork();
@@ -53,7 +57,7 @@ export function LayoutSwitcher({ children }: { children: React.ReactNode }) {
   const hasWallet = Boolean(walletAddress);
 
   useEffect(() => {
-    if (!pathname || pathname === PUBLIC_ROUTE) return;
+    if (!pathname || !isProtectedStudioRoute(pathname)) return;
     if (!sessionReady) return;
     if (hasSession) return;
     if (account !== undefined && !hasWallet) {
@@ -69,11 +73,11 @@ export function LayoutSwitcher({ children }: { children: React.ReactNode }) {
     router,
   ]);
 
-  const isFullPage = pathname && FULL_PAGE_ROUTES.includes(pathname);
+  const shellMode = getStudioShellMode(pathname);
 
   if (
     pathname &&
-    pathname !== PUBLIC_ROUTE &&
+    isProtectedStudioRoute(pathname) &&
     sessionReady &&
     !hasSession &&
     account !== undefined &&
@@ -86,11 +90,11 @@ export function LayoutSwitcher({ children }: { children: React.ReactNode }) {
     <ActiveAccountProvider account={account}>{children}</ActiveAccountProvider>
   );
 
-  if (pathname === PUBLIC_ROUTE) {
+  if (shellMode === "public") {
     return <>{wrappedChildren}</>;
   }
 
-  if (isFullPage) {
+  if (shellMode === "shellless") {
     return <>{wrappedChildren}</>;
   }
 

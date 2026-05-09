@@ -13,6 +13,10 @@ import { getConfig } from "@/lib/api";
 import { setRuntimeFeatures, setRuntimeConfig } from "@/config/environment";
 import { ROUTES } from "@/constants/routes";
 import type { RuntimeConfig } from "@/lib/api";
+import {
+  CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+  withAsyncTimeout,
+} from "@/lib/runtime-timeouts";
 
 const CONFIG_SWR_KEY = "config";
 /** Cache config for 24h. Feature flags and defaults rarely change. */
@@ -50,9 +54,19 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const shouldFetch = pathname !== ROUTES.LOGIN;
 
+  const configFetcher = useCallback(
+    () =>
+      withAsyncTimeout(
+        getConfig(),
+        CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+        "Runtime configuration",
+      ),
+    [],
+  );
+
   const { data, error, isLoading, mutate } = useSWR(
     shouldFetch ? CONFIG_SWR_KEY : null,
-    getConfig,
+    configFetcher,
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: true,

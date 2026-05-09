@@ -8,6 +8,10 @@ import {
   type LogsFilters,
 } from "@/lib/api";
 import { POLLING } from "@/constants/defaults";
+import {
+  CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+  withAsyncTimeout,
+} from "@/lib/runtime-timeouts";
 
 export interface UseLogsOptions {
   autoRefresh?: boolean;
@@ -66,13 +70,25 @@ export function useLogs(options: UseLogsOptions = {}): UseLogsReturn {
     try {
       setError(null);
       const [response, servicesList, hostsList] = await Promise.all([
-        getLogs({
-          ...filtersRef.current,
-          page: pageRef.current,
-          page_size: pageSizeRef.current,
-        }),
-        getLogServices().catch(() => []),
-        getLogHosts().catch(() => []),
+        withAsyncTimeout(
+          getLogs({
+            ...filtersRef.current,
+            page: pageRef.current,
+            page_size: pageSizeRef.current,
+          }),
+          CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+          "Logs",
+        ),
+        withAsyncTimeout(
+          getLogServices().catch(() => []),
+          CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+          "Log services",
+        ),
+        withAsyncTimeout(
+          getLogHosts().catch(() => []),
+          CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+          "Log hosts",
+        ),
       ]);
       setLogs(response.logs);
       setTotal(response.total);
@@ -90,11 +106,15 @@ export function useLogs(options: UseLogsOptions = {}): UseLogsReturn {
   const fetchLogs = useCallback(async () => {
     try {
       setError(null);
-      const response = await getLogs({
-        ...filtersRef.current,
-        page: pageRef.current,
-        page_size: pageSizeRef.current,
-      });
+      const response = await withAsyncTimeout(
+        getLogs({
+          ...filtersRef.current,
+          page: pageRef.current,
+          page_size: pageSizeRef.current,
+        }),
+        CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+        "Logs",
+      );
       setLogs(response.logs);
       setTotal(response.total);
       setPage(response.page);

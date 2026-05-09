@@ -11,11 +11,15 @@ const jestBin = require.resolve("jest/bin/jest", { paths: [studioRoot] });
 
 process.env.JEST_CACHE_FOLDER = path.join(studioRoot, ".jest-cache");
 
+const forwardedArgs = process.argv.slice(2);
+const sanitizedArgs =
+  forwardedArgs[0] === "--" ? forwardedArgs.slice(1) : forwardedArgs;
+
 const args = [
   jestBin,
   "--config",
   path.join(studioRoot, "jest.config.cjs"),
-  ...process.argv.slice(2),
+  ...sanitizedArgs,
 ];
 
 const result = spawnSync(process.execPath, args, {

@@ -28,6 +28,10 @@ import {
   SESSION_LLM_PASS_THROUGH_UPDATED_EVENT,
   type SessionLLMProvider,
 } from "@/lib/session-store";
+import {
+  CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+  withAsyncTimeout,
+} from "@/lib/runtime-timeouts";
 
 const BYOK_PROVIDERS = ["openai", "anthropic", "google", "together"] as const;
 
@@ -114,7 +118,11 @@ export function LLMKeysCard() {
       return;
     }
     setLoading(true);
-    getConfiguredLLMProviders()
+    withAsyncTimeout(
+      getConfiguredLLMProviders(),
+      CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+      "LLM key configuration",
+    )
       .then((res) => {
         setError(null);
         setConfigured(res.configured_providers || []);
@@ -154,7 +162,11 @@ export function LLMKeysCard() {
         if (cancelled) return;
         setTestStatus((prev) => ({ ...prev, [provider]: { loading: true } }));
         try {
-          const res = await validateLLMKey(provider, undefined);
+          const res = await withAsyncTimeout(
+            validateLLMKey(provider, undefined),
+            CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+            `${provider} key validation`,
+          );
           if (!cancelled) {
             setTestStatus((prev) => ({
               ...prev,
@@ -279,7 +291,11 @@ export function LLMKeysCard() {
     }
     setTestStatus((prev) => ({ ...prev, [provider]: { loading: true } }));
     try {
-      const res = await validateLLMKey(provider, keyToTest || undefined);
+      const res = await withAsyncTimeout(
+        validateLLMKey(provider, keyToTest || undefined),
+        CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+        `${provider} key validation`,
+      );
       setTestStatus((prev) => ({
         ...prev,
         [provider]: {

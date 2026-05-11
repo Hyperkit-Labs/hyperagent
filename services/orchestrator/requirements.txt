@@ -17,7 +17,7 @@ redis>=5.0.0
 datasets>=2.14.0
 # Celery: replaces hand-rolled Redis BLPOP queue with retry/backoff/Flower visibility.
 # Set CELERY_ENABLED=1 and REDIS_URL. Run: celery -A celery_app worker -Q pipeline
-celery[redis]>=5.3.0
+celery[redis]>=5.6.3
 # Celery Flower monitoring dashboard (optional)
 flower>=2.0.0
 # LangGraph Postgres checkpointer: durable pipeline state in Supabase DB.

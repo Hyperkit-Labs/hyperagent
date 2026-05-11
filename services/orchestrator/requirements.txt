@@ -13,7 +13,7 @@ web3>=6.0.0
 # eth-account: ECDSA/EIP-191 signature verification for x402_verifier.py.
 # Already a transitive dependency of web3; listed explicitly so removals don't break x402_verifier.
 eth-account>=0.10.0
-redis>=5.0.0
+redis>=7.4.0
 datasets>=2.14.0
 # Celery: replaces hand-rolled Redis BLPOP queue with retry/backoff/Flower visibility.
 # Set CELERY_ENABLED=1 and REDIS_URL. Run: celery -A celery_app worker -Q pipeline

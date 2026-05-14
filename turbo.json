@@ -1,14 +1,41 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "envMode": "loose",
+  "envMode": "strict",
+  "globalEnv": [
+    "CI",
+    "NODE_ENV",
+    "ENVIRONMENT",
+    "DATABASE_URL",
+    "REDIS_URL",
+    "UPSTASH_*",
+    "SUPABASE_*",
+    "AUTH_JWT_SECRET",
+    "IDENTITY_HMAC_SECRET",
+    "NEXT_PUBLIC_*",
+    "THIRDWEB_*",
+    "TENDERLY_*",
+    "X402_*",
+    "MERCHANT_*",
+    "PLAYWRIGHT_*",
+    "CSP_*",
+    "STUDIO_GATEWAY_PROXY_TIMEOUT_MS",
+    "NEXT_TELEMETRY_DISABLED",
+    "ARGOCD_*",
+    "SLACK_*",
+    "GITHUB_*",
+    "TURBO_*"
+  ],
+  "globalDependencies": [".env*"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "env": ["*"],
       "outputs": ["dist/**", ".next/**", "build/**", "!.next/cache/**"]
     },
     "test": {
       "dependsOn": ["^build"],
+      "env": ["*"],
       "outputs": []
     },
     "lint": {

@@ -188,9 +188,12 @@ export function workflowCreateFailureMessage(err: unknown): string {
   }
   const status = (err as ApiErrorWithStatus)?.status;
   let base: string;
-  if (status === 401 || status === 403) {
+  if (status === 401) {
     base =
       "Your session expired. Sign in again to resume. Your draft text on this page is saved in this browser until you send it.";
+  } else if (status === 403) {
+    base =
+      "This action is not available for your current account or workflow state. Your draft is still here.";
   } else if (status === 402) {
     base =
       "Payment is required to start this run. Complete the x402 payment flow, then try again. Your draft is still here.";

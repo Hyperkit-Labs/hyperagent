@@ -80,7 +80,10 @@ pnpm --filter hyperagent-studio dev    # Run Studio dev server
 pnpm --filter hyperagent-studio build  # Build Studio
 pnpm turbo lint                 # Lint
 pnpm turbo test                 # Test
+pnpm run ci:gate:pr             # Canonical local PR-gate reproduction
 ```
+
+For canonical contract ownership and the required-check vocabulary, see [Canonical ownership and gates](../control-plane/canonical-ownership-and-gates.md).
 
 Backend (Makefile):
 

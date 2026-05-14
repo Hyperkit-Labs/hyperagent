@@ -55,6 +55,7 @@ export interface GatewayEnv {
   readonly redisRest: GatewayRedisRest;
   readonly rateLimits: GatewayRateLimits;
   readonly identityHmacSecret: string;
+  readonly internalServiceToken: string;
   readonly metering: {
     readonly enforced: boolean;
     readonly minBalance: number;
@@ -209,6 +210,7 @@ export function buildGatewayEnv(e: NodeJS.ProcessEnv): GatewayEnv {
     },
     rateLimits: buildRateLimits(e),
     identityHmacSecret: trimEnv(e, Env.IDENTITY_HMAC_SECRET),
+    internalServiceToken: trimEnv(e, Env.INTERNAL_SERVICE_TOKEN),
     metering: {
       enforced: meteringEnforced,
       minBalance: parseEnvFloat(e[Env.METERING_MIN_BALANCE], 0),

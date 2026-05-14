@@ -52,7 +52,7 @@ Do **not** treat these as guarantees in copy, UI, or reviews until enforcement i
 
 **Why it matters:** Without this, auth is split and spoofable.
 
-**Update (repo):** `apps/api-gateway/src/auth.ts` enforces JWT on non-public paths; `apps/api-gateway/src/index.ts` requires `AUTH_JWT_SECRET` and Upstash REST env in production before listen; `apps/api-gateway/src/proxy.ts` strips client `X-User-Id` and sets identity from JWT with optional `IDENTITY_HMAC_SECRET` signature for the orchestrator; `services/orchestrator/api/spoofed_identity_middleware.py` rejects unsigned identity when the secret is set. **Still verify:** orchestrator is not reachable without the gateway in production, and Studio only calls the gateway.
+**Update (repo):** `apps/api-gateway/src/auth.ts` enforces JWT on non-public paths; `apps/api-gateway/src/index.ts` now blocks production startup when `AUTH_JWT_SECRET`, Upstash REST rate-limit env, or `IDENTITY_HMAC_SECRET` are missing; `apps/api-gateway/src/proxy.ts` strips client `X-User-Id` and sets identity from JWT with signed `x-user-id-sig` for the orchestrator; `services/orchestrator/api/spoofed_identity_middleware.py` rejects unsigned identity when enforcement is active. **Still verify:** orchestrator is not reachable without the gateway in production, and Studio only calls the gateway.
 
 ---
 
@@ -183,7 +183,7 @@ Do **not** treat these as guarantees in copy, UI, or reviews until enforcement i
 - Environment hardening checks.
 - Full health proof for every downstream dependency.
 
-**Update (repo):** API gateway `/health` exposes `rate_limit_rest_configured`, `identity_hmac_configured`, `production_security_ready`, and folds them into `pipeline_ready`; orchestrator logs when `IDENTITY_HMAC_SECRET` is unset in production.
+**Update (repo):** API gateway `/health` exposes `rate_limit_rest_configured`, `identity_hmac_configured`, `production_security_ready`, and folds them into `pipeline_ready`; orchestrator now treats `STRICT_STARTUP` as effectively on by default in production and requires explicit `STRICT_STARTUP=0` to allow degraded startup for break-glass debugging.
 
 ---
 

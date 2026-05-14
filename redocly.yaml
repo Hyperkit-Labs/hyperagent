@@ -3,7 +3,7 @@ apis:
     root: ./packages/api-contracts/openapi/openapi.json
 
 extends:
-  - minimal
+  - recommended-strict
 
 rules:
   operation-operationId: error

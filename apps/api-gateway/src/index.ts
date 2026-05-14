@@ -15,7 +15,6 @@ import { authMiddleware, type RequestWithUser } from "./auth.js";
 import { isKnownGatewayPath, isStaticProbePath } from "./knownPaths.js";
 import { rateLimitMiddleware, hasRestRateLimitEnv } from "./rateLimit.js";
 import { authBootstrapHandler } from "./authBootstrap.js";
-import { byokRouter } from "./byok.js";
 import {
   createOrchestratorLegacyMountProxy,
   createOrchestratorStripMountProxy,
@@ -28,6 +27,7 @@ import { initOtel } from "./otel-sdk.js";
 import { initSentry } from "./sentry-init.js";
 import { createPlatformTrackRecordHandler } from "./trackRecord.js";
 import { logOrchestratorPreflight } from "./orchestrator-preflight.js";
+import { getGatewayStartupFatalMisconfig } from "./startupPolicy.js";
 
 initSentry();
 initOtel();
@@ -43,13 +43,14 @@ if (gw.isProduction && gw.billing.x402EnabledForHints) {
   validateRequiredSecrets([Env.MERCHANT_WALLET_ADDRESS], "api-gateway (x402)");
 }
 
-if (gw.isProduction && !hasRestRateLimitEnv()) {
-  log.fatal("Production requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN for rate limiting");
-  process.exit(1);
-}
-
-if (gw.isProduction && !gw.auth.jwtSecret) {
-  log.fatal("Production requires AUTH_JWT_SECRET");
+const startupFatalMisconfig = getGatewayStartupFatalMisconfig(gw, {
+  restRateLimitConfigured: hasRestRateLimitEnv(),
+});
+if (startupFatalMisconfig.length > 0) {
+  log.fatal(
+    "Production startup blocked: %s",
+    startupFatalMisconfig.join("; "),
+  );
   process.exit(1);
 }
 
@@ -153,8 +154,6 @@ app.use((req, res, next) => {
 app.post("/api/v1/auth/bootstrap", jsonParser, (req, res, next) => {
   void authBootstrapHandler(req, res).catch(next);
 });
-app.use("/api/v1/byok", jsonParser, byokRouter);
-
 /** Legacy paths without `/api/v1` (old clients or internal probes) → orchestrator versioned routes. */
 app.use(
   "/config",

@@ -6,7 +6,7 @@ Central schema: `security_audit_log` with `schema_version`, `service`, `event_ca
 
 | Service        | Categories (examples)              | How it is emitted                                      |
 |----------------|-------------------------------------|--------------------------------------------------------|
-| api-gateway    | `auth`, `rate_limit`, `byok`        | `emitSecurityAuditV1FromGateway`, `emitAuditEvent`     |
+| api-gateway    | `auth`, `rate_limit`                | `emitSecurityAuditV1FromGateway`, `emitAuditEvent`     |
 | orchestrator   | `deploy`, `waiver`, `security_gate`| `emit_security_audit_v1` in workflows, waiver path     |
 
 Structured JSON logs also carry `audit: true` or `security_audit_v1` for log pipelines.

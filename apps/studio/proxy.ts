@@ -9,10 +9,10 @@ import {
   isPublicStudioRoute,
   ROUTES,
 } from "@/constants/routes";
+import { SESSION_TOKEN_COOKIE_NAMES } from "@/lib/session-token-cookies";
 
 const SESSION_COOKIE_NAME = "hyperagent_has_session";
 const SESSION_EXPIRES_COOKIE_NAME = "hyperagent_session_expires";
-const SESSION_TOKEN_COOKIE_NAME = "hyperagent_session_token";
 
 function generateNonce(): string {
   const bytes = new Uint8Array(16);
@@ -143,6 +143,18 @@ async function sessionTokenIsValid(token: string): Promise<boolean> {
   return jwtLooksValidAndNotExpired(token);
 }
 
+export function getRequestSessionToken(request: NextRequest): string | null {
+  const authHeader = request.headers.get("authorization");
+  if (authHeader) {
+    return authHeader.replace(/^Bearer\s+/i, "") || null;
+  }
+  for (const name of SESSION_TOKEN_COOKIE_NAMES) {
+    const value = request.cookies.get(name)?.value;
+    if (value) return value;
+  }
+  return null;
+}
+
 const E2E_BYPASS_COOKIE = "PLAYWRIGHT_E2E";
 
 function e2eBypassEnvAllowed(): boolean {
@@ -170,9 +182,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
       return nextWithCsp(request, nonce);
     }
 
-    const token =
-      request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
-      request.cookies.get(SESSION_TOKEN_COOKIE_NAME)?.value;
+    const token = getRequestSessionToken(request);
 
     if (!token) {
       return NextResponse.json(
@@ -205,11 +215,11 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   }
 
   const hasSession = request.cookies.get(SESSION_COOKIE_NAME)?.value === "1";
-  if (!hasSession) {
+  const rawToken = getRequestSessionToken(request);
+  if (!hasSession && !rawToken) {
     return redirectToLogin(request);
   }
 
-  const rawToken = request.cookies.get(SESSION_TOKEN_COOKIE_NAME)?.value;
   if (rawToken) {
     if (!(await sessionTokenIsValid(rawToken))) {
       return redirectToLogin(request);

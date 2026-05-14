@@ -1,6 +1,7 @@
 """Integration tests: gateway-orchestrator auth chain.
-Verifies orchestrator accepts and uses X-User-Id from gateway proxy.
-Gateway sets x-user-id from JWT sub; orchestrator uses it for workflows, credits, etc."""
+Verifies orchestrator accepts signed X-User-Id values from the gateway proxy.
+Gateway sets x-user-id from JWT sub and signs it; orchestrator uses it for
+workflow ownership and other user-scoped backend actions."""
 
 from __future__ import annotations
 
@@ -36,7 +37,7 @@ def client(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_workflows_list_with_x_user_id_returns_user_scoped(client):
-    """Gateway passes X-User-Id; orchestrator uses it for workflow listing."""
+    """Gateway passes signed X-User-Id; orchestrator uses it for workflow listing."""
     user_id = "550e8400-e29b-41d4-a716-446655440000"
     r = client.get("/api/v1/workflows", headers=_signed_user_headers(user_id))
     assert r.status_code == 200
@@ -54,7 +55,7 @@ def test_workflows_list_without_x_user_id_allows_anonymous(client):
 
 
 def test_generate_accepts_x_user_id(client):
-    """POST /generate accepts X-User-Id for credit deduction and workflow ownership."""
+    """POST /generate accepts signed X-User-Id for ownership and billing context."""
     user_id = "550e8400-e29b-41d4-a716-446655440001"
     r = client.post(
         "/api/v1/workflows/generate",

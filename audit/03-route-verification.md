@@ -25,7 +25,6 @@
 | `/streaming` (legacy) | `/api/v1/streaming/workflows` | `workflows_streaming_router` | OK |
 | `/presets`, `/blueprints`, `/templates`, `/networks`, `/agents`, `/contracts`, `/logs`, `/metrics`, `/security`, `/pricing`, `/tokens`, `/infra`, `/quick-demo` | `/api/v1/...` | various routers in `runs_registry`, `metrics_health`, `infra`, `billing` | OK |
 | `/api/v1/auth/bootstrap` (gateway-internal) | (gateway) | n/a — gateway-issued JWT | OK |
-| `/api/v1/byok` (gateway-internal) | (gateway) | n/a | OK |
 | `/platform/track-record` and `/api/v1/platform/track-record` | gateway-internal | n/a | OK (resolved via `metrics_health` for the v1 variant) |
 
 ## Frontend-called routes (apps/studio/lib/api/*) → backend reality

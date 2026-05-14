@@ -3,7 +3,11 @@
 import { useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { useActiveAccount } from "thirdweb/react";
-import { setAuthHeaderProvider, setOn401Callback } from "@/lib/api";
+import {
+  setAuthHeaderProvider,
+  setOn401Callback,
+  type UnauthorizedRequestContext,
+} from "@/lib/api";
 import {
   getStoredSession,
   clearStoredSession,
@@ -20,18 +24,37 @@ import {
 } from "@/lib/sadPathCopy";
 import { bootstrapWithThirdwebInApp } from "@/lib/authBootstrap";
 
-const SILENT_REFRESH_BUFFER_SEC = 120;
-const REDIRECT_BUFFER_SEC = 300;
+const SILENT_REFRESH_BUFFER_SEC = 300;
+const REDIRECT_BUFFER_SEC = 120;
 
 /**
  * Wires gateway session (our JWT) to the API client. Every request to the gateway
  * includes Authorization: Bearer <access_token> from the session store.
  * On 401, clears session, shows toast, and redirects to /login?next=.
- * Schedules a proactive redirect 5 min before JWT expiry so users do not lose work mid-flow.
+ * Schedules silent refresh before the fallback redirect so valid sessions are renewed first.
  */
 export function ApiAuthProvider({ children }: { children: React.ReactNode }) {
   const account = useActiveAccount();
   const refreshAttemptedRef = useRef(false);
+
+  const traceUnauthorized = useCallback(
+    (context: UnauthorizedRequestContext) => {
+      if (
+        typeof console === "undefined" ||
+        typeof console.warn !== "function"
+      ) {
+        return;
+      }
+      console.warn("[auth] global 401 logout", {
+        ...context,
+        route:
+          typeof window !== "undefined"
+            ? `${window.location.pathname}${window.location.search}`
+            : undefined,
+      });
+    },
+    [],
+  );
 
   const attemptSilentRefresh = useCallback(async (): Promise<boolean> => {
     if (refreshAttemptedRef.current) return false;
@@ -64,7 +87,8 @@ export function ApiAuthProvider({ children }: { children: React.ReactNode }) {
         ? { Authorization: `Bearer ${session.access_token}` }
         : {};
     });
-    setOn401Callback(() => {
+    setOn401Callback((context) => {
+      traceUnauthorized(context);
       clearStoredSession();
       toast.error(SESSION_INVALIDATED_TOAST);
       redirectToLoginWithNext();
@@ -73,7 +97,7 @@ export function ApiAuthProvider({ children }: { children: React.ReactNode }) {
       setAuthHeaderProvider(null);
       setOn401Callback(null);
     };
-  }, []);
+  }, [traceUnauthorized]);
 
   useEffect(() => {
     let refreshTimerId: number | undefined;

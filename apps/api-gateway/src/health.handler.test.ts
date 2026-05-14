@@ -15,6 +15,11 @@ vi.mock("@hyperagent/config", () => ({
   getGatewayEnv: vi.fn(() => ({
     auth: { jwtSecret: "s" },
     bootstrap: { thirdwebSecretKey: "t" },
+    identityHmacSecret: "hmac",
+    internalServiceToken: "svc-token",
+    billing: { x402EnabledForHints: false, merchantWallet: "" },
+    isProduction: false,
+    redisRest: { restUrl: "", restToken: "" },
   })),
 }));
 
@@ -48,6 +53,11 @@ describe("healthHandler", () => {
     vi.mocked(getGatewayEnv).mockReturnValue({
       auth: { jwtSecret: "s" },
       bootstrap: { thirdwebSecretKey: "t" },
+      identityHmacSecret: "hmac",
+      internalServiceToken: "svc-token",
+      billing: { x402EnabledForHints: false, merchantWallet: "" },
+      isProduction: false,
+      redisRest: { restUrl: "", restToken: "" },
     } as ReturnType<typeof getGatewayEnv>);
   });
 
@@ -69,6 +79,9 @@ describe("healthHandler", () => {
     expect(payload.statusCode).toBe(200);
     expect(payload.body?.status).toBe("ok");
     expect(payload.body?.pipeline_ready).toBe(true);
+    expect(payload.body?.identity_hmac_configured).toBe(true);
+    expect(payload.body?.rate_limit_rest_configured).toBe(false);
+    expect(payload.body?.production_security_ready).toBe(true);
   });
 
   it("returns 503 when orchestrator /health is not OK", async () => {
@@ -97,6 +110,11 @@ describe("healthHandler", () => {
     vi.mocked(getGatewayEnv).mockReturnValue({
       auth: { jwtSecret: "" },
       bootstrap: { thirdwebSecretKey: "t" },
+      identityHmacSecret: "",
+      internalServiceToken: "",
+      billing: { x402EnabledForHints: false, merchantWallet: "" },
+      isProduction: true,
+      redisRest: { restUrl: "", restToken: "" },
     } as ReturnType<typeof getGatewayEnv>);
 
     global.fetch = vi.fn() as typeof fetch;
@@ -106,6 +124,7 @@ describe("healthHandler", () => {
     await h({} as Request, res);
     expect(payload.statusCode).toBe(503);
     expect(payload.body?.auth_signin_ready).toBe(false);
+    expect(payload.body?.production_security_ready).toBe(false);
   });
 
   it("shallow: returns 200 when only orchestrator /health/live is OK (no deep /health call)", async () => {

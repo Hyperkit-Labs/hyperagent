@@ -1,10 +1,8 @@
-# HyperAgent CI/CD Pipeline
-name: HyperAgent CI/CD
+# Main Gate
+name: Main Gate
 
 on:
   push:
-    branches: [main, development]
-  pull_request:
     branches: [main, development]
   schedule:
     - cron: '0 2 * * *'  # Daily security scan
@@ -23,25 +21,32 @@ jobs:
   # ============================================================================
   
   spec-drift-check:
-    name: '[*] Spec Drift Check (TS canonical)'
+    name: '[*] Spec Contract Check'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20.19.0'
-      
+          cache: 'pnpm'
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      
-      - name: Run spec drift check
-        run: |
-          test -f tools/scripts/spec/check_spec_drift.sh && bash tools/scripts/spec/check_spec_drift.sh || echo "Spec drift script not found, skipping"
-        continue-on-error: true
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run spec contract check
+        run: pnpm run spec-contract:check
   
   lint-and-format:
     name: '[*] Code Quality Checks'

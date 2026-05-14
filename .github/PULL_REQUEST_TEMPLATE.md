@@ -63,9 +63,10 @@ For **UI or behavior changes**, add screenshots or a short GIF to illustrate.
 
 ## Author checklist (before requesting review)
 
-- [ ] Code follows the project's style guidelines (see `.cursor/rules/rules.mdc`)
+- [ ] Code follows the project's style guidelines and canonical ownership/gate rules
 - [ ] Unit tests added or updated and coverage is acceptable (target 80%+ where applicable)
 - [ ] Documentation (code comments, README, ADRs) updated as needed
+- [ ] Canonical PR gate reproduced locally with `pnpm run ci:gate:pr` when practical
 - [ ] Changes tested locally (and steps captured in "How to test" above)
 - [ ] No secrets or `.env` in the diff
 - [ ] CODEOWNERS review expected for touched paths

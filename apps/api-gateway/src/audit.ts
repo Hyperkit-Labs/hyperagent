@@ -11,9 +11,6 @@ export type AuditEventType =
   | "auth_bootstrap_success"
   | "auth_bootstrap_failure"
   | "auth_token_expired"
-  | "byok_key_saved"
-  | "byok_key_deleted"
-  | "byok_key_validated"
   | "rate_limit_hit"
   | "session_revoked";
 

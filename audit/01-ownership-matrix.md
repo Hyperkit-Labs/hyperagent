@@ -20,7 +20,7 @@
 | artifact export | UI export view | proxy | `api/ui_export.py` | `services/storage` | Canonical: orchestrator. |
 | run history | UI table | proxy | `api/runs_registry.py` (incl. `approve_spec_legacy_router`) | — | **Mostly orchestrator.** F-008 + F-016: legacy router still mounted, untested. |
 | metrics / health | UI dashboard | `/health/*` direct + proxy | `api/metrics_health.py` | — | Canonical: gateway for `/health`, orchestrator for detailed. |
-| BYOK | `lib/byok` UI | `src/byok.ts` (mount `/api/v1/byok`) | `llm_keys_router` in `runs_registry.py` | — | **Three places** (F-010). |
+| BYOK | settings / workspace UI | gateway auth + proxy only | `llm_keys_router` in `runs_registry.py` | — | Canonical write/read path now centers on orchestrator plus shared API contracts. |
 | stage / pipeline state | XState in `packages/workflow-state` | (none) | `workflow_state.py` (`current_stage: str`) | `packages/workflow-state` | **Duplicate ownership** (F-004, F-019). |
 | public-path allow-list | `apps/studio/middleware.ts` (independent list) | `@hyperagent/api-contracts.GATEWAY_PUBLIC_PATHS` | (none) | — | **Duplicate enumeration** (F-013). |
 

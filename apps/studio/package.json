@@ -34,7 +34,7 @@
     "@hyperagent/config": "workspace:*",
     "@hyperagent/frontend-data": "workspace:*",
     "@hyperagent/workflow-state": "workspace:*",
-    "@noble/hashes": "1.8.0",
+    "@noble/hashes": "2.2.0",
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@sentry/nextjs": "^10.47.0",

@@ -12,7 +12,11 @@ export type AuditEventType =
   | "auth_bootstrap_failure"
   | "auth_token_expired"
   | "rate_limit_hit"
-  | "session_revoked";
+  | "session_revoked"
+  /** BYOK / workspace LLM key lifecycle (gateway `byok` routes when enabled). */
+  | "byok_key_validated"
+  | "byok_key_saved"
+  | "byok_key_deleted";
 
 interface AuditPayload {
   event_type: AuditEventType;

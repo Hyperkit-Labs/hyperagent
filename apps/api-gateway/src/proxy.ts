@@ -242,6 +242,11 @@ export function createProxyOptions(
       if (traceparent) proxyReq.setHeader("traceparent", traceparent);
       if (r.headers.authorization) proxyReq.setHeader("authorization", r.headers.authorization);
       if (r.headers["x-agent-session"]) proxyReq.setHeader("x-agent-session", r.headers["x-agent-session"] as string);
+      proxyReq.setHeader("x-gateway-proxy", "1");
+      const internalToken = getGatewayEnv().internalServiceToken;
+      if (internalToken) {
+        proxyReq.setHeader("x-internal-token", internalToken);
+      }
       proxyReq.removeHeader("x-user-id");
       proxyReq.removeHeader("X-User-Id");
       proxyReq.removeHeader("x-user-id-sig");

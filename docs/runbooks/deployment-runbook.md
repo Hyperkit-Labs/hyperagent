@@ -5,6 +5,7 @@ High-level checklist for operators shipping HyperAgent components. Adjust for yo
 ## Preconditions
 
 - [ ] Read [Deploy ownership](deploy-ownership.md) (who signs deploys, what runs in Studio vs backend).
+- [ ] Read [Repo gates runbook](repo-gates-runbook.md) (required checks, tag restrictions, environment reviewers).
 - [ ] Confirm **secrets** are in the vault or host environment, not in the repo (see `.env.example` and `SECURITY.md`).
 - [ ] **Supabase** migrations applied for the target project.
 - [ ] **Redis**: gateway rate limits (Upstash REST) and orchestrator queue/checkpointer (`REDIS_URL`) configured per `production.mdc` / `.env.example`.
@@ -15,6 +16,13 @@ High-level checklist for operators shipping HyperAgent components. Adjust for yo
 2. **Orchestrator and workers**: deploy after DB and Redis are reachable.
 3. **API gateway**: deploy with correct upstream orchestrator URL and CORS.
 4. **Studio (Next.js)**: deploy with `NEXT_PUBLIC_*` pointing at the gateway and public config.
+
+## Release integrity
+
+- [ ] Release tag matches root `package.json` version.
+- [ ] Release tag commit is contained in `main`.
+- [ ] Canonical PR/Main gates were green before tagging.
+- [ ] Image signatures and, where supported by repo visibility/plan, artifact attestations verified successfully.
 
 ## Smoke checks
 

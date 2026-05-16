@@ -221,6 +221,7 @@ Ensure your work meets quality standards before submission.
 
 **Quality Gates:**
 - [ ] Code follows project style guide (see `.cursor/rules/rules.mdc`)
+- [ ] Canonical local gate reproduced where practical: `pnpm run ci:gate:pr`
 - [ ] All tests pass (unit, integration, e2e)
 - [ ] Test coverage is 80%+ (check with coverage tools)
 - [ ] No critical lint/security issues

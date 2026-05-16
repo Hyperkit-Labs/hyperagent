@@ -23,6 +23,7 @@ export {
   type ApiErrorWithStatus,
   type NormalizeApiErrorOptions,
   type FetchJsonOptions,
+  type UnauthorizedRequestContext,
   fetchJson,
   fetchJsonAuthed,
 } from "./core";

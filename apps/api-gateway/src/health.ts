@@ -2,6 +2,8 @@ import type { Request, Response } from "express";
 import { getGatewayEnv } from "@hyperagent/config";
 import { getSupabaseAdmin } from "./authBootstrap.js";
 import { log } from "./logger.js";
+import { hasRestRateLimitEnv } from "./rateLimit.js";
+import { getGatewayStartupFatalMisconfig } from "./startupPolicy.js";
 
 export type HealthHandlerOptions = {
   /** Probe only orchestrator GET /health/live (fast). Skips deep GET /health (Redis, Supabase, queue). */
@@ -16,6 +18,12 @@ export function healthHandler(
   return async (_req: Request, res: Response): Promise<void> => {
     const gw = getGatewayEnv();
     const authJwtConfigured = Boolean(gw.auth.jwtSecret);
+    const identityHmacConfigured = Boolean(gw.identityHmacSecret);
+    const rateLimitRestConfigured = hasRestRateLimitEnv();
+    const productionSecurityReady =
+      getGatewayStartupFatalMisconfig(gw, {
+        restRateLimitConfigured: rateLimitRestConfigured,
+      }).length === 0;
     const thirdwebSecretConfigured = Boolean(gw.bootstrap.thirdwebSecretKey);
     const supabase = getSupabaseAdmin();
     let dbOk = false;
@@ -71,6 +79,9 @@ export function healthHandler(
       orchestrator_ok: orchestratorOk,
       orchestrator_reachable: orchestratorReachable,
       auth_jwt_configured: authJwtConfigured,
+      identity_hmac_configured: identityHmacConfigured,
+      rate_limit_rest_configured: rateLimitRestConfigured,
+      production_security_ready: productionSecurityReady,
       thirdweb_secret_configured: thirdwebSecretConfigured,
       in_app_wallet_signin_ready: thirdwebSecretConfigured,
       supabase_configured: Boolean(supabase),

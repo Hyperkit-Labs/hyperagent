@@ -133,6 +133,11 @@ Exit criteria:
 - Auth, metering, and deploy protections have regression tests
 - No body-only or legacy fallback path bypasses enforced auth in production
 
+Current repo alignment:
+
+- API gateway production startup is now blocked when JWT auth, Upstash REST rate limiting, or signed internal identity (`IDENTITY_HMAC_SECRET`) are missing.
+- Orchestrator production startup now defaults to strict fail-closed behavior unless `STRICT_STARTUP=0` is explicitly set as a break-glass override.
+
 ### 5. Upgrade service boundaries from “present” to “operational”
 
 Scope:

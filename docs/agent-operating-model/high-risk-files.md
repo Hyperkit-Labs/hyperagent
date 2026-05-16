@@ -8,7 +8,7 @@ Agentic and automated edits must treat certain paths as **high impact**. Read or
 |------|------------|-----|
 | Auth and session | `apps/api-gateway/src/auth.ts`, `apps/api-gateway/src/authBootstrap.ts`, `apps/studio/proxy.ts`, `apps/studio/lib/authBootstrap.ts`, `apps/studio/lib/session-store.ts` | Breaks login, CSRF/session assumptions, redirects |
 | Security and rate limits | `apps/api-gateway/src/rateLimit.ts`, `packages/backend-middleware/src/index.ts` | Abuse surface, accidental lockout |
-| BYOK and secrets handling | `apps/api-gateway/src/byok.ts`, studio API clients under `apps/studio/lib/api/` | Key exposure, compliance |
+| BYOK and secrets handling | `services/orchestrator/api/runs_registry.py` (`llm_keys_router`), studio API clients under `apps/studio/lib/api/` | Key exposure, compliance |
 | Env and production rules | `.env.example`, `CLAUDE.md`, `.cursor/rules/production.mdc` | Wrong env splits break prod |
 | Database migrations | `supabase/migrations/*.sql` | Irreversible data errors |
 | Shared types | `packages/core-types/*` | Cross-service contract breaks |

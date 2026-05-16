@@ -1,4 +1,8 @@
-import { fetchJson, setAuthHeaderProvider } from "@/lib/api/core";
+import {
+  fetchJson,
+  setAuthHeaderProvider,
+  setOn401Callback,
+} from "@/lib/api/core";
 
 jest.mock("@/config/environment", () => ({
   getServiceUrl: () => "https://api.hyperkitlabs.com/api/v1",
@@ -9,11 +13,13 @@ describe("fetchJson request shaping", () => {
 
   beforeEach(() => {
     setAuthHeaderProvider(null);
+    setOn401Callback(null);
   });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
     setAuthHeaderProvider(null);
+    setOn401Callback(null);
   });
 
   function okResponse(body: unknown = {}): Response {
@@ -54,6 +60,39 @@ describe("fetchJson request shaping", () => {
     expect(options.headers).toEqual({
       Authorization: "Bearer test-token",
       "Content-Type": "application/json",
+    });
+  });
+
+  it("passes 401 context to the global unauthorized callback", async () => {
+    const on401 = jest.fn();
+    setOn401Callback(on401);
+    globalThis.fetch = jest.fn(async () => ({
+      ok: false,
+      status: 401,
+      statusText: "Unauthorized",
+      text: async () =>
+        JSON.stringify({
+          message: "Invalid or expired token",
+          code: "unauthorized.invalid_token",
+          requestId: "req-401",
+        }),
+      headers: new Headers({
+        "x-request-id": "req-401",
+      }),
+    })) as typeof fetch;
+
+    await expect(
+      fetchJson("/workflows", {
+        invokeGlobal401OnUnauthorized: true,
+      }),
+    ).rejects.toThrow("Invalid or expired token");
+
+    expect(on401).toHaveBeenCalledWith({
+      path: "/workflows",
+      status: 401,
+      code: "unauthorized.invalid_token",
+      requestId: "req-401",
+      message: "Invalid or expired token",
     });
   });
 });

@@ -230,10 +230,10 @@
       "title": "BYOK validation surface is split across gateway, orchestrator, and Studio with three header-forwarding contracts",
       "workstream": "WS6-duplicate",
       "severity": "medium",
-      "owner": "apps/api-gateway/src/byok.ts + services/orchestrator/api/runs_registry.py (llm_keys_router) + apps/studio/lib/byok",
+      "owner": "services/orchestrator/api/runs_registry.py (llm_keys_router) + Studio settings/BYOK clients",
       "category": "duplicate-validation",
       "evidence": {
-        "gateway_router": "apps/api-gateway/src/byok.ts (mounted at /api/v1/byok)",
+        "gateway_router": "removed legacy gateway BYOK router; gateway now provides auth/proxy only",
         "orchestrator_router": "services/orchestrator/api/runs_registry.py \u00e2\u20ac\u201d `llm_keys_router`",
         "studio": "apps/studio/lib references `byok` flow in chat hooks"
       },

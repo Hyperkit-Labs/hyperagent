@@ -88,7 +88,15 @@ export function setAuthHeaderProvider(
   authHeaderProvider = provider;
 }
 
-type On401Callback = () => void;
+export interface UnauthorizedRequestContext {
+  path: string;
+  status: 401;
+  code?: string;
+  requestId?: string;
+  message: string;
+}
+
+type On401Callback = (context: UnauthorizedRequestContext) => void;
 let on401Callback: On401Callback | null = null;
 
 export function setOn401Callback(callback: On401Callback | null): void {
@@ -346,12 +354,23 @@ export async function fetchJson<T>(
         if (res.status >= 400 && res.status < 500 && res.status !== 408) {
           if (res.status === 401 && on401Callback && shouldFireGlobal401) {
             try {
-              on401Callback();
+              on401Callback({
+                path,
+                status: 401,
+                code: apiCode,
+                requestId,
+                message,
+              });
             } catch {
               // ignore
             }
           }
-          reportApiError(error, { path, status: res.status });
+          reportApiError(error, {
+            path,
+            status: res.status,
+            code: apiCode,
+            requestId,
+          });
           throw error;
         }
         if (attempt < maxRetries - 1) {

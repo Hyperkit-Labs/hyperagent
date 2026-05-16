@@ -55,6 +55,7 @@ from api import (
     workflows_streaming_router,
     x402_webhooks_router,
 )
+from api.gateway_proxy_middleware import GatewayProxyBoundaryMiddleware
 from api.spoofed_identity_middleware import SpoofedIdentityMiddleware
 from fastapi import FastAPI
 from observability import record_latency
@@ -91,11 +92,21 @@ def _service_url(env_key: str, local_default: str) -> str:
     return local_default.rstrip("/")
 
 
+def _strict_startup_enabled() -> bool:
+    raw = os.environ.get("STRICT_STARTUP", "").strip().lower()
+    if raw in ("1", "true", "yes"):
+        return True
+    if raw in ("0", "false", "no"):
+        return False
+    return _is_production()
+
+
 COMPILE_SERVICE_URL = _service_url("COMPILE_SERVICE_URL", "http://localhost:8004")
 AUDIT_SERVICE_URL = _service_url("AUDIT_SERVICE_URL", "http://localhost:8001")
 
 app = FastAPI(title="HyperAgent Orchestrator", version="0.1.0")
 app.add_middleware(SpoofedIdentityMiddleware)
+app.add_middleware(GatewayProxyBoundaryMiddleware)
 
 # slowapi: orchestrator-level rate limiting (second layer after API-gateway Upstash limits).
 from rate_limit import limiter
@@ -140,6 +151,9 @@ def _validate_critical_services() -> None:
         identity_hmac = os.environ.get("IDENTITY_HMAC_SECRET", "").strip()
         if not identity_hmac:
             missing.append("IDENTITY_HMAC_SECRET")
+        internal_service_token = os.environ.get("INTERNAL_SERVICE_TOKEN", "").strip()
+        if not internal_service_token:
+            missing.append("INTERNAL_SERVICE_TOKEN")
         byok_tee_strict = os.environ.get("BYOK_TEE_STRICT", "").strip().lower() in (
             "1",
             "true",
@@ -173,11 +187,7 @@ def _validate_critical_services() -> None:
         if missing:
             _startup_degraded = True
             _startup_missing_vars = missing
-            strict = os.environ.get("STRICT_STARTUP", "").strip().lower() in (
-                "1",
-                "true",
-                "yes",
-            )
+            strict = _strict_startup_enabled()
             if strict:
                 logger.critical(
                     "[orchestrator] STRICT_STARTUP: aborting. Missing required env: %s",
@@ -189,7 +199,7 @@ def _validate_critical_services() -> None:
             logger.error(
                 "[orchestrator] Production requires: %s. "
                 "Process will stay alive but /health returns 503 until resolved. "
-                "Set STRICT_STARTUP=1 to abort instead.",
+                "Set STRICT_STARTUP=0 to allow degraded startup.",
                 ", ".join(missing),
             )
 
@@ -370,8 +380,8 @@ class RequestIdMiddleware:
 app.add_middleware(RequestIdMiddleware)
 
 
-# x402 enforcement middleware: intercepts protected endpoints for external callers.
-# Internal callers (Studio users with X-User-Id) skip x402 and use credits instead.
+# x402 enforcement middleware: priced routes use one payment path for browser and
+# external callers; only trusted service-to-service calls may bypass via X-Internal-Token.
 try:
     from x402_middleware import X402EnforcementMiddleware
 

@@ -1,0 +1,33 @@
+{
+  "branch_targets": ["main", "development"],
+  "canonical_pr_gate_workflow": "PR Gate",
+  "canonical_main_gate_workflow": "Main Gate",
+  "canonical_release_gate_workflow": "Create Release",
+  "required_status_checks": [
+    "contract:artifacts-diff",
+    "contract:schema-registry-validate",
+    "contract:openapi-lint",
+    "contract:schemathesis-public-smoke",
+    "quality:python",
+    "quality:typescript",
+    "db:migrations-verify",
+    "test:backend",
+    "test:frontend",
+    "build:gateway"
+  ],
+  "advisory_status_checks": [
+    "contract:ai-tools-tenderly-advisory",
+    "contract:evm-tests",
+    "security:advisory-scan",
+    "advisory:pr-size",
+    "advisory:commit-messages",
+    "build:docker-advisory",
+    "automation:label-pr",
+    "PR Format Advisory"
+  ],
+  "notes": [
+    "Do not mark path-gated or conditionally skipped jobs as required checks.",
+    "Use repository rulesets or branch protection so only the required_status_checks gate merges.",
+    "Release tags must be created from a green main branch and the tag version must match package.json."
+  ]
+}

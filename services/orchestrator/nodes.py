@@ -20,7 +20,7 @@ from registries import (
     get_template,
 )
 from step_trace import step_span
-from store import _ensure_contracts_dict
+from store import _ensure_contracts_dict, update_workflow
 from workflow_state import AgentState, set_current_stage
 
 logger = logging.getLogger(__name__)

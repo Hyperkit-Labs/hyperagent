@@ -9,18 +9,46 @@ permissions:
   contents: write
   packages: write
   id-token: write
+  attestations: write
+  artifact-metadata: write
 
 jobs:
   validate-tag:
     name: Validate Tag Format
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Validate semver tag
         env:
           REF_NAME: ${{ github.ref_name }}
         run: |
           if [[ ! "$REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
             echo "Invalid tag format. Must be vX.Y.Z or vX.Y.Z-prerelease"
+            exit 1
+          fi
+
+      - name: Validate root package version matches tag
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          package_version="$(node -p "require('./package.json').version")"
+          tag_version="${REF_NAME#v}"
+          if [[ "$package_version" != "$tag_version" ]]; then
+            echo "package.json version ($package_version) does not match tag ($tag_version)"
+            exit 1
+          fi
+
+      - name: Validate tag commit is contained in origin/main
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          git fetch origin main --depth=1
+          tag_sha="$(git rev-list -n 1 "$REF_NAME")"
+          if ! git branch -r --contains "$tag_sha" | grep -q 'origin/main$'; then
+            echo "Release tags must point to a commit that is contained in origin/main"
             exit 1
           fi
 
@@ -65,6 +93,22 @@ jobs:
       - name: Install Node dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip build
+          pip install -e "packages/execution-backend[opensandbox]"
+          pip install -r services/orchestrator/requirements.txt
+          pip install -r services/roma-service/requirements.txt
+          pip install pytest pytest-asyncio schemathesis jsonschema
+        env:
+          ENVIRONMENT: test
+
+      - name: Contract governance checks
+        run: pnpm run ci:gate:contracts
+
+      - name: Schemathesis public smoke
+        run: pnpm run test:contracts:schemathesis
+
       - name: Build backend-middleware
         run: pnpm --filter @hyperagent/backend-middleware run build
 
@@ -73,15 +117,6 @@ jobs:
 
       - name: Frontend tests
         run: pnpm --filter hyperagent-studio run test
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip build
-          pip install -e "packages/execution-backend[opensandbox]"
-          pip install -r services/orchestrator/requirements.txt
-          pip install pytest pytest-asyncio
-        env:
-          ENVIRONMENT: test
 
       - name: Backend tests
         working-directory: services/orchestrator
@@ -160,6 +195,23 @@ jobs:
         with:
           image: ghcr.io/${{ github.repository }}/backend@${{ steps.push-backend.outputs.digest }}
           artifact-name: sbom-backend.spdx.json
+
+      - name: Generate backend provenance attestation
+        if: ${{ github.event.repository.private == false }}
+        uses: actions/attest@v4
+        with:
+          subject-name: ghcr.io/${{ github.repository }}/backend
+          subject-digest: ${{ steps.push-backend.outputs.digest }}
+          push-to-registry: true
+
+      - name: Verify backend provenance attestation
+        if: ${{ github.event.repository.private == false }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh attestation verify \
+            "oci://ghcr.io/${{ github.repository }}/backend@${{ steps.push-backend.outputs.digest }}" \
+            -R "${{ github.repository }}"
       
       - name: Build and push frontend
         id: push-frontend
@@ -205,6 +257,23 @@ jobs:
         with:
           image: ghcr.io/${{ github.repository }}/frontend@${{ steps.push-frontend.outputs.digest }}
           artifact-name: sbom-frontend.spdx.json
+
+      - name: Generate frontend provenance attestation
+        if: ${{ github.event.repository.private == false }}
+        uses: actions/attest@v4
+        with:
+          subject-name: ghcr.io/${{ github.repository }}/frontend
+          subject-digest: ${{ steps.push-frontend.outputs.digest }}
+          push-to-registry: true
+
+      - name: Verify frontend provenance attestation
+        if: ${{ github.event.repository.private == false }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh attestation verify \
+            "oci://ghcr.io/${{ github.repository }}/frontend@${{ steps.push-frontend.outputs.digest }}" \
+            -R "${{ github.repository }}"
 
   generate-changelog:
     name: Generate Changelog

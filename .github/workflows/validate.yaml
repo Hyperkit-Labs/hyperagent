@@ -1,4 +1,4 @@
-name: PR Format Validation
+name: PR Format Advisory
 
 on:
   pull_request:
@@ -72,7 +72,7 @@ jobs:
             }
             const titleRegex = /^([\w\s,{}/.]+): .+/;
             if (!titleRegex.test(prTitle)) {
-              core.setFailed(`PR title "${prTitle}" does not match required format: directory, ...: description (or Merge X into Y)`);
+              core.warning(`PR title "${prTitle}" does not match advisory format: directory, ...: description (or Merge X into Y)`);
               return;
             }
 
@@ -88,7 +88,7 @@ jobs:
             }
             
             if (missingDirs.length > 0) {
-              core.setFailed(`The following directories in the PR title do not exist: ${missingDirs.join(', ')}`);
+              core.warning(`The following directories in the PR title do not exist: ${missingDirs.join(', ')}`);
               return;
             }
             
@@ -112,7 +112,7 @@ jobs:
             ];
             const missing = required.filter(r => !r.test());
             if (missing.length > 0) {
-              core.setFailed(`PR body is missing required sections: ${missing.map(m => m.name).join(', ')}. See .github/template/PULL_REQUEST_TEMPLATE.md for the template.`);
+              core.warning(`PR body is missing advisory sections: ${missing.map(m => m.name).join(', ')}. See .github/template/PULL_REQUEST_TEMPLATE.md for the template.`);
               return;
             }
             console.log('✅ PR body contains required template sections');

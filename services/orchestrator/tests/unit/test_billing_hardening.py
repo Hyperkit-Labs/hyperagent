@@ -153,10 +153,15 @@ class TestBillingModule:
         price = get_endpoint_price("/api/v1/unknown/path")
         assert price is None
 
-    def test_is_internal_caller_with_user_id(self):
+    def test_is_internal_caller_does_not_trust_x_user_id(self):
         from billing import is_internal_caller
 
-        assert is_internal_caller({"X-User-Id": "u123"}, "u123") is True
+        assert is_internal_caller({"X-User-Id": "u123"}, "u123") is False
+
+    def test_is_internal_caller_with_internal_token(self):
+        from billing import is_internal_caller
+
+        assert is_internal_caller({"X-Internal-Token": "svc-token"}, None) is True
 
     def test_is_internal_caller_external(self):
         from billing import is_internal_caller
@@ -560,6 +565,7 @@ class TestStartupValidation:
         os.environ,
         {
             "RENDER": "true",
+            "STRICT_STARTUP": "0",
             "REDIS_URL": "",
             "SUPABASE_URL": "",
             "SUPABASE_SERVICE_ROLE_KEY": "",
@@ -574,3 +580,25 @@ class TestStartupValidation:
         main._validate_critical_services()
         assert main._startup_degraded is True
         assert len(main._startup_missing_vars) > 0
+
+    @patch.dict(
+        os.environ,
+        {
+            "RENDER": "true",
+            "STRICT_STARTUP": "",
+            "REDIS_URL": "",
+            "SUPABASE_URL": "",
+            "SUPABASE_SERVICE_ROLE_KEY": "",
+            "PINATA_JWT": "",
+            "PINATA_API_KEY": "",
+            "IDENTITY_HMAC_SECRET": "",
+        },
+        clear=False,
+    )
+    def test_startup_strict_by_default_in_production(self):
+        import main
+
+        main._startup_degraded = False
+        main._startup_missing_vars = []
+        with pytest.raises(SystemExit):
+            main._validate_critical_services()

@@ -1,72 +1,166 @@
-name: PR Validation
+name: PR Gate
 
 on:
   pull_request:
     branches: [development, main]
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, edited]
 
 permissions:
   contents: read
   actions: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: pr-gate-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  lint-python:
-    name: Lint Python Code
+  contract-artifacts-diff:
+    name: "contract:artifacts-diff"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: pnpm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Python dependencies for contract export
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r services/orchestrator/requirements.txt
+          pip install -r services/roma-service/requirements.txt
+          pip install jsonschema
+
+      - name: Generate OpenAPI + spec contract mirrors
+        run: pnpm run contracts:generate
+
+      - name: Check generated artifacts are committed
+        run: pnpm run contracts:artifacts:check
+
+  contract-schema-registry-validate:
+    name: "contract:schema-registry-validate"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install schema validation dependency
+        run: pip install jsonschema
+
+      - name: Validate schema registry
+        run: python3 scripts/schema/validate_registry.py
+
+  contract-openapi-lint:
+    name: "contract:openapi-lint"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: pnpm
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint OpenAPI with Redocly
+        run: pnpm run openapi:lint
+
+  contract-schemathesis-public-smoke:
+    name: "contract:schemathesis-public-smoke"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install orchestrator + Schemathesis dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r services/orchestrator/requirements.txt
+          pip install schemathesis
+
+      - name: Run Schemathesis against in-process FastAPI app
+        run: bash scripts/api/run_schemathesis.sh
+
+  quality-python:
+    name: "quality:python"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-          cache: 'pip'
-      
+          python-version: "3.12"
+          cache: pip
+
       - name: Install linting tools
         run: |
           pip install ruff "black==24.10.0" isort
-      
+
       - name: Run ruff
         run: ruff check services/orchestrator/ --output-format=concise
-      
+
       - name: Check black formatting
         run: black --check services/orchestrator/
-      
+
       - name: Check import sorting
         run: isort --check-only --profile black services/orchestrator/
 
-  lint-typescript:
-    name: Lint TypeScript/JavaScript
+  quality-typescript:
+    name: "quality:typescript"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 10.26.0
-      
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20.19.0'
-          cache: 'pnpm'
-      
+          node-version: "20.19.0"
+          cache: "pnpm"
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      
+
       - name: Run ESLint (hyperagent-studio)
         run: pnpm --filter hyperagent-studio run lint
-      
+
       - name: Check TypeScript types (hyperagent-studio)
         run: pnpm --filter hyperagent-studio run typecheck
 
-  test-backend:
-    name: Backend Tests
+  db-migrations-verify:
+    name: "db:migrations-verify"
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -82,16 +176,57 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    
     steps:
       - uses: actions/checkout@v4
-      
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: "pnpm"
+
+      - name: Install workspace deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply Supabase migrations + RLS test users
+        run: |
+          pnpm db:apply-migrations
+          pnpm db:ci-setup-rls-test-users
+          pnpm db:verify-security
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hyperagent_test
+
+  test-backend:
+    name: "test:backend"
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hyperagent_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-          cache: 'pip'
-      
+          python-version: "3.12"
+          cache: pip
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip build
@@ -109,8 +244,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20.19.0'
-          cache: 'pnpm'
+          node-version: "20.19.0"
+          cache: "pnpm"
 
       - name: Install workspace deps
         run: pnpm install --frozen-lockfile
@@ -119,7 +254,6 @@ jobs:
         run: |
           pnpm db:apply-migrations
           pnpm db:ci-setup-rls-test-users
-          pnpm db:verify-security
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hyperagent_test
 
@@ -133,31 +267,59 @@ jobs:
           RLS_INTEGRATION_TESTS: "1"
 
   test-frontend:
-    name: Frontend Tests
+    name: "test:frontend"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 10.26.0
-      
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20.19.0'
-          cache: 'pnpm'
-      
+          node-version: "20.19.0"
+          cache: "pnpm"
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      
+
       - name: Run tests (hyperagent-studio)
         run: pnpm --filter hyperagent-studio run test -- --watchAll=false
 
-  # Path-gated: same contract as ci.yml — catches type drift that breaks agent-runtime / simulation images.
+  build-gateway:
+    name: "build:gateway"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build backend-middleware
+        run: pnpm --filter @hyperagent/backend-middleware run build
+
+      - name: Typecheck api-gateway
+        run: pnpm --filter hyperagent-api-gateway exec tsc --noEmit
+
+      - name: Build api-gateway
+        run: pnpm --filter hyperagent-api-gateway run build
+
   ai-tools-tenderly-contract:
-    name: ai-tools (Tenderly contract — path-gated)
+    name: "contract:ai-tools-tenderly-advisory"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -185,8 +347,8 @@ jobs:
         if: steps.paths.outputs.contract == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: '20.19.0'
-          cache: 'pnpm'
+          node-version: "20.19.0"
+          cache: "pnpm"
 
       - name: Install dependencies
         if: steps.paths.outputs.contract == 'true'
@@ -198,17 +360,17 @@ jobs:
 
       - name: Skip (unchanged paths)
         if: steps.paths.outputs.contract != 'true'
-        run: echo "Skip ai-tools contract — paths outside core-types / ai-tools / agent-runtime / simulation / agent-runtime Dockerfile / turbo.json / lockfile."
+        run: echo "Skip ai-tools contract advisory check."
 
   test-contracts:
-    name: Smart Contract Tests
+    name: "contract:evm-tests"
     runs-on: ubuntu-latest
     if: hashFiles('contracts/**') != ''
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      
+
       - name: Check for Foundry
         id: foundry
         run: |
@@ -217,11 +379,11 @@ jobs:
           else
             echo "found=false" >> $GITHUB_OUTPUT
           fi
-      
+
       - name: Setup Foundry
         if: steps.foundry.outputs.found == 'true'
         uses: foundry-rs/foundry-toolchain@v1
-      
+
       - name: Run Foundry tests
         if: steps.foundry.outputs.found == 'true'
         run: |
@@ -229,14 +391,14 @@ jobs:
           forge test -vvv --gas-report
 
   security-scan:
-    name: Security Scan
+    name: "security:advisory-scan"
     runs-on: ubuntu-latest
     permissions:
       contents: read
       security-events: write
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Run Slither (Smart Contracts)
         if: hashFiles('contracts/**/*.sol') != ''
         uses: crytic/slither-action@v0.3.0
@@ -245,30 +407,29 @@ jobs:
           target: contracts/
           slither-args: --filter-paths "lib|test" --exclude-dependencies
           fail-on: high
-      
+
       - name: Run Trivy (Dependencies & IaC)
         uses: aquasecurity/trivy-action@master
         with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          severity: 'CRITICAL,HIGH'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          exit-code: '0'
-        # exit-code '0': dependency CVEs reported via SARIF; fix via Dependabot PRs.
-      
+          scan-type: "fs"
+          scan-ref: "."
+          severity: "CRITICAL,HIGH"
+          format: "sarif"
+          output: "trivy-results.sarif"
+          exit-code: "0"
+
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
-          sarif_file: 'trivy-results.sarif'
-      
+          sarif_file: "trivy-results.sarif"
+
       - name: Run Bandit (Python)
         run: |
           pip install bandit
           bandit -r services/orchestrator/ -f json -o bandit-report.json -x '*/data/*' || true
           bandit -r services/orchestrator/ -x '*/data/*' || true
-      
+
       - name: Upload Bandit results
         uses: actions/upload-artifact@v4
         if: always()
@@ -277,39 +438,39 @@ jobs:
           path: bandit-report.json
 
   pr-size-check:
-    name: PR Size Check
+    name: "advisory:pr-size"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - name: Check PR size
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
           files_changed=$(git diff --name-only "origin/$BASE_REF...HEAD" | wc -l)
           lines_changed=$(git diff --shortstat "origin/$BASE_REF...HEAD" | awk '{print $4+$6}')
-          
+
           echo "Files changed: $files_changed"
           echo "Lines changed: $lines_changed"
-          
+
           if [ "$files_changed" -gt 50 ]; then
             echo "::warning::PR modifies $files_changed files. Consider breaking into smaller PRs."
           fi
-          
+
           if [ "$lines_changed" -gt 1000 ]; then
             echo "::warning::PR changes $lines_changed lines. Consider breaking into smaller PRs."
           fi
 
   conventional-commits:
-    name: Validate Commit Messages
+    name: "advisory:commit-messages"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - name: Check commit messages
         env:
           BASE_REF: ${{ github.base_ref }}
@@ -319,14 +480,14 @@ jobs:
         continue-on-error: true
 
   build-docker:
-    name: Build Docker Images
+    name: "build:docker-advisory"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      
+
       - name: Build backend image
         uses: docker/build-push-action@v5
         with:
@@ -336,7 +497,7 @@ jobs:
           tags: hyperagent-backend:pr-${{ github.event.pull_request.number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      
+
       - name: Build frontend image
         uses: docker/build-push-action@v5
         with:
@@ -354,7 +515,7 @@ jobs:
             NEXT_PUBLIC_SUPABASE_ANON_KEY=pr-validation-anon-key
 
   label-pr:
-    name: Auto-label PR
+    name: "automation:label-pr"
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -364,35 +525,3 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           configuration-path: .github/labeler.yml
-
-  pr-comment-summary:
-    name: PR Summary Comment
-    runs-on: ubuntu-latest
-    needs: [lint-python, test-backend, security-scan]
-    if: always()
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - name: Comment PR
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const summary = `## PR Validation Summary
-            
-            | Check | Status |
-            |-------|--------|
-            | Lint Python | ${{ needs.lint-python.result == 'success' && '✅' || '❌' }} |
-            | Backend Tests | ${{ needs.test-backend.result == 'success' && '✅' || '❌' }} |
-            | Security Scan | ${{ needs.security-scan.result == 'success' && '✅' || '❌' }} |
-            
-            ${needs.test-backend.result !== 'success' ? '⚠️ **Backend tests failed. Please review the logs.**' : ''}
-            ${needs.security-scan.result !== 'success' ? '⚠️ **Security scan found issues. Please address them.**' : ''}
-            `;
-            
-            github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: summary
-            });

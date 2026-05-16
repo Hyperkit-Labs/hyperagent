@@ -92,8 +92,6 @@ def test_accepts_valid_internal_token(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client = _client(monkeypatch)
-    r = client.get(
-        "/api/v1/workflows", headers={"X-Internal-Token": "service-secret"}
-    )
+    r = client.get("/api/v1/workflows", headers={"X-Internal-Token": "service-secret"})
     assert r.status_code == 200
     assert r.json() == {"ok": True}

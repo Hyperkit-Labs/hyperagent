@@ -16,6 +16,10 @@ jest.mock("next/server", () => ({
   },
 }));
 
+jest.mock("jose", () => ({
+  jwtVerify: jest.fn(),
+}));
+
 import { getRequestSessionToken } from "@/proxy";
 
 describe("Studio proxy session token resolution", () => {

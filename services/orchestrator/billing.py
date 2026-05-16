@@ -63,13 +63,10 @@ def get_endpoint_price(path: str, method: str = "POST") -> float | None:
 
 def is_internal_caller(request_headers: dict[str, str], user_id: str | None) -> bool:
     """
-    True if caller is internal (Studio user with X-User-Id) and uses credits.
-    False if external agent; should get x402 402 challenge.
+    True only for trusted service-to-service callers.
+    Browser and Studio traffic should take the same x402 path as any other caller
+    on priced routes once it passes through the gateway.
     """
-    if user_id and (
-        request_headers.get("X-User-Id") or request_headers.get("x-user-id")
-    ):
-        return True
     if request_headers.get("X-Internal-Token"):
         return True
     return False

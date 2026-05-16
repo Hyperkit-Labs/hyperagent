@@ -280,7 +280,9 @@ def _query_validation_detail(name: str, message: str) -> list[dict[str, Any]]:
 
 
 def ensure_allowed_query_keys(request: Request, allowed: set[str]) -> None:
-    unsupported = sorted({key for key in request.query_params.keys() if key not in allowed})
+    unsupported = sorted(
+        {key for key in request.query_params.keys() if key not in allowed}
+    )
     if unsupported:
         raise HTTPException(
             status_code=422,
@@ -355,9 +357,7 @@ def parse_bool_query_param(
         return False
     raise HTTPException(
         status_code=422,
-        detail=_query_validation_detail(
-            name, f"{name} must be one of: true, false"
-        ),
+        detail=_query_validation_detail(name, f"{name} must be one of: true, false"),
     )
 
 

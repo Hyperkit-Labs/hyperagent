@@ -32,7 +32,7 @@ module.exports = {
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
     "^@hyperagent/api-contracts$":
-      "<rootDir>/../../packages/api-contracts/src/index.ts",
+      "<rootDir>/../../packages/api-contracts/dist/index.js",
     "^@hyperagent/config$": "<rootDir>/../../packages/config/dist/index.js",
     "^react$": "<rootDir>/node_modules/react",
     "^react-dom$": "<rootDir>/node_modules/react-dom",

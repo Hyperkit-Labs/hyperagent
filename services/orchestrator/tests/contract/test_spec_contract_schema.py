@@ -77,9 +77,7 @@ def test_orchestrator_spec_contract_mirror_matches_canonical_model() -> None:
     orchestrator_spec_path = (
         _repo_root() / "services" / "orchestrator" / "spec_contract.py"
     )
-    spec = spec_from_file_location(
-        "orchestrator_spec_contract", orchestrator_spec_path
-    )
+    spec = spec_from_file_location("orchestrator_spec_contract", orchestrator_spec_path)
     assert spec is not None and spec.loader is not None
     module = module_from_spec(spec)
     sys.modules["orchestrator_spec_contract"] = module

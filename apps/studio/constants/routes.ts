@@ -46,11 +46,10 @@ export const PUBLIC_STUDIO_API_PREFIXES = [
 
 export const SHELLLESS_STUDIO_ROUTES = [ROUTES.HOME, ROUTES.LOGIN] as const;
 
-const STATIC_STUDIO_PROTECTED_ROUTES = Array.from(
+const STATIC_STUDIO_PROTECTED_ROUTES: string[] = Array.from(
   new Set(
-    Object.values(ROUTES).filter(
-      (route): route is string =>
-        typeof route === "string" && route !== ROUTES.LOGIN,
+    Object.values(ROUTES).flatMap((route) =>
+      typeof route === "string" && route !== ROUTES.LOGIN ? [route] : [],
     ),
   ),
 );

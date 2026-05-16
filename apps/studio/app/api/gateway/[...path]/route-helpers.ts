@@ -1,5 +1,7 @@
 import { sessionTokenFromCookieHeader } from "@/lib/session-token-cookies";
 
+export { sessionTokenFromCookieHeader } from "@/lib/session-token-cookies";
+
 type HeadersCarrier = { headers: Headers };
 const SAFE_PATH_SEGMENT = /^[A-Za-z0-9._:-]{1,128}$/;
 

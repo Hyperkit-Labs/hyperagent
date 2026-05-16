@@ -9,7 +9,11 @@ import db
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from .common import ensure_allowed_query_keys, get_caller_id, parse_bounded_int_query_param
+from .common import (
+    ensure_allowed_query_keys,
+    get_caller_id,
+    parse_bounded_int_query_param,
+)
 
 router = APIRouter(prefix="/api/v1/infra", tags=["infra"])
 
@@ -57,11 +61,6 @@ class AddDomainBody(BaseModel):
 @router.get("/domains")
 def list_domains(request: Request) -> list[dict[str, Any]]:
     ensure_allowed_query_keys(request, {"limit"})
-    caller = get_caller_id(request)
-    if not caller:
-        raise HTTPException(status_code=401, detail="authentication required")
-    if not db.is_configured():
-        raise HTTPException(status_code=503, detail="database not configured")
     limit = parse_bounded_int_query_param(
         request,
         "limit",
@@ -69,6 +68,11 @@ def list_domains(request: Request) -> list[dict[str, Any]]:
         minimum=1,
         maximum=100,
     )
+    caller = get_caller_id(request)
+    if not caller:
+        raise HTTPException(status_code=401, detail="authentication required")
+    if not db.is_configured():
+        raise HTTPException(status_code=503, detail="database not configured")
     return db.list_custom_domains_for_wallet(caller, limit=limit)
 
 

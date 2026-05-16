@@ -23,6 +23,13 @@ def _signed_user_headers(user_id: str) -> dict[str, str]:
     return {"X-User-Id": user_id, "x-user-id-sig": f"{user_id}.{sig}"}
 
 
+def _detail_messages(response) -> list[str]:
+    detail = response.json()["detail"]
+    if isinstance(detail, str):
+        return [detail]
+    return [item.get("msg", "") for item in detail if isinstance(item, dict)]
+
+
 @pytest.fixture
 def client(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("IDENTITY_HMAC_SECRET", IDENTITY_SECRET)
@@ -40,7 +47,7 @@ def test_workflows_list_status_injection_string(client):
         params={"status": "'; DROP TABLE workflows;--"},
     )
     assert r.status_code == 422
-    assert "status must be one of" in r.json()["detail"]
+    assert any("status must be one of" in msg for msg in _detail_messages(r))
 
 
 def test_workflows_list_extreme_limit(client):
@@ -51,7 +58,7 @@ def test_workflows_list_extreme_limit(client):
 def test_workflows_list_rejects_invalid_status(client):
     r = client.get("/api/v1/workflows", params={"status": "dropped_table"})
     assert r.status_code == 422
-    assert "status must be one of" in r.json()["detail"]
+    assert any("status must be one of" in msg for msg in _detail_messages(r))
 
 
 def test_workflow_path_param_rejects_unsafe_id(client):
@@ -68,19 +75,19 @@ def test_logs_reject_invalid_pagination(client):
 def test_logs_reject_unknown_query_key(client):
     r = client.get("/api/v1/logs", params={"unknown": "1"})
     assert r.status_code == 422
-    assert "Unsupported query parameter" in r.json()["detail"]
+    assert "Unsupported query parameter" in _detail_messages(r)
 
 
 def test_llm_keys_reject_unknown_query_key(client):
     r = client.get("/api/v1/workspaces/current/llm-keys", params={"foo": "bar"})
     assert r.status_code == 422
-    assert "Unsupported query parameter" in r.json()["detail"]
+    assert "Unsupported query parameter" in _detail_messages(r)
 
 
 def test_networks_reject_invalid_boolean_query(client):
     r = client.get("/api/v1/networks", params={"skale": "maybe"})
     assert r.status_code == 422
-    assert "skale must be one of" in r.json()["detail"]
+    assert any("skale must be one of" in msg for msg in _detail_messages(r))
 
 
 def test_payments_history_rejects_invalid_offset(client):

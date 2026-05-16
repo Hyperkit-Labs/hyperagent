@@ -20,7 +20,7 @@
     "@opentelemetry/sdk-node": "^0.214.0",
     "@opentelemetry/semantic-conventions": "^1.40.0",
     "@sentry/node": "^10.47.0",
-    "@supabase/supabase-js": "^2.47.0",
+    "@supabase/supabase-js": "^2.105.4",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.36.0",
     "@x402/core": "^2.10.0",

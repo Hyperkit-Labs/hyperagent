@@ -26,9 +26,11 @@ def _is_production() -> bool:
 
 
 def _enforce_gateway_proxy_boundary() -> bool:
-    if os.environ.get(
-        "DISABLE_GATEWAY_PROXY_ENFORCEMENT", ""
-    ).strip().lower() in ("1", "true", "yes"):
+    if os.environ.get("DISABLE_GATEWAY_PROXY_ENFORCEMENT", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    ):
         return False
     return _is_production()
 

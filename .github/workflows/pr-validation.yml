@@ -154,7 +154,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build shared workspace packages
-        run: pnpm --filter @hyperagent/api-contracts run build
+        run: |
+          pnpm --filter @hyperagent/api-contracts run build
+          pnpm --filter @hyperagent/frontend-data run build
 
       - name: Run ESLint (hyperagent-studio)
         run: pnpm --filter hyperagent-studio run lint

@@ -11,6 +11,8 @@ cd "$ROOT_DIR/services/orchestrator"
 
 export PYTHONPATH="${PYTHONPATH:-}:$(pwd)"
 export HYPERAGENT_ROOT="$ROOT_DIR"
+export ENVIRONMENT="${ENVIRONMENT:-test}"
+export STRICT_STARTUP="${STRICT_STARTUP:-0}"
 
 python3 - <<'PY'
 import json
@@ -43,6 +45,12 @@ for _ in $(seq 1 30); do
   fi
   sleep 1
 done
+
+if ! curl -fsS "$BASE_URL/health/live" >/dev/null 2>&1; then
+  echo "Schemathesis server failed to start" >&2
+  cat /tmp/hyperagent-schemathesis-server.log >&2 || true
+  exit 1
+fi
 
 st run \
   "$TRIMMED_SCHEMA_PATH" \

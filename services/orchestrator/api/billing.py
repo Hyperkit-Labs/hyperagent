@@ -23,7 +23,11 @@ from registries import (
     get_x402_resources,
 )
 from store import count_workflows
-from .common import ensure_allowed_query_keys, get_caller_id, parse_bounded_int_query_param
+from .common import (
+    ensure_allowed_query_keys,
+    get_caller_id,
+    parse_bounded_int_query_param,
+)
 
 logger = logging.getLogger(__name__)
 

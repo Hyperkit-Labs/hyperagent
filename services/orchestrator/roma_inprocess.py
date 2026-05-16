@@ -143,7 +143,9 @@ async def invoke_roma_spec(
                             "multi_contract": spec.get("multi_contract"),
                             "roles": list(spec.get("roles") or []),
                             "oracles": list(spec.get("oracles") or []),
-                            "frontend_actions": list(spec.get("frontend_actions") or []),
+                            "frontend_actions": list(
+                                spec.get("frontend_actions") or []
+                            ),
                             "wizard_options": spec.get("wizard_options"),
                         }
                     )
@@ -166,6 +168,7 @@ async def invoke_roma_spec(
 
     try:
         from registries import get_anchor_network_slug
+
         anchor_chain = get_anchor_network_slug()
     except Exception:
         anchor_chain = "skalebase-sepolia"

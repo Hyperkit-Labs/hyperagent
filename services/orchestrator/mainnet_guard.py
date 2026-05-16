@@ -78,7 +78,10 @@ def check_security_verdict_deploy_gate(workflow: dict) -> tuple[bool, str]:
         return True, ""
     # String fallback
     if str(verdict).lower() in ("rejected", "failed", "fail"):
-        return False, f"Deploy blocked by security policy verdict: '{verdict}'. Resolve audit findings."
+        return (
+            False,
+            f"Deploy blocked by security policy verdict: '{verdict}'. Resolve audit findings.",
+        )
     return True, ""
 
 

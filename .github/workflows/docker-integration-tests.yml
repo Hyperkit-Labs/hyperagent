@@ -42,7 +42,7 @@ jobs:
           python -m pip install --upgrade pip build
           pip install -e "packages/execution-backend[opensandbox]"
           pip install -r services/orchestrator/requirements.txt
-          pip install httpx pytest pytest-asyncio
+          pip install httpx pytest pytest-asyncio hypothesis
         env:
           ENVIRONMENT: test
 

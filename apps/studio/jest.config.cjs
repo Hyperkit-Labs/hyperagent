@@ -31,6 +31,8 @@ module.exports = {
   watchPathIgnorePatterns: ["<rootDir>/.next/"],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
+    "^@hyperagent/api-contracts$":
+      "<rootDir>/../../packages/api-contracts/src/index.ts",
     "^@hyperagent/config$": "<rootDir>/../../packages/config/dist/index.js",
     "^react$": "<rootDir>/node_modules/react",
     "^react-dom$": "<rootDir>/node_modules/react-dom",

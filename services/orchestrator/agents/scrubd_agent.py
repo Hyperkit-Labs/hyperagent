@@ -5,7 +5,7 @@ import csv
 import logging
 import os
 import re
-import subprocess
+import subprocess  # nosec B404 - fixed subprocess calls with shell=False only
 from pathlib import Path
 from typing import Any
 
@@ -33,21 +33,21 @@ def _ensure_scrubd() -> Path:
 
     base.mkdir(parents=True, exist_ok=True)
     try:
-        subprocess.run(
+        subprocess.run(  # nosec B603,B607 - fixed git invocation, no shell, pinned remote/commit
             ["git", "init", str(base)],
             check=True,
             capture_output=True,
             text=True,
             timeout=30,
         )
-        subprocess.run(
+        subprocess.run(  # nosec B603,B607 - fixed git invocation, no shell, pinned remote/commit
             ["git", "-C", str(base), "remote", "add", "origin", SCRUBD_REPO],
             check=True,
             capture_output=True,
             text=True,
             timeout=30,
         )
-        subprocess.run(
+        subprocess.run(  # nosec B603,B607 - fixed git invocation, no shell, pinned commit fetch
             [
                 "git",
                 "-C",
@@ -63,7 +63,7 @@ def _ensure_scrubd() -> Path:
             text=True,
             timeout=120,
         )
-        subprocess.run(
+        subprocess.run(  # nosec B603,B607 - fixed git invocation, no shell, pinned fetch head checkout
             ["git", "-C", str(base), "checkout", "FETCH_HEAD"],
             check=True,
             capture_output=True,

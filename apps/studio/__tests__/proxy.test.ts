@@ -2,6 +2,20 @@ jest.mock("@hyperagent/config", () => ({
   buildStudioConnectSrcDirective: () => "'self'",
 }));
 
+jest.mock("next/server", () => ({
+  NextResponse: {
+    next: jest.fn(() => ({
+      headers: new Headers(),
+    })),
+    redirect: jest.fn(() => ({
+      headers: new Headers(),
+    })),
+    json: jest.fn(() => ({
+      headers: new Headers(),
+    })),
+  },
+}));
+
 import { getRequestSessionToken } from "@/proxy";
 
 describe("Studio proxy session token resolution", () => {

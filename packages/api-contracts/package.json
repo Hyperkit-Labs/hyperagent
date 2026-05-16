@@ -21,6 +21,7 @@
   "scripts": {
     "generate": "node scripts/generate.mjs",
     "build": "tsc",
+    "prepare": "tsc",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

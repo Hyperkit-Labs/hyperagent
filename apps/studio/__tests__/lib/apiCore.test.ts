@@ -1,4 +1,5 @@
 import {
+  AUTH_ERROR_MESSAGE,
   fetchJson,
   setAuthHeaderProvider,
   setOn401Callback,
@@ -81,11 +82,13 @@ describe("fetchJson request shaping", () => {
       }),
     })) as typeof fetch;
 
+    // Outer catch normalizes 401 to AUTH_ERROR_MESSAGE for consistent UI copy;
+    // on401 still receives the gateway body message below.
     await expect(
       fetchJson("/workflows", {
         invokeGlobal401OnUnauthorized: true,
       }),
-    ).rejects.toThrow("Invalid or expired token");
+    ).rejects.toThrow(AUTH_ERROR_MESSAGE);
 
     expect(on401).toHaveBeenCalledWith({
       path: "/workflows",

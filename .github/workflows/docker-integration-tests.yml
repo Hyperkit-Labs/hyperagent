@@ -49,7 +49,7 @@ jobs:
       - name: Run orchestrator integration tests
         run: |
           cd services/orchestrator
-          pytest tests/ -v --no-cov -x
+          pytest tests/ -v -x
         env:
           DATABASE_URL: postgresql://test_user:test_password@localhost:5432/hyperagent_test
           SKIP_DOCKER_INTEGRATION: "1"

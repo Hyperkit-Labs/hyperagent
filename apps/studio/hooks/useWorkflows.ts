@@ -50,6 +50,7 @@ export function useWorkflows(
 
   const isMounted = useRef(true);
   const fetchController = useRef<AbortController | null>(null);
+  const normalizedNetworkFilter = filters.network?.trim().toLowerCase() ?? "";
 
   // Fetch workflows from API
   const fetchWorkflows = useCallback(
@@ -154,4 +155,3 @@ export function useWorkflows(
     total,
   };
 }
-const normalizedNetworkFilter = filters.network?.trim().toLowerCase() ?? "";

@@ -1,3 +1,7 @@
 #!/usr/bin/env sh
 set -e
-pnpm turbo run test --continue
+# Husky runs hooks with a minimal PATH; `pnpm turbo` can fail to resolve the
+# workspace `turbo` binary on Windows/Git Bash. `cd` to repo root then invoke
+# turbo explicitly via pnpm's exec resolver (matches CI / local `pnpm exec`).
+cd "$(dirname "$0")/.." || exit 1
+exec pnpm exec turbo run test --continue

@@ -3,8 +3,8 @@ x402 enforcement middleware for FastAPI.
 
 Intercepts protected endpoints and enforces the x402 payment protocol:
 1. Checks if endpoint requires payment (via billing.get_endpoint_price)
-2. Internal callers (Studio users with X-User-Id) skip x402; they use credits instead
-3. External callers must provide a payment proof in the X-Payment header
+2. Trusted service-to-service callers may bypass via X-Internal-Token
+3. Browser and external callers must provide a payment proof in the X-Payment header
 4. Validates proof structure, expiry, and replay protection
 5. Returns 402 Payment Required with challenge body if missing/invalid
 

@@ -336,36 +336,6 @@ export async function rateLimitMiddleware(
   const ip = clientRemoteIp(req);
   const userId = req.userId || "";
 
-  const isByokRoute = req.path.startsWith(ApiPaths.byokPrefix);
-  if (isByokRoute) {
-    const limIp = getLimiter(redis, rl.byokMaxIp, rl.windowSec, "byok-ip");
-    const byokIp = await checkLimit(limIp, ip, rl.windowSec);
-    if (
-      !sendLimitOrRedis(req, res, byokIp, {
-        retryAfterSec: rl.windowSec,
-        event: "rate_limit_byok",
-        message: "BYOK key management rate limit exceeded. Try again later.",
-      })
-    ) {
-      return;
-    }
-    if (userId) {
-      const limU = getLimiter(redis, rl.byokMaxUser, rl.windowSec, "byok-user");
-      const byokUser = await checkLimit(limU, userId, rl.windowSec);
-      if (
-        !sendLimitOrRedis(req, res, byokUser, {
-          retryAfterSec: rl.windowSec,
-          event: "rate_limit_byok",
-          message: "BYOK key management rate limit exceeded.",
-        })
-      ) {
-        return;
-      }
-    }
-    next();
-    return;
-  }
-
   const isLlmKeysPost =
     req.method === "POST" &&
     (req.path === LLM_KEYS_PATH || req.path === LLM_KEYS_PATH_LEGACY);

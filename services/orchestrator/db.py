@@ -1142,7 +1142,7 @@ def list_workflow_states(
         def _query(client: Any) -> list[dict[str, Any]]:
             q = (
                 client.table("runs")
-                .select("id, workflow_state, status, created_at")
+                .select("id, workflow_state, status, current_stage, created_at")
                 .order("created_at", desc=True)
                 .limit(min(limit, 500))
             )
@@ -1157,6 +1157,12 @@ def list_workflow_states(
                     state = dict(state)
                     state["workflow_id"] = str(row.get("id", ""))
                     state["run_id"] = str(row.get("id", ""))
+                    if row.get("status"):
+                        state["status"] = row.get("status")
+                    if row.get("current_stage"):
+                        state["current_stage"] = row.get("current_stage")
+                    if row.get("created_at"):
+                        state.setdefault("created_at", row.get("created_at"))
                     out.append(state)
                 elif row.get("id"):
                     out.append(
@@ -1164,6 +1170,7 @@ def list_workflow_states(
                             "workflow_id": str(row["id"]),
                             "run_id": str(row["id"]),
                             "status": row.get("status"),
+                            "current_stage": row.get("current_stage"),
                             "created_at": row.get("created_at"),
                         }
                     )

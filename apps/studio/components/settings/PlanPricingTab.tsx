@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Zap } from "lucide-react";
+import { ApiErrorBanner } from "@/components/ApiErrorBanner";
+import { EmptyState } from "@/components/ui/EmptyState";
 import type { PricingPlan, PricingResource, UsageSummary } from "@/lib/api";
 
 interface PlanPricingTabProps {
@@ -38,20 +40,25 @@ export function PlanPricingTab({
           <span className="text-sm">Loading plan information...</span>
         </div>
       )}
-      {planError && (
-        <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 flex items-center justify-between">
-          <p className="text-xs text-red-400">{planError}</p>
-          <button
-            type="button"
-            onClick={refetchPlan}
-            className="text-xs text-red-400 underline"
-          >
-            Retry
-          </button>
-        </div>
-      )}
+      {planError && <ApiErrorBanner error={planError} onRetry={refetchPlan} />}
       {!planLoading && !planError && (
         <>
+          {!usage && plans.length === 0 && resources.length === 0 && (
+            <EmptyState
+              icon={<Zap className="w-5 h-5" />}
+              title="Plan data unavailable"
+              description="Plan, usage, and pricing data are not configured or did not load for this workspace."
+              action={
+                <button
+                  type="button"
+                  onClick={refetchPlan}
+                  className="mt-2 inline-flex items-center gap-2 rounded-lg btn-primary-gradient px-3 py-1.5 text-xs font-medium"
+                >
+                  Retry
+                </button>
+              }
+            />
+          )}
           {usage && (
             <div className="flex items-center gap-4 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] px-4 py-3">
               <div className="flex-1 min-w-0">

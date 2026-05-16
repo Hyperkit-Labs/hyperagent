@@ -14,6 +14,10 @@ import {
   getPricingUsage,
   getErrorMessage,
 } from "@/lib/api";
+import {
+  CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+  withAsyncTimeout,
+} from "@/lib/runtime-timeouts";
 import type { PricingPlan, PricingResource, UsageSummary } from "@/lib/api";
 
 export interface UsePlanDataOptions {
@@ -45,9 +49,21 @@ export function usePlanData(
     setError(null);
     try {
       const [plansRes, resourcesRes, usageRes] = await Promise.all([
-        getPricingPlans(),
-        getPricingResources(),
-        getPricingUsage(),
+        withAsyncTimeout(
+          getPricingPlans(),
+          CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+          "Pricing plans",
+        ),
+        withAsyncTimeout(
+          getPricingResources(),
+          CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+          "Pricing resources",
+        ),
+        withAsyncTimeout(
+          getPricingUsage(),
+          CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+          "Pricing usage",
+        ),
       ]);
       setPlans(plansRes?.plans ?? []);
       setResources(resourcesRes?.resources ?? []);

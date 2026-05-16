@@ -5,7 +5,11 @@
  * Optional payment hints on 402 only when X402 is enabled and a merchant address exists.
  */
 import type { Request, Response, NextFunction } from "express";
-import { ApiPaths, METERING_EXEMPT_PREFIXES } from "@hyperagent/api-contracts";
+import {
+  ApiPaths,
+  METERING_EXEMPT_PREFIXES,
+  X402_PRICED_PATHS,
+} from "@hyperagent/api-contracts";
 import { getGatewayEnv } from "@hyperagent/config";
 import { getSupabaseAdmin } from "./authBootstrap.js";
 import type { RequestWithUser } from "./auth.js";
@@ -24,6 +28,7 @@ function normalizePath(input: string): string {
 }
 
 const EXEMPT_PREFIXES = [...METERING_EXEMPT_PREFIXES];
+const X402_PRICED_ROUTE_PATHS = new Set(Object.keys(X402_PRICED_PATHS));
 
 /**
  * Exported for unit tests. True when this request should not consume credit preflight.
@@ -39,6 +44,10 @@ export function isMeteringExemptPath(path: string, method: string): boolean {
     if (p === prefix || p.startsWith(`${prefix}/`)) return true;
   }
   return false;
+}
+
+function isX402PricedPath(path: string): boolean {
+  return X402_PRICED_ROUTE_PATHS.has(normalizePath(path));
 }
 
 /** Absolute URL for x402 resource (no PUBLIC_API_BASE_URL — use forwarded host behind proxies). */
@@ -152,7 +161,7 @@ export async function meteringMiddleware(
       normalizePath(req.path || "") ||
       normalizePath((req.baseUrl || "") + (req.path || ""));
 
-    if (isMeteringExemptPath(path, method)) {
+    if (isMeteringExemptPath(path, method) || isX402PricedPath(path)) {
       next();
       return;
     }

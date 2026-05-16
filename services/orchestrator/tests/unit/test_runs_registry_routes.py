@@ -28,6 +28,24 @@ def test_has_unverifiable_trace_rejects_legacy_stub_ids() -> None:
     assert _has_unverifiable_trace([{"trace_blob_id": "stub:run:step:0"}]) is True
 
 
+def test_get_run_api_prefers_current_stage_over_status(monkeypatch) -> None:
+    from api.runs_registry import get_run_api
+
+    monkeypatch.setattr(
+        "api.runs_registry.get_workflow",
+        lambda run_id: {
+            "workflow_id": run_id,
+            "status": "building",
+            "current_stage": "simulation",
+            "created_at": "2026-01-01T00:00:00Z",
+        },
+    )
+
+    result = get_run_api("wf_123")
+    assert result["status"] == "building"
+    assert result["current_stage"] == "simulation"
+
+
 @pytest.mark.asyncio
 async def test_quick_demo_helper_requires_url(monkeypatch) -> None:
     import api.runs_registry as runs_registry

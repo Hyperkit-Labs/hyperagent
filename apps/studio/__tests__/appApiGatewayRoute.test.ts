@@ -35,7 +35,8 @@ describe("Studio gateway route helpers", () => {
     const request = {
       headers: new Headers({
         accept: "*/*",
-        cookie: "hyperagent_session_token=cookie-token; hyperagent_has_session=1",
+        cookie:
+          "hyperagent_session_token=cookie-token; hyperagent_has_session=1",
       }),
     };
     const headers = buildUpstreamHeaders(request);
@@ -54,9 +55,9 @@ describe("Studio gateway route helpers", () => {
     expect(
       sanitizeGatewayPathSegments(["api", "v1", "workspaces", "current"]),
     ).toEqual(["api", "v1", "workspaces", "current"]);
-    expect(() => sanitizeGatewayPathSegments(["api", "..", "workflows"])).toThrow(
-      "gateway.invalid_path_segment",
-    );
+    expect(() =>
+      sanitizeGatewayPathSegments(["api", "..", "workflows"]),
+    ).toThrow("gateway.invalid_path_segment");
     expect(() => sanitizeGatewayPathSegments(["bad segment"])).toThrow(
       "gateway.invalid_path_segment",
     );

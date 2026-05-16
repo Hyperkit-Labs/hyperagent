@@ -79,7 +79,7 @@ def get_run_api(run_id: str, request: Request = None) -> dict[str, Any]:
         "id": w.get("workflow_id"),
         "workflow_id": w.get("workflow_id"),
         "status": w.get("status"),
-        "current_stage": w.get("status"),
+        "current_stage": w.get("current_stage") or w.get("status"),
         "created_at": w.get("created_at"),
     }
 

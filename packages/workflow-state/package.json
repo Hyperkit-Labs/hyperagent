@@ -17,7 +17,7 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "pnpm exec vitest run"
   },
   "dependencies": {
     "xstate": "^5.19.0"

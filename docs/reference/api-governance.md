@@ -28,6 +28,7 @@ Canonical JSON Schemas live under **`packages/schema-registry/`**. Use this for:
 | Workflow / SSE-style events | `workflow-events/v1/` | Pipeline stream events (`data: {...}` JSON) |
 | Storage webhooks | `storage-webhooks/v1/` | Pinata-compatible pin webhook bodies |
 | Agent outputs / traces | `agent-outputs/v1/` | Trace blobs and structured agent outputs |
+| Generated non-REST contracts | `spec-contracts/v1/` | Canonical Pydantic-generated contracts such as Spec Lock |
 
 - **Version folders:** **`v1`**, **`v2`**, … are immutable major lines. Prefer additive changes inside a major version; incompatible shapes get a **new major folder** (`v2/`) rather than silent edits to v1.
 

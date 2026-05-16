@@ -282,7 +282,7 @@ def test_x402_enforce_internal_flag(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_x402_mandatory_v01_disables_internal_bypass() -> None:
-    """X402_MANDATORY_V01=1 must set _X402_MANDATORY_V01=True so internal callers cannot bypass."""
+    """X402_MANDATORY_V01=1 must set _X402_MANDATORY_V01=True for strict launch-mode enforcement."""
     os.environ["X402_MANDATORY_V01"] = "1"
     try:
         import x402_middleware
@@ -295,7 +295,7 @@ def test_x402_mandatory_v01_disables_internal_bypass() -> None:
 
 
 def test_x402_mandatory_v01_off_by_default() -> None:
-    """Without X402_MANDATORY_V01, internal bypass remains active (safe default for dev)."""
+    """Without X402_MANDATORY_V01, strict launch-mode enforcement is off by default."""
     os.environ.pop("X402_MANDATORY_V01", None)
     import x402_middleware
 

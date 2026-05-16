@@ -181,7 +181,11 @@ function AnalyticsContent() {
               <Download className="w-3.5 h-3.5" />
               Export
             </button>
-            <div className="flex gap-1" role="tablist" aria-label="Analytics view">
+            <div
+              className="flex gap-1"
+              role="tablist"
+              aria-label="Analytics view"
+            >
               {Object.entries(VIEW_LABELS).map(([v, { label }]) => (
                 <Link
                   key={v}

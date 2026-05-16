@@ -11,8 +11,13 @@ import { useState, useEffect, useCallback } from "react";
 import {
   getCreditsBalance,
   getSpendingControlWithBudget,
+  getErrorMessage,
   type SpendingControlWithBudget,
 } from "@/lib/api";
+import {
+  CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+  withAsyncTimeout,
+} from "@/lib/runtime-timeouts";
 
 export interface UseSettingsX402DataOptions {
   enabled?: boolean;
@@ -48,17 +53,45 @@ export function useSettingsX402Data(
     setLoading(true);
     setError(null);
     try {
-      const [balanceRes, controlRes] = await Promise.all([
-        getCreditsBalance().catch(() => ({ balance: 0, currency: "USD" })),
-        getSpendingControlWithBudget().catch(() => null),
+      const [balanceRes, controlRes] = await Promise.allSettled([
+        withAsyncTimeout(
+          getCreditsBalance(),
+          CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+          "Credits balance",
+        ),
+        withAsyncTimeout(
+          getSpendingControlWithBudget(),
+          CRITICAL_ROUTE_SETTLE_TIMEOUT_MS,
+          "Spending controls",
+        ),
       ]);
-      setBalance({
-        balance: balanceRes.balance ?? 0,
-        currency: balanceRes.currency ?? "USD",
-      });
-      setControl(controlRes);
+      if (balanceRes.status === "fulfilled") {
+        setBalance({
+          balance: balanceRes.value.balance ?? 0,
+          currency: balanceRes.value.currency ?? "USD",
+        });
+      } else {
+        setBalance(null);
+      }
+      if (controlRes.status === "fulfilled") {
+        setControl(controlRes.value);
+      } else {
+        setControl(null);
+      }
+
+      const failures = [balanceRes, controlRes]
+        .filter(
+          (result): result is PromiseRejectedResult =>
+            result.status === "rejected",
+        )
+        .map((result) =>
+          getErrorMessage(result.reason, "Failed to load x402 data"),
+        );
+      if (failures.length > 0) {
+        setError(failures.join("\n"));
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load x402 data");
+      setError(getErrorMessage(err, "Failed to load x402 data"));
     } finally {
       setLoading(false);
     }

@@ -56,6 +56,7 @@ import {
   TiltedCard,
   ActivityRingCard,
   TableFilterBar,
+  EmptyState,
 } from "@/components/ui";
 import { PageTitle } from "@/components/layout/PageTitle";
 import { RequireApiSession } from "@/components/auth/RequireApiSession";
@@ -87,7 +88,8 @@ function DashboardCTAs({
   function focusItem(nextIndex: number) {
     const items = itemRefs.current.filter(Boolean);
     if (items.length === 0) return;
-    const safeIndex = ((nextIndex % items.length) + items.length) % items.length;
+    const safeIndex =
+      ((nextIndex % items.length) + items.length) % items.length;
     items[safeIndex]?.focus();
   }
 
@@ -154,7 +156,9 @@ function DashboardCTAs({
                   case "ArrowUp":
                     event.preventDefault();
                     focusItem(
-                      currentIndex < 0 ? itemRefs.current.length - 1 : currentIndex - 1,
+                      currentIndex < 0
+                        ? itemRefs.current.length - 1
+                        : currentIndex - 1,
                     );
                     break;
                   case "Home":
@@ -251,7 +255,8 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setDeployTableFilter(
-      searchParams.get("deploy") === "ok" || searchParams.get("deploy") === "bad"
+      searchParams.get("deploy") === "ok" ||
+        searchParams.get("deploy") === "bad"
         ? (searchParams.get("deploy") as "ok" | "bad")
         : "all",
     );
@@ -282,6 +287,12 @@ export default function DashboardPage() {
   }, [recentDeployments, deployTableFilter]);
   const apiError = dashboardError;
   const refetchAll = refetchDashboard;
+  const isDashboardEmpty =
+    !dashboardLoading &&
+    !apiError &&
+    workflows.length === 0 &&
+    deployments.length === 0 &&
+    (metrics?.workflows?.total ?? 0) === 0;
   const trafficData = [
     { name: "Workflows", value: metrics?.workflows?.total ?? 0 },
     { name: "Completed", value: metrics?.workflows?.completed ?? 0 },
@@ -368,6 +379,21 @@ export default function DashboardPage() {
                   setQuickDemoError(null);
                 }}
               />
+              {isDashboardEmpty && (
+                <EmptyState
+                  icon={<Rocket className="w-5 h-5" />}
+                  title="No activity yet"
+                  description="This workspace has no workflows or deployments yet. Start from chat or create your first workflow to populate the dashboard."
+                  action={
+                    <Link
+                      href={ROUTES.HOME}
+                      className="mt-2 inline-flex items-center gap-2 rounded-lg btn-primary-gradient px-3 py-1.5 text-xs font-medium"
+                    >
+                      Open chat
+                    </Link>
+                  }
+                />
+              )}
               <OnboardingChecklist
                 onConnectClick={() => {
                   if (client) void connect(getConnectConfig(client));

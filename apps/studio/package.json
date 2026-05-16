@@ -88,6 +88,7 @@
   "devDependencies": {
     "@babel/core": "^7.26.0",
     "@babel/runtime": "^7.28.0",
+    "@next/env": "16.2.6",
     "lightningcss-win32-x64-msvc": "1.31.1",
     "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4.2.1",

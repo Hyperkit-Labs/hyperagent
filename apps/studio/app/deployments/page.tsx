@@ -9,11 +9,7 @@ import { useDeployments } from "@/hooks/useDeployments";
 import { Rocket } from "lucide-react";
 import { ShimmerTableRows } from "@/components/ai-elements";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
-import {
-  MetricCard,
-  StatusBadge,
-  TableFilterBar,
-} from "@/components/ui";
+import { MetricCard, StatusBadge, TableFilterBar } from "@/components/ui";
 import { DeploymentDetails } from "./DeploymentDetails";
 import { cn } from "@/lib/utils";
 

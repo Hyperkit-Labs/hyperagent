@@ -23,7 +23,6 @@ describe("isKnownGatewayPath", () => {
     "/health/signin",
     "/health/live",
     "/api/v1/workflows",
-    "/api/v1/byok/validate",
     "/config",
     "/platform/track-record",
     "/workspaces/current/llm-keys",

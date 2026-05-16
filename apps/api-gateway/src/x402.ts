@@ -4,11 +4,9 @@
  * Architecture:
  *   External agents → x402 challenge (402) → ERC-3009 proof → orchestrator verifies
  *                                                            → PayAI facilitator settles
- *   Internal Studio users (JWT) → skip x402 → credits system → orchestrator
+ *   Studio users (JWT)          → same x402 challenge / proof flow → orchestrator
  *
- * Only applies to priced endpoints listed in PRICED_ROUTES. Internal callers
- * identified by X-User-Id (set by authMiddleware after JWT validation) bypass
- * the x402 gate and use the credit system instead.
+ * Only applies to priced endpoints listed in PRICED_ROUTES.
  */
 
 import type { RoutesConfig } from "@x402/core/server";
@@ -54,18 +52,6 @@ const X402_ENABLED = !!X402_PAY_TO_ADDRESS && x402EnabledFromEnv();
 
 function normalizePath(req: Request): string {
   return req.path.replace(/\/$/, "");
-}
-
-/**
- * Returns true if the caller is an internal Studio user (has a JWT-issued
- * X-User-Id set by authMiddleware). Internal callers use the credit system.
- */
-function isInternalCaller(req: Request): boolean {
-  const userId =
-    (req.headers["x-user-id"] as string | undefined) ?? "";
-  const internalToken =
-    (req.headers["x-internal-token"] as string | undefined) ?? "";
-  return !!(userId.trim() || internalToken.trim());
 }
 
 /**
@@ -220,7 +206,7 @@ let _initPromise: Promise<void> | null = null;
  *   X-Payment present → pass through to orchestrator (which verifies + settles
  *                        via PayAI facilitator in x402_middleware.py)
  *
- * Internal Studio users (identified by X-User-Id from JWT) bypass entirely.
+ * All callers on priced routes go through the same challenge / proof path.
  */
 export function x402GatewayMiddleware(
   req: Request,
@@ -228,9 +214,6 @@ export function x402GatewayMiddleware(
   next: NextFunction,
 ): void {
   if (!X402_ENABLED) return next();
-
-  // Skip x402 for internal callers — they use the credit system.
-  if (isInternalCaller(req)) return next();
 
   const path = normalizePath(req);
   if (!PRICED_ROUTES[path]) return next();

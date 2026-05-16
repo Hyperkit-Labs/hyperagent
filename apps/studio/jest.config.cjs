@@ -1,10 +1,8 @@
 /* CommonJS Jest config: use .cjs so ESLint (no-require-imports) does not apply. */
 const path = require("path");
-// pnpm nests `@next/env` under `next`; a bare `require("@next/env")` is not always hoisted.
-const nextDir = path.dirname(
-  require.resolve("next/package.json", { paths: [__dirname] }),
-);
-const { loadEnvConfig } = require(path.join(nextDir, "..", "@next", "env"));
+// Direct `devDependency` on `@next/env` (aligned with `next`) so pnpm + Jest resolve
+// reliably on Windows; avoid fragile paths into `.pnpm/next@…/node_modules`.
+const { loadEnvConfig } = require("@next/env");
 
 const studioDir = __dirname;
 const monorepoRoot = path.join(studioDir, "../..");

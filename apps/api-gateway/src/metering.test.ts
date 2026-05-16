@@ -3,7 +3,7 @@ import { resetGatewayEnvForTests } from "@hyperagent/config";
 import { isMeteringEnforced, isMeteringExemptPath } from "./metering.js";
 
 describe("metering", () => {
-  it("isMeteringExemptPath exempts credits, payments, llm-keys, byok", () => {
+  it("isMeteringExemptPath exempts credits, payments, and llm-keys", () => {
     expect(isMeteringExemptPath("/api/v1/auth/bootstrap", "POST")).toBe(true);
     // bare /auth/bootstrap is NOT mounted in the gateway (only /api/v1/auth/bootstrap
     // is mounted); the dead prefix was removed from METERING_EXEMPT_PREFIXES as part
@@ -17,7 +17,6 @@ describe("metering", () => {
         "POST",
       ),
     ).toBe(true);
-    expect(isMeteringExemptPath("/api/v1/byok/status", "GET")).toBe(true);
     expect(isMeteringExemptPath("/api/v1/config", "GET")).toBe(true);
     expect(isMeteringExemptPath("/config", "GET")).toBe(true);
     expect(isMeteringExemptPath("/config/integrations-debug", "GET")).toBe(
@@ -31,7 +30,7 @@ describe("metering", () => {
     expect(isMeteringExemptPath("/tokens/stablecoins", "GET")).toBe(true);
   });
 
-  it("exempts read-only GETs but not mutating workflow writes", () => {
+  it("exempts read-only GETs and leaves priced writes to runtime x402 routing", () => {
     expect(isMeteringExemptPath("/api/v1/workflows", "GET")).toBe(true);
     expect(isMeteringExemptPath("/api/v1/workflows?limit=10", "GET")).toBe(
       true,

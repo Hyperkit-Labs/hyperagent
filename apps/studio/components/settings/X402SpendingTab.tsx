@@ -4,8 +4,10 @@ import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { Zap, ExternalLink } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
+import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { CreditsCard } from "@/components/settings/CreditsCard";
 import { SpendingControlCard } from "@/components/settings/SpendingControlCard";
+import { EmptyState } from "@/components/ui/EmptyState";
 import type { RuntimeConfig } from "@/lib/api";
 import type { SpendingControlWithBudget } from "@/lib/api";
 
@@ -62,19 +64,26 @@ export function X402SpendingTab({
         </div>
       )}
       {x402Error && !x402Loading && (
-        <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 flex items-center justify-between">
-          <p className="text-xs text-red-400">{x402Error}</p>
-          <button
-            type="button"
-            onClick={() => void refetchX402()}
-            className="text-xs text-red-400 underline"
-          >
-            Retry
-          </button>
-        </div>
+        <ApiErrorBanner error={x402Error} onRetry={() => void refetchX402()} />
       )}
       {!x402Loading && (
         <>
+          {!x402Error && !x402Balance && !x402Control && (
+            <EmptyState
+              icon={<Zap className="w-5 h-5" />}
+              title="x402 data unavailable"
+              description="Credits balance and spending controls did not load. Retry or open the Payments route for more detail."
+              action={
+                <button
+                  type="button"
+                  onClick={() => void refetchX402()}
+                  className="mt-2 inline-flex items-center gap-2 rounded-lg btn-primary-gradient px-3 py-1.5 text-xs font-medium"
+                >
+                  Retry
+                </button>
+              }
+            />
+          )}
           <div className="flex items-center justify-between gap-4 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] px-4 py-3">
             <div className="flex items-center gap-2">
               <span

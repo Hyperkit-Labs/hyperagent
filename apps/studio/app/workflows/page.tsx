@@ -570,7 +570,9 @@ export default function WorkflowsPage() {
                                       {w.intent?.slice(0, 32) ||
                                         w.name ||
                                         "Untitled"}
-                                      {(w.intent?.length || 0) > 32 ? "..." : ""}
+                                      {(w.intent?.length || 0) > 32
+                                        ? "..."
+                                        : ""}
                                     </motion.h3>
                                   </Link>
                                   <div className="text-[10px] text-[var(--color-text-tertiary)]">
@@ -713,9 +715,9 @@ export default function WorkflowsPage() {
                                 href={ROUTES.WORKFLOW_ID(w.workflow_id)}
                                 aria-label={`Open workflow ${w.intent?.slice(0, 32) || w.name || w.workflow_id} in Studio`}
                                 className="btn-primary-gradient px-4 py-1.5 rounded-full text-xs font-medium text-white transition-all hover:scale-105 w-fit"
-                                onClick={(e: ReactMouseEvent<HTMLAnchorElement>) =>
-                                  e.stopPropagation()
-                                }
+                                onClick={(
+                                  e: ReactMouseEvent<HTMLAnchorElement>,
+                                ) => e.stopPropagation()}
                               >
                                 Open in Studio
                               </Link>

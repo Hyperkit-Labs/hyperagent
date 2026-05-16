@@ -14,7 +14,7 @@ describe("gateway ↔ api-paths contract", () => {
     expect(GATEWAY_PUBLIC_PATHS).toContain(ApiPaths.platformTrackRecord);
   });
 
-  it("metering exempts BYOK and credits", () => {
+  it("metering exempts workspace llm-keys and credits", () => {
     expect(METERING_EXEMPT_PREFIXES).toContain(ApiPaths.authBootstrap);
     expect(METERING_EXEMPT_PREFIXES).toContain(
       ApiPaths.workspacesCurrentLlmKeys,

@@ -15,7 +15,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "prepare": "tsc -p tsconfig.json",
-    "test": "vitest run",
+    "test": "pnpm exec vitest run",
     "typecheck": "tsc -p tsconfig.test.json --noEmit"
   },
   "dependencies": {

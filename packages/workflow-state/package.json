@@ -20,7 +20,7 @@
     "test": "pnpm exec vitest run"
   },
   "dependencies": {
-    "xstate": "^5.19.0"
+    "xstate": "^5.31.1"
   },
   "peerDependencies": {
     "@xstate/react": "^5.0.0",
